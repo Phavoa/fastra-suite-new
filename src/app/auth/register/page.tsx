@@ -57,7 +57,7 @@ const LeftHero: React.FC = () => {
           style={{ lineHeight: 1.12 }}
         >
           Maximize the Planning of Projects with
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3B7CED] to-[#4169E1]">
+          <span className="text-transparent bg-clip-text bg-linear-to-r from-[#3B7CED] to-[#4169E1]">
             <span className="text-transparent"> Fastra Suite</span>
           </span>
         </h1>
