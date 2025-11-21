@@ -11,30 +11,39 @@ import {
   REGISTER,
 } from "redux-persist";
 import { authApi } from "../../api/authApi";
+import { userApi } from "../../api/userApi";
+import { productsApi } from "../../api/purchase/products";
+import { unitOfMeasureApi } from "../../api/purchase/unitOfMeasure";
+import authReducer from "./authSlice";
 
-const persistConfig = {
-  key: "root",
+const authPersistConfig = {
+  key: "auth",
   storage,
 };
 
-// Temporary identity reducer to satisfy Redux requirements
-const dummyReducer = (state = {}, action: unknown) => state;
+const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
 
 const rootReducer = combineReducers({
-  dummy: dummyReducer,
+  auth: persistedAuthReducer,
   [authApi.reducerPath]: authApi.reducer,
+  [userApi.reducerPath]: userApi.reducer,
+  [productsApi.reducerPath]: productsApi.reducer,
+  [unitOfMeasureApi.reducerPath]: unitOfMeasureApi.reducer,
 });
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
-
 export const store = configureStore({
-  reducer: persistedReducer,
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) => {
     return getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(authApi.middleware);
+    }).concat(
+      authApi.middleware,
+      userApi.middleware,
+      productsApi.middleware,
+      unitOfMeasureApi.middleware
+    );
   },
 });
 

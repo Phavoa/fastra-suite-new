@@ -175,3 +175,14 @@
     animation: checkmarkDraw 0.6s ease-out 0.6s both;
   }
 }
+
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
+  }
+}

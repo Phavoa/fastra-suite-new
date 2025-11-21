@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLoginMutation } from "@/api/authApi";
+import { useDispatch } from "react-redux";
+import { setAuthData } from "@/lib/store/authSlice";
+import { useRouter } from "next/navigation";
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 6 characters"),
@@ -29,6 +32,8 @@ const LoginPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [login, { isLoading: isLoggingIn }] = useLoginMutation();
+  const dispatch = useDispatch();
+  const router = useRouter();
 
   const {
     register,
@@ -43,7 +48,34 @@ const LoginPage: NextPage = () => {
     setError(null);
     try {
       const result = await login(data).unwrap();
+      console.log(result);
+      dispatch(
+        setAuthData({
+          user: result.user,
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+          tenant_id: result.tenant_id,
+          tenant_schema_name: result.tenant_schema_name,
+          tenant_company_name: result.tenant_company_name,
+          isOnboarded: result.isOnboarded,
+          user_accesses: result.user_accesses,
+        })
+      );
+
+      // Set httpOnly cookie via API route for security
+      await fetch("/api/auth/set-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+        }),
+      });
+
       setSubmittedId(result.user.username || "success");
+      router.push("/");
     } catch (err) {
       const error = err as { data?: { detail?: string } };
       setError(error?.data?.detail || "Failed to login. Please try again.");
