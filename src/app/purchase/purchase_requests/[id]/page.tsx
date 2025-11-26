@@ -181,8 +181,6 @@ const Page = () => {
         </FadeIn>
 
         <div className="flex items-start gap-8">
-          {/* Avatar with scale animation */}
-
           {/* Content: rows with separators */}
           <div className="flex-1">
             {/* Row 1 (first 3 fields) */}

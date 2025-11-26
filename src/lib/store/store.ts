@@ -16,6 +16,7 @@ import { productsApi } from "../../api/purchase/productsApi";
 import { unitOfMeasureApi } from "../../api/purchase/unitOfMeasureApi";
 import { vendorsApi } from "../../api/purchase/vendorsApi";
 import { purchaseRequestApi } from "../../api/purchase/purchaseRequestApi";
+import { currencyApi } from "../../api/purchase/currencyApi";
 import authReducer from "./authSlice";
 
 const authPersistConfig = {
@@ -33,6 +34,7 @@ const rootReducer = combineReducers({
   [unitOfMeasureApi.reducerPath]: unitOfMeasureApi.reducer,
   [vendorsApi.reducerPath]: vendorsApi.reducer,
   [purchaseRequestApi.reducerPath]: purchaseRequestApi.reducer,
+  [currencyApi.reducerPath]: currencyApi.reducer,
 });
 
 export const store = configureStore({
@@ -48,7 +50,8 @@ export const store = configureStore({
       productsApi.middleware,
       unitOfMeasureApi.middleware,
       vendorsApi.middleware,
-      purchaseRequestApi.middleware
+      purchaseRequestApi.middleware,
+      currencyApi.middleware
     );
   },
 });
