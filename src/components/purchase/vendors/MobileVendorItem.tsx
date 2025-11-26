@@ -2,27 +2,27 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Product } from "../../../app/purchase/products/types";
+import { Vendor } from "../../../types/purchase";
 
-interface MobileProductItemProps {
-  product: Product;
+interface MobileVendorItemProps {
+  vendor: Vendor;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
 }
 
-export function MobileProductItem({
-  product,
+export function MobileVendorItem({
+  vendor,
   isSelected,
   onToggleSelect,
-}: MobileProductItemProps) {
+}: MobileVendorItemProps) {
   const router = useRouter();
 
   const handleRowClick = () => {
-    router.push(`/purchase/products/${product.id}`);
+    router.push(`/purchase/vendors/${vendor.id}`);
   };
 
   const handleCheckboxChange = (checked: boolean) => {
-    onToggleSelect(product.id);
+    onToggleSelect(vendor.id);
   };
 
   return (
@@ -39,7 +39,7 @@ export function MobileProductItem({
     >
       <div className="flex-shrink-0">
         <Checkbox
-          id={`cb-${product.id}`}
+          id={`cb-${vendor.id}`}
           checked={isSelected}
           onCheckedChange={handleCheckboxChange}
           className="transition-all duration-200"
@@ -53,14 +53,14 @@ export function MobileProductItem({
             whileHover={{ color: "#1e293b" }}
             transition={{ duration: 0.2 }}
           >
-            {product.name}
+            {vendor.name}
           </motion.div>
           <motion.div
             className="text-sm text-slate-600"
             whileHover={{ color: "#475569" }}
             transition={{ duration: 0.2 }}
           >
-            {product.quantity}
+            {vendor.email}
           </motion.div>
         </div>
         <motion.div
@@ -68,7 +68,7 @@ export function MobileProductItem({
           whileHover={{ color: "#64748b" }}
           transition={{ duration: 0.2 }}
         >
-          {product.category}
+          {vendor.phone} • {vendor.address}
         </motion.div>
       </div>
     </motion.li>

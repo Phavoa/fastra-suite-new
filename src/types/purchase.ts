@@ -36,3 +36,25 @@ export type BreadcrumbItem = {
 };
 
 export type ViewType = "grid" | "list";
+
+// Local UI Vendor type (matches existing component interface)
+export type Vendor = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  profile_picture?: string;
+};
+
+// API Vendor type (from the actual API response)
+export interface ApiVendor {
+  url: string;
+  id: number;
+  company_name: string;
+  profile_picture: string;
+  email: string;
+  address: string;
+  phone_number: string;
+  is_hidden: boolean;
+}

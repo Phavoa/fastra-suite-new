@@ -73,7 +73,8 @@ export default function Page() {
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
-    { label: "Products", href: "/purchase/products", current: true },
+    { label: "Purchase Request", href: "/purchase/products" },
+    { label: "New", href: "/purchase/products/new", current: true },
   ];
 
   // Avatar upload state
@@ -166,7 +167,7 @@ export default function Page() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <PageHeader items={items} title="New Product" />
+        <PageHeader items={items} title="New Purchase Request" />
       </motion.div>
 
       {/* Main form area */}

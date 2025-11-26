@@ -5,17 +5,16 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import Breadcrumbs from "../../../components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
+
+import { ActionBar } from "../../../components/purchase/vendors/index";
 import {
-  ActionBar,
-  ProductsTable,
-  ProductsTableSkeleton,
-  type BreadcrumbItem,
-} from "../../../components/purchase/products/index";
-import {
-  useGetProductsQuery,
-  type Product as ApiProduct,
-} from "../../../api/purchase/productsApi";
-import type { Product } from "../../../types/purchase";
+  useGetVendorsQuery,
+  type Vendor as ApiVendor,
+} from "../../../api/purchase/vendorsApi";
+import type { BreadcrumbItem, Vendor } from "../../../types/purchase";
+import { ProductsTableSkeleton } from "@/components/purchase/vendors/VendorTableSkeleton";
+import { VendorTable } from "@/components/purchase/vendors/VendorTable";
+import { VendorCards } from "@/components/purchase/vendors/VendorCards";
 
 export default function Page() {
   const [currentView, setCurrentView] = React.useState<"grid" | "list">("list");
@@ -31,35 +30,39 @@ export default function Page() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch products with search parameter
+  // Fetch vendors with search parameter
   const {
-    data: apiProducts,
+    data: apiVendors,
     isLoading,
     error,
-  } = useGetProductsQuery(debouncedSearch ? { search: debouncedSearch } : {});
+  } = useGetVendorsQuery(debouncedSearch ? { search: debouncedSearch } : {});
 
-  // Map API products to local Product type
-  const products: Product[] = React.useMemo(() => {
-    if (!apiProducts) return [];
-    return apiProducts.map(
-      (apiProduct: {
+  // Map API vendors to local Vendor type
+  const vendors: Vendor[] = React.useMemo(() => {
+    if (!apiVendors) return [];
+    return apiVendors.map(
+      (apiVendor: {
         id: number;
-        product_name: string;
-        product_category: string;
-        available_product_quantity: string;
+        company_name: string;
+        profile_picture: string;
+        email: string;
+        phone_number: string;
+        address: string;
       }) => ({
-        id: String(apiProduct.id),
-        name: apiProduct.product_name,
-        category: apiProduct.product_category,
-        quantity: parseInt(apiProduct.available_product_quantity) || 0,
+        id: String(apiVendor.id),
+        name: apiVendor.company_name,
+        email: apiVendor.email,
+        phone: apiVendor.phone_number,
+        address: apiVendor.address,
+        profile_picture: apiVendor.profile_picture,
       })
     );
-  }, [apiProducts]);
+  }, [apiVendors]);
 
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
-    { label: "Products", href: "/purchase/products", current: true },
+    { label: "vendors", href: "/purchase/vendors", current: true },
   ];
 
   const handleViewChange = (view: "grid" | "list") => {
@@ -101,7 +104,7 @@ export default function Page() {
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
       >
         <ActionBar
-          href={"/purchase/products/new"}
+          href={"/purchase/vendors/new"}
           currentView={currentView}
           onViewChange={handleViewChange}
           searchTerm={searchTerm}
@@ -120,11 +123,17 @@ export default function Page() {
         ) : error ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-red-500">
-              Error loading products. Please try again.
+              Error loading vendors. Please try again.
             </div>
           </div>
         ) : (
-          <ProductsTable products={products} />
+          <>
+            {currentView === "grid" ? (
+              <VendorCards vendors={vendors} />
+            ) : (
+              <VendorTable vendors={vendors} />
+            )}
+          </>
         )}
       </motion.section>
     </motion.main>

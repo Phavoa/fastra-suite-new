@@ -12,8 +12,10 @@ import {
 } from "redux-persist";
 import { authApi } from "../../api/authApi";
 import { userApi } from "../../api/userApi";
-import { productsApi } from "../../api/purchase/products";
-import { unitOfMeasureApi } from "../../api/purchase/unitOfMeasure";
+import { productsApi } from "../../api/purchase/productsApi";
+import { unitOfMeasureApi } from "../../api/purchase/unitOfMeasureApi";
+import { vendorsApi } from "../../api/purchase/vendorsApi";
+import { purchaseRequestApi } from "../../api/purchase/purchaseRequestApi";
 import authReducer from "./authSlice";
 
 const authPersistConfig = {
@@ -29,6 +31,8 @@ const rootReducer = combineReducers({
   [userApi.reducerPath]: userApi.reducer,
   [productsApi.reducerPath]: productsApi.reducer,
   [unitOfMeasureApi.reducerPath]: unitOfMeasureApi.reducer,
+  [vendorsApi.reducerPath]: vendorsApi.reducer,
+  [purchaseRequestApi.reducerPath]: purchaseRequestApi.reducer,
 });
 
 export const store = configureStore({
@@ -42,7 +46,9 @@ export const store = configureStore({
       authApi.middleware,
       userApi.middleware,
       productsApi.middleware,
-      unitOfMeasureApi.middleware
+      unitOfMeasureApi.middleware,
+      vendorsApi.middleware,
+      purchaseRequestApi.middleware
     );
   },
 });

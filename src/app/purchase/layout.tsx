@@ -1,4 +1,4 @@
-import { TopNav } from "@/components/purchase";
+import { TopNav } from "@/components/purchase/purchaseRequest";
 import React from "react";
 
 export default function PurchaseLayout({

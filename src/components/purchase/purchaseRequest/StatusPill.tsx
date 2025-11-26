@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Status } from "./types";
+import { Status } from "../types";
 
 const STATUS_MAP: Record<Status, { bg: string; text: string }> = {
   approved: { bg: "bg-[#D4F4DD]", text: "text-[#0D894F]" },

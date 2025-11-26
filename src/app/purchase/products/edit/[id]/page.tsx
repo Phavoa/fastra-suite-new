@@ -1,26 +1,27 @@
 "use client";
 
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, ChangeEvent, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
-import { ProductImageUpload } from "@/components/purchase/products/ProductImageUpload";
-import { ProductFormFields } from "@/components/purchase/products/ProductFormFields";
 import { ProductFormActions } from "@/components/purchase/products/ProductFormActions";
 import { BreadcrumbItem } from "@/types/purchase";
+import { EditProductImageUpload } from "@/components/purchase/products/EditProductImageUpload";
+import { EditProductFormFields } from "@/components/purchase/products/EditProductFormFields";
+import {
+  useGetProductQuery,
+  usePatchProductMutation,
+} from "@/api/purchase/productsApi";
+import { useGetUnitOfMeasuresQuery } from "@/api/purchase/unitOfMeasureApi";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 
 type Option = { value: string; label: string };
 
 const CATEGORY_OPTIONS: Option[] = [
-  { value: "food", label: "Food & Beverages" },
-  { value: "office", label: "Office Supplies" },
-  { value: "electronics", label: "Electronics" },
-];
-
-const UNIT_OPTIONS: Option[] = [
-  { value: "pcs", label: "Pieces (pcs)" },
-  { value: "kg", label: "Kilogram (kg)" },
-  { value: "ltr", label: "Liters (ltr)" },
+  { value: "consumable", label: "Consumable" },
+  { value: "stockable", label: "Stockable" },
+  { value: "service-product", label: "Service Product" },
 ];
 
 type ProductFormData = {
@@ -34,6 +35,31 @@ type ProductFormData = {
 
 export default function Page() {
   const router = useRouter();
+  const params = useParams();
+  const productId = params.id as string;
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // API hooks
+  const {
+    data: product,
+    isLoading: isLoadingProduct,
+    error: productError,
+  } = useGetProductQuery(parseInt(productId));
+  const [patchProduct, { isLoading: isUpdating }] = usePatchProductMutation();
+
+  // Unit of measure data
+  const {
+    data: unitOfMeasures,
+    isLoading: isLoadingUnits,
+    error: unitsError,
+  } = useGetUnitOfMeasuresQuery({});
+
+  // Transform unit of measures to options format
+  const UNIT_OPTIONS: Option[] =
+    unitOfMeasures?.map((unit) => ({
+      value: unit.unit_name,
+      label: `${unit.unit_name} (${unit.unit_symbol})`,
+    })) || [];
 
   // Form state
   const [formData, setFormData] = useState<ProductFormData>({
@@ -45,14 +71,41 @@ export default function Page() {
     unit: "",
   });
 
+  // Notification state
+  const [notification, setNotification] = useState<{
+    type: "success" | "error" | "";
+    message: string;
+  }>({ type: "", message: "" });
+
+  const showNotification =
+    notification.type !== "" && notification.message !== "";
+
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
     { label: "Products", href: "/purchase/products", current: true },
+    { label: "Edit Product", href: "", current: true },
   ];
 
   // Avatar upload state
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+
+  // Populate form when product data is loaded
+  useEffect(() => {
+    if (product) {
+      // Use a microtask to avoid the synchronous setState warning
+      Promise.resolve().then(() => {
+        setFormData({
+          name: product.product_name,
+          description: product.product_description,
+          available: parseInt(product.available_product_quantity) || 0,
+          totalPurchased: parseInt(product.total_quantity_purchased) || 0,
+          category: product.product_category,
+          unit: product.unit_of_measure_details?.unit_name || "",
+        });
+      });
+    }
+  }, [product, unitOfMeasures]);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -61,21 +114,156 @@ export default function Page() {
     setAvatarSrc(url);
   }
 
-  function handleFormChange(
-    field: keyof ProductFormData,
-    value: string | number | ""
-  ) {
+  function handleFormChange(field: string, value: string | number | "") {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleCreate(e: React.FormEvent) {
+  async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
-    // Mock submit action
-    const payload = { ...formData };
-    // Here you would call an API. For demo we just log and navigate back.
-    // eslint-disable-next-line no-console
-    console.log("Create product", payload);
-    router.push("/");
+
+    if (!product) {
+      setNotification({ type: "error", message: "Product data not loaded" });
+      return;
+    }
+
+    try {
+      // Prepare the update data
+      const updateData = {
+        product_name: formData.name,
+        product_description: formData.description,
+        product_category: formData.category as "consumable" | string,
+        unit_of_measure: product.unit_of_measure, // Keep the same unit of measure
+      };
+
+      await patchProduct({
+        id: parseInt(productId),
+        data: updateData,
+      }).unwrap();
+
+      setNotification({
+        type: "success",
+        message: "Product updated successfully!",
+      });
+
+      // Navigate back to products page after a short delay
+      setTimeout(() => {
+        router.push("/purchase/products");
+      }, 1500);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      setNotification({
+        type: "error",
+        message: "Failed to update product. Please try again.",
+      });
+    }
+  }
+
+  // Show loading state while fetching product
+  if (isLoadingProduct) {
+    return (
+      <motion.div
+        className="h-full text-gray-900 font-sans antialiased"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <PageHeader items={items} title="Edit Product" />
+        </motion.div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Show loading state while fetching unit of measures
+  if (isLoadingUnits) {
+    return (
+      <motion.div
+        className="h-full text-gray-900 font-sans antialiased"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <PageHeader items={items} title="Edit Product" />
+        </motion.div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Show error state if unit of measures failed to load
+  if (unitsError) {
+    return (
+      <motion.div
+        className="h-full text-gray-900 font-sans antialiased"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <PageHeader items={items} title="Edit Product" />
+        </motion.div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Failed to load unit of measures</p>
+            <button
+              onClick={() => router.push("/purchase/products")}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Back to Products
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Show error state if product failed to load
+  if (productError) {
+    return (
+      <motion.div
+        className="h-full text-gray-900 font-sans antialiased"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <PageHeader items={items} title="Edit Product" />
+        </motion.div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Failed to load product details</p>
+            <button
+              onClick={() => router.push("/purchase/products")}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Back to Products
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
   }
 
   return (
@@ -90,7 +278,7 @@ export default function Page() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <PageHeader items={items} title="New Product" />
+        <PageHeader items={items} title="Edit Product" />
       </motion.div>
 
       {/* Main form area */}
@@ -100,7 +288,15 @@ export default function Page() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
       >
-        <form onSubmit={handleCreate} className="bg-white">
+        {/* Notification */}
+        <ToastNotification
+          message={notification.message}
+          type={notification.type as "success" | "error"}
+          show={showNotification}
+          onClose={() => setNotification({ type: "", message: "" })}
+        />
+
+        <form ref={formRef} onSubmit={handleUpdate} className="bg-white">
           <motion.h2
             className="text-lg font-medium text-blue-500 mb-6"
             initial={{ opacity: 0, x: -20 }}
@@ -116,7 +312,7 @@ export default function Page() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: "easeOut", delay: 0.4 }}
           >
-            <ProductImageUpload
+            <EditProductImageUpload
               avatarSrc={avatarSrc}
               onImageChange={handleFileChange}
             />
@@ -128,11 +324,12 @@ export default function Page() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.5 }}
           >
-            <ProductFormFields
+            <EditProductFormFields
               formData={formData}
               onChange={handleFormChange}
               categoryOptions={CATEGORY_OPTIONS}
               unitOptions={UNIT_OPTIONS}
+              isLoadingUnits={isLoadingUnits}
             />
           </motion.div>
 
@@ -143,8 +340,9 @@ export default function Page() {
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
           >
             <ProductFormActions
-              onSubmit={handleCreate}
-              submitText="Edit Product"
+              formRef={formRef}
+              submitText={isUpdating ? "Updating..." : "Update Product"}
+              isLoading={isUpdating}
             />
           </motion.div>
         </form>

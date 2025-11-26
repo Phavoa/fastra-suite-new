@@ -2,19 +2,19 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
-interface ProductFormActionsProps {
+interface VendorFormActionsProps {
   onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
   submitText?: string;
   isLoading?: boolean;
   formRef?: React.RefObject<HTMLFormElement | null>;
 }
 
-export function ProductFormActions({
+export function VendorFormActions({
   onSubmit,
-  submitText = "Create Product",
+  submitText = "Create Vendor",
   isLoading = false,
   formRef,
-}: ProductFormActionsProps) {
+}: VendorFormActionsProps) {
   const handleClick = () => {
     if (formRef?.current) {
       formRef.current.requestSubmit();
@@ -24,7 +24,7 @@ export function ProductFormActions({
   return (
     <>
       {/* Spacer area to mimic design whitespace */}
-      <div className="h-28" />
+      <div className="h-10" />
 
       {/* Bottom action area - fixed to bottom right */}
       <motion.div

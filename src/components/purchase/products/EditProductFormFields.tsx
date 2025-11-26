@@ -45,7 +45,7 @@ interface SimpleProps {
 
 type ProductFormFieldsProps = ReactHookFormProps | SimpleProps;
 
-export function ProductFormFields(props: ProductFormFieldsProps) {
+export function EditProductFormFields(props: ProductFormFieldsProps) {
   // Check if we're using react-hook-form props or simple props
   const isReactHookForm = "register" in props;
 

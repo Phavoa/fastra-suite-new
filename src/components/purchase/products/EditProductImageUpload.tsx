@@ -5,13 +5,11 @@ import { Pencil } from "lucide-react";
 interface ProductImageUploadProps {
   avatarSrc: string | null;
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  isBase64?: boolean; // true if avatarSrc is a base64 string, false if it's a URL
 }
 
-export function ProductImageUpload({
+export function EditProductImageUpload({
   avatarSrc,
   onImageChange,
-  isBase64 = false,
 }: ProductImageUploadProps) {
   return (
     <motion.div
@@ -37,9 +35,7 @@ export function ProductImageUpload({
           >
             {avatarSrc ? (
               <motion.img
-                src={
-                  isBase64 ? `data:image/png;base64,${avatarSrc}` : avatarSrc
-                }
+                src={avatarSrc}
                 alt="Product"
                 className="w-24 h-24 object-cover rounded-full"
                 initial={{ scale: 0.8, opacity: 0 }}

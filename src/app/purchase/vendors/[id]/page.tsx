@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/purchase/products";
 import { BreadcrumbItem } from "@/types/purchase";
-import { useGetProductQuery } from "@/api/purchase/productsApi";
+import { useGetVendorQuery } from "@/api/purchase/vendorsApi";
 import {
   FadeIn,
   SlideUp,
@@ -13,48 +13,57 @@ import {
   Interactive,
 } from "@/components/shared/AnimatedWrapper";
 import Image from "next/image";
-import React from "react";
+import React, { useEffect } from "react";
 
 const items: BreadcrumbItem[] = [
   { label: "Home", href: "/" },
   { label: "Purchase", href: "/purchase" },
-  { label: "Products", href: "/purchase/products", current: true },
+  { label: "Vendors", href: "/purchase/vendors", current: true },
 ];
 
 const Page = () => {
   const params = useParams();
-  const productId = parseInt(params.id as string);
+  const vendorId = parseInt(params.id as string);
 
-  const { data: product, isLoading, error } = useGetProductQuery(productId);
+  const {
+    data: vendor,
+    isLoading,
+    error,
+    refetch,
+  } = useGetVendorQuery(vendorId);
+
+  useEffect(() => {
+    refetch();
+  }, [vendorId, refetch]);
 
   if (isLoading) {
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <PageHeader
           items={items}
-          title="Product Details"
-          isEdit={`/purchase/products/edit/${productId}`}
+          title="Vendor Details"
+          isEdit={`/purchase/vendors/edit/${vendorId}`}
         />
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
-            <div className="text-gray-500">Loading product details...</div>
+            <div className="text-gray-500">Loading vendor details...</div>
           </div>
         </div>
       </FadeIn>
     );
   }
 
-  if (error || !product) {
+  if (error || !vendor) {
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <PageHeader
           items={items}
-          title="Product Details"
-          isEdit={`/purchase/products/edit/${productId}`}
+          title="Vendor Details"
+          isEdit={`/purchase/vendors/edit/${vendorId}`}
         />
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
-            <div className="text-red-500">Error loading product details</div>
+            <div className="text-red-500">Error loading vendor details</div>
           </div>
         </div>
       </FadeIn>
@@ -65,14 +74,14 @@ const Page = () => {
     <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader
         items={items}
-        title="New Product"
-        isEdit={`/purchase/products/edit/${productId}`}
+        title="Vendor Details"
+        isEdit={`/purchase/vendors/edit/${vendorId}`}
       />
 
       <div className="h-full mx-auto px-6 py-8 bg-white">
         <FadeIn delay={0.2}>
           <h2 className="text-lg font-medium text-blue-500 mb-6">
-            Basic Information
+            Vendor Information
           </h2>
         </FadeIn>
 
@@ -82,8 +91,11 @@ const Page = () => {
             <Interactive effect="subtle">
               <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center shadow-sm">
                 <Image
-                  src="/vercel.svg"
-                  alt="Product avatar"
+                  src={
+                    `data:image/png;base64,${vendor.profile_picture}` ||
+                    "/vendor_dummy.png"
+                  }
+                  alt="Vendor avatar"
                   className="w-24 h-24 object-cover rounded-full"
                   width={400}
                   height={400}
@@ -101,38 +113,36 @@ const Page = () => {
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-4"
                   staggerDelay={0.15}
                 >
-                  {/* Product Name */}
+                  {/* Company Name */}
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Product Name
+                        Company Name
                       </h3>
                       <p className="text-gray-700">
-                        {product.product_name || "N/A"}
+                        {vendor.company_name || "N/A"}
                       </p>
                     </div>
                   </FadeIn>
 
-                  {/* Product Description */}
+                  {/* Email */}
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Product Description
+                        Email
                       </h3>
-                      <p className="text-gray-700">
-                        {product.product_description || "N/A"}
-                      </p>
+                      <p className="text-gray-700">{vendor.email || "N/A"}</p>
                     </div>
                   </FadeIn>
 
-                  {/* Available Product Quantity */}
+                  {/* Phone Number */}
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Available Product Quantity
+                        Phone Number
                       </h3>
                       <p className="text-gray-700">
-                        {product.available_product_quantity || "N/A"}
+                        {vendor.phone_number || "N/A"}
                       </p>
                     </div>
                   </FadeIn>
@@ -140,45 +150,31 @@ const Page = () => {
               </div>
             </SlideUp>
 
-            {/* Row 2 (next 3 fields) */}
+            {/* Row 2 (remaining fields) */}
             <SlideUp delay={0.6}>
               <div className="py-4 last:border-b-0 my-4">
                 <StaggerContainer
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-6"
                   staggerDelay={0.15}
                 >
-                  {/* Total Quantity Purchased */}
+                  {/* Address */}
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Total Quantity Purchased
+                        Address
                       </h3>
-                      <p className="text-gray-700">
-                        {product.total_quantity_purchased || "N/A"}
-                      </p>
+                      <p className="text-gray-700">{vendor.address || "N/A"}</p>
                     </div>
                   </FadeIn>
 
-                  {/* Product Category */}
+                  {/* Status */}
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Product Category
+                        Status
                       </h3>
                       <p className="text-gray-700">
-                        {product.product_category || "N/A"}
-                      </p>
-                    </div>
-                  </FadeIn>
-
-                  {/* Unit of Measure */}
-                  <FadeIn>
-                    <div className="p-4 transition-colors border-r border-gray-300">
-                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Unit of Measure
-                      </h3>
-                      <p className="text-gray-700">
-                        {product.unit_of_measure_details?.unit_name || "N/A"}
+                        {vendor.is_hidden ? "Hidden" : "Active"}
                       </p>
                     </div>
                   </FadeIn>
