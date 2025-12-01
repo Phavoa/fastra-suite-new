@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGetActiveLocationsFilteredQuery } from "../../../api/inventory/locationApi";
+
 import { PurchaseRequestFormData } from "@/schemas/purchaseRequestSchema";
 
 type Option = { value: string; label: string };
@@ -50,10 +50,10 @@ interface SimpleProps {
   isLoadingLocations?: boolean;
 }
 
-type PurchaseRequestFormFieldsProps = ReactHookFormProps | SimpleProps;
+type EditPurchaseRequestFormFieldsProps = ReactHookFormProps | SimpleProps;
 
-export function PurchaseRequestFormFields(
-  props: PurchaseRequestFormFieldsProps
+export function EditPurchaseRequestFormFields(
+  props: EditPurchaseRequestFormFieldsProps
 ) {
   // Check if we're using react-hook-form props or simple props
   const isReactHookForm = "register" in props;
@@ -62,25 +62,28 @@ export function PurchaseRequestFormFields(
   const reactHookFormProps = props as ReactHookFormProps;
   const simpleProps = props as SimpleProps;
 
-  // Fetch active locations
-  const { data: activeLocations, isLoading: isLoadingLocations } =
-    useGetActiveLocationsFilteredQuery();
-
-  // Convert locations to option format
-  const locationOptions: Option[] =
-    activeLocations?.map((location) => ({
-      value: location.id,
-      label: `${location.location_name} (${location.location_code})`,
-    })) || [];
-
-  // Helper function to get field value
+  // Helper function to get field value with specific field watching
   const getFieldValue = (field: string): string | number | "" | undefined => {
     if (isReactHookForm) {
-      // For react-hook-form, use the watch function
+      // For react-hook-form, use the watch function with specific field
       return reactHookFormProps.watch(field as keyof PurchaseRequestFormData);
     }
     return simpleProps.formData[field as keyof typeof simpleProps.formData];
   };
+
+  // Explicitly watch form fields to ensure re-renders when values change
+  const watchedCurrency = isReactHookForm
+    ? reactHookFormProps.watch("currency")
+    : simpleProps.formData.currency;
+  const watchedVendor = isReactHookForm
+    ? reactHookFormProps.watch("vendor")
+    : simpleProps.formData.vendor;
+  const watchedLocation = isReactHookForm
+    ? reactHookFormProps.watch("requesting_location")
+    : simpleProps.formData.requesting_location;
+  const watchedPurpose = isReactHookForm
+    ? reactHookFormProps.watch("purpose")
+    : simpleProps.formData.purpose;
 
   // Helper function to handle field changes
   const handleFieldChange = (field: string, value: string | number | "") => {
@@ -134,7 +137,7 @@ export function PurchaseRequestFormFields(
               transition={{ duration: 0.2 }}
             >
               <Select
-                value={(getFieldValue("currency") as string) || ""}
+                value={(watchedCurrency as string) || ""}
                 onValueChange={(value) => handleSelectChange("currency", value)}
                 disabled={
                   isReactHookForm
@@ -191,7 +194,7 @@ export function PurchaseRequestFormFields(
                   {...(isReactHookForm
                     ? reactHookFormProps.register("purpose")
                     : {
-                        value: getFieldValue("purpose"),
+                        value: watchedPurpose || "",
                         onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                           handleFieldChange("purpose", e.target.value),
                       })}
@@ -224,7 +227,7 @@ export function PurchaseRequestFormFields(
               transition={{ duration: 0.2 }}
             >
               <Select
-                value={(getFieldValue("vendor") as string) || ""}
+                value={(watchedVendor as string) || ""}
                 onValueChange={(value) => handleSelectChange("vendor", value)}
                 disabled={
                   isReactHookForm
@@ -275,11 +278,15 @@ export function PurchaseRequestFormFields(
               transition={{ duration: 0.2 }}
             >
               <Select
-                value={(getFieldValue("requesting_location") as string) || ""}
+                value={(watchedLocation as string) || ""}
                 onValueChange={(value) =>
                   handleSelectChange("requesting_location", value)
                 }
-                disabled={isLoadingLocations}
+                disabled={
+                  isReactHookForm
+                    ? reactHookFormProps.isLoadingLocations
+                    : simpleProps.isLoadingLocations
+                }
               >
                 <SelectTrigger
                   className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -288,11 +295,16 @@ export function PurchaseRequestFormFields(
                   <SelectValue placeholder="Select requesting location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locationOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const options = isReactHookForm
+                      ? reactHookFormProps.locationOptions
+                      : simpleProps.locationOptions;
+                    return (options || []).map((option: Option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
               {isReactHookForm &&

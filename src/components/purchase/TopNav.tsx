@@ -10,7 +10,10 @@ export function TopNav() {
 
   const navItems = [
     { label: "Purchase Requests", href: "/purchase/purchase_requests" },
-    { label: "Request for Quotations", href: "/purchase/quotations" },
+    {
+      label: "Request for Quotations",
+      href: "/purchase/request_for_quotations",
+    },
     { label: "Purchase Orders", href: "/purchase/orders" },
     { label: "Vendors", href: "/purchase/vendors" },
     { label: "Products", href: "/purchase/products" },

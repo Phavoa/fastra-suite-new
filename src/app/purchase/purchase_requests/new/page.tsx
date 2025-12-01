@@ -39,11 +39,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Option = { value: string; label: string };
 
 const initialItems: LineItem[] = [
-  { id: "1", product: "", qty: 0, estimated_unit_price: "" },
+  {
+    id: "1",
+    product: "",
+    qty: 0,
+    estimated_unit_price: "",
+    product_description: "",
+    unit_of_measure: "",
+  },
 ];
 
 export default function Page() {
@@ -56,9 +72,11 @@ export default function Page() {
   const { data: currencies, isLoading: isLoadingCurrencies } =
     useGetCurrenciesQuery({});
   const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
-  const { data: products, isLoading: isLoadingProducts } = useGetProductsQuery(
-    {}
-  );
+  const {
+    data: products,
+    isLoading: isLoadingProducts,
+    error: productsError,
+  } = useGetProductsQuery({});
 
   // Form state
   const [items, setItems] = useState<LineItem[]>(initialItems);
@@ -71,6 +89,8 @@ export default function Page() {
         product: "",
         qty: 0,
         estimated_unit_price: "",
+        product_description: "",
+        unit_of_measure: "",
       },
     ]);
 
@@ -95,6 +115,7 @@ export default function Page() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
     reset,
   } = useForm<PurchaseRequestFormData>({
@@ -105,6 +126,7 @@ export default function Page() {
       currency: "",
       vendor: "",
       purpose: "",
+      requesting_location: "",
     },
   });
 
@@ -140,6 +162,24 @@ export default function Page() {
       label: product.product_name,
     })) || [];
 
+  // Debug logging
+  console.log("Products data:", products);
+  console.log("Product options:", productOptions);
+  console.log("Is loading products:", isLoadingProducts);
+  console.log("Products error:", productsError);
+
+  // Show notification if products fail to load
+  React.useEffect(() => {
+    if (productsError) {
+      setNotification({
+        message:
+          "Failed to load products. Please check your connection and try again.",
+        type: "error",
+        show: true,
+      });
+    }
+  }, [productsError]);
+
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
@@ -174,7 +214,7 @@ export default function Page() {
         vendor: parseInt(data.vendor),
         purpose: data.purpose,
         requester: loggedInUser?.id || 1, // Default to 1 or logged in user ID
-        requesting_location: "main", // Default location, could be made dynamic
+        requesting_location: data.requesting_location,
         items: validItems.map((item) => ({
           product: parseInt(item.product),
           qty: item.qty,
@@ -225,11 +265,60 @@ export default function Page() {
     setNotification((prev) => ({ ...prev, show: false }));
   }
 
+  // Get currently selected currency symbol
+  const getCurrentCurrencySymbol = () => {
+    const selectedCurrencyId = watch("currency");
+    if (!selectedCurrencyId || !currencies) return "₦"; // Default to Naira
+
+    const selectedCurrency = currencies.find(
+      (c) => c.id.toString() === selectedCurrencyId
+    );
+    return selectedCurrency?.currency_symbol || "₦";
+  };
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+    const symbol = getCurrentCurrencySymbol();
+
+    // Format number with proper locale formatting
+    const formattedAmount = new Intl.NumberFormat("en-NG", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
+
+    return `${symbol} ${formattedAmount}`;
+  };
+
+  // Function to get product details when a product is selected
+  const getProductDetails = (productId: string) => {
+    const product = products?.find((p) => p.id.toString() === productId);
+    return {
+      description: product?.product_description || "No description available",
+      unit: product?.unit_of_measure_details?.unit_symbol || "N/A",
+    };
+  };
+
+  // Enhanced updateItem function that also populates product details
+  const updateItemWithProductDetails = (
+    id: string,
+    patch: Partial<LineItem>
+  ) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id === id) {
+          const updatedItem = { ...it, ...patch };
+
+          // If product is being updated, populate description and unit
+          if (patch.product && patch.product !== it.product) {
+            const productDetails = getProductDetails(patch.product);
+            updatedItem.product_description = productDetails.description;
+            updatedItem.unit_of_measure = productDetails.unit;
+          }
+
+          return updatedItem;
+        }
+        return it;
+      })
+    );
   };
 
   return (
@@ -324,6 +413,7 @@ export default function Page() {
               register={register}
               errors={errors}
               setValue={setValue}
+              watch={watch}
               currencyOptions={currencyOptions}
               vendorOptions={vendorOptions}
               isLoadingCurrencies={isLoadingCurrencies}
@@ -331,121 +421,188 @@ export default function Page() {
             />
           </motion.div>
 
-          <section className="bg-white border border-gray-100 rounded-md shadow-sm mt-8">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
-                  <tr className="text-sm text-slate-600">
-                    <th className="px-4 py-3 text-left">Product</th>
-                    <th className="px-4 py-3 text-center w-24">Quantity</th>
-                    <th className="px-4 py-3 text-right w-40">
-                      Estimated Unit Price
-                    </th>
-                    <th className="px-4 py-3 text-right w-36">Total Price</th>
-                    <th className="px-4 py-3 text-center w-12"> </th>
-                  </tr>
-                </thead>
+          <section className="bg-white  mt-8 border-none">
+            <div className="mx-auto">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1100px] table-fixed">
+                  <TableHeader className="bg-[#F6F7F8]">
+                    <TableRow>
+                      <TableHead className="w-30 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Product
+                      </TableHead>
+                      <TableHead className="w-80 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Description
+                      </TableHead>
+                      <TableHead className="w-20 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        QTY
+                      </TableHead>
+                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Unit of Measure
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-right text-sm text-gray-600 font-medium">
+                        Estimated Unit Price
+                      </TableHead>
+                      <TableHead className="w-28 border border-gray-200 px-4 py-3 text-right text-sm text-gray-600 font-medium">
+                        Total Price
+                      </TableHead>
+                      <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
 
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {items.map((it) => {
-                    const rowTotal =
-                      it.qty * Number(it.estimated_unit_price || 0);
-                    return (
-                      <tr key={it.id} className="group hover:bg-gray-50">
-                        <td className="px-4 py-3 align-middle">
-                          <Select
-                            value={it.product}
-                            onValueChange={(value) =>
-                              updateItem(it.id, { product: value })
-                            }
-                            disabled={isLoadingProducts}
-                          >
-                            <SelectTrigger className="h-11 rounded-none rounded-l-md border-r border-gray-100 focus:ring-4 focus:ring-blue-100">
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {productOptions.map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={option.value}
-                                >
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
+                  <TableBody className="bg-white">
+                    {items.map((it) => {
+                      const rowTotal =
+                        it.qty * Number(it.estimated_unit_price || 0);
+                      return (
+                        <TableRow
+                          key={it.id}
+                          className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150"
+                        >
+                          <TableCell className="border border-gray-200 align-middle">
+                            <Select
+                              value={it.product}
+                              onValueChange={(value) =>
+                                updateItemWithProductDetails(it.id, {
+                                  product: value,
+                                })
+                              }
+                              disabled={isLoadingProducts}
+                            >
+                              <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0">
+                                <SelectValue
+                                  placeholder={
+                                    isLoadingProducts
+                                      ? "Loading products..."
+                                      : "Select product"
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {isLoadingProducts ? (
+                                  <SelectItem value="__loading__" disabled>
+                                    Loading products...
+                                  </SelectItem>
+                                ) : productOptions.length === 0 ? (
+                                  <SelectItem value="__no_products__" disabled>
+                                    No products available
+                                  </SelectItem>
+                                ) : (
+                                  productOptions.map((option) => (
+                                    <SelectItem
+                                      key={option.value}
+                                      value={option.value}
+                                    >
+                                      {option.label}
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
 
-                        <td className="px-4 py-3 align-middle text-center">
-                          <Input
-                            type="number"
-                            min={1}
-                            aria-label="Quantity"
-                            value={String(it.qty)}
-                            onChange={(e) =>
-                              updateItem(it.id, {
-                                qty: Math.max(1, Number(e.target.value || 0)),
-                              })
-                            }
-                            className="h-11 w-20 text-center rounded-none border-r border-gray-100 focus:ring-4 focus:ring-blue-100"
-                          />
-                        </td>
+                          <TableCell className="border border-gray-200 px-4 align-middle">
+                            <div className="text-sm text-gray-600 line-clamp-2">
+                              {it.product_description || "Select a product"}
+                            </div>
+                          </TableCell>
 
-                        <td className="px-4 py-3 align-middle text-right">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            aria-label="Estimated unit price"
-                            value={String(it.estimated_unit_price)}
-                            onChange={(e) =>
-                              updateItem(it.id, {
-                                estimated_unit_price: e.target.value,
-                              })
-                            }
-                            placeholder="0.00"
-                            className="h-11 w-40 text-right rounded-none border-r border-gray-100 focus:ring-4 focus:ring-blue-100"
-                          />
-                        </td>
+                          <TableCell className="border border-gray-200  align-middle text-center">
+                            <Input
+                              type="number"
+                              min={1}
+                              aria-label="Quantity"
+                              value={String(it.qty)}
+                              onChange={(e) =>
+                                updateItemWithProductDetails(it.id, {
+                                  qty: Math.max(1, Number(e.target.value || 0)),
+                                })
+                              }
+                              className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
+                            />
+                          </TableCell>
 
-                        <td className="px-4 py-3 align-middle text-right">
-                          <div className="h-11 flex items-center justify-end pr-3 text-sm font-medium">
-                            {formatCurrency(rowTotal)}
-                          </div>
-                        </td>
+                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                            <div className="text-sm text-gray-700">
+                              {it.unit_of_measure || "N/A"}
+                            </div>
+                          </TableCell>
 
-                        <td className="px-4 py-3 align-middle text-center">
-                          <button
-                            onClick={() => removeRow(it.id)}
-                            aria-label="Remove row"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
-                            disabled={items.length === 1}
-                          >
-                            <Trash className="w-4 h-4 text-red-500" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <TableCell className="border border-gray-200 px-4  align-middle text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              aria-label="Estimated unit price"
+                              value={String(it.estimated_unit_price)}
+                              onChange={(e) =>
+                                updateItemWithProductDetails(it.id, {
+                                  estimated_unit_price: e.target.value,
+                                })
+                              }
+                              placeholder="0.00"
+                              className="h-11 w-28 text-right rounded-none border-0 focus:ring-0 focus:ring-offset-0"
+                            />
+                          </TableCell>
+
+                          <TableCell className="border border-gray-200 px-4 align-middle text-right">
+                            <div className="text-sm font-medium text-gray-800 tabular-nums">
+                              {formatCurrency(rowTotal)}
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                            <button
+                              onClick={() => removeRow(it.id)}
+                              aria-label="Remove row"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
+                              disabled={items.length === 1}
+                            >
+                              <Trash className="w-4 h-4 text-red-500" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+
+                  <TableFooter className="bg-[#FBFCFD] border border-gray-200">
+                    <TableRow className="">
+                      {/* Empty cells for alignment */}
+                      <TableCell className="bg-white">
+                        <Button
+                          variant="ghost"
+                          onClick={addRow}
+                          className="flex items-center gap-2 px-3 py-0 text-sm m-auto rounded-md hover:bg-gray-50"
+                          aria-label="Add row"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+
+                      {/* <TableCell className="w-28 border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-700">
+                        Total
+                      </TableCell>
+                      <TableCell className="w-16 border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-800 tabular-nums">
+                        {formatCurrency(total)}
+                      </TableCell> */}
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
             </div>
 
-            <div className="px-4 py-3 border-t border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  onClick={addRow}
-                  className="flex items-center gap-2 px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
-                  aria-label="Add row"
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="ml-auto flex items-center gap-4">
-                <div className="hidden sm:block text-sm text-slate-700 px-4 py-2 bg-white rounded-md border border-gray-100">
-                  <div className="flex items-center justify-between gap-6 min-w-[220px]">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="ml-auto flex items-center gap-4 border-x border-b">
+                <div className="hidden sm:block text-sm text-slate-700 px-4 py-2 bg-white rounded-md">
+                  <div className="flex items-center justify-between gap-6 min-w-[220px] ">
                     <span className="text-sm text-slate-600">Total</span>
                     <span className="font-medium">{formatCurrency(total)}</span>
                   </div>

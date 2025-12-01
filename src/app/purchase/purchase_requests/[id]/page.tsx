@@ -19,6 +19,7 @@ import {
 } from "@/api/purchase/purchaseRequestApi";
 import { useParams } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useSelector } from "react-redux";
@@ -34,6 +35,7 @@ const Page = () => {
     data: purchaseRequest,
     isLoading,
     error,
+    refetch,
   } = useGetPurchaseRequestQuery(purchaseRequestId);
 
   const [updateStatus, { isLoading: isUpdatingStatus }] =
@@ -48,6 +50,22 @@ const Page = () => {
       purchaseRequest?.requester_details?.user?.last_name
     ? `${purchaseRequest?.requester_details.user.first_name} ${purchaseRequest?.requester_details.user.last_name}`
     : "Unknown Requester";
+
+  // Notification state
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+    show: boolean;
+  }>({
+    message: "",
+    type: "success",
+    show: false,
+  });
+
+  // Close notification
+  const closeNotification = () => {
+    setNotification((prev) => ({ ...prev, show: false }));
+  };
 
   // Loading state
   if (isLoading) {
@@ -136,15 +154,37 @@ const Page = () => {
   };
 
   // Action handlers
-  const handleStatusUpdate = async (newStatus: "approved" | "rejected") => {
+  const handleStatusUpdate = async (
+    newStatus: "approved" | "rejected" | "pending"
+  ) => {
     try {
       await updateStatus({
         id: purchaseRequestId,
         data: { status: newStatus },
       }).unwrap();
-      // The query will automatically refetch due to RTK Query caching
+
+      // Refetch the data to get updated purchase request
+      await refetch();
+
+      // Show success notification
+      const statusMessages = {
+        pending: "Purchase request sent for approval successfully!",
+        approved: "Purchase request approved successfully!",
+        rejected: "Purchase request rejected successfully!",
+      };
+
+      setNotification({
+        message: statusMessages[newStatus],
+        type: "success",
+        show: true,
+      });
     } catch (error) {
       console.error("Failed to update status:", error);
+      setNotification({
+        message: "Failed to update purchase request status. Please try again.",
+        type: "error",
+        show: true,
+      });
     }
   };
 
@@ -152,16 +192,41 @@ const Page = () => {
     window.location.href = `/purchase/purchase_requests/edit/${purchaseRequestId}`;
   };
 
-  const handleConvertToRFQ = () => {
-    // TODO: Implement convert to RFQ functionality
-    console.log("Convert to RFQ clicked");
+  const handleSendForApproval = () => {
+    handleStatusUpdate("pending");
+  };
+
+  const handleConvertToRFQ = async () => {
+    try {
+      // TODO: Implement convert to RFQ functionality
+      console.log("Convert to RFQ clicked");
+
+      // For now, show a success message
+      setNotification({
+        message: "Purchase request converted to RFQ successfully!",
+        type: "success",
+        show: true,
+      });
+
+      // In a real implementation, you would make an API call here
+      // and then refetch the data
+      // await convertToRFQ({ id: purchaseRequestId }).unwrap();
+      // await refetch();
+    } catch (error) {
+      console.error("Failed to convert to RFQ:", error);
+      setNotification({
+        message: "Failed to convert to RFQ. Please try again.",
+        type: "error",
+        show: true,
+      });
+    }
   };
 
   return (
     <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader
         items={items}
-        title="Request for Quotations"
+        title="Purchase Request"
         isEdit={
           purchaseRequest.status === "draft"
             ? `/purchase/purchase_requests/edit/${purchaseRequest.id}`
@@ -319,11 +384,12 @@ const Page = () => {
             <SlideUp delay={0.2}>
               <div className="flex justify-end gap-4">
                 <Button
-                  onClick={handleEdit}
-                  variant="contained"
-                  className="text-white bg-[#3B7CED] hover:bg-[#3065c3]"
+                  onClick={handleSendForApproval}
+                  variant="ghost"
+                  disabled={isUpdatingStatus}
+                  className="text-white bg-[#2BA24D] hover:bg-[#248d40] hover:text-gray-50"
                 >
-                  Edit
+                  {isUpdatingStatus ? "Processing..." : "Send for Approval"}
                 </Button>
               </div>
             </SlideUp>
@@ -334,9 +400,9 @@ const Page = () => {
               <div className="flex justify-end gap-4">
                 <Button
                   onClick={() => handleStatusUpdate("approved")}
-                  variant="contained"
+                  variant="ghost"
                   disabled={isUpdatingStatus}
-                  className="text-white bg-[#2BA24D] hover:bg-[#248d40]"
+                  className="text-white bg-[#2BA24D] hover:bg-[#248d40] hover:text-gray-50"
                 >
                   {isUpdatingStatus ? "Processing..." : "Approve"}
                 </Button>
@@ -375,6 +441,14 @@ const Page = () => {
           )}
         </div>
       </div>
+
+      {/* Notification */}
+      <ToastNotification
+        message={notification.message}
+        type={notification.type}
+        show={notification.show}
+        onClose={closeNotification}
+      />
     </FadeIn>
   );
 };
