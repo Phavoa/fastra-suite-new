@@ -2,49 +2,56 @@
 
 import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
+import { PurchaseTable } from "@/components/purchase/purchaseRequest/PurchaseRequestTable";
+import { PurchaseRequestCards } from "@/components/purchase/purchaseRequest/PurchaseRequestCards";
+import { RequestRow } from "@/components/purchase/types";
 import { Input } from "@/components/ui/input";
 import { SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ViewToggle } from "@/components/purchase/purchaseRequest/ViewToggle";
 import {
-  useGetRequestForQuotationsQuery,
-  RequestForQuotation,
-} from "@/api/purchase/requestForQuotationApi";
+  useGetPurchaseRequestsQuery,
+  PurchaseRequest,
+} from "@/api/purchase/purchaseRequestApi";
 import type { RootState } from "@/lib/store/store";
-import {
-  RequestRow,
-  StatusCards,
-} from "@/components/purchase/requestForQuotation";
-import { ViewToggle } from "@/components/purchase/requestForQuotation/ViewToggle";
-import { RfqTable } from "@/components/purchase/requestForQuotation";
-import { RfqCards } from "@/components/purchase/requestForQuotation/RfqCards";
+import { StatusCards } from "@/components/purchase/purchaseRequest";
 
-// Helper function to transform RFQ API data to RequestRow format
-const transformRfqToRow = (
-  rfq: RequestForQuotation,
+// Helper function to transform API data to RequestRow format
+const transformPurchaseRequestToRow = (
+  purchaseRequest: PurchaseRequest,
   loggedInUserId?: number
 ): RequestRow => {
   const totalItems =
-    rfq.items?.reduce((sum: number, item) => sum + item.qty, 0) || 0;
-  const totalPrice = parseFloat(rfq.rfq_total_price || "0");
+    purchaseRequest.items?.reduce((sum: number, item) => sum + item.qty, 0) ||
+    0;
+  const totalPrice = parseFloat(purchaseRequest.pr_total_price || "0");
 
-  // Check if the vendor is the logged-in user's company (if applicable)
-  const vendorName = rfq.vendor_details?.company_name || "Unknown Vendor";
+  // Check if the requester is the logged-in user
+  const isOwnRequest =
+    purchaseRequest.requester_details?.user?.id === loggedInUserId;
+
+  const requesterName = isOwnRequest
+    ? "YOU"
+    : purchaseRequest.requester_details?.user?.first_name &&
+      purchaseRequest.requester_details?.user?.last_name
+    ? `${purchaseRequest.requester_details.user.first_name} ${purchaseRequest.requester_details.user.last_name}`
+    : "Unknown Requester";
 
   return {
-    id: rfq.id,
+    id: purchaseRequest.id,
     product:
-      rfq.items
+      purchaseRequest.items
         ?.map((item) => item.product_details?.product_name || "Unknown Product")
         .join(", ") || "No items",
     quantity: totalItems,
     amount: totalPrice.toLocaleString(),
-    requester: vendorName,
-    status: rfq.status,
+    requester: requesterName,
+    status: purchaseRequest.status,
   };
 };
 
-export default function RequestForQuotationsPage() {
+export default function PurchaseRequestsPage() {
   const [query, setQuery] = useState("");
   const [currentView, setCurrentView] = useState<"grid" | "list">("list");
 
@@ -52,22 +59,22 @@ export default function RequestForQuotationsPage() {
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserId = loggedInUser?.id;
 
-  // Use the RFQ API query hook
+  // Use the API query hook
   const {
-    data: requestForQuotations = [],
+    data: purchaseRequests = [],
     isLoading,
     isError,
     error,
-  } = useGetRequestForQuotationsQuery({
+  } = useGetPurchaseRequestsQuery({
     search: query || undefined,
   });
 
   // Transform API data to match component interface
   const rows: RequestRow[] = useMemo(() => {
-    return requestForQuotations.map((rfq) =>
-      transformRfqToRow(rfq, loggedInUserId)
+    return purchaseRequests.map((purchaseRequest) =>
+      transformPurchaseRequestToRow(purchaseRequest, loggedInUserId)
     );
-  }, [requestForQuotations, loggedInUserId]);
+  }, [purchaseRequests, loggedInUserId]);
 
   const handleViewChange = (view: "grid" | "list") => {
     setCurrentView(view);
@@ -79,7 +86,7 @@ export default function RequestForQuotationsPage() {
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading request for quotations...</p>
+          <p>Loading purchase requests...</p>
         </div>
       </main>
     );
@@ -90,7 +97,7 @@ export default function RequestForQuotationsPage() {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center text-red-600">
-          <p>Error loading request for quotations</p>
+          <p>Error loading purchase requests</p>
           <p className="text-sm mt-2">{error?.toString()}</p>
         </div>
       </main>
@@ -105,7 +112,7 @@ export default function RequestForQuotationsPage() {
 
       <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
         <div className="flex items-center space-x-4">
-          <h2 className="text-lg text-nowrap">Request for Quotations</h2>
+          <h2 className="text-lg text-nowrap">Purchase Requests</h2>
 
           <div className="relative w-xs">
             <Input
@@ -114,7 +121,7 @@ export default function RequestForQuotationsPage() {
               placeholder="Search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search request for quotations"
+              aria-label="Search purchase requests"
             />
             <SearchIcon
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -123,9 +130,9 @@ export default function RequestForQuotationsPage() {
           </div>
         </div>
         <div className="flex space-x-4">
-          <Link href="/purchase/request_for_quotations/new">
+          <Link href="/purchase/purchase_requests/new">
             <Button variant="contained" className="px-4 py-2 cursor-pointer">
-              New RFQ
+              New Purchase Request
             </Button>
           </Link>
           <ViewToggle
@@ -137,9 +144,9 @@ export default function RequestForQuotationsPage() {
 
       {/* Conditional rendering based on current view */}
       {currentView === "list" ? (
-        <RfqTable rows={rows} query={query} />
+        <PurchaseTable rows={rows} query={query} />
       ) : (
-        <RfqCards requestForQuotations={rows} />
+        <PurchaseRequestCards purchaseRequests={rows} />
       )}
     </main>
   );

@@ -302,6 +302,11 @@ export const purchaseRequestApi = createApi({
     getPurchaseRequest: builder.query<PurchaseRequest, string>({
       query: (id) => `/purchase/purchase-request/${id}/`,
     }),
+    getApprovedPurchaseRequests: builder.query<PurchaseRequest[], void>({
+      query: () => ({
+        url: "/purchase/purchase-request/approved_list/",
+      }),
+    }),
 
     // Purchase Request Mutation endpoints
     createPurchaseRequest: builder.mutation<
@@ -393,6 +398,7 @@ export const {
   // Purchase Request hooks
   useGetPurchaseRequestsQuery,
   useGetPurchaseRequestQuery,
+  useGetApprovedPurchaseRequestsQuery,
   useCreatePurchaseRequestMutation,
   useUpdatePurchaseRequestMutation,
   usePatchPurchaseRequestMutation,

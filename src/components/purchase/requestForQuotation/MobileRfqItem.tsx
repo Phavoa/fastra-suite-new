@@ -5,21 +5,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusPill } from "./StatusPill";
 import { RequestRow } from "../types";
 
-interface MobilePurchaseRequestItemProps {
+interface MobileRfqItemProps {
   request: RequestRow;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
 }
 
-export function MobilePurchaseRequestItem({
+export function MobileRfqItem({
   request,
   isSelected,
   onToggleSelect,
-}: MobilePurchaseRequestItemProps) {
+}: MobileRfqItemProps) {
   const router = useRouter();
 
   const handleRowClick = () => {
-    router.push(`/purchase/purchase_requests/${request.id}`);
+    router.push(`/purchase/request_for_quotations/${request.id}`);
   };
 
   const handleCheckboxChange = (checked: boolean) => {

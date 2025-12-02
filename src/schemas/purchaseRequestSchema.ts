@@ -5,6 +5,8 @@ export const purchaseRequestSchema = z.object({
   vendor: z.string().min(1, "Vendor is required"),
   purpose: z.string().min(1, "Purpose is required"),
   requesting_location: z.string().min(1, "Requesting location is required"),
+  expiry_date: z.string().min(1, "Expiry date is required"),
+  purchase_request: z.string().min(1, "Purchase request is required"),
 });
 
 export type PurchaseRequestFormData = z.infer<typeof purchaseRequestSchema>;

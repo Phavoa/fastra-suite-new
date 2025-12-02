@@ -1,23 +1,25 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSearchParams } from "next/navigation";
+import { TopNav } from "@/components/purchase/TopNav";
+import { RfqTable } from "@/components/purchase/requestForQuotation/RfqTable";
+import { RfqCards } from "@/components/purchase/requestForQuotation/RfqCards";
+import { RequestRow } from "@/components/purchase/types";
 import { Input } from "@/components/ui/input";
 import { SearchIcon } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ViewToggle } from "@/components/purchase/requestForQuotation/ViewToggle";
 import {
   useGetRequestForQuotationsQuery,
   RequestForQuotation,
 } from "@/api/purchase/requestForQuotationApi";
+import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
-import {
-  RequestRow,
-  StatusCards,
-} from "@/components/purchase/requestForQuotation";
-import { ViewToggle } from "@/components/purchase/requestForQuotation/ViewToggle";
-import { RfqTable } from "@/components/purchase/requestForQuotation";
-import { RfqCards } from "@/components/purchase/requestForQuotation/RfqCards";
+import { BreadcrumbItem } from "../../products/types";
+import { motion } from "framer-motion";
+import Breadcrumbs from "@/components/shared/BreadScrumbs";
+import { AutoSaveIcon } from "@/components/shared/icons";
 
 // Helper function to transform RFQ API data to RequestRow format
 const transformRfqToRow = (
@@ -44,15 +46,62 @@ const transformRfqToRow = (
   };
 };
 
-export default function RequestForQuotationsPage() {
+// Status mapping for display
+const getStatusInfo = (status: string) => {
+  const statusMap = {
+    draft: { label: "Draft", color: "text-[#3B7CED]", bgColor: "bg-[#3B7CED]" },
+    approved: {
+      label: "Approved",
+      color: "text-[#2BA24D]",
+      bgColor: "bg-[#2BA24D]",
+    },
+    pending: {
+      label: "Pending",
+      color: "text-[#F0B401]",
+      bgColor: "bg-[#F0B401]",
+    },
+    rejected: {
+      label: "Rejected",
+      color: "text-[#E43D2B]",
+      bgColor: "bg-[#E43D2B]",
+    },
+  };
+  return statusMap[status as keyof typeof statusMap] || statusMap.draft;
+};
+
+export default function RfqStatusPage() {
+  const searchParams = useSearchParams();
+  const status = searchParams.get("status") as
+    | "draft"
+    | "approved"
+    | "pending"
+    | "rejected"
+    | null;
+
   const [query, setQuery] = useState("");
   const [currentView, setCurrentView] = useState<"grid" | "list">("list");
+
+  const items: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Purchase", href: "/purchase" },
+    {
+      label: "Request for Quotations",
+      href: `/purchase/request_for_quotations`,
+    },
+    {
+      label: `${
+        status ? status.charAt(0).toUpperCase() + status.slice(1) : "All"
+      } RFQs`,
+      href: `/purchase/request_for_quotations/status?status=${status}`,
+      current: true,
+    },
+  ];
 
   // Get logged-in user from Redux store
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserId = loggedInUser?.id;
 
-  // Use the RFQ API query hook
+  // Use the RFQ API query hook with status filter
   const {
     data: requestForQuotations = [],
     isLoading,
@@ -60,6 +109,7 @@ export default function RequestForQuotationsPage() {
     error,
   } = useGetRequestForQuotationsQuery({
     search: query || undefined,
+    status: status || undefined, // Filter by status if provided
   });
 
   // Transform API data to match component interface
@@ -72,6 +122,9 @@ export default function RequestForQuotationsPage() {
   const handleViewChange = (view: "grid" | "list") => {
     setCurrentView(view);
   };
+
+  // Get status info for display
+  const statusInfo = status ? getStatusInfo(status) : null;
 
   // Show loading state
   if (isLoading) {
@@ -98,15 +151,45 @@ export default function RequestForQuotationsPage() {
   }
 
   return (
-    <main className="min-h-screen text-gray-800 mr-4">
-      <div className="bg-white rounded-md shadow hover:shadow-lg transition-shadow duration-300 p-6 pb-4 mt-4">
-        <StatusCards rows={rows} />
-      </div>
-
-      <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
+    <main className="min-h-screen text-gray-800">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
+      >
+        <Breadcrumbs
+          items={items}
+          action={
+            <Button
+              variant="ghost"
+              className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
+            >
+              Autosaved <AutoSaveIcon />
+            </Button>
+          }
+        />
+      </motion.div>
+      {/* Header */}
+      <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-4 mr-4">
         <div className="flex items-center space-x-4">
-          <h2 className="text-lg text-nowrap">Request for Quotations</h2>
+          {statusInfo && (
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-4 h-4 rounded-full ${statusInfo.bgColor}`}
+              ></div>
+              <h2 className="text-xl font-semibold">
+                {statusInfo.label} Request for Quotations
+              </h2>
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color} bg-gray-100`}
+              >
+                {rows.length} {rows.length === 1 ? "RFQ" : "RFQs"}
+              </span>
+            </div>
+          )}
+        </div>
 
+        <div className="flex items-center space-x-4">
           <div className="relative w-xs">
             <Input
               type="text"
@@ -121,13 +204,6 @@ export default function RequestForQuotationsPage() {
               size={16}
             />
           </div>
-        </div>
-        <div className="flex space-x-4">
-          <Link href="/purchase/request_for_quotations/new">
-            <Button variant="contained" className="px-4 py-2 cursor-pointer">
-              New RFQ
-            </Button>
-          </Link>
           <ViewToggle
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -135,7 +211,7 @@ export default function RequestForQuotationsPage() {
         </div>
       </div>
 
-      {/* Conditional rendering based on current view */}
+      {/* Content */}
       {currentView === "list" ? (
         <RfqTable rows={rows} query={query} />
       ) : (

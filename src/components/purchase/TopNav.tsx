@@ -14,7 +14,7 @@ export function TopNav() {
       label: "Request for Quotations",
       href: "/purchase/request_for_quotations",
     },
-    { label: "Purchase Orders", href: "/purchase/orders" },
+    { label: "Purchase Orders", href: "/purchase/purchase_orders" },
     { label: "Vendors", href: "/purchase/vendors" },
     { label: "Products", href: "/purchase/products" },
     { label: "Configuration", href: "/purchase/configuration" },
