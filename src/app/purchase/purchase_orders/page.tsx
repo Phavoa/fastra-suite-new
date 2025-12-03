@@ -2,56 +2,55 @@
 
 import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { PurchaseTable } from "@/components/purchase/purchaseRequest/PurchaseRequestTable";
-import { PurchaseRequestCards } from "@/components/purchase/purchaseRequest/PurchaseRequestCards";
+import { PurchaseTable } from "@/components/purchase/purchaseOrder/PurchaseRequestTable";
+import { PurchaseRequestCards } from "@/components/purchase/purchaseOrder/PurchaseRequestCards";
 import { RequestRow } from "@/components/purchase/types";
 import { Input } from "@/components/ui/input";
 import { SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ViewToggle } from "@/components/purchase/purchaseRequest/ViewToggle";
+import { ViewToggle } from "@/components/purchase/purchaseOrder/ViewToggle";
 import {
-  useGetPurchaseRequestsQuery,
-  PurchaseRequest,
-} from "@/api/purchase/purchaseRequestApi";
+  useGetPurchaseOrdersQuery,
+  PurchaseOrder,
+} from "@/api/purchase/purchaseOrderApi";
 import type { RootState } from "@/lib/store/store";
-import { StatusCards } from "@/components/purchase/purchaseRequest";
+import { StatusCards } from "@/components/purchase/purchaseOrder";
 
 // Helper function to transform API data to RequestRow format
-const transformPurchaseRequestToRow = (
-  purchaseRequest: PurchaseRequest,
+const transformPurchaseOrderToRow = (
+  purchaseOrder: PurchaseOrder,
   loggedInUserId?: number
 ): RequestRow => {
   const totalItems =
-    purchaseRequest.items?.reduce((sum: number, item) => sum + item.qty, 0) ||
-    0;
-  const totalPrice = parseFloat(purchaseRequest.pr_total_price || "0");
+    purchaseOrder.items?.reduce((sum: number, item) => sum + item.qty, 0) || 0;
+  const totalPrice = parseFloat(purchaseOrder.po_total_price || "0");
 
-  // Check if the requester is the logged-in user
-  const isOwnRequest =
-    purchaseRequest.requester_details?.user?.id === loggedInUserId;
+  // Check if the creator is the logged-in user
+  const isOwnOrder =
+    purchaseOrder.created_by_details?.user?.id === loggedInUserId;
 
-  const requesterName = isOwnRequest
+  const creatorName = isOwnOrder
     ? "YOU"
-    : purchaseRequest.requester_details?.user?.first_name &&
-      purchaseRequest.requester_details?.user?.last_name
-    ? `${purchaseRequest.requester_details.user.first_name} ${purchaseRequest.requester_details.user.last_name}`
-    : "Unknown Requester";
+    : purchaseOrder.created_by_details?.user?.first_name &&
+      purchaseOrder.created_by_details?.user?.last_name
+    ? `${purchaseOrder.created_by_details.user.first_name} ${purchaseOrder.created_by_details.user.last_name}`
+    : "Unknown Creator";
 
   return {
-    id: purchaseRequest.id,
+    id: purchaseOrder.id,
     product:
-      purchaseRequest.items
+      purchaseOrder.items
         ?.map((item) => item.product_details?.product_name || "Unknown Product")
         .join(", ") || "No items",
     quantity: totalItems,
     amount: totalPrice.toLocaleString(),
-    requester: requesterName,
-    status: purchaseRequest.status,
+    requester: creatorName,
+    status: purchaseOrder.status,
   };
 };
 
-export default function PurchaseRequestsPage() {
+export default function PurchaseOrdersPage() {
   const [query, setQuery] = useState("");
   const [currentView, setCurrentView] = useState<"grid" | "list">("list");
 
@@ -61,20 +60,20 @@ export default function PurchaseRequestsPage() {
 
   // Use the API query hook
   const {
-    data: purchaseRequests = [],
+    data: purchaseOrders = [],
     isLoading,
     isError,
     error,
-  } = useGetPurchaseRequestsQuery({
+  } = useGetPurchaseOrdersQuery({
     search: query || undefined,
   });
 
   // Transform API data to match component interface
   const rows: RequestRow[] = useMemo(() => {
-    return purchaseRequests.map((purchaseRequest) =>
-      transformPurchaseRequestToRow(purchaseRequest, loggedInUserId)
+    return purchaseOrders.map((purchaseOrder) =>
+      transformPurchaseOrderToRow(purchaseOrder, loggedInUserId)
     );
-  }, [purchaseRequests, loggedInUserId]);
+  }, [purchaseOrders, loggedInUserId]);
 
   const handleViewChange = (view: "grid" | "list") => {
     setCurrentView(view);
@@ -86,7 +85,7 @@ export default function PurchaseRequestsPage() {
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading purchase requests...</p>
+          <p>Loading purchase orders...</p>
         </div>
       </main>
     );
@@ -97,7 +96,7 @@ export default function PurchaseRequestsPage() {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center text-red-600">
-          <p>Error loading purchase requests</p>
+          <p>Error loading purchase orders</p>
           <p className="text-sm mt-2">{error?.toString()}</p>
         </div>
       </main>
@@ -112,7 +111,7 @@ export default function PurchaseRequestsPage() {
 
       <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
         <div className="flex items-center space-x-4">
-          <h2 className="text-lg text-nowrap">Purchase Requests</h2>
+          <h2 className="text-lg text-nowrap">Purchase Orders</h2>
 
           <div className="relative w-xs">
             <Input
@@ -121,7 +120,7 @@ export default function PurchaseRequestsPage() {
               placeholder="Search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search purchase requests"
+              aria-label="Search purchase orders"
             />
             <SearchIcon
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -130,9 +129,9 @@ export default function PurchaseRequestsPage() {
           </div>
         </div>
         <div className="flex space-x-4">
-          <Link href="/purchase/purchase_requests/new">
+          <Link href="/purchase/purchase_orders/new">
             <Button variant="contained" className="px-4 py-2 cursor-pointer">
-              New Purchase Request
+              New Purchase Order
             </Button>
           </Link>
           <ViewToggle

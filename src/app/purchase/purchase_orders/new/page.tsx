@@ -5,22 +5,16 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
-import {
-  PurchaseRequestFormFields,
-  PurchaseRequestFormActions,
-} from "@/components/purchase/purchaseRequest";
+import { PurchaseRequestFormActions } from "@/components/purchase/purchaseOrder";
 import { BreadcrumbItem } from "@/types/purchase";
-import { useCreatePurchaseRequestMutation } from "@/api/purchase/purchaseRequestApi";
+import { useCreatePurchaseOrderMutation } from "@/api/purchase/purchaseOrderApi";
 import { useGetCurrenciesQuery } from "@/api/purchase/currencyApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
+import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
-import {
-  purchaseRequestSchema,
-  type PurchaseRequestFormData,
-  type LineItem,
-} from "@/schemas/purchaseRequestSchema";
 import type { Resolver } from "react-hook-form";
 import {
   FadeIn,
@@ -32,6 +26,8 @@ import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -51,6 +47,27 @@ import {
 
 type Option = { value: string; label: string };
 
+// Purchase Order specific schema
+const purchaseOrderSchema = z.object({
+  currency: z.string().min(1, "Currency is required"),
+  vendor: z.string().min(1, "Vendor is required"),
+  destination_location: z.string().min(1, "Destination location is required"),
+  payment_terms: z.string().min(1, "Payment terms are required"),
+  delivery_terms: z.string().optional(),
+  purchase_policy: z.string().optional(),
+});
+
+type PurchaseOrderFormData = z.infer<typeof purchaseOrderSchema>;
+
+interface LineItem {
+  id: string;
+  product: string;
+  qty: number;
+  estimated_unit_price: string;
+  product_description: string;
+  unit_of_measure: string;
+}
+
 const initialItems: LineItem[] = [
   {
     id: "1",
@@ -67,8 +84,8 @@ export default function Page() {
   const formRef = useRef<HTMLFormElement>(null);
 
   // API mutations and queries
-  const [createPurchaseRequest, { isLoading: isCreating }] =
-    useCreatePurchaseRequestMutation();
+  const [createPurchaseOrder, { isLoading: isCreating }] =
+    useCreatePurchaseOrderMutation();
   const { data: currencies, isLoading: isLoadingCurrencies } =
     useGetCurrenciesQuery({});
   const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
@@ -77,6 +94,8 @@ export default function Page() {
     isLoading: isLoadingProducts,
     error: productsError,
   } = useGetProductsQuery({});
+  const { data: activeLocations, isLoading: isLoadingLocations } =
+    useGetActiveLocationsFilteredQuery();
 
   // Form state
   const [items, setItems] = useState<LineItem[]>(initialItems);
@@ -118,15 +137,17 @@ export default function Page() {
     watch,
     formState: { errors },
     reset,
-  } = useForm<PurchaseRequestFormData>({
+  } = useForm<PurchaseOrderFormData>({
     resolver: zodResolver(
-      purchaseRequestSchema
-    ) as Resolver<PurchaseRequestFormData>,
+      purchaseOrderSchema
+    ) as Resolver<PurchaseOrderFormData>,
     defaultValues: {
       currency: "",
       vendor: "",
-      purpose: "",
-      requesting_location: "",
+      destination_location: "",
+      payment_terms: "",
+      delivery_terms: "",
+      purchase_policy: "",
     },
   });
 
@@ -162,11 +183,11 @@ export default function Page() {
       label: product.product_name,
     })) || [];
 
-  // Debug logging
-  console.log("Products data:", products);
-  console.log("Product options:", productOptions);
-  console.log("Is loading products:", isLoadingProducts);
-  console.log("Products error:", productsError);
+  const locationOptions: Option[] =
+    activeLocations?.map((location) => ({
+      value: location.id,
+      label: `${location.location_name} (${location.location_code})`,
+    })) || [];
 
   // Show notification if products fail to load
   React.useEffect(() => {
@@ -184,14 +205,14 @@ export default function Page() {
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
     {
-      label: "Purchase Requests",
-      href: "/purchase/purchase_requests",
+      label: "Purchase Orders",
+      href: "/purchase/purchase_orders",
       current: true,
     },
-    { label: "New", href: "/purchase/purchase_requests/new", current: true },
+    { label: "New", href: "/purchase/purchase_orders/new", current: true },
   ];
 
-  async function onSubmit(data: PurchaseRequestFormData): Promise<void> {
+  async function onSubmit(data: PurchaseOrderFormData): Promise<void> {
     // Validate items
     const validItems = items.filter(
       (item) => item.product && item.qty > 0 && item.estimated_unit_price
@@ -209,12 +230,14 @@ export default function Page() {
 
     try {
       // Transform form data to match API format
-      const purchaseRequestData = {
+      const purchaseOrderData = {
         currency: parseInt(data.currency),
         vendor: parseInt(data.vendor),
-        purpose: data.purpose,
-        requester: loggedInUser?.id || 1, // Default to 1 or logged in user ID
-        requesting_location: data.requesting_location,
+        destination_location: data.destination_location,
+        payment_terms: data.payment_terms,
+        delivery_terms: data.delivery_terms || "",
+        purchase_policy: data.purchase_policy || "",
+        created_by: loggedInUser?.id || 1,
         items: validItems.map((item) => ({
           product: parseInt(item.product),
           qty: item.qty,
@@ -225,24 +248,24 @@ export default function Page() {
       };
 
       // Call the API mutation
-      await createPurchaseRequest(purchaseRequestData).unwrap();
+      await createPurchaseOrder(purchaseOrderData).unwrap();
 
       // Show success notification
       setNotification({
-        message: "Purchase request created successfully!",
+        message: "Purchase order created successfully!",
         type: "success",
         show: true,
       });
 
-      // Reset form and navigate to purchase requests page after a short delay
+      // Reset form and navigate to purchase orders page after a short delay
       setTimeout(() => {
         reset();
         setItems(initialItems);
-        router.push("/purchase/purchase_requests");
+        router.push("/purchase/purchase_orders");
       }, 1500);
     } catch (error: unknown) {
       // Handle API errors
-      let errorMessage = "Failed to create purchase request. Please try again.";
+      let errorMessage = "Failed to create purchase order. Please try again.";
 
       if (error && typeof error === "object" && "data" in error) {
         const apiError = error as {
@@ -333,7 +356,7 @@ export default function Page() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <PageHeader items={breadcrumsItem} title="New Purchase Request" />
+        <PageHeader items={breadcrumsItem} title="New Purchase Order" />
       </motion.div>
 
       {/* Main form area */}
@@ -387,11 +410,11 @@ export default function Page() {
                     </div>
                   </FadeIn>
 
-                  {/* Requester */}
+                  {/* Created By */}
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Requester
+                        Created By
                       </h3>
                       <p className="text-gray-700">
                         {loggedInUser?.username || "User"}
@@ -403,25 +426,207 @@ export default function Page() {
             </SlideUp>
           </div>
 
-          {/* Purchase request form fields */}
+          {/* Purchase order form fields */}
           <motion.div
+            className="md:flex md:items-start md:gap-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.5 }}
           >
-            <PurchaseRequestFormFields
-              register={register}
-              errors={errors}
-              setValue={setValue}
-              watch={watch}
-              currencyOptions={currencyOptions}
-              vendorOptions={vendorOptions}
-              isLoadingCurrencies={isLoadingCurrencies}
-              isLoadingVendors={isLoadingVendors}
-            />
+            <div className="flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Currency */}
+                <motion.div
+                  className="col-span-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+                >
+                  <Label
+                    htmlFor="currency"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
+                    Currency *
+                  </Label>
+                  <Select
+                    value={watch("currency") || ""}
+                    onValueChange={(value) => setValue("currency", value)}
+                    disabled={isLoadingCurrencies}
+                  >
+                    <SelectTrigger
+                      className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      size="md"
+                    >
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencyOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.currency && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.currency.message}
+                    </p>
+                  )}
+                </motion.div>
+
+                {/* Vendor */}
+                <motion.div
+                  className="col-span-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
+                >
+                  <Label
+                    htmlFor="vendor"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
+                    Vendor *
+                  </Label>
+                  <Select
+                    value={watch("vendor") || ""}
+                    onValueChange={(value) => setValue("vendor", value)}
+                    disabled={isLoadingVendors}
+                  >
+                    <SelectTrigger
+                      className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      size="md"
+                    >
+                      <SelectValue placeholder="Select vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendorOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.vendor && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.vendor.message}
+                    </p>
+                  )}
+                </motion.div>
+
+                {/* Destination Location */}
+                <motion.div
+                  className="col-span-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
+                >
+                  <Label
+                    htmlFor="destination_location"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
+                    Destination Location *
+                  </Label>
+                  <Select
+                    value={watch("destination_location") || ""}
+                    onValueChange={(value) =>
+                      setValue("destination_location", value)
+                    }
+                    disabled={isLoadingLocations}
+                  >
+                    <SelectTrigger
+                      className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      size="md"
+                    >
+                      <SelectValue placeholder="Select destination location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.destination_location && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.destination_location.message}
+                    </p>
+                  )}
+                </motion.div>
+
+                {/* Payment Terms */}
+                <motion.div
+                  className="col-span-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.4 }}
+                >
+                  <Label
+                    htmlFor="payment_terms"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
+                    Payment Terms *
+                  </Label>
+                  <Input
+                    id="payment_terms"
+                    placeholder="Enter payment terms"
+                    {...register("payment_terms")}
+                    className="h-11 bg-white border border-gray-400 rounded shadow-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                  />
+                  {errors.payment_terms && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.payment_terms.message}
+                    </p>
+                  )}
+                </motion.div>
+
+                {/* Delivery Terms */}
+                <motion.div
+                  className="col-span-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.5 }}
+                >
+                  <Label
+                    htmlFor="delivery_terms"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
+                    Delivery Terms
+                  </Label>
+                  <Input
+                    id="delivery_terms"
+                    placeholder="Enter delivery terms"
+                    {...register("delivery_terms")}
+                    className="h-11 bg-white border border-gray-400 rounded shadow-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                  />
+                </motion.div>
+
+                {/* Purchase Policy */}
+                <motion.div
+                  className="col-span-1 lg:col-span-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.6 }}
+                >
+                  <Label
+                    htmlFor="purchase_policy"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
+                    Purchase Policy
+                  </Label>
+                  <Textarea
+                    id="purchase_policy"
+                    placeholder="Enter purchase policy"
+                    {...register("purchase_policy")}
+                    className="bg-white border border-gray-400 rounded shadow-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                    rows={3}
+                  />
+                </motion.div>
+              </div>
+            </div>
           </motion.div>
 
-          <section className="bg-white  mt-8 border-none">
+          <section className="bg-white mt-8 border-none">
             <div className="mx-auto">
               <div className="overflow-x-auto">
                 <Table className="min-w-[1100px] table-fixed">
@@ -508,7 +713,7 @@ export default function Page() {
                             </div>
                           </TableCell>
 
-                          <TableCell className="border border-gray-200  align-middle text-center">
+                          <TableCell className="border border-gray-200 align-middle text-center">
                             <Input
                               type="number"
                               min={1}
@@ -529,7 +734,7 @@ export default function Page() {
                             </div>
                           </TableCell>
 
-                          <TableCell className="border border-gray-200 px-4  align-middle text-right">
+                          <TableCell className="border border-gray-200 px-4 align-middle text-right">
                             <Input
                               type="number"
                               step="0.01"
@@ -554,6 +759,7 @@ export default function Page() {
 
                           <TableCell className="border border-gray-200 px-4 align-middle text-center">
                             <button
+                              type="button"
                               onClick={() => removeRow(it.id)}
                               aria-label="Remove row"
                               className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
@@ -572,6 +778,7 @@ export default function Page() {
                       {/* Empty cells for alignment */}
                       <TableCell className="bg-white">
                         <Button
+                          type="button"
                           variant="ghost"
                           onClick={addRow}
                           className="flex items-center gap-2 px-3 py-0 text-sm m-auto rounded-md hover:bg-gray-50"
@@ -586,13 +793,6 @@ export default function Page() {
                       <TableCell className="bg-white" />
                       <TableCell className="bg-white" />
                       <TableCell className="bg-white" />
-
-                      {/* <TableCell className="w-28 border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-700">
-                        Total
-                      </TableCell>
-                      <TableCell className="w-16 border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-800 tabular-nums">
-                        {formatCurrency(total)}
-                      </TableCell> */}
                     </TableRow>
                   </TableFooter>
                 </Table>
@@ -619,9 +819,7 @@ export default function Page() {
           >
             <PurchaseRequestFormActions
               formRef={formRef}
-              submitText={
-                isCreating ? "Creating..." : "Create Purchase Request"
-              }
+              submitText={isCreating ? "Creating..." : "Create Purchase Order"}
               isLoading={isCreating}
             />
           </motion.div>

@@ -19,7 +19,7 @@ function PurchaseRequestCard({ request, index }: PurchaseRequestCardProps) {
   const router = useRouter();
 
   const handleCardClick = () => {
-    router.push(`/purchase/purchase_requests/${request.id}`);
+    router.push(`/purchase/purchase_orders/${request.id}`);
   };
 
   return (
@@ -71,17 +71,17 @@ function PurchaseRequestCard({ request, index }: PurchaseRequestCardProps) {
               </span>
             </div>
 
-            {/* Requester */}
+            {/* Created By */}
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Requester:</span>
+              <span className="text-sm text-gray-600">Created By:</span>
               <span className="text-sm font-medium text-gray-900 truncate max-w-32">
                 {request.requester}
               </span>
             </div>
 
-            {/* Request ID */}
+            {/* Order ID */}
             <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-              <span className="text-xs text-gray-500">Request ID:</span>
+              <span className="text-xs text-gray-500">Order ID:</span>
               <span className="text-xs font-mono text-gray-600">
                 {request.id}
               </span>
@@ -137,7 +137,7 @@ export function PurchaseRequestCards({
                 />
               </svg>
             </div>
-            <p className="text-gray-400 text-sm">No purchase requests found</p>
+            <p className="text-gray-400 text-sm">No purchase orders found</p>
           </div>
         </motion.div>
       )}

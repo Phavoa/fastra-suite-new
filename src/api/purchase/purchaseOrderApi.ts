@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
+import type { PurchaseOrderStatus } from "@/components/purchase/types";
 
 // Define types for nested objects
 export interface User {
@@ -45,6 +46,32 @@ export interface VendorDetails {
   is_hidden: boolean;
 }
 
+export interface LocationManagerDetails {
+  url: string;
+  id: number;
+  user: User;
+  role: string;
+  phone_number: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  groups: string[];
+}
+
+export interface StoreKeeperDetails {
+  url: string;
+  id: number;
+  user: User;
+  role: string;
+  phone_number: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  groups: string[];
+}
+
 export interface UnitOfMeasureDetails {
   url: string;
   unit_name: string;
@@ -70,10 +97,10 @@ export interface ProductDetails {
 }
 
 // Define main types
-export interface RfqItem {
+export interface PurchaseOrderItem {
   id: number;
   url: string;
-  request_for_quotation: string;
+  purchase_order: string;
   product: number;
   product_details: ProductDetails;
   qty: number;
@@ -81,91 +108,117 @@ export interface RfqItem {
   total_price: string;
 }
 
-export interface RequestForQuotation {
-  url: string;
+export interface DestinationLocationDetails {
   id: string;
-  expiry_date: string;
-  vendor: number;
-  purchase_request: string;
-  currency: number;
-  status: "draft" | "approved" | "pending" | "rejected";
-  items: RfqItem[];
+  location_code: string;
+  location_name: string;
+  location_type: string;
+  address: string;
+  location_manager: number;
+  location_manager_details: LocationManagerDetails;
+  store_keeper: number;
+  store_keeper_details: StoreKeeperDetails;
+  contact_information: string;
   is_hidden: boolean;
-  is_expired: string;
-  is_submitted: boolean;
-  can_edit: boolean;
-  vendor_details: VendorDetails;
-  currency_details: CurrencyDetails;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  url: string;
+  status: PurchaseOrderStatus;
   date_created: string;
   date_updated: string;
-  rfq_total_price: string;
+  related_rfq: string;
+  created_by: number;
+  vendor: number;
+  currency: number;
+  payment_terms: string;
+  destination_location: string;
+  created_by_details: UserDetails;
+  purchase_policy: string;
+  delivery_terms: string;
+  items: PurchaseOrderItem[];
+  po_total_price: string;
+  vendor_details: VendorDetails;
+  is_hidden: boolean;
+  is_submitted: boolean;
+  can_edit: boolean;
+  currency_details: CurrencyDetails;
+  destination_location_details: DestinationLocationDetails;
 }
 
 // Define query parameter types
-export interface GetRequestForQuotationsParams {
+export interface GetPurchaseOrdersParams {
+  created_by__user_id?: number;
   date_created?: string;
-  purchase_request__id?: string;
+  destination_location__id?: string;
   search?: string;
-  status?: "approved" | "draft" | "pending" | "rejected";
-  [key: string]: string | number | boolean | undefined;
-}
-
-export interface GetRfqItemsParams {
-  request_for_quotation__id?: string;
-  search?: string;
+  status?: PurchaseOrderStatus;
   [key: string]: string | number | boolean | undefined;
 }
 
 // Define request body types
-export interface CreateRfqItemRequest {
+export interface CreatePurchaseOrderItemRequest {
   product: number;
   qty: number;
   estimated_unit_price: string;
 }
 
-export interface UpdateRfqItemRequest {
+export interface UpdatePurchaseOrderItemRequest {
   product: number;
   qty: number;
   estimated_unit_price: string;
 }
 
-export interface PatchRfqItemRequest {
+export interface PatchPurchaseOrderItemRequest {
   product?: number;
   qty?: number;
   estimated_unit_price?: string;
 }
 
-export interface CreateRequestForQuotationRequest {
-  expiry_date: string;
+export interface CreatePurchaseOrderRequest {
+  status?: PurchaseOrderStatus;
+  related_rfq?: string;
+  created_by: number;
   vendor: number;
-  purchase_request: string;
   currency: number;
-  status?: "draft" | "approved" | "pending" | "rejected";
-  items: CreateRfqItemRequest[];
+  payment_terms: string;
+  destination_location: string;
+  purchase_policy?: string;
+  delivery_terms?: string;
+  items: CreatePurchaseOrderItemRequest[];
   is_hidden?: boolean;
   is_submitted?: boolean;
   can_edit?: boolean;
 }
 
-export interface UpdateRequestForQuotationRequest {
-  expiry_date?: string;
+export interface UpdatePurchaseOrderRequest {
+  status?: PurchaseOrderStatus;
+  related_rfq?: string;
+  created_by?: number;
   vendor?: number;
-  purchase_request?: string;
   currency?: number;
-  status?: "draft" | "approved" | "pending" | "rejected";
-  items?: UpdateRfqItemRequest[];
+  payment_terms?: string;
+  destination_location?: string;
+  purchase_policy?: string;
+  delivery_terms?: string;
+  items?: UpdatePurchaseOrderItemRequest[];
   is_hidden?: boolean;
   is_submitted?: boolean;
   can_edit?: boolean;
 }
 
-export interface PatchRequestForQuotationRequest {
-  expiry_date?: string;
+export interface PatchPurchaseOrderRequest {
+  status?: PurchaseOrderStatus;
+  related_rfq?: string;
+  created_by?: number;
   vendor?: number;
-  purchase_request?: string;
   currency?: number;
-  status?: "draft" | "approved" | "pending" | "rejected";
-  items?: PatchRfqItemRequest[];
+  payment_terms?: string;
+  destination_location?: string;
+  purchase_policy?: string;
+  delivery_terms?: string;
+  items?: PatchPurchaseOrderItemRequest[];
   is_hidden?: boolean;
   is_submitted?: boolean;
   can_edit?: boolean;
@@ -179,8 +232,8 @@ const getTenantBaseUrl = (state: RootState): string => {
   return `https://${tenantSchemaName}.${apiDomain}`;
 };
 
-export const requestForQuotationApi = createApi({
-  reducerPath: "requestForQuotationApi",
+export const purchaseOrderApi = createApi({
+  reducerPath: "purchaseOrderApi",
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -245,98 +298,97 @@ export const requestForQuotationApi = createApi({
     }
   },
   endpoints: (builder) => ({
-    // Request For Quotation Query endpoints
-    getRequestForQuotations: builder.query<
-      RequestForQuotation[],
-      GetRequestForQuotationsParams
-    >({
+    // Purchase Order Query endpoints
+    getPurchaseOrders: builder.query<PurchaseOrder[], GetPurchaseOrdersParams>({
       query: (params) => ({
-        url: "/purchase/request-for-quotation/",
+        url: "/purchase/purchase-order/",
         params,
       }),
     }),
-    getRequestForQuotation: builder.query<RequestForQuotation, string>({
-      query: (id) => `/purchase/request-for-quotation/${id}/`,
-    }),
-    // Get approved RFQs for purchase order creation
-    getApprovedRfqList: builder.query<RequestForQuotation[], void>({
-      query: () => "/purchase/request-for-quotation/approved_list/",
+    getPurchaseOrder: builder.query<PurchaseOrder, string>({
+      query: (id) => `/purchase/purchase-order/${id}/`,
     }),
 
-    // Request For Quotation Mutation endpoints
-    createRequestForQuotation: builder.mutation<
-      RequestForQuotation,
-      CreateRequestForQuotationRequest
+    // Purchase Order Mutation endpoints
+    createPurchaseOrder: builder.mutation<
+      PurchaseOrder,
+      CreatePurchaseOrderRequest
     >({
       query: (body) => ({
-        url: "/purchase/request-for-quotation/",
+        url: "/purchase/purchase-order/",
         method: "POST",
         body,
       }),
     }),
-    updateRequestForQuotation: builder.mutation<
-      RequestForQuotation,
-      { id: string; data: UpdateRequestForQuotationRequest }
+    updatePurchaseOrder: builder.mutation<
+      PurchaseOrder,
+      { id: string; data: UpdatePurchaseOrderRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/purchase/request-for-quotation/${id}/`,
+        url: `/purchase/purchase-order/${id}/`,
         method: "PUT",
         body: data,
       }),
     }),
-    patchRequestForQuotation: builder.mutation<
-      RequestForQuotation,
-      { id: string; data: PatchRequestForQuotationRequest }
+    patchPurchaseOrder: builder.mutation<
+      PurchaseOrder,
+      { id: string; data: PatchPurchaseOrderRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/purchase/request-for-quotation/${id}/`,
+        url: `/purchase/purchase-order/${id}/`,
         method: "PATCH",
         body: data,
       }),
     }),
 
-    // RFQ Item Query endpoints
-    getRfqItems: builder.query<RfqItem[], GetRfqItemsParams>({
+    // Purchase Order Item Query endpoints (if needed separately)
+    getPurchaseOrderItems: builder.query<
+      PurchaseOrderItem[],
+      { purchase_order__id?: string }
+    >({
       query: (params) => ({
-        url: "/purchase/request-for-quotation-items/",
+        url: "/purchase/purchase-order-items/",
         params,
       }),
     }),
-    getRfqItem: builder.query<RfqItem, number>({
-      query: (id) => `/purchase/request-for-quotation-items/${id}/`,
+    getPurchaseOrderItem: builder.query<PurchaseOrderItem, number>({
+      query: (id) => `/purchase/purchase-order-items/${id}/`,
     }),
 
-    // RFQ Item Mutation endpoints
-    createRfqItem: builder.mutation<RfqItem, CreateRfqItemRequest>({
+    // Purchase Order Item Mutation endpoints (if needed separately)
+    createPurchaseOrderItem: builder.mutation<
+      PurchaseOrderItem,
+      CreatePurchaseOrderItemRequest
+    >({
       query: (body) => ({
-        url: "/purchase/request-for-quotation-items/",
+        url: "/purchase/purchase-order-items/",
         method: "POST",
         body,
       }),
     }),
-    updateRfqItem: builder.mutation<
-      RfqItem,
-      { id: number; data: UpdateRfqItemRequest }
+    updatePurchaseOrderItem: builder.mutation<
+      PurchaseOrderItem,
+      { id: number; data: UpdatePurchaseOrderItemRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/purchase/request-for-quotation-items/${id}/`,
+        url: `/purchase/purchase-order-items/${id}/`,
         method: "PUT",
         body: data,
       }),
     }),
-    patchRfqItem: builder.mutation<
-      RfqItem,
-      { id: number; data: PatchRfqItemRequest }
+    patchPurchaseOrderItem: builder.mutation<
+      PurchaseOrderItem,
+      { id: number; data: PatchPurchaseOrderItemRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/purchase/request-for-quotation-items/${id}/`,
+        url: `/purchase/purchase-order-items/${id}/`,
         method: "PATCH",
         body: data,
       }),
     }),
-    deleteRfqItem: builder.mutation<void, number>({
+    deletePurchaseOrderItem: builder.mutation<void, number>({
       query: (id) => ({
-        url: `/purchase/request-for-quotation-items/${id}/`,
+        url: `/purchase/purchase-order-items/${id}/`,
         method: "DELETE",
       }),
     }),
@@ -344,19 +396,18 @@ export const requestForQuotationApi = createApi({
 });
 
 export const {
-  // Request For Quotation hooks
-  useGetRequestForQuotationsQuery,
-  useGetRequestForQuotationQuery,
-  useGetApprovedRfqListQuery,
-  useCreateRequestForQuotationMutation,
-  useUpdateRequestForQuotationMutation,
-  usePatchRequestForQuotationMutation,
+  // Purchase Order hooks
+  useGetPurchaseOrdersQuery,
+  useGetPurchaseOrderQuery,
+  useCreatePurchaseOrderMutation,
+  useUpdatePurchaseOrderMutation,
+  usePatchPurchaseOrderMutation,
 
-  // RFQ Item hooks
-  useGetRfqItemsQuery,
-  useGetRfqItemQuery,
-  useCreateRfqItemMutation,
-  useUpdateRfqItemMutation,
-  usePatchRfqItemMutation,
-  useDeleteRfqItemMutation,
-} = requestForQuotationApi;
+  // Purchase Order Item hooks
+  useGetPurchaseOrderItemsQuery,
+  useGetPurchaseOrderItemQuery,
+  useCreatePurchaseOrderItemMutation,
+  useUpdatePurchaseOrderItemMutation,
+  usePatchPurchaseOrderItemMutation,
+  useDeletePurchaseOrderItemMutation,
+} = purchaseOrderApi;

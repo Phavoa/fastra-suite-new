@@ -21,7 +21,7 @@ export function PurchaseRequestRow({
   const router = useRouter();
 
   const handleRowClick = () => {
-    router.push(`/purchase/purchase_requests/${request.id}`);
+    router.push(`/purchase/purchase_orders/${request.id}`);
   };
 
   const handleCheckboxChange = (checked: boolean) => {

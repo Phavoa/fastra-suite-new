@@ -65,7 +65,7 @@ export function PurchaseTable({
             <div className="flex items-center">
               <Checkbox
                 id="select-all"
-                aria-label="Select all purchase requests"
+                aria-label="Select all purchase orders"
                 checked={allSelected}
                 onCheckedChange={() => toggleAll()}
                 className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700 transition-all duration-200"
@@ -74,7 +74,7 @@ export function PurchaseTable({
             <div>Product</div>
             <div>Quantity</div>
             <div>Amount</div>
-            <div>Requester</div>
+            <div>Created By</div>
             <div>Status</div>
           </motion.div>
 
@@ -129,7 +129,7 @@ export function PurchaseTable({
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
           >
-            No purchase requests found
+            No purchase orders found
           </motion.div>
         )}
 
