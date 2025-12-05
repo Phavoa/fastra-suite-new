@@ -11,6 +11,38 @@ export interface User {
   email: string;
 }
 
+export interface NewUserRequest {
+  user_id?: number;
+  name: string;
+  email: string;
+  company_role: number;
+  phone_number: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  access_codes: string[];
+  signature_image?: string;
+  user_image_image?: string;
+}
+
+export interface NewUserResponse {
+  id: number;
+  user_id: number;
+  company_role: number;
+  company_role_details: { id: number; name: string };
+  phone_number: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  temp_password: string;
+  date_created: string;
+  signature: string;
+  user_image: string;
+}
+
+
 // Helper to get tenant-specific base URL
 const getTenantBaseUrl = (state: RootState) => {
   const tenantSchemaName = state.auth.tenant_schema_name;
@@ -31,15 +63,19 @@ export const usersApi = createApi({
     headers.set("accept", "application/json");
 
     let url: string;
+    let method = "GET";
+    let body: any = undefined;
 
     if (typeof args === "string") {
       url = `${baseUrl}${args}`;
     } else {
       url = `${baseUrl}${args.url}`;
+      method = args.method ?? "GET";
+      body = args.body ? JSON.stringify(args.body) : undefined;
     }
 
     try {
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { headers, method, body });
       if (!response.ok) {
         return {
           error: {
@@ -66,7 +102,14 @@ export const usersApi = createApi({
     getUser: builder.query<User, number>({
       query: (id) => `/users/users/${id}/`,
     }),
+    createUser: builder.mutation<NewUserResponse, NewUserRequest>({
+      query: (body) => ({
+        url: "/users/tenant-users/",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
-export const { useGetUsersQuery, useGetUserQuery } = usersApi;
+export const { useGetUsersQuery, useGetUserQuery, useCreateUserMutation } = usersApi;

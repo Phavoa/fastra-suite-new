@@ -36,24 +36,30 @@ export const companyApi = createApi({
 
     const headers = new Headers();
     if (token) headers.set("authorization", `Bearer ${token}`);
-    headers.set("content-type", "application/json");
-    headers.set("accept", "application/json");
 
-    // Determine URL and method
     let url: string;
     let method = "GET";
     let body: any = undefined;
 
+    // Handle args
     if (typeof args === "string") {
       url = `${baseUrl}${args}`;
     } else {
       url = `${baseUrl}${args.url}`;
       method = args.method || "GET";
-      if (args.body) body = JSON.stringify(args.body);
+
+      // ⬇ Detect FormData automatically
+      if (args.body instanceof FormData) {
+        body = args.body;
+      } else if (args.body) {
+        headers.set("content-type", "application/json");
+        body = JSON.stringify(args.body);
+      }
     }
 
     try {
       const response = await fetch(url, { method, headers, body });
+
       if (!response.ok) {
         return {
           error: {
@@ -62,22 +68,32 @@ export const companyApi = createApi({
           },
         };
       }
+
       const data = await response.json();
       return { data };
     } catch (error) {
       return {
         error: {
-          status: "FETCH_ERROR" as const,
+          status: "FETCH_ERROR",
           data: error,
         },
       };
     }
   },
+
   endpoints: (builder) => ({
     getCompany: builder.query<Company, void>({
-    query: () => "/company/update-company-profile/",
-  }),
+      query: () => "/company/update-company-profile/",
+    }),
+
+    updateCompany: builder.mutation<any, FormData>({
+      query: (formData) => ({
+        url: "/company/update-company-profile/",
+        method: "PUT",
+        body: formData, // ← MUST be FormData
+      }),
+    }),
   }),
 });
 
-export const { useGetCompanyQuery } = companyApi;
+export const { useGetCompanyQuery, useUpdateCompanyMutation } = companyApi;
