@@ -158,7 +158,7 @@ const InventoryOperationsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar Placeholder */}
-      <div className="hidden lg:block w-16 bg-white border-r border-gray-200 flex-shrink-0">
+      {/* <div className="hidden lg:block w-16 bg-white border-r border-gray-200 flex-shrink-0">
         <div className="h-full flex flex-col items-center py-4 gap-6">
           <div className="w-10 h-10 bg-blue-600 rounded-lg"></div>
           <div className="flex flex-col gap-4">
@@ -167,7 +167,7 @@ const InventoryOperationsPage: React.FC = () => {
             ))}
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
