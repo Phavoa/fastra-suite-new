@@ -11,12 +11,12 @@ import {
 } from "@/components/shared/AnimatedWrapper";
 import Image from "next/image";
 import React from "react";
-import { StatusPill } from "@/components/purchase/purchaseRequest";
-import ProductItemsTable from "@/components/purchase/purchaseRequest/ProductItemsTable";
+import { StatusPill } from "@/components/purchase/purchaseOrder";
+import ProductItemsTable from "@/components/purchase/purchaseOrder/ProductItemsTable";
 import {
-  useGetPurchaseRequestQuery,
-  usePatchPurchaseRequestMutation,
-} from "@/api/purchase/purchaseRequestApi";
+  useGetPurchaseOrderQuery,
+  usePatchPurchaseOrderMutation,
+} from "@/api/purchase/purchaseOrderApi";
 import { useParams } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
 import { ToastNotification } from "@/components/shared/ToastNotification";
@@ -27,29 +27,29 @@ import { RootState } from "@/lib/store/store";
 
 const Page = () => {
   const params = useParams();
-  const purchaseRequestId = params.id as string;
+  const purchaseOrderId = params.id as string;
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserId = loggedInUser?.id;
 
   const {
-    data: purchaseRequest,
+    data: purchaseOrder,
     isLoading,
     error,
     refetch,
-  } = useGetPurchaseRequestQuery(purchaseRequestId);
+  } = useGetPurchaseOrderQuery(purchaseOrderId);
 
   const [updateStatus, { isLoading: isUpdatingStatus }] =
-    usePatchPurchaseRequestMutation();
+    usePatchPurchaseOrderMutation();
 
-  const isOwnRequest =
-    purchaseRequest?.requester_details?.user?.id === loggedInUserId;
+  const isOwnOrder =
+    purchaseOrder?.created_by_details?.user?.id === loggedInUserId;
 
-  const requesterName = isOwnRequest
+  const creatorName = isOwnOrder
     ? "YOU"
-    : purchaseRequest?.requester_details?.user?.first_name &&
-      purchaseRequest?.requester_details?.user?.last_name
-    ? `${purchaseRequest?.requester_details.user.first_name} ${purchaseRequest?.requester_details.user.last_name}`
-    : "Unknown Requester";
+    : purchaseOrder?.created_by_details?.user?.first_name &&
+      purchaseOrder?.created_by_details?.user?.last_name
+    ? `${purchaseOrder?.created_by_details.user.first_name} ${purchaseOrder?.created_by_details.user.last_name}`
+    : "Unknown Creator";
 
   // Notification state
   const [notification, setNotification] = useState<{
@@ -76,7 +76,7 @@ const Page = () => {
             <div className="text-center">
               <LoadingDots />
               <p className="mt-4 text-gray-600">
-                Loading purchase request details...
+                Loading purchase order details...
               </p>
             </div>
           </div>
@@ -91,15 +91,15 @@ const Page = () => {
       "data" in error
         ? error.data?.detail ||
           error.data?.message ||
-          "Unable to load purchase request details"
-        : "Unable to load purchase request details";
+          "Unable to load purchase order details"
+        : "Unable to load purchase order details";
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-red-500 text-lg font-semibold mb-2">
-                Error Loading Purchase Request
+                Error Loading Purchase Order
               </div>
               <p className="text-gray-600">{errorMessage}</p>
             </div>
@@ -110,17 +110,17 @@ const Page = () => {
   }
 
   // If no data
-  if (!purchaseRequest) {
+  if (!purchaseOrder) {
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-gray-500 text-lg font-semibold mb-2">
-                Purchase Request Not Found
+                Purchase Order Not Found
               </div>
               <p className="text-gray-600">
-                The requested purchase request could not be found.
+                The requested purchase order could not be found.
               </p>
             </div>
           </div>
@@ -132,10 +132,10 @@ const Page = () => {
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
-    { label: "Purchase Requests", href: "/purchase/purchase_requests" },
+    { label: "Purchase Orders", href: "/purchase/purchase_orders" },
     {
-      label: purchaseRequest.id,
-      href: `/purchase/purchase_requests/${purchaseRequest.id}`,
+      label: purchaseOrder.id,
+      href: `/purchase/purchase_orders/${purchaseOrder.id}`,
       current: true,
     },
   ];
@@ -155,22 +155,22 @@ const Page = () => {
 
   // Action handlers
   const handleStatusUpdate = async (
-    newStatus: "approved" | "rejected" | "pending"
+    newStatus: "pending_approval" | "approved" | "rejected"
   ) => {
     try {
       await updateStatus({
-        id: purchaseRequestId,
+        id: purchaseOrderId,
         data: { status: newStatus },
       }).unwrap();
 
-      // Refetch the data to get updated purchase request
+      // Refetch the data to get updated purchase order
       await refetch();
 
       // Show success notification
       const statusMessages = {
-        pending: "Purchase request sent for approval successfully!",
-        approved: "Purchase request approved successfully!",
-        rejected: "Purchase request rejected successfully!",
+        pending_approval: "Purchase order sent for approval successfully!",
+        approved: "Purchase order approved successfully!",
+        rejected: "Purchase order rejected successfully!",
       };
 
       setNotification({
@@ -181,7 +181,7 @@ const Page = () => {
     } catch (error) {
       console.error("Failed to update status:", error);
       setNotification({
-        message: "Failed to update purchase request status. Please try again.",
+        message: "Failed to update purchase order status. Please try again.",
         type: "error",
         show: true,
       });
@@ -189,33 +189,59 @@ const Page = () => {
   };
 
   const handleEdit = () => {
-    window.location.href = `/purchase/purchase_requests/edit/${purchaseRequestId}`;
+    window.location.href = `/purchase/purchase_orders/edit/${purchaseOrderId}`;
   };
 
   const handleSendForApproval = () => {
-    handleStatusUpdate("pending");
+    handleStatusUpdate("pending_approval");
   };
 
-  const handleConvertToRFQ = async () => {
+  const handleActivateOrder = async () => {
     try {
-      // TODO: Implement convert to RFQ functionality
-      console.log("Convert to RFQ clicked");
+      // TODO: Implement activate order functionality
+      console.log("Activate order clicked");
 
       // For now, show a success message
       setNotification({
-        message: "Purchase request converted to RFQ successfully!",
+        message: "Purchase order activated successfully!",
         type: "success",
         show: true,
       });
 
       // In a real implementation, you would make an API call here
       // and then refetch the data
-      // await convertToRFQ({ id: purchaseRequestId }).unwrap();
+      // await activateOrder({ id: purchaseOrderId }).unwrap();
       // await refetch();
     } catch (error) {
-      console.error("Failed to convert to RFQ:", error);
+      console.error("Failed to activate order:", error);
       setNotification({
-        message: "Failed to convert to RFQ. Please try again.",
+        message: "Failed to activate order. Please try again.",
+        type: "error",
+        show: true,
+      });
+    }
+  };
+
+  const handleConvertToIncomingProduct = async () => {
+    try {
+      // TODO: Implement convert to incoming product functionality
+      console.log("Convert to incoming product clicked");
+
+      // For now, show a success message
+      setNotification({
+        message: "Purchase order converted to incoming product successfully!",
+        type: "success",
+        show: true,
+      });
+
+      // In a real implementation, you would make an API call here
+      // and then refetch the data or navigate to the new incoming product
+      // await convertToIncomingProduct({ id: purchaseOrderId }).unwrap();
+      // await refetch();
+    } catch (error) {
+      console.error("Failed to convert to incoming product:", error);
+      setNotification({
+        message: "Failed to convert to incoming product. Please try again.",
         type: "error",
         show: true,
       });
@@ -226,10 +252,10 @@ const Page = () => {
     <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader
         items={items}
-        title="Purchase Request"
+        title="Purchase Order"
         isEdit={
-          purchaseRequest.status === "draft"
-            ? `/purchase/purchase_requests/edit/${purchaseRequest.id}`
+          purchaseOrder.status === "draft"
+            ? `/purchase/purchase_orders/edit/${purchaseOrder.id}`
             : undefined
         }
       />
@@ -241,7 +267,7 @@ const Page = () => {
               Basic Information
             </h2>
 
-            <StatusPill status={purchaseRequest.status} />
+            <StatusPill status={purchaseOrder.status} />
           </div>
         </FadeIn>
 
@@ -261,7 +287,7 @@ const Page = () => {
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
                         ID
                       </h3>
-                      <p className="text-gray-700">{purchaseRequest.id}</p>
+                      <p className="text-gray-700">{purchaseOrder.id}</p>
                     </div>
                   </FadeIn>
 
@@ -269,10 +295,10 @@ const Page = () => {
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Date Opened
+                        Date Created
                       </h3>
                       <p className="text-gray-700">
-                        {formatDate(purchaseRequest.date_created)}
+                        {formatDate(purchaseOrder.date_created)}
                       </p>
                     </div>
                   </FadeIn>
@@ -284,8 +310,8 @@ const Page = () => {
                         Currency
                       </h3>
                       <p className="text-gray-700">
-                        {purchaseRequest.currency_details?.currency_name} (
-                        {purchaseRequest.currency_details?.currency_symbol})
+                        {purchaseOrder.currency_details?.currency_name} (
+                        {purchaseOrder.currency_details?.currency_symbol})
                       </p>
                     </div>
                   </FadeIn>
@@ -307,7 +333,7 @@ const Page = () => {
                         Date Updated
                       </h3>
                       <p className="text-gray-700">
-                        {formatDate(purchaseRequest.date_updated)}
+                        {formatDate(purchaseOrder.date_updated)}
                       </p>
                     </div>
                   </FadeIn>
@@ -319,7 +345,7 @@ const Page = () => {
                         Vendor
                       </h3>
                       <p className="text-gray-700">
-                        {purchaseRequest.vendor_details?.company_name || "N/A"}
+                        {purchaseOrder.vendor_details?.company_name || "N/A"}
                       </p>
                     </div>
                   </FadeIn>
@@ -327,10 +353,21 @@ const Page = () => {
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Purpose
+                        Payment Terms
                       </h3>
                       <p className="text-gray-700">
-                        {purchaseRequest.purpose || "N/A"}
+                        {purchaseOrder.payment_terms || "N/A"}
+                      </p>
+                    </div>
+                  </FadeIn>
+
+                  <FadeIn>
+                    <div className="p-4 transition-colors border-r border-gray-300">
+                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
+                        Purchase Policy
+                      </h3>
+                      <p className="text-gray-700">
+                        {purchaseOrder.purchase_policy || "N/A"}
                       </p>
                     </div>
                   </FadeIn>
@@ -348,10 +385,10 @@ const Page = () => {
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Requesting Location
+                        Destination Location
                       </h3>
                       <p className="text-gray-700">
-                        {purchaseRequest.requesting_location_details
+                        {purchaseOrder.destination_location_details
                           ?.location_name || "N/A"}
                       </p>
                     </div>
@@ -360,9 +397,20 @@ const Page = () => {
                   <FadeIn>
                     <div className="p-4 transition-colors border-r border-gray-300">
                       <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Requester
+                        Delivery Terms
                       </h3>
-                      <p className="text-gray-700">{requesterName}</p>
+                      <p className="text-gray-700">
+                        {purchaseOrder.delivery_terms || "N/A"}
+                      </p>
+                    </div>
+                  </FadeIn>
+
+                  <FadeIn>
+                    <div className="p-4 transition-colors border-r border-gray-300">
+                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
+                        Created By
+                      </h3>
+                      <p className="text-gray-700">{creatorName}</p>
                     </div>
                   </FadeIn>
                 </StaggerContainer>
@@ -371,7 +419,7 @@ const Page = () => {
           </div>
         </div>
 
-        <ProductItemsTable items={purchaseRequest.items} />
+        <ProductItemsTable items={purchaseOrder.items} />
 
         {/* Status-based Action Buttons */}
         <div>
@@ -379,8 +427,8 @@ const Page = () => {
             <div className="h-24"></div>
           </SlideUp>
 
-          {/* Render buttons based on purchase request status */}
-          {purchaseRequest.status === "draft" && (
+          {/* Render buttons based on purchase order status */}
+          {purchaseOrder.status === "draft" && (
             <SlideUp delay={0.2}>
               <div className="flex justify-end gap-4">
                 <Button
@@ -395,7 +443,7 @@ const Page = () => {
             </SlideUp>
           )}
 
-          {purchaseRequest.status === "pending" && (
+          {purchaseOrder.status === "pending_approval" && (
             <SlideUp delay={0.2}>
               <div className="flex justify-end gap-4">
                 <Button
@@ -418,24 +466,39 @@ const Page = () => {
             </SlideUp>
           )}
 
-          {purchaseRequest.status === "approved" && (
+          {purchaseOrder.status === "approved" && (
             <SlideUp delay={0.2}>
               <div className="flex justify-end gap-4">
                 <Button
-                  onClick={handleConvertToRFQ}
+                  onClick={handleActivateOrder}
                   variant="contained"
                   className="text-white bg-[#3B7CED] hover:bg-[#3065c3]"
                 >
-                  Convert to RFQ
+                  Activate Order
                 </Button>
               </div>
             </SlideUp>
           )}
 
-          {purchaseRequest.status === "rejected" && (
+          {(purchaseOrder.status === "rejected" ||
+            purchaseOrder.status === "cancelled") && (
             <SlideUp delay={0.2}>
               <div className="flex justify-end gap-4">
-                {/* No action buttons for rejected status */}
+                {/* No action buttons for rejected/cancelled status */}
+              </div>
+            </SlideUp>
+          )}
+
+          {purchaseOrder.status === "completed" && (
+            <SlideUp delay={0.2}>
+              <div className="flex justify-end gap-4">
+                <Button
+                  onClick={handleConvertToIncomingProduct}
+                  variant="contained"
+                  className="text-white bg-[#3B7CED] hover:bg-[#3065c3]"
+                >
+                  Convert to Incoming Product
+                </Button>
               </div>
             </SlideUp>
           )}

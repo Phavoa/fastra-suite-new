@@ -79,7 +79,7 @@ export function PurchaseTable({
           </motion.div>
 
           <ul className="md:hidden divide-y divide-gray-100">
-            {filtered.map((v, index) => (
+            {/*{filtered.map((v, index) => (
               <motion.li
                 key={v.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -96,6 +96,14 @@ export function PurchaseTable({
                   onToggleSelect={toggleOne}
                 />
               </motion.li>
+            ))}*/}
+            {filtered.map((v) => (
+              <MobilePurchaseRequestItem
+                key={v.id} // move key here
+                request={v}
+                isSelected={!!selected[v.id]}
+                onToggleSelect={toggleOne}
+              />
             ))}
           </ul>
 

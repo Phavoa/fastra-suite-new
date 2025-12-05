@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { PurchaseRequestItem } from "@/api/purchase/purchaseRequestApi";
+import { PurchaseOrderItem } from "@/api/purchase/purchaseOrderApi";
 
 type ProductRow = {
   id: string;
@@ -24,7 +25,7 @@ type ProductRow = {
 };
 
 interface ProductItemsTableProps {
-  items: PurchaseRequestItem[];
+  items: (PurchaseRequestItem | PurchaseOrderItem)[];
 }
 
 const formatCurrency = (value: string) =>
@@ -33,7 +34,7 @@ const formatCurrency = (value: string) =>
     maximumFractionDigits: 0,
   }).format(parseFloat(value));
 
-const computeRowTotal = (item: PurchaseRequestItem) =>
+const computeRowTotal = (item: PurchaseRequestItem | PurchaseOrderItem) =>
   item.qty * parseFloat(item.estimated_unit_price);
 
 const ProductItemsTable: React.FC<ProductItemsTableProps> = ({
@@ -77,7 +78,7 @@ const ProductItemsTable: React.FC<ProductItemsTableProps> = ({
                   colSpan={6}
                   className="text-center py-8 text-gray-500"
                 >
-                  No items found for this purchase request
+                  No items found for this order
                 </TableCell>
               </TableRow>
             </TableBody>

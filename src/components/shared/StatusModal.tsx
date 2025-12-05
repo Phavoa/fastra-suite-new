@@ -1,125 +1,205 @@
 "use client";
 
-import * as React from "react";
-import { CheckCircle, XCircle, AlertCircle, Info } from "lucide-react";
+import React from "react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type StatusType = "success" | "error" | "warning" | "info";
+export type StatusType = "success" | "error" | "warning" | "info";
 
-interface StatusModalProps {
+export interface StatusModalProps {
+  /** Whether the modal is open */
   isOpen: boolean;
+  /** Callback when the modal is closed */
   onClose: () => void;
+  /** The type of status to display */
+  type: StatusType;
+  /** The title of the modal */
   title: string;
-  description: string;
-  status?: StatusType;
-  actionLabel?: string;
+  /** The message to display */
+  message: string;
+  /** Optional action button text (defaults based on type) */
+  actionText?: string;
+  /** Optional callback for the action button */
   onAction?: () => void;
+  /** Optional secondary button text */
+  secondaryText?: string;
+  /** Optional callback for the secondary button */
+  onSecondary?: () => void;
+  /** Whether to show the close button in the header */
   showCloseButton?: boolean;
-  closeOnAction?: boolean;
 }
 
-const statusConfig = {
+const statusConfig: Record<
+  StatusType,
+  {
+    icon: React.ElementType;
+    iconColor: string;
+    bgColor: string;
+    borderColor: string;
+    defaultActionText: string;
+  }
+> = {
   success: {
-    icon: CheckCircle,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
+    icon: CheckCircle2,
+    iconColor: "text-green-500",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    defaultActionText: "Continue",
   },
   error: {
     icon: XCircle,
-    iconBg: "bg-red-50",
-    iconColor: "text-red-600",
+    iconColor: "text-red-500",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-200",
+    defaultActionText: "Try Again",
   },
   warning: {
-    icon: AlertCircle,
-    iconBg: "bg-yellow-50",
-    iconColor: "text-yellow-600",
+    icon: AlertTriangle,
+    iconColor: "text-amber-500",
+    bgColor: "bg-amber-50",
+    borderColor: "border-amber-200",
+    defaultActionText: "Understood",
   },
   info: {
     icon: Info,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
+    iconColor: "text-blue-500",
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
+    defaultActionText: "OK",
   },
 };
 
 export function StatusModal({
   isOpen,
   onClose,
+  type,
   title,
-  description,
-  status = "success",
-  actionLabel = "Continue",
+  message,
+  actionText,
   onAction,
+  secondaryText,
+  onSecondary,
   showCloseButton = true,
-  closeOnAction = true,
 }: StatusModalProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[type];
   const Icon = config.icon;
 
   const handleAction = () => {
     if (onAction) {
       onAction();
-    }
-    if (closeOnAction) {
+    } else {
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className={cn(
-          "sm:max-w-lg",
-          "bg-white border-0 shadow-xl",
-          "data-[state=open]:animate-status-modal-bounce data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-4"
+      <DialogContent className="sm:max-w-md">
+        {showCloseButton && (
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
         )}
-        showCloseButton={showCloseButton}
-      >
-        <DialogHeader className="text-center">
-          <div className="flex mb-4">
-            <div
-              className={cn(
-                "w-14 h-14 rounded-full flex items-center justify-center",
-                config.iconBg,
-                "animate-status-icon-pulse"
-              )}
-            >
-              <Icon
-                className={cn(
-                  "w-7 h-7",
-                  config.iconColor,
-                  "animate-checkmark-draw"
-                )}
-              />
-            </div>
+
+        <DialogHeader className="flex flex-col items-center text-center">
+          <div
+            className={cn(
+              "w-16 h-16 rounded-full flex items-center justify-center mb-4",
+              config.bgColor,
+              config.borderColor,
+              "border"
+            )}
+          >
+            <Icon className={cn("w-8 h-8", config.iconColor)} />
           </div>
-          <DialogTitle className="text-xl font-semibold text-gray-900">
-            {title}
-          </DialogTitle>
-          <DialogDescription className="text-gray-600 text-sm leading-relaxed">
-            {description}
+          <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
+          <DialogDescription className="text-gray-600 mt-2">
+            {message}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex-col gap-2">
+
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">
+          {secondaryText && onSecondary && (
+            <Button
+              variant="outline"
+              onClick={onSecondary}
+              className="w-full sm:w-auto"
+            >
+              {secondaryText}
+            </Button>
+          )}
           <Button
             onClick={handleAction}
-            className="w-full bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white font-medium py-4 px-4 rounded transition-colors border-none"
+            className={cn(
+              "w-full sm:w-auto",
+              type === "success" && "bg-green-600 hover:bg-green-700",
+              type === "error" && "bg-red-600 hover:bg-red-700",
+              type === "warning" && "bg-amber-600 hover:bg-amber-700",
+              type === "info" && "bg-[#3B7CED] hover:bg-[#2d63c7]"
+            )}
           >
-            {actionLabel}
+            {actionText || config.defaultActionText}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+// Hook for easier status modal management
+export interface UseStatusModalReturn {
+  isOpen: boolean;
+  type: StatusType;
+  title: string;
+  message: string;
+  showSuccess: (title: string, message: string) => void;
+  showError: (title: string, message: string) => void;
+  showWarning: (title: string, message: string) => void;
+  showInfo: (title: string, message: string) => void;
+  close: () => void;
+}
+
+export function useStatusModal(): UseStatusModalReturn {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [type, setType] = React.useState<StatusType>("info");
+  const [title, setTitle] = React.useState("");
+  const [message, setMessage] = React.useState("");
+
+  const show = (
+    statusType: StatusType,
+    statusTitle: string,
+    statusMessage: string
+  ) => {
+    setType(statusType);
+    setTitle(statusTitle);
+    setMessage(statusMessage);
+    setIsOpen(true);
+  };
+
+  return {
+    isOpen,
+    type,
+    title,
+    message,
+    showSuccess: (t, m) => show("success", t, m),
+    showError: (t, m) => show("error", t, m),
+    showWarning: (t, m) => show("warning", t, m),
+    showInfo: (t, m) => show("info", t, m),
+    close: () => setIsOpen(false),
+  };
+}
+
+export default StatusModal;
