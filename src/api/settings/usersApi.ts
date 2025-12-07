@@ -11,6 +11,25 @@ export interface User {
   email: string;
 }
 
+export interface TenantUser {
+  id: number;
+  user_id: number;
+  name: string;
+  email: string;
+  company_role: number;
+  company_role_details: { id: number; name: string };
+  phone_number: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  temp_password: string;
+  date_created: string;
+  signature: string;
+  user_image: string;
+}
+
+
 export interface NewUserRequest {
   user_id?: number;
   name: string;
@@ -22,7 +41,7 @@ export interface NewUserRequest {
   in_app_notifications: boolean;
   email_notifications: boolean;
   access_codes: string[];
-  signature_image?: string;
+  signature_image?: File;
   user_image_image?: string;
 }
 
@@ -96,20 +115,44 @@ export const usersApi = createApi({
     }
   },
   endpoints: (builder) => ({
-    getUsers: builder.query<User[], void>({
-      query: () => "/users/users/",
-    }),
-    getUser: builder.query<User, number>({
-      query: (id) => `/users/users/${id}/`,
-    }),
-    createUser: builder.mutation<NewUserResponse, NewUserRequest>({
-      query: (body) => ({
-        url: "/users/tenant-users/",
-        method: "POST",
-        body,
-      }),
+  getUsers: builder.query<User[], void>({
+    query: () => "/users/users/", // list all users
+  }),
+
+  // Original getUser (keep it)
+  getUser: builder.query<User, number>({
+    query: (id) => `/users/users/${id}/`,
+  }),
+
+  // ✅ New tenant-specific getUserById
+  getUserById: builder.query<TenantUser, number>({
+    query: (id) => `/users/tenant-users/${id}/`,
+  }),
+
+  // ✅ Update user mutation for tenant users
+  updateUserById: builder.mutation<TenantUser, { id: number; data: Partial<NewUserRequest> }>({
+    query: ({ id, data }) => ({
+      url: `/users/tenant-users/${id}/`,
+      method: "PUT",
+      body: data,
     }),
   }),
+
+  createUser: builder.mutation<NewUserResponse, NewUserRequest>({
+    query: (body) => ({
+      url: "/users/tenant-users/",
+      method: "POST",
+      body,
+    }),
+  }),
+})
+
 });
 
-export const { useGetUsersQuery, useGetUserQuery, useCreateUserMutation } = usersApi;
+export const { 
+  useGetUsersQuery, 
+  useGetUserQuery,   // original
+  useGetUserByIdQuery, // new tenant-specific
+  useUpdateUserByIdMutation, // new mutation
+  useCreateUserMutation 
+} = usersApi;

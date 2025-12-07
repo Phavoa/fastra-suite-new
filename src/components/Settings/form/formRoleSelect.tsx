@@ -11,6 +11,7 @@ export default function NewUserRoleSelect({
 }) {
   // Fetch company info including roles
   const { data: company, isLoading, error } = useGetCompanyQuery();
+  console.log(company)
 
   // Map roles to select options
   const roleOptions =

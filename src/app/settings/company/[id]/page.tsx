@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useGetCompanyQuery, useUpdateCompanyMutation } from "@/api/settings/companyApi";
 import { FaPlusCircle } from "react-icons/fa";
+import { useRouter } from "next/navigation";
 
 import Form from "@/components/Settings/form/form";
 import FormSection from "@/components/Settings/form/FormSection";
@@ -13,15 +14,17 @@ import FormSelect from "@/components/Settings/form/FormSelect";
 import { industries } from '@teclone/industries';
 import { useSelector } from "react-redux";
 import ISO6391 from "iso-639-1";
-
+import { LoadingDots } from "@/components/shared/LoadingComponents";
 
 export default function CompanyDetails() {
 
   const { data, isLoading } = useGetCompanyQuery();
   const [updateCompany] = useUpdateCompanyMutation();
  const user = useSelector((state: any) => state.auth.user);
- const tenant_company_name = useSelector((state:any) => state.auth.tenant_company_name)
- console.log(user)
+ const tenant_company_name = useSelector((state:any) => state.auth.tenant_company_name);
+ const router = useRouter();
+
+
 
 
   const [form, setForm] = useState({
@@ -36,7 +39,7 @@ export default function CompanyDetails() {
     language: "en",
     company_size: "",
     website: "",
-    roles: [""] as string[], // <-- store roles as string array
+    roles: [] as string[],
     logoPreview: null as string | null,
     logoFile: null as File | null,
   });
@@ -89,31 +92,46 @@ export default function CompanyDetails() {
           label: ISO6391.getName(code),
           value: code,
           }));
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+          const handleSubmit = async (e: React.FormEvent) => {
+            e.preventDefault();
 
-    const fd = new FormData();
+            const fd = new FormData();
 
-    Object.entries(form).forEach(([key, value]) => {
-      if (key === "logoFile" || key === "logoPreview") return;
+            // Append only the fields the backend expects:
+            fd.append("phone", form.phone);
+            fd.append("street_address", form.street_address);
+            fd.append("city", form.city);
+            fd.append("state", form.state);
+            fd.append("country", form.country);
+            fd.append("registration_number", form.registration_number);
+            fd.append("tax_id", form.tax_id);
+            fd.append("industry", form.industry);
+            fd.append("language", form.language);
+            fd.append("company_size", form.company_size);
+            fd.append("website", form.website);
 
-      if (key === "roles") {
-        form.roles.forEach((role, idx) => {
-          fd.append(`roles[${idx}][name]`, role);
-        });
-      } else {
-        fd.append(key, value as any);
-      }
-    });
+            // roles must be JSON
+            const cleanedRoles = form.roles.filter(r => r.trim() !== "");
+            fd.append("roles", JSON.stringify(cleanedRoles.map(r => ({ name: r }))));
 
-    if (form.logoFile) {
-      fd.append("logo_image", form.logoFile);
-    }
+            // image if changed
+            if (form.logoFile) {
+              fd.append("logo_image", form.logoFile);
+            }
 
-    await updateCompany(fd).unwrap();
-  };
+            for (let pair of fd.entries()) {
+              console.log(pair[0], pair[1]);  // verify what's being sent
+            }
 
-  if (isLoading) return <p>Loading...</p>;
+            await updateCompany(fd).unwrap();
+
+            router.push("/settings");
+          };
+
+
+  if (isLoading) return <div className="p-6 flex justify-center items-center">
+        <LoadingDots count={3} />  {/* animated loader */}
+      </div>;
 
   const industryOptions = industries.map((item) => ({
     label: item.name,

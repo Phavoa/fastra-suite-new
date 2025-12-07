@@ -12,6 +12,9 @@ import { LoadingDots } from "@/components/shared/LoadingComponents";
 export default function Settings() {
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const router = useRouter();
+  const tenant_company_name = useSelector(
+      (state: any) => state.auth.tenant_company_name
+    );
 
   const { data: company, isLoading, isError } = useGetCompanyQuery();
 
@@ -72,7 +75,7 @@ export default function Settings() {
             <SettingsCard
               key={item.id ?? 1}
               icon={item.icon}
-              title={item.title}
+              title={tenant_company_name}
               data={item.data}
               className="w-[60%]"
               onClick={() => handleCardClick(item.id)}
