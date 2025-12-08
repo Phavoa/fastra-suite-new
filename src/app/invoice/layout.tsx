@@ -1,6 +1,4 @@
-import { TopNav } from "@/components/inventory/TopNav";
-import { Button } from "@/components/ui/button";
-import { Bell, Menu } from "lucide-react";
+import { TopNav } from "@/components/invoice/TopNav";
 import React from "react";
 
 export default function InventoryLayout({
@@ -10,7 +8,6 @@ export default function InventoryLayout({
 }>) {
   return (
     <div>
-      {/* Top Navigation */}
       <TopNav />
       {children}
     </div>

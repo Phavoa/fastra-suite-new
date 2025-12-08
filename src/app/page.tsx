@@ -42,8 +42,8 @@ type Module = {
 
 const MODULES: Module[] = [
   {
-    id: "accounts",
-    title: "Accounts",
+    id: "invoice",
+    title: "Invoice",
     description:
       "Manage all financial transactions, including invoicing, billing, and ledger entries, to ensure accurate accounting records and financial reporting.",
     color: "green",
@@ -205,7 +205,7 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
 
   const getRoute = (id: string): string | null => {
     const routeMap: Record<string, string> = {
-      accounts: "/account",
+      invoice: "/invoice",
       purchase: "/purchase",
       sales: "/sales",
       finance: "/finance",

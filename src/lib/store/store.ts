@@ -24,6 +24,9 @@ import { tenantUserApi } from "@/api/settings/tenantUserApi";
 import { currencyApi } from "../../api/purchase/currencyApi";
 import { locationApi } from "../../api/inventory/locationApi";
 import { multilocationApi } from "../../api/inventory/multilocationApi";
+import { stockAdjustmentApi } from "../../api/inventory/stockAdjustmentApi";
+import { scrapApi } from "../../api/inventory/scrapApi";
+import { invoiceApi } from "../../api/invoice/invoiceApi";
 import authReducer from "./authSlice";
 import viewModeReducer from "../../components/Settings/viewModeSlice";
 
@@ -54,6 +57,9 @@ const rootReducer = combineReducers({
   [currencyApi.reducerPath]: currencyApi.reducer,
   [locationApi.reducerPath]: locationApi.reducer,
   [multilocationApi.reducerPath]: multilocationApi.reducer,
+  [stockAdjustmentApi.reducerPath]: stockAdjustmentApi.reducer,
+  [scrapApi.reducerPath]: scrapApi.reducer,
+  [invoiceApi.reducerPath]: invoiceApi.reducer,
   [companyApi.reducerPath]: companyApi.reducer,
 });
 
@@ -78,6 +84,9 @@ export const store = configureStore({
       currencyApi.middleware,
       locationApi.middleware,
       multilocationApi.middleware,
+      stockAdjustmentApi.middleware,
+      scrapApi.middleware,
+      invoiceApi.middleware,
       companyApi.middleware
     );
   },
