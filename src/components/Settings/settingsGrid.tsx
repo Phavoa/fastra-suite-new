@@ -3,6 +3,7 @@
 import React from "react";
 import { SettingsCard } from "./settingsCard";
 import userAvatar from "../../../public/images/userAvatar.png";
+import { useSelector } from "react-redux";
 
 type Entity = {
   id: string | number;
@@ -25,6 +26,11 @@ export const SettingsGrid = ({
   type,
   onItemClick,
 }: SettingsGridProps) => {
+
+
+  const tenant_company_name = useSelector(
+      (state: any) => state.auth.tenant_company_name
+    );
   return (
     <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pr-2">
       {dataList.map((item) => {

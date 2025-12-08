@@ -2,7 +2,7 @@
 
 import { BreadcrumbItem } from "@/components/shared/BreadScrumbs";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { GrayButton } from "@/components/ui/grayButton";
 import { CloudUploadFilled } from "@/components/icons/CloudUploadFilled";
@@ -15,6 +15,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const dispatch = useDispatch();
   const archive = useSelector((state: RootState) => state.viewMode.archive); 
+   const router = useRouter()
 
   const navItems = [
     { label: "Company", href: "/settings" },
@@ -43,9 +44,28 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     console.log("Search query:", query);
   };
 
-  const handleNew = () => {
-    console.log("New button clicked for", activeSection);
-  };
+   const handleNew = () => {
+    let newPath = "/settings";
+
+    switch (activeSection) {
+      case "company":
+        newPath += "/company/newcompany";
+        break;
+      case "user":
+        newPath += "/users/newUser";
+        break;
+      case "accessgroup":
+        newPath += "/accessgroup/newAccessGroup";
+        break;
+      case "application":
+        newPath += "/application/newApplication";
+        break;
+      default:
+        newPath += "/new";
+        break;
+    }
+    router.push(newPath); 
+  }
 
   const handleShowArchivedUsers = () => {
     dispatch(setArchive());
