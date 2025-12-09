@@ -28,7 +28,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const activeNav =
   navItems.find((item) => pathname === item.href);
 
-  const activeSection = activeNav?.label.toLowerCase().replace(/\s+/g, "") || "company";
+  const activeSection = activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") || "company";
+
   
 
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -71,6 +72,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     dispatch(setArchive());
 };
 
+const hideControlBar =
+  /^\/settings\/users\/newUser$/.test(pathname) ||
+  /^\/settings\/users\/[^/]+$/.test(pathname) && pathname !== "/settings/users";
 
   return (
     <>
@@ -88,13 +92,16 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </div>
 
       {/* Settings control bar */}
-      <SettingsControlBar
-        activeSection={activeSection as any} // TS will infer the string type; your prop accepts specific literals
-        onSearch={handleSearch}
-        onNew={handleNew}
-        initialView="grid"
-        onShowArchivedUsers={activeSection === "user" ? handleShowArchivedUsers : undefined}
-      />
+      {!hideControlBar && (
+        <SettingsControlBar
+          activeSection={activeSection as any}
+          onSearch={handleSearch}
+          onNew={handleNew}
+          initialView="grid"
+          onShowArchivedUsers={activeSection === "user" ? handleShowArchivedUsers : undefined}
+        />
+      )}
+
 
       {/* Page content */}
       <main>{children}</main>

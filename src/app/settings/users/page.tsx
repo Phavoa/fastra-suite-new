@@ -24,7 +24,7 @@ type User = {
   firstname?: string;
   lastname?: string;
   status: string;
-  createdBy?: string;
+  companyRole?: string;
   phone?: string;
   address?: string;
 };
@@ -36,16 +36,19 @@ export default function Users() {
   const router = useRouter();
 
   const { data: users } = useGetUsersQuery();
+  console.log(users)
 
   const formattedUsers: User[] =
-    users?.map((u: ApiUser) => ({
-      id: u.id ?? 1,
-      name: u.username,
-      email: u.email,
-      firstname: u.first_name,
-      lastname: u.last_name,
-      status: u.status ?? "active",
-    })) ?? [];
+  users?.map((u: any) => ({
+    id: u.id,
+    name: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim(),  
+    email: u.email,
+    companyRole: u.company_role_details?.name ?? "—",               // ROLE NAME
+    phone: u.phone_number ?? "—",
+    address: u.address ?? "—",                                    // optional
+    status: u.status ?? "active",
+  })) ?? [];
+
 
   const finalDataset = archiveFlag
     ? formattedUsers.filter(u => u.status?.toLowerCase() === "archived")
@@ -68,7 +71,7 @@ export default function Users() {
   const headers = [
     { key: "name", label: "Name" },
     { key: "email", label: "Email" },
-    { key: "createdBy", label: "Created By" },
+    { key: "company_role", label: "Company Role" },
     { key: "phone", label: "Phone" },
     { key: "address", label: "Address" },
     ...(archiveFlag ? [{ key: "status", label: "Status" }] : []),
@@ -76,7 +79,7 @@ export default function Users() {
 
   // Navigate to user detail page
   const handleUserClick = (id?: string | number) => {
-    router.push(`/settings/user/${id ?? 1}`);
+    router.push(`/settings/users/${id ?? 1}`);
   };
 
   return (
@@ -86,13 +89,17 @@ export default function Users() {
           icon={<GridCardIcon />}
           dataList={finalDataset}
           type="user"
-          fieldsToShow={["createdBy", "email", "phone"]}
+          fieldsToShow={["companyRole", "email", "phone"]}
           onItemClick={handleUserClick}
         />
       ) : (
         <ReusableTable
           headers={headers}
           data={finalDataset}
+          className="bg-white p-4"
+          headerClassName="bg-[#F1F2F4]"
+          headerTextColor="text-[#7A8A98]"
+          bodyTextColor="text-[#1A1A1A]"
           type="user"
           icon={
             <img

@@ -10,27 +10,45 @@ export interface User {
   last_name: string;
   email: string;
 }
-
 export interface TenantUser {
-  id: number;
-  user_id: number;
-  name: string;
+  user_id?: number;
+  first_name: string;
+  last_name: string;
   email: string;
   company_role: number;
-  company_role_details: { id: number; name: string };
   phone_number: string;
   language: string;
   timezone: string;
   in_app_notifications: boolean;
   email_notifications: boolean;
-  temp_password: string;
-  date_created: string;
-  signature: string;
-  user_image: string;
+  access_codes: string[];
+  signature?: string;
+  user_image_image?: string;
+  user_image?: string;
+  company_role_details: { id: number; name: string };
 }
 
 
 export interface NewUserRequest {
+  user_id?: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  company_role: number;
+  phone_number: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  access_codes: string[];
+  signature_image?: string;
+  user_image_image?: string;
+  
+}
+
+
+
+/*export interface NewUserRequest {
   user_id?: number;
   name: string;
   email: string;
@@ -43,7 +61,7 @@ export interface NewUserRequest {
   access_codes: string[];
   signature_image?: File;
   user_image_image?: string;
-}
+}*/
 
 export interface NewUserResponse {
   id: number;
@@ -72,51 +90,54 @@ const getTenantBaseUrl = (state: RootState) => {
 export const usersApi = createApi({
   reducerPath: "usersApi",
   baseQuery: async (args, api) => {
-    const state = api.getState() as RootState;
-    const baseUrl = getTenantBaseUrl(state);
-    const token = state.auth.access_token;
+  const state = api.getState() as RootState;
+  const baseUrl = getTenantBaseUrl(state);
+  const token = state.auth.access_token;
 
-    const headers = new Headers();
-    if (token) headers.set("authorization", `Bearer ${token}`);
-    headers.set("content-type", "application/json");
-    headers.set("accept", "application/json");
+  let url: string;
+  let method = "GET";
+  let body: any = undefined;
 
-    let url: string;
-    let method = "GET";
-    let body: any = undefined;
+  const headers = new Headers();
+  if (token) headers.set("authorization", `Bearer ${token}`);
+  headers.set("accept", "application/json");
 
-    if (typeof args === "string") {
-      url = `${baseUrl}${args}`;
-    } else {
-      url = `${baseUrl}${args.url}`;
-      method = args.method ?? "GET";
-      body = args.body ? JSON.stringify(args.body) : undefined;
+  if (typeof args === "string") {
+    url = `${baseUrl}${args}`;
+  } else {
+    url = `${baseUrl}${args.url}`;
+    method = args.method ?? "GET";
+
+    // If body is FormData, don't JSON.stringify it, don't set content-type
+    if (args.body instanceof FormData) {
+      body = args.body;
+    } else if (args.body) {
+      body = JSON.stringify(args.body);
+      headers.set("content-type", "application/json");
     }
+  }
 
-    try {
-      const response = await fetch(url, { headers, method, body });
-      if (!response.ok) {
-        return {
-          error: {
-            status: response.status,
-            data: await response.json(),
-          },
-        };
-      }
-      const data = await response.json();
-      return { data };
-    } catch (error) {
+  try {
+    const response = await fetch(url, { method, body, headers });
+    if (!response.ok) {
       return {
         error: {
-          status: "FETCH_ERROR" as const,
-          data: error,
+          status: response.status,
+          data: await response.json(),
         },
       };
     }
-  },
+    const data = await response.json();
+    return { data };
+  } catch (error) {
+    return {
+      error: { status: "FETCH_ERROR" as const, data: error },
+    };
+  }
+},
   endpoints: (builder) => ({
   getUsers: builder.query<User[], void>({
-    query: () => "/users/users/", // list all users
+    query: () => "/users/tenant-users/", // list all users
   }),
 
   // Original getUser (keep it)
@@ -130,10 +151,10 @@ export const usersApi = createApi({
   }),
 
   // ✅ Update user mutation for tenant users
-  updateUserById: builder.mutation<TenantUser, { id: number; data: Partial<NewUserRequest> }>({
+  updateUserById: builder.mutation<NewUserResponse, { id: number; data: FormData }>({
     query: ({ id, data }) => ({
-      url: `/users/tenant-users/${id}/`,
-      method: "PUT",
+      url: `/users/tenant-users/edit/${id}/`,
+      method: "PATCH",
       body: data,
     }),
   }),
