@@ -20,6 +20,8 @@ import { purchaseOrderApi } from "../../api/purchase/purchaseOrderApi";
 import { requestForQuotationApi } from "../../api/purchase/requestForQuotationApi";
 import { companyApi } from "@/api/settings/companyApi";
 import { usersApi } from "@/api/settings/usersApi";
+import { accessGroupRightApi } from "@/api/settings/accessGroupRightApi";
+import { applicationsApi } from "@/api/settings/applicationsApi";
 import { tenantUserApi } from "@/api/settings/tenantUserApi";
 import { currencyApi } from "../../api/purchase/currencyApi";
 import { locationApi } from "../../api/inventory/locationApi";
@@ -61,6 +63,8 @@ const rootReducer = combineReducers({
   [scrapApi.reducerPath]: scrapApi.reducer,
   [invoiceApi.reducerPath]: invoiceApi.reducer,
   [companyApi.reducerPath]: companyApi.reducer,
+  [accessGroupRightApi.reducerPath]: accessGroupRightApi.reducer,
+  [applicationsApi.reducerPath]: applicationsApi.reducer,
 });
 
 export const store = configureStore({
@@ -87,7 +91,9 @@ export const store = configureStore({
       stockAdjustmentApi.middleware,
       scrapApi.middleware,
       invoiceApi.middleware,
-      companyApi.middleware
+      companyApi.middleware,
+      accessGroupRightApi.middleware,
+      applicationsApi.middleware
     );
   },
 });

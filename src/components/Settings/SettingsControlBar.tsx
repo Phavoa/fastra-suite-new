@@ -29,7 +29,7 @@ export const SettingsControlBar = ({
   const [search, setSearch] = useState("");
   const dispatch = useDispatch();
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
-  const archive = useSelector((state: RootState) => state.viewMode.archive); 
+  const archive = useSelector((state: RootState) => state.viewMode.archive);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -39,7 +39,7 @@ export const SettingsControlBar = ({
   const handleToggleView = (mode: "grid" | "list") => {
     dispatch(setViewMode(mode));
   };
-  console.log(activeSection)
+  console.log(activeSection);
   const getButtonLabel = () => {
     switch (activeSection) {
       case "company":
@@ -75,7 +75,6 @@ export const SettingsControlBar = ({
 
       {/* Right Controls */}
       <div className="flex gap-3 items-center">
-
         {/* Primary Button */}
         <GrayButton
           size="md"
@@ -89,14 +88,14 @@ export const SettingsControlBar = ({
         {activeSection === "user" && (
           <GrayButton
             size="md"
-            className={archive
-              ? "bg-[#3B7CED] text-white":
-              "bg-white border border-[#3B7CED] text-[#3B7CED]"
+            className={
+              archive
+                ? "bg-[#3B7CED] text-white"
+                : "bg-white border border-[#3B7CED] text-[#3B7CED]"
             }
-           
             onClick={onShowArchivedUsers}
           >
-            Archived Users
+            {/* Archived Users */}
           </GrayButton>
         )}
 
