@@ -223,8 +223,23 @@ const Page = () => {
   };
 
   const handleConvertToIncomingProduct = () => {
-    // Navigate to the fromPO page with the purchase order ID
-    window.location.href = `/inventory/operation/incoming_product/fromPO?poId=${purchaseOrderId}`;
+    try {
+      // For now, show a success message
+      setNotification({
+        message: "Purchase order converted to incoming product successfully!",
+        type: "success",
+        show: true,
+      });
+
+      // Navigate to the fromPO page with the purchase order ID
+      window.location.href = `/inventory/operation/incoming_product/fromPO?poId=${purchaseOrderId}`;
+    } catch (error) {
+      setNotification({
+        message: "Failed to convert to incoming product. Please try again.",
+        type: "error",
+        show: true,
+      });
+    }
   };
 
   return (
