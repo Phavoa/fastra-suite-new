@@ -103,7 +103,7 @@ export const store = configureStore({
       incomingProductApi.middleware,
       deliveryOrderApi.middleware,
       deliveryOrderReturnApi.middleware,
-      internalTransferApi.middleware
+      internalTransferApi.middleware,
       accessGroupRightApi.middleware,
       applicationsApi.middleware
     );
