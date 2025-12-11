@@ -29,6 +29,10 @@ import { scrapApi } from "../../api/inventory/scrapApi";
 import { invoiceApi } from "../../api/invoice/invoiceApi";
 import authReducer from "./authSlice";
 import viewModeReducer from "../../components/Settings/viewModeSlice";
+import { incomingProductApi } from "@/api/inventory/incomingProductApi";
+import { deliveryOrderApi } from "@/api/inventory/deliveryOrderApi";
+import { deliveryOrderReturnApi } from "@/api/inventory/deliveryOrderReturnApi";
+import { internalTransferApi } from "@/api/inventory/internalTransferApi";
 
 const authPersistConfig = {
   key: "auth",
@@ -61,6 +65,10 @@ const rootReducer = combineReducers({
   [scrapApi.reducerPath]: scrapApi.reducer,
   [invoiceApi.reducerPath]: invoiceApi.reducer,
   [companyApi.reducerPath]: companyApi.reducer,
+  [incomingProductApi.reducerPath]: incomingProductApi.reducer,
+  [deliveryOrderApi.reducerPath]: deliveryOrderApi.reducer,
+  [deliveryOrderReturnApi.reducerPath]: deliveryOrderReturnApi.reducer,
+  [internalTransferApi.reducerPath]: internalTransferApi.reducer,
 });
 
 export const store = configureStore({
@@ -87,7 +95,11 @@ export const store = configureStore({
       stockAdjustmentApi.middleware,
       scrapApi.middleware,
       invoiceApi.middleware,
-      companyApi.middleware
+      companyApi.middleware,
+      incomingProductApi.middleware,
+      deliveryOrderApi.middleware,
+      deliveryOrderReturnApi.middleware,
+      internalTransferApi.middleware
     );
   },
 });

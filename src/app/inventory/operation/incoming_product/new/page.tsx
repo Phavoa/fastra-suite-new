@@ -1,717 +1,905 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
-import { useForm, useFieldArray, UseFormReturn } from "react-hook-form";
+import React, { useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { PageHeader } from "@/components/purchase/products/PageHeader";
+import { BreadcrumbItem } from "@/types/purchase";
+import { useCreateIncomingProductMutation } from "@/api/inventory/incomingProductApi";
+import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetProductsQuery } from "@/api/purchase/productsApi";
+import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
-  ChevronDown,
-  Plus,
-  Trash2,
-  ArrowLeft,
-  CloudUpload,
-} from "lucide-react";
+  FadeIn,
+  SlideUp,
+  StaggerContainer,
+} from "@/components/shared/AnimatedWrapper";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
+import { Button } from "@/components/ui/button";
+import { Plus, Trash } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { z } from "zod";
+import type { Resolver } from "react-hook-form";
+import type { CreateIncomingProductRequest } from "@/types/incomingProduct";
 
-// --- 1. TYPES & SCHEMA ---
+type Option = { value: string; label: string };
 
-type Product = {
-  id: number;
-  product_name: string;
-  available_product_quantity: number;
-  unit_of_measure_details: {
-    unit_symbol: string;
-  };
-};
-
-type Vendor = {
-  id: number;
-  company_name: string;
-};
-
-type Location = {
+// Incoming product item type
+interface IncomingProductLineItem {
   id: string;
-  location_name: string;
-};
+  product: string;
+  product_details: {
+    product_name: string;
+    product_description: string;
+    unit_of_measure_details: {
+      unit_symbol: string;
+    };
+  };
+  expected_quantity: string;
+  quantity_received: string;
+}
 
-// Zod Schema
-const productLineSchema = z.object({
-  productName: z.string().min(1, "Product name is required"),
-  productId: z
-    .number()
-    .refine((val) => val !== 0, { message: "Product must be selected" }),
-  expectedQty: z.string(), // Holds Unit of Measure Symbol
-  unitOfMeasure: z.number(), // Holds Available Quantity
-  qtyReceived: z.number().min(1, "Quantity received must be at least 1"),
-});
-
-const formSchema = z.object({
-  receiptType: z.string().min(1, "Receipt type is required"),
-  supplierName: z.string().min(1, "Supplier name is required"),
-  location: z.string().min(1, "Location is required"),
-  productLines: z
-    .array(productLineSchema)
-    .min(1, "At least one product line is required"),
-});
-
-type FormData = z.infer<typeof formSchema>;
-type ProductLine = FormData["productLines"][number];
-
-// --- 2. MOCK DATA ---
-
-const products: Product[] = [
-  {
-    id: 10,
-    product_name: "Puffpuff",
-    available_product_quantity: 50,
-    unit_of_measure_details: { unit_symbol: "Pcs" },
-  },
-  {
-    id: 9,
-    product_name: "Sugar",
-    available_product_quantity: 0,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 8,
-    product_name: "Phone",
-    available_product_quantity: 1,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 7,
-    product_name: "Comb",
-    available_product_quantity: 0,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 6,
-    product_name: "Keyboard",
-    available_product_quantity: 40,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 5,
-    product_name: "Laptop",
-    available_product_quantity: 0,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 4,
-    product_name: "BLUESEA DIAPERS",
-    available_product_quantity: 0,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 3,
-    product_name: "House service",
-    available_product_quantity: 0,
-    unit_of_measure_details: { unit_symbol: "m" },
-  },
-  {
-    id: 2,
-    product_name: "Plastic Chair",
-    available_product_quantity: 53,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-  {
-    id: 1,
-    product_name: "Meat burger",
-    available_product_quantity: 0,
-    unit_of_measure_details: { unit_symbol: "kg" },
-  },
-];
-
-const vendors: Vendor[] = [
-  { id: 4, company_name: "G-Mama kiosk" },
-  { id: 3, company_name: "Minat Venture" },
-  { id: 2, company_name: "Clean cut" },
-  { id: 1, company_name: "Cee Qee" },
-];
-
-const activeLocation: Location[] = [
-  { id: "IB1200001", location_name: "Cocoa house" },
-  { id: "KAD100001", location_name: "Kaduna Store" },
-];
-
+// Form schema for incoming product creation
 const receiptTypes = [
   "vendor_receipt",
   "manufacturing_receipt",
-  "internal_receipt",
+  "internal_transfer",
   "returns",
   "scrap",
+] as const;
+
+const incomingProductSchema = z.object({
+  receipt_type: z.enum(receiptTypes),
+  supplier: z.string().min(1, "Supplier is required"),
+  source_location: z.string().min(1, "Source location is required"),
+  destination_location: z.string().min(1, "Destination location is required"),
+  related_po: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type IncomingProductFormData = z.infer<typeof incomingProductSchema>;
+
+const initialItems: IncomingProductLineItem[] = [
+  {
+    id: "1",
+    product: "",
+    product_details: {
+      product_name: "",
+      product_description: "",
+      unit_of_measure_details: {
+        unit_symbol: "",
+      },
+    },
+    expected_quantity: "",
+    quantity_received: "",
+  },
 ];
 
-// --- 3. UTILITY FUNCTIONS ---
+export default function Page() {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
 
-const formatDate = (date: Date): string => {
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const day = date.getDate();
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  let hours = date.getHours();
-  const minutes = date.getMinutes().toString().padStart(2, "0");
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12;
+  // API mutations and queries
+  const [createIncomingProduct, { isLoading: isCreating }] =
+    useCreateIncomingProductMutation();
+  const { data: locations, isLoading: isLoadingLocations } =
+    useGetActiveLocationsQuery();
+  const {
+    data: vendors,
+    isLoading: isLoadingVendors,
+    error: vendorsError,
+  } = useGetVendorsQuery({});
+  const {
+    data: products,
+    isLoading: isLoadingProducts,
+    error: productsError,
+  } = useGetProductsQuery({});
 
-  return `${day} ${month} ${year} - ${hours}:${minutes} ${ampm}`;
-};
+  // Form state
+  const [items, setItems] = useState<IncomingProductLineItem[]>(initialItems);
 
-const normalizeText = (text: string): string => {
-  return text
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
+  const addRow = () =>
+    setItems((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        product: "",
+        product_details: {
+          product_name: "",
+          product_description: "",
+          unit_of_measure_details: {
+            unit_symbol: "",
+          },
+        },
+        expected_quantity: "",
+        quantity_received: "",
+      },
+    ]);
 
-// --- 4. SUB-COMPONENTS ---
+  const removeRow = (id: string) =>
+    setItems((prev) => prev.filter((p) => p.id !== id));
 
-interface FormHeaderProps {
-  receiptDate: string;
-}
+  const updateItem = (id: string, patch: Partial<IncomingProductLineItem>) =>
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
+    );
 
-const FormHeader: React.FC<FormHeaderProps> = ({ receiptDate }) => (
-  <>
-    {/* Breadcrumb & Autosave */}
-    <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-10 shadow-sm">
-      <div className="flex items-center justify-between max-w-7xl mx-auto">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <a href="#" className="hover:text-gray-900">
-            Home
-          </a>
-          <span>{`>`}</span>
-          <a href="#" className="hover:text-gray-900">
-            Inventory
-          </a>
-          <span>{`>`}</span>
-          <span className="text-gray-900 font-medium">Operation</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="text-xs italic">Autosaved: {receiptDate}</span>
-          <CloudUpload className="w-4 h-4 text-gray-400" />
-        </div>
-      </div>
-    </div>
-    {/* Page Title */}
-    <div className="max-w-7xl mx-auto pt-8 pb-4">
-      <button className="flex items-center text-gray-600 hover:text-gray-900">
-        <ArrowLeft className="w-5 h-5 mr-2" />
-        <span className="text-2xl font-bold text-gray-900">
-          New Incoming Product Receipt
-        </span>
-      </button>
-    </div>
-  </>
-);
-
-interface BasicInfoSectionProps {
-  register: UseFormReturn<FormData>["register"];
-  errors: UseFormReturn<FormData>["formState"]["errors"];
-  receiptDate: string;
-}
-
-const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
-  register,
-  errors,
-  receiptDate,
-}) => (
-  <div className="bg-white rounded-xl shadow-lg p-8 mb-8 border border-gray-100">
-    <h2 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">
-      Basic Information
-    </h2>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      {/* Receipt Type */}
-      <div>
-        <label
-          htmlFor="receiptType"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
-          Receipt Type
-        </label>
-        <div className="relative">
-          <select
-            id="receiptType"
-            {...register("receiptType")}
-            className={`w-full px-4 py-2.5 border rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-              errors.receiptType ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select receipt type</option>
-            {receiptTypes.map((type) => (
-              <option key={type} value={type}>
-                {normalizeText(type)}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-        </div>
-        {errors.receiptType && (
-          <p className="mt-1 text-sm text-red-600 font-medium">
-            {errors.receiptType.message}
-          </p>
-        )}
-      </div>
-
-      {/* Receipt Date (Non-editable) */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Receipt Date
-        </label>
-        <input
-          type="text"
-          value={receiptDate}
-          disabled
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-        />
-      </div>
-
-      {/* Name of Supplier */}
-      <div>
-        <label
-          htmlFor="supplierName"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
-          Name of Supplier
-        </label>
-        <div className="relative">
-          <select
-            id="supplierName"
-            {...register("supplierName")}
-            className={`w-full px-4 py-2.5 border rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-              errors.supplierName ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Enter supplier's name</option>
-            {vendors.map((vendor) => (
-              <option key={vendor.id} value={vendor.company_name}>
-                {vendor.company_name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-        </div>
-        {errors.supplierName && (
-          <p className="mt-1 text-sm text-red-600 font-medium">
-            {errors.supplierName.message}
-          </p>
-        )}
-      </div>
-
-      {/* Location */}
-      <div>
-        <label
-          htmlFor="location"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
-          Location
-        </label>
-        <div className="relative">
-          <select
-            id="location"
-            {...register("location")}
-            className={`w-full px-4 py-2.5 border rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-              errors.location ? "border-red-500" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select your location</option>
-            {activeLocation.map((loc) => (
-              <option key={loc.id} value={loc.location_name}>
-                {loc.location_name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-        </div>
-        {errors.location && (
-          <p className="mt-1 text-sm text-red-600 font-medium">
-            {errors.location.message}
-          </p>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
-interface ProductLineRowProps {
-  index: number;
-  field: ProductLine & { id: string };
-  register: UseFormReturn<FormData>["register"];
-  errors: UseFormReturn<FormData>["formState"]["errors"];
-  watch: UseFormReturn<FormData>["watch"];
-  remove: (index?: number | number[]) => void;
-  hoveredIndex: number | null;
-  setHoveredIndex: React.Dispatch<React.SetStateAction<number | null>>;
-  searchTerms: { [key: number]: string };
-  showDropdowns: { [key: number]: boolean };
-  handleProductSearch: (index: number, value: string) => void;
-  handleProductSelect: (index: number, product: Product) => void;
-  getFilteredProducts: (index: number) => Product[];
-}
-
-const ProductLineRow: React.FC<ProductLineRowProps> = ({
-  index,
-  field,
-  register,
-  errors,
-  watch,
-  remove,
-  hoveredIndex,
-  setHoveredIndex,
-  searchTerms,
-  showDropdowns,
-  handleProductSearch,
-  handleProductSelect,
-  getFilteredProducts,
-}) => {
-  const lineErrors = errors.productLines?.[index];
-
-  return (
-    <tr
-      key={field.id}
-      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-      onMouseEnter={() => setHoveredIndex(index)}
-      onMouseLeave={() => setHoveredIndex(null)}
-    >
-      {/* Product Name with Autocomplete */}
-      <td className="py-4 px-4 min-w-[250px]">
-        <div className="relative">
-          <input
-            type="text"
-            {...register(`productLines.${index}.productName`)}
-            onChange={(e) => handleProductSearch(index, e.target.value)}
-            onFocus={() => handleProductSearch(index, searchTerms[index] || "")} // Re-open dropdown on focus
-            onBlur={() =>
-              setTimeout(
-                () =>
-                  handleProductSearch(
-                    index,
-                    watch(`productLines.${index}.productName`)
-                  ),
-                200
-              )
-            } // Close dropdown after a short delay
-            placeholder="Type to search..."
-            className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-              lineErrors?.productName ? "border-red-500" : "border-gray-300"
-            }`}
-            autoComplete="off"
-          />
-
-          {showDropdowns[index] && getFilteredProducts(index).length > 0 && (
-            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-              {getFilteredProducts(index).map((product) => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => handleProductSelect(index, product)}
-                  className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 text-sm transition-colors"
-                >
-                  {product.product_name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {lineErrors?.productName && (
-          <p className="mt-1 text-xs text-red-600">
-            {lineErrors.productName.message}
-          </p>
-        )}
-      </td>
-
-      {/* Expected QTY (auto-filled, actually Unit of Measure symbol) */}
-      <td className="py-4 px-4">
-        <input
-          type="text"
-          value={watch(`productLines.${index}.expectedQty`) || "N/A"}
-          disabled
-          className="w-24 text-center px-3 py-2 border border-gray-300 rounded bg-gray-50 text-gray-600 cursor-not-allowed"
-        />
-      </td>
-
-      {/* Unit of Measure (auto-filled, actually Available Quantity) */}
-      <td className="py-4 px-4">
-        <input
-          type="text"
-          value={watch(`productLines.${index}.unitOfMeasure`) || 0}
-          disabled
-          className="w-28 text-center px-3 py-2 border border-gray-300 rounded bg-gray-50 text-gray-600 cursor-not-allowed"
-        />
-      </td>
-
-      {/* QTY Received (user input) */}
-      <td className="py-4 px-4 min-w-[150px]">
-        <input
-          type="number"
-          {...register(`productLines.${index}.qtyReceived`, {
-            valueAsNumber: true,
-          })}
-          placeholder="0"
-          min="1"
-          className={`w-32 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-right ${
-            lineErrors?.qtyReceived ? "border-red-500" : "border-gray-300"
-          }`}
-        />
-        {lineErrors?.qtyReceived && (
-          <p className="mt-1 text-xs text-red-600">
-            {lineErrors.qtyReceived.message}
-          </p>
-        )}
-      </td>
-
-      {/* Delete button */}
-      <td className="py-4 px-4 w-12 text-center">
-        {hoveredIndex === index && (
-          <button
-            type="button"
-            onClick={() => remove(index)}
-            className="text-red-500 hover:text-red-700 transition-colors p-2 rounded-full hover:bg-red-50"
-            aria-label={`Remove product line ${index + 1}`}
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        )}
-      </td>
-    </tr>
-  );
-};
-
-// --- 5. MAIN COMPONENT ---
-
-export default function CreateIncomingProductForm() {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [searchTerms, setSearchTerms] = useState<{ [key: number]: string }>({});
-  const [showDropdowns, setShowDropdowns] = useState<{
-    [key: number]: boolean;
-  }>({});
-
-  const receiptDate = useMemo(() => formatDate(new Date()), []);
-
+  // React Hook Form setup
   const {
     register,
-    control,
     handleSubmit,
-    watch,
     setValue,
-    formState: { errors, isValid },
-  } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    mode: "onChange",
+    watch,
+    formState: { errors },
+    reset,
+  } = useForm<IncomingProductFormData>({
+    resolver: zodResolver(
+      incomingProductSchema
+    ) as Resolver<IncomingProductFormData>,
     defaultValues: {
-      receiptType: "",
-      supplierName: "",
-      location: "",
-      productLines: [
-        {
-          productName: "",
-          productId: 0,
-          expectedQty: "",
-          unitOfMeasure: 0,
-          qtyReceived: 0,
-        },
-      ],
+      receipt_type: "vendor_receipt",
+      supplier: "",
+      source_location: "",
+      destination_location: "",
+      related_po: null,
+      notes: "",
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "productLines",
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+
+  // Notification state
+  const [notification, setNotification] = React.useState<{
+    message: string;
+    type: "success" | "error";
+    show: boolean;
+  }>({
+    message: "",
+    type: "success",
+    show: false,
   });
 
-  // Handler to open dropdown and filter products based on input
-  const handleProductSearch = useCallback((index: number, value: string) => {
-    setSearchTerms((prev) => ({ ...prev, [index]: value }));
-    // Only show dropdown if value is present or if we are actively focused (re-opening on focus is handled by onFocus in the input)
-    if (value.length > 0) {
-      setShowDropdowns((prev) => ({ ...prev, [index]: true }));
-    } else {
-      // Close dropdown if input is cleared, but only if the product hasn't been selected yet
-      // We rely on onBlur to close the dropdown properly after selection
+  // Convert API data to option format
+  const locationOptions: Option[] =
+    locations?.map((location) => ({
+      value: location.id.toString(),
+      label: `${location.location_name} (${location.location_code})`,
+    })) || [];
+
+  const vendorOptions: Option[] =
+    vendors?.map((vendor) => ({
+      value: vendor.id.toString(),
+      label: vendor.company_name,
+    })) || [];
+
+  const productOptions: Option[] =
+    products?.map((product) => ({
+      value: product.id.toString(),
+      label: product.product_name,
+    })) || [];
+
+  // Show notification if products or vendors fail to load
+  React.useEffect(() => {
+    if (productsError) {
+      setNotification({
+        message:
+          "Failed to load products. Please check your connection and try again.",
+        type: "error",
+        show: true,
+      });
     }
-  }, []);
+  }, [productsError]);
 
-  // Handler when a product is selected from the dropdown
-  const handleProductSelect = useCallback(
-    (index: number, product: Product) => {
-      setValue(`productLines.${index}.productName`, product.product_name, {
-        shouldValidate: true,
+  React.useEffect(() => {
+    if (vendorsError) {
+      setNotification({
+        message:
+          "Failed to load vendors. Please check your connection and try again.",
+        type: "error",
+        show: true,
       });
-      setValue(`productLines.${index}.productId`, product.id, {
-        shouldValidate: true,
-      });
-      setValue(
-        `productLines.${index}.expectedQty`,
-        product.unit_of_measure_details.unit_symbol
-      );
-      setValue(
-        `productLines.${index}.unitOfMeasure`,
-        product.available_product_quantity
-      );
-      setShowDropdowns((prev) => ({ ...prev, [index]: false }));
-      setSearchTerms((prev) => ({ ...prev, [index]: "" })); // Clear the search term after selection
-    },
-    [setValue]
-  );
+    }
+  }, [vendorsError]);
 
-  // Utility to filter products based on the current search term for a row
-  const getFilteredProducts = useCallback(
-    (index: number) => {
-      const term = searchTerms[index] || "";
-      if (!term) return products.slice(0, 10); // Show top 10 products if no search term
-      return products.filter((p) =>
-        p.product_name.toLowerCase().includes(term.toLowerCase())
-      );
+  const breadcrumsItem: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Inventory", href: "/inventory" },
+    {
+      label: "Operation",
+      href: "/inventory/operation",
     },
-    [searchTerms]
-  );
+    {
+      label: "Incoming Product",
+      href: "/inventory/operation/incoming_product",
+    },
+    {
+      label: "New",
+      href: "/inventory/operation/incoming_product/new",
+      current: true,
+    },
+  ];
 
-  // Form submission handler
-  const onSubmit = (data: FormData) => {
-    console.log("Form submitted successfully:", data);
-    // Add logic for API call here
+  // Helper function to validate and prepare data
+  const prepareSubmissionData = (
+    data: IncomingProductFormData,
+    status: "draft" | "validated"
+  ): CreateIncomingProductRequest | null => {
+    const validItems = items.filter(
+      (item) => item.product && item.expected_quantity && item.quantity_received
+    );
+
+    if (validItems.length === 0) {
+      return null;
+    }
+
+    return {
+      receipt_type: data.receipt_type,
+      related_po: data.related_po || null,
+      supplier: parseInt(data.supplier),
+      source_location: data.source_location,
+      destination_location: data.destination_location,
+      incoming_product_items: validItems.map((item) => ({
+        product: parseInt(item.product),
+        expected_quantity: item.expected_quantity,
+        quantity_received: item.quantity_received,
+      })),
+      status,
+      is_validated: status === "validated",
+      can_edit: status === "draft",
+      is_hidden: false,
+    };
   };
 
-  const onValidate = () => {
-    // Calling handleSubmit will trigger validation checks
-    handleSubmit(
-      (data) => {
-        console.log("Form is valid:", data);
-        alert("Form validated successfully!");
-      },
-      (err) => {
-        console.error("Validation failed:", err);
-        alert("Validation failed! Please check the errors above.");
+  // Save as draft
+  async function onSave(data: IncomingProductFormData): Promise<void> {
+    const incomingProductData = prepareSubmissionData(data, "draft");
+
+    if (!incomingProductData) {
+      setNotification({
+        message:
+          "Please add at least one valid item with product, expected quantity, and quantity received",
+        type: "error",
+        show: true,
+      });
+      return;
+    }
+
+    try {
+      await createIncomingProduct(incomingProductData).unwrap();
+
+      setNotification({
+        message: "Incoming product saved as draft!",
+        type: "success",
+        show: true,
+      });
+
+      setTimeout(() => {
+        reset();
+        setItems(initialItems);
+        router.push("/inventory/operation");
+      }, 1500);
+    } catch (error: unknown) {
+      let errorMessage = "Failed to save incoming product. Please try again.";
+
+      if (error && typeof error === "object" && "data" in error) {
+        const apiError = error as {
+          data?: { detail?: string; message?: string };
+        };
+        errorMessage =
+          apiError.data?.detail || apiError.data?.message || errorMessage;
       }
-    )();
+
+      setNotification({
+        message: errorMessage,
+        type: "error",
+        show: true,
+      });
+    }
+  }
+
+  // Validate and mark as done
+  async function onValidate(data: IncomingProductFormData): Promise<void> {
+    const incomingProductData = prepareSubmissionData(data, "validated");
+
+    if (!incomingProductData) {
+      setNotification({
+        message:
+          "Please add at least one valid item with product, expected quantity, and quantity received",
+        type: "error",
+        show: true,
+      });
+      return;
+    }
+
+    try {
+      await createIncomingProduct(incomingProductData).unwrap();
+
+      setNotification({
+        message: "Incoming product validated and completed!",
+        type: "success",
+        show: true,
+      });
+
+      setTimeout(() => {
+        reset();
+        setItems(initialItems);
+        router.push("/inventory/operation");
+      }, 1500);
+    } catch (error: unknown) {
+      let errorMessage =
+        "Failed to validate incoming product. Please try again.";
+
+      if (error && typeof error === "object" && "data" in error) {
+        const apiError = error as {
+          data?: { detail?: string; message?: string };
+        };
+        errorMessage =
+          apiError.data?.detail || apiError.data?.message || errorMessage;
+      }
+
+      setNotification({
+        message: errorMessage,
+        type: "error",
+        show: true,
+      });
+    }
+  }
+
+  // Close notification
+  function closeNotification() {
+    setNotification((prev) => ({ ...prev, show: false }));
+  }
+
+  // Function to get product details when a product is selected
+  const getProductDetails = (productId: string) => {
+    const product = products?.find((p) => p.id.toString() === productId);
+    return {
+      product_name: product?.product_name || "",
+      product_description:
+        product?.product_description || "No description available",
+      unit_of_measure_details: {
+        unit_symbol: product?.unit_of_measure_details?.unit_symbol || "N/A",
+      },
+    };
+  };
+
+  // Enhanced updateItem function that also populates product details
+  const updateItemWithProductDetails = (
+    id: string,
+    patch: Partial<IncomingProductLineItem>
+  ) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id === id) {
+          const updatedItem = { ...it, ...patch };
+
+          // If product is being updated, populate product details
+          if (patch.product && patch.product !== it.product) {
+            const productDetails = getProductDetails(patch.product);
+            updatedItem.product_details = productDetails;
+          }
+
+          return updatedItem;
+        }
+        return it;
+      })
+    );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16 font-inter">
-      <FormHeader receiptDate={receiptDate} />
+    <motion.div
+      className="h-full text-gray-900 font-sans antialiased"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <PageHeader items={breadcrumsItem} title="New Incoming Product" />
+      </motion.div>
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-0">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Basic Information Section */}
-          <BasicInfoSection
-            register={register}
-            errors={errors}
-            receiptDate={receiptDate}
-          />
+      {/* Main form area */}
+      <motion.main
+        className="h-full mx-auto px-6 py-8 bg-white"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+      >
+        <form ref={formRef} className="bg-white">
+          <motion.h2
+            className="text-lg font-medium text-blue-500 mb-6"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
+          >
+            Basic Information
+          </motion.h2>
 
-          {/* Inventory Product Content */}
-          <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-            <h2 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">
-              Inventory Product Content
-            </h2>
+          {/* Content: rows with separators */}
+          <div className="flex-1">
+            {/* Row 1 (first 3 fields) */}
+            <SlideUp delay={0.4}>
+              <div className="py-2 mb-6 border-b border-gray-200">
+                <StaggerContainer
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-4"
+                  staggerDelay={0.15}
+                >
+                  {/* Receipt Type */}
+                  <FadeIn>
+                    <div className="p-4 transition-colors border-r border-gray-300">
+                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
+                        Receipt Type
+                      </h3>
+                      <p className="text-gray-700">
+                        {watch("receipt_type") === "vendor_receipt"
+                          ? "Vendor Receipt"
+                          : watch("receipt_type") === "manufacturing_receipt"
+                          ? "Manufacturing Receipt"
+                          : watch("receipt_type") === "internal_transfer"
+                          ? "Internal Transfer"
+                          : watch("receipt_type") === "returns"
+                          ? "Returns"
+                          : watch("receipt_type") === "scrap"
+                          ? "Scrap"
+                          : "Select type"}
+                      </p>
+                    </div>
+                  </FadeIn>
 
-            {/* Product Lines Table */}
-            <div className="overflow-x-auto min-h-[150px]">
-              <table className="w-full table-auto">
-                <thead>
-                  <tr className="border-b border-gray-200 sticky top-0 bg-white">
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-500 min-w-[250px]">
-                      Product Name
-                    </th>
-                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-500 min-w-[100px]">
-                      UOM
-                    </th>
-                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-500 min-w-[120px]">
-                      Available QTY
-                    </th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-500 min-w-[150px]">
-                      QTY Received
-                    </th>
-                    <th className="w-12"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fields.map((field, index) => (
-                    <ProductLineRow
-                      key={field.id}
-                      index={index}
-                      field={field}
-                      register={register}
-                      errors={errors}
-                      watch={watch}
-                      remove={remove}
-                      hoveredIndex={hoveredIndex}
-                      setHoveredIndex={setHoveredIndex}
-                      searchTerms={searchTerms}
-                      showDropdowns={showDropdowns}
-                      handleProductSearch={handleProductSearch}
-                      handleProductSelect={handleProductSelect}
-                      getFilteredProducts={getFilteredProducts}
+                  {/* Date */}
+                  <FadeIn>
+                    <div className="p-4 transition-colors border-r border-gray-300">
+                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
+                        Date
+                      </h3>
+                      <p className="text-gray-700">
+                        {new Date().toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}{" "}
+                        -{" "}
+                        {new Date().toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </FadeIn>
+                </StaggerContainer>
+              </div>
+            </SlideUp>
+          </div>
+
+          {/* Scrap form fields */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.5 }}
+            className="mb-8"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Receipt Type */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Receipt Type <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={watch("receipt_type")}
+                  onValueChange={(value) =>
+                    setValue(
+                      "receipt_type",
+                      value as
+                        | "vendor_receipt"
+                        | "manufacturing_receipt"
+                        | "internal_transfer"
+                        | "returns"
+                        | "scrap"
+                    )
+                  }
+                >
+                  <SelectTrigger size="md" className="h-11 w-full">
+                    <SelectValue placeholder="Select receipt type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vendor_receipt">
+                      Vendor Receipt
+                    </SelectItem>
+                    <SelectItem value="manufacturing_receipt">
+                      Manufacturing Receipt
+                    </SelectItem>
+                    <SelectItem value="internal_transfer">
+                      Internal Transfer
+                    </SelectItem>
+                    <SelectItem value="returns">Returns</SelectItem>
+                    <SelectItem value="scrap">Scrap</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.receipt_type && (
+                  <p className="text-sm text-red-500">
+                    {errors.receipt_type.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Supplier */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Supplier <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={watch("supplier")}
+                  onValueChange={(value) => setValue("supplier", value)}
+                  disabled={isLoadingVendors}
+                >
+                  <SelectTrigger size="md" className="h-11 w-full">
+                    <SelectValue
+                      placeholder={
+                        isLoadingVendors
+                          ? "Loading suppliers..."
+                          : "Select supplier"
+                      }
                     />
-                  ))}
-                </tbody>
-              </table>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingVendors ? (
+                      <SelectItem value="__loading__" disabled>
+                        Loading suppliers...
+                      </SelectItem>
+                    ) : vendorOptions.length === 0 ? (
+                      <SelectItem value="__no_vendors__" disabled>
+                        No suppliers available
+                      </SelectItem>
+                    ) : (
+                      vendorOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.supplier && (
+                  <p className="text-sm text-red-500">
+                    {errors.supplier.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Source Location */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Source Location <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={watch("source_location")}
+                  onValueChange={(value) => setValue("source_location", value)}
+                  disabled={isLoadingLocations}
+                >
+                  <SelectTrigger size="md" className="h-11 w-full">
+                    <SelectValue
+                      placeholder={
+                        isLoadingLocations
+                          ? "Loading locations..."
+                          : "Select source location"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingLocations ? (
+                      <SelectItem value="__loading__" disabled>
+                        Loading locations...
+                      </SelectItem>
+                    ) : locationOptions.length === 0 ? (
+                      <SelectItem value="__no_locations__" disabled>
+                        No locations available
+                      </SelectItem>
+                    ) : (
+                      locationOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.source_location && (
+                  <p className="text-sm text-red-500">
+                    {errors.source_location.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Destination Location */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Destination Location <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={watch("destination_location")}
+                  onValueChange={(value) =>
+                    setValue("destination_location", value)
+                  }
+                  disabled={isLoadingLocations}
+                >
+                  <SelectTrigger size="md" className="h-11 w-full">
+                    <SelectValue
+                      placeholder={
+                        isLoadingLocations
+                          ? "Loading locations..."
+                          : "Select destination location"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingLocations ? (
+                      <SelectItem value="__loading__" disabled>
+                        Loading locations...
+                      </SelectItem>
+                    ) : locationOptions.length === 0 ? (
+                      <SelectItem value="__no_locations__" disabled>
+                        No locations available
+                      </SelectItem>
+                    ) : (
+                      locationOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.destination_location && (
+                  <p className="text-sm text-red-500">
+                    {errors.destination_location.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Related PO */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Related PO
+                </label>
+                <Input
+                  {...register("related_po")}
+                  placeholder="Enter related purchase order..."
+                  className="h-11"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Notes
+                </label>
+                <Textarea
+                  {...register("notes")}
+                  placeholder="Enter any notes for this incoming product..."
+                  className="min-h-11"
+                />
+              </div>
             </div>
+          </motion.div>
 
-            {/* Add Item Button */}
-            <button
+          <section className="bg-white mt-8 border-none">
+            <div className="mx-auto">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1000px] table-fixed">
+                  <TableHeader className="bg-[#F6F7F8]">
+                    <TableRow>
+                      <TableHead className="w-48 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Product
+                      </TableHead>
+                      <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Description
+                      </TableHead>
+                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Unit
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Expected QTY
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Received QTY
+                      </TableHead>
+                      <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody className="bg-white">
+                    {items.map((it) => (
+                      <TableRow
+                        key={it.id}
+                        className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150"
+                      >
+                        <TableCell className="border border-gray-200 align-middle">
+                          <Select
+                            value={it.product}
+                            onValueChange={(value) =>
+                              updateItemWithProductDetails(it.id, {
+                                product: value,
+                              })
+                            }
+                            disabled={isLoadingProducts}
+                          >
+                            <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0">
+                              <SelectValue
+                                placeholder={
+                                  isLoadingProducts
+                                    ? "Loading products..."
+                                    : "Select product"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {isLoadingProducts ? (
+                                <SelectItem value="__loading__" disabled>
+                                  Loading products...
+                                </SelectItem>
+                              ) : productOptions.length === 0 ? (
+                                <SelectItem value="__no_products__" disabled>
+                                  No products available
+                                </SelectItem>
+                              ) : (
+                                productOptions.map((option) => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+
+                        <TableCell className="border border-gray-200 px-4 align-middle">
+                          <div className="text-sm text-gray-600 line-clamp-2">
+                            {it.product_details.product_description ||
+                              "Select a product"}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                          <div className="text-sm text-gray-700">
+                            {it.product_details.unit_of_measure_details
+                              .unit_symbol || "N/A"}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="border border-gray-200 align-middle text-center">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            aria-label="Expected quantity"
+                            value={it.expected_quantity}
+                            onChange={(e) =>
+                              updateItemWithProductDetails(it.id, {
+                                expected_quantity: e.target.value,
+                              })
+                            }
+                            placeholder="0"
+                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
+                          />
+                        </TableCell>
+
+                        <TableCell className="border border-gray-200 align-middle text-center">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            aria-label="Quantity received"
+                            value={it.quantity_received}
+                            onChange={(e) =>
+                              updateItemWithProductDetails(it.id, {
+                                quantity_received: e.target.value,
+                              })
+                            }
+                            placeholder="0"
+                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
+                          />
+                        </TableCell>
+
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeRow(it.id)}
+                            aria-label="Remove row"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
+                            disabled={items.length === 1}
+                          >
+                            <Trash className="w-4 h-4 text-red-500" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+
+                  <TableFooter className="bg-[#FBFCFD] border border-gray-200">
+                    <TableRow>
+                      <TableCell className="bg-white">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={addRow}
+                          className="flex items-center gap-2 px-3 py-0 text-sm m-auto rounded-md hover:bg-gray-50"
+                          aria-label="Add row"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                      <TableCell className="bg-white" />
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+            </div>
+          </section>
+
+          {/* Form actions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
+            className="flex justify-end gap-4 mt-8"
+          >
+            <Button
               type="button"
-              onClick={() =>
-                append({
-                  productName: "",
-                  productId: 0,
-                  expectedQty: "",
-                  unitOfMeasure: 0,
-                  qtyReceived: 0,
-                })
-              }
-              className="mt-6 flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors border border-blue-100 rounded-full px-4 py-2 hover:bg-blue-50"
+              disabled={isCreating}
+              onClick={handleSubmit(onSave)}
             >
-              <Plus className="w-5 h-5 mr-1" />
-              Add Item
-            </button>
-
-            {errors.productLines?.root && (
-              <p className="mt-2 text-sm text-red-600 font-medium">
-                {errors.productLines.root.message}
-              </p>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-4">
-            <button
+              {isCreating ? "Saving..." : "Save"}
+            </Button>
+            <Button
               type="button"
-              onClick={onValidate}
-              disabled={!isValid}
-              className={`px-8 py-3 border-2 rounded-xl font-semibold transition-colors shadow-md ${
-                isValid
-                  ? "border-blue-600 text-blue-600 hover:bg-blue-50"
-                  : "border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100"
-              }`}
+              disabled={isCreating}
+              onClick={handleSubmit(onValidate)}
+              variant={"contained"}
             >
-              Validate
-            </button>
-            <button
-              type="submit"
-              disabled={!isValid}
-              className={`px-8 py-3 rounded-xl font-semibold transition-colors shadow-md ${
-                isValid
-                  ? "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              Save Receipt
-            </button>
-          </div>
+              {isCreating ? "Validating..." : "Validate"}
+            </Button>
+          </motion.div>
         </form>
-      </div>
-    </div>
+      </motion.main>
+
+      {/* Notification */}
+      <ToastNotification
+        message={notification.message}
+        type={notification.type}
+        show={notification.show}
+        onClose={closeNotification}
+      />
+    </motion.div>
   );
 }

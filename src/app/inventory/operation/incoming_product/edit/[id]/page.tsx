@@ -2,16 +2,18 @@
 
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
 import { BreadcrumbItem } from "@/types/purchase";
-import { useCreateIncomingProductMutation } from "@/api/inventory/incomingProductApi";
+import {
+  useUpdateIncomingProductMutation,
+  useGetIncomingProductQuery,
+} from "@/api/inventory/incomingProductApi";
 import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
-import { useGetPurchaseOrderQuery } from "@/api/purchase/purchaseOrderApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   FadeIn,
@@ -42,7 +44,7 @@ import {
 } from "@/components/ui/table";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
-import type { CreateIncomingProductRequest } from "@/types/incomingProduct";
+import type { UpdateIncomingProductRequest } from "@/types/incomingProduct";
 
 type Option = { value: string; label: string };
 
@@ -61,7 +63,7 @@ interface IncomingProductLineItem {
   quantity_received: string;
 }
 
-// Form schema for incoming product creation
+// Form schema for incoming product editing
 const receiptTypes = [
   "vendor_receipt",
   "manufacturing_receipt",
@@ -97,17 +99,17 @@ const initialItems: IncomingProductLineItem[] = [
   },
 ];
 
-export default function CreateIncomingProductFromPOPage() {
+export default function EditIncomingProductPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const poId = searchParams.get("poId");
+  const params = useParams();
+  const incomingProductId = params.id as string;
   const formRef = useRef<HTMLFormElement>(null);
 
   // API mutations and queries
-  const [createIncomingProduct, { isLoading: isCreating }] =
-    useCreateIncomingProductMutation();
-  const { data: purchaseOrder, isLoading: isLoadingPO } =
-    useGetPurchaseOrderQuery(poId || "", { skip: !poId });
+  const [updateIncomingProduct, { isLoading: isUpdating }] =
+    useUpdateIncomingProductMutation();
+  const { data: incomingProduct, isLoading: isLoadingIncomingProduct } =
+    useGetIncomingProductQuery(incomingProductId);
   const { data: locations, isLoading: isLoadingLocations } =
     useGetActiveLocationsQuery();
   const {
@@ -123,48 +125,7 @@ export default function CreateIncomingProductFromPOPage() {
 
   // Form state
   const [items, setItems] = useState<IncomingProductLineItem[]>(initialItems);
-
-  // Load PO data and pre-populate form
-  useEffect(() => {
-    if (purchaseOrder) {
-      // Pre-populate form with PO data
-      setValue("receipt_type", "vendor_receipt");
-      setValue("supplier", purchaseOrder.vendor_details?.id.toString() || "");
-      setValue(
-        "source_location",
-        purchaseOrder.vendor_details?.id.toString() || ""
-      ); // Assuming vendor location as source
-      setValue(
-        "destination_location",
-        purchaseOrder.destination_location_details?.id.toString() || ""
-      );
-      setValue("related_po", purchaseOrder.id);
-      setValue("notes", "");
-
-      // Pre-populate items from PO
-      if (purchaseOrder.items && purchaseOrder.items.length > 0) {
-        const poItems: IncomingProductLineItem[] = purchaseOrder.items.map(
-          (item, index) => ({
-            id: (index + 1).toString(),
-            product: item.product_details?.id.toString() || "",
-            product_details: {
-              product_name: item.product_details?.product_name || "",
-              product_description:
-                item.product_details?.product_description || "",
-              unit_of_measure_details: {
-                unit_symbol:
-                  item.product_details?.unit_of_measure_details?.unit_symbol ||
-                  "",
-              },
-            },
-            expected_quantity: item.qty.toString(),
-            quantity_received: "",
-          })
-        );
-        setItems(poItems);
-      }
-    }
-  }, [purchaseOrder]);
+  const [formKey, setFormKey] = useState(0); // Key to force re-render of form components
 
   const addRow = () =>
     setItems((prev) => [
@@ -209,10 +170,49 @@ export default function CreateIncomingProductFromPOPage() {
       supplier: "",
       source_location: "",
       destination_location: "",
-      related_po: poId || "",
+      related_po: "",
       notes: "",
     },
   });
+
+  // Load existing data when component mounts
+  useEffect(() => {
+    if (incomingProduct && !isLoadingVendors && !isLoadingLocations) {
+      // Use reset to set all form values at once
+      reset({
+        receipt_type: incomingProduct.receipt_type as
+          | "vendor_receipt"
+          | "manufacturing_receipt"
+          | "internal_transfer"
+          | "returns"
+          | "scrap",
+        supplier: incomingProduct.supplier.toString(),
+        source_location: incomingProduct.source_location,
+        destination_location: incomingProduct.destination_location,
+        related_po: incomingProduct.related_po || "",
+        notes: "",
+      });
+
+      // Force re-render of form components
+      setFormKey((prev) => prev + 1);
+
+      // Set items
+      if (
+        incomingProduct.incoming_product_items &&
+        incomingProduct.incoming_product_items.length > 0
+      ) {
+        const loadedItems: IncomingProductLineItem[] =
+          incomingProduct.incoming_product_items.map((item) => ({
+            id: item.id,
+            product: item.product.toString(),
+            product_details: item.product_details,
+            expected_quantity: item.expected_quantity,
+            quantity_received: item.quantity_received,
+          }));
+        setItems(loadedItems);
+      }
+    }
+  }, [incomingProduct, isLoadingVendors, isLoadingLocations, reset]);
 
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
 
@@ -281,8 +281,8 @@ export default function CreateIncomingProductFromPOPage() {
       href: "/inventory/operation/incoming_product",
     },
     {
-      label: "New from PO",
-      href: `/inventory/operation/incoming_product/fromPO?poId=${poId}`,
+      label: "Edit",
+      href: `/inventory/operation/incoming_product/edit/${incomingProductId}`,
       current: true,
     },
   ];
@@ -291,7 +291,7 @@ export default function CreateIncomingProductFromPOPage() {
   const prepareSubmissionData = (
     data: IncomingProductFormData,
     status: "draft" | "validated"
-  ): CreateIncomingProductRequest | null => {
+  ): UpdateIncomingProductRequest | null => {
     const validItems = items.filter(
       (item) => item.product && item.expected_quantity && item.quantity_received
     );
@@ -301,12 +301,14 @@ export default function CreateIncomingProductFromPOPage() {
     }
 
     return {
+      incoming_product_id: incomingProductId,
       receipt_type: data.receipt_type,
       related_po: data.related_po || null,
       supplier: parseInt(data.supplier),
       source_location: data.source_location,
       destination_location: data.destination_location,
       incoming_product_items: validItems.map((item) => ({
+        id: item.id,
         product: parseInt(item.product),
         expected_quantity: item.expected_quantity,
         quantity_received: item.quantity_received,
@@ -333,21 +335,22 @@ export default function CreateIncomingProductFromPOPage() {
     }
 
     try {
-      await createIncomingProduct(incomingProductData).unwrap();
+      await updateIncomingProduct({
+        id: incomingProductId,
+        data: incomingProductData,
+      }).unwrap();
 
       setNotification({
-        message: "Incoming product saved as draft!",
+        message: "Incoming product updated as draft!",
         type: "success",
         show: true,
       });
 
       setTimeout(() => {
-        reset();
-        setItems(initialItems);
         router.push("/inventory/operation");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to save incoming product. Please try again.";
+      let errorMessage = "Failed to update incoming product. Please try again.";
 
       if (error && typeof error === "object" && "data" in error) {
         const apiError = error as {
@@ -380,7 +383,10 @@ export default function CreateIncomingProductFromPOPage() {
     }
 
     try {
-      await createIncomingProduct(incomingProductData).unwrap();
+      await updateIncomingProduct({
+        id: incomingProductId,
+        data: incomingProductData,
+      }).unwrap();
 
       setNotification({
         message: "Incoming product validated and completed!",
@@ -389,8 +395,6 @@ export default function CreateIncomingProductFromPOPage() {
       });
 
       setTimeout(() => {
-        reset();
-        setItems(initialItems);
         router.push("/inventory/operation");
       }, 1500);
     } catch (error: unknown) {
@@ -454,13 +458,13 @@ export default function CreateIncomingProductFromPOPage() {
     );
   };
 
-  // Show loading state while fetching PO data
-  if (isLoadingPO) {
+  // Show loading state while fetching existing data
+  if (isLoadingIncomingProduct) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading purchase order data...</p>
+          <p>Loading incoming product...</p>
         </div>
       </main>
     );
@@ -478,10 +482,7 @@ export default function CreateIncomingProductFromPOPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <PageHeader
-          items={breadcrumsItem}
-          title="New Incoming Product from PO"
-        />
+        <PageHeader items={breadcrumsItem} title="Edit Incoming Product" />
       </motion.div>
 
       {/* Main form area */}
@@ -571,6 +572,7 @@ export default function CreateIncomingProductFromPOPage() {
                   Receipt Type <span className="text-red-500">*</span>
                 </label>
                 <Select
+                  key={`receipt_type-${formKey}`}
                   value={watch("receipt_type")}
                   onValueChange={(value) =>
                     setValue(
@@ -614,6 +616,7 @@ export default function CreateIncomingProductFromPOPage() {
                   Supplier <span className="text-red-500">*</span>
                 </label>
                 <Select
+                  key={`supplier-${formKey}`}
                   value={watch("supplier")}
                   onValueChange={(value) => setValue("supplier", value)}
                   disabled={isLoadingVendors}
@@ -658,6 +661,7 @@ export default function CreateIncomingProductFromPOPage() {
                   Source Location <span className="text-red-500">*</span>
                 </label>
                 <Select
+                  key={`source_location-${formKey}`}
                   value={watch("source_location")}
                   onValueChange={(value) => setValue("source_location", value)}
                   disabled={isLoadingLocations}
@@ -702,6 +706,7 @@ export default function CreateIncomingProductFromPOPage() {
                   Destination Location <span className="text-red-500">*</span>
                 </label>
                 <Select
+                  key={`destination_location-${formKey}`}
                   value={watch("destination_location")}
                   onValueChange={(value) =>
                     setValue("destination_location", value)
@@ -751,7 +756,6 @@ export default function CreateIncomingProductFromPOPage() {
                   {...register("related_po")}
                   placeholder="Enter related purchase order..."
                   className="h-11"
-                  readOnly
                 />
               </div>
 
@@ -939,18 +943,18 @@ export default function CreateIncomingProductFromPOPage() {
           >
             <Button
               type="button"
-              disabled={isCreating}
+              disabled={isUpdating}
               onClick={handleSubmit(onSave)}
             >
-              {isCreating ? "Saving..." : "Save"}
+              {isUpdating ? "Updating..." : "Update"}
             </Button>
             <Button
               type="button"
-              disabled={isCreating}
+              disabled={isUpdating}
               onClick={handleSubmit(onValidate)}
               variant={"contained"}
             >
-              {isCreating ? "Validating..." : "Validate"}
+              {isUpdating ? "Validating..." : "Validate"}
             </Button>
           </motion.div>
         </form>
