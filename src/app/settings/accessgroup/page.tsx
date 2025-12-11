@@ -7,6 +7,7 @@ import { SettingsGrid } from "@/components/Settings/settingsGrid";
 import { ReusableTable } from "@/components/Settings/settingsReusableTable";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import { useGetAccessGroupRightsQuery } from "@/api/settings/accessGroupRightApi";
+import { useRouter } from "next/navigation"; 
 
 // Access group interface matching API structure
 interface AccessGroupData {
@@ -46,6 +47,7 @@ const formatDate = (dateString: string): string => {
 export default function AccessGroup() {
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const archive = useSelector((state: RootState) => state.viewMode.archive);
+  const router = useRouter()
 
   // Fetch access group rights data
   const {
@@ -83,27 +85,34 @@ export default function AccessGroup() {
   // Note: Since the API doesn't include a status/hidden field in the basic response,
   // we'll show all data when archive is false, and handle filtering based on available data
   const filteredData: AccessGroupData[] = accessGroupRights || [];
+  console.log(filteredData)
+
+  const handleUserClick = (access_code?: string | number) => {
+    router.push(`/settings/accessgroup/${access_code}`);
+  };
 
   return (
     <div className="w-full py-4">
       {viewMode === "grid" ? (
         <SettingsGrid
-          type="company"
-          dataList={filteredData.map((item) => ({
-            ...item,
-            name: item.group_name, // required by SettingsGrid
-            access_right_details_name: item.access_right_details?.name || "N/A", // flatten object
-            date_created_formatted: formatDate(item.date_created),
-          }))}
-          fieldsToShow={[
-            "application",
-            "access_right_details_name",
-            "date_created_formatted",
-          ]}
-          icon={<GridCardIcon />}
-          onItemClick={(id) => console.log("Clicked Access Group", id)}
-          // title will be group_name
-        />
+            type="company"
+            dataList={filteredData.map((item) => ({
+              id: item.id,
+              access_code: item.access_code, // ✅ include this explicitly
+              name: item.group_name, 
+              access_right_details_name: item.access_right_details?.name || "N/A",
+              date_created_formatted: formatDate(item.date_created),
+            }))}
+            fieldsToShow={[
+              "application",
+              "access_right_details_name",
+              "date_created_formatted",
+            ]}
+            icon={<GridCardIcon />}
+            clickKey="access_code"
+            onItemClick={handleUserClick}
+          />
+
       ) : (
         <ReusableTable
           headers={[
@@ -140,7 +149,9 @@ export default function AccessGroup() {
             if (key === "date_created") return formatDate(row.date_created);
             return row[key] ?? "—";
           }}
-          onRowClick={(row) => console.log("Clicked row", row)}
+         clickKey="access_code"
+         onRowClick={(access_code) => router.push(`/settings/accessgroup/${access_code}`)}
+
         />
       )}
     </div>

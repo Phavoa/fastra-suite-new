@@ -17,6 +17,7 @@ type SettingsGridProps = {
   icon: React.ReactNode;                     // icon for non-user types
   type: "user" | "company";                  // page type
   onItemClick?: (id: string | number) => void;
+  clickKey?: string; 
 };
 
 export const SettingsGrid = ({
@@ -25,12 +26,15 @@ export const SettingsGrid = ({
   icon,
   type,
   onItemClick,
+  clickKey,
 }: SettingsGridProps) => {
 
 
   const tenant_company_name = useSelector(
       (state: any) => state.auth.tenant_company_name
     );
+
+    
   return (
     <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pr-2">
       {dataList.map((item) => {
@@ -45,13 +49,15 @@ export const SettingsGrid = ({
             icon
           );
 
+
+        const valueToPass = clickKey ? item[clickKey] : item.id;
         return (
           <SettingsCard
             key={item.id}
             icon={finalIcon}
             title={item.name}
             data={fieldsToShow.map((field) => item[field])}
-            onClick={() => onItemClick?.(item.id)}
+             onClick={() => onItemClick?.(valueToPass)}
           />
         );
       })}
