@@ -8,14 +8,18 @@ import { GrayButton } from "@/components/ui/grayButton";
 import { CloudUploadFilled } from "@/components/icons/CloudUploadFilled";
 import { SettingsControlBar } from "@/components/Settings/SettingsControlBar";
 import { useDispatch, useSelector } from "react-redux";
-import { setArchive } from "@/components/Settings/viewModeSlice"; 
+import { setArchive } from "@/components/Settings/viewModeSlice";
 import { RootState } from "@/lib/store/store";
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const dispatch = useDispatch();
-  const archive = useSelector((state: RootState) => state.viewMode.archive); 
-   const router = useRouter()
+  const archive = useSelector((state: RootState) => state.viewMode.archive);
+  const router = useRouter();
 
   const navItems = [
     { label: "Company", href: "/settings" },
@@ -25,11 +29,11 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   ];
 
   // Determine active section automatically
-  const activeNav =
-  navItems.find((item) => pathname === item.href);
+  const activeNav = navItems.find((item) => pathname === item.href);
 
-  const activeSection = activeNav?.label.toLowerCase().replace(/\s+/g, "") || "company";
-  
+  const activeSection =
+    activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||
+    "company";
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -44,7 +48,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     console.log("Search query:", query);
   };
 
-   const handleNew = () => {
+  const handleNew = () => {
     let newPath = "/settings";
 
     switch (activeSection) {
@@ -55,7 +59,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         newPath += "/users/newUser";
         break;
       case "accessgroup":
-        newPath += "/accessgroup/newAccessGroup";
+        newPath += "/accessgroup/new";
         break;
       case "application":
         newPath += "/application/newApplication";
@@ -64,14 +68,19 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         newPath += "/new";
         break;
     }
-    router.push(newPath); 
-  }
+    router.push(newPath);
+  };
 
   const handleShowArchivedUsers = () => {
     dispatch(setArchive());
-};
+  };
 
-
+  const hideControlBar =
+    /^\/settings\/users\/newUser$/.test(pathname) ||
+    (/^\/settings\/users\/[^/]+$/.test(pathname) &&
+      pathname !== "/settings/users") ||
+    (/^\/settings\/accessgroup\/[^/]+$/.test(pathname) &&
+      pathname !== "/settings/accessgroup");
   return (
     <>
       <NavBar title="Settings" items={navItems} />
@@ -88,13 +97,17 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </div>
 
       {/* Settings control bar */}
-      <SettingsControlBar
-        activeSection={activeSection as any} // TS will infer the string type; your prop accepts specific literals
-        onSearch={handleSearch}
-        onNew={handleNew}
-        initialView="grid"
-        onShowArchivedUsers={activeSection === "user" ? handleShowArchivedUsers : undefined}
-      />
+      {!hideControlBar && (
+        <SettingsControlBar
+          activeSection={activeSection}
+          onSearch={handleSearch}
+          onNew={handleNew}
+          initialView="grid"
+          onShowArchivedUsers={
+            activeSection === "user" ? handleShowArchivedUsers : undefined
+          }
+        />
+      )}
 
       {/* Page content */}
       <main>{children}</main>

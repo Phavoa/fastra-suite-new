@@ -13,28 +13,31 @@ export default function Settings() {
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const router = useRouter();
   const tenant_company_name = useSelector(
-      (state: any) => state.auth.tenant_company_name
-    );
+    (state: any) => state.auth.tenant_company_name
+  );
+  const userEmail = useSelector(
+    (state: any) => state.auth.user.email
+  );
 
   const { data: company, isLoading, isError } = useGetCompanyQuery();
 
   // Early UI states
   if (isLoading) return (
     <div className="p-6 flex justify-center items-center">
-      <LoadingDots count={3} />  {/* animated loader */}
+      <LoadingDots count={3} />
     </div>
   );
 
   if (isError) return <p className="p-6 text-red-500">Failed to load company</p>;
   if (!company) return <p className="p-6">No company has been created yet</p>;
 
-  // Prepare only the fields: title → industry, data → [role, phone, website]
+  // Get first role name if available
   const roleName =
     Array.isArray(company.roles) && company.roles.length > 0
       ? company.roles[0].name
       : "—";
 
-  // Card data
+  // Card data (show email instead of website)
   const cardData = [
     {
       id: company.id,
@@ -42,17 +45,18 @@ export default function Settings() {
       icon: <GridCardIcon />,
       data: [
         roleName,
+         userEmail,
         company.phone,
-        company.website,
       ].filter(Boolean),
     },
   ];
 
-  // Table data
+  // Table data (add email field)
   const tableData = [
     {
       ...company,
       role: roleName,
+      email: userEmail, // ✅ user email
     },
   ];
 
@@ -64,7 +68,7 @@ export default function Settings() {
     { key: "industry", label: "Industry" },
     { key: "role", label: "Role" },
     { key: "phone", label: "Phone" },
-    { key: "website", label: "Website" },
+    { key: "email", label: "Email" }, // ✅ show email in table
   ];
 
   return (
