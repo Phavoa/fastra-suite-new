@@ -79,7 +79,7 @@ export default function Users() {
 
   // Navigate to user detail page
   const handleUserClick = (id?: string | number) => {
-    router.push(`/settings/users/${id ?? 1}`);
+    router.push(`/settings/users/${id}`);
   };
 
   return (
@@ -130,7 +130,7 @@ export default function Users() {
             return row[key] ?? "—";
           }}
           showStatusColumn={archive}
-          onRowClick={(row) => handleUserClick(row.id)}
+          onRowClick={handleUserClick}
         />
       )}
     </div>

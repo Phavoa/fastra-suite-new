@@ -73,7 +73,7 @@ export const accessGroupRightApi = createApi({
 
     let url: string;
     let method = "GET";
-    let body: unknown = undefined;
+    let body: any = undefined;
 
     const headers = new Headers();
     if (token) headers.set("authorization", `Bearer ${token}`);
@@ -94,23 +94,40 @@ export const accessGroupRightApi = createApi({
       }
     }
 
-    try {
-      const response = await fetch(url, { method, body, headers });
-      if (!response.ok) {
-        return {
-          error: {
-            status: response.status,
-            data: await response.json(),
-          },
-        };
-      }
-      const data = await response.json();
-      return { data };
-    } catch (error) {
-      return {
-        error: { status: "FETCH_ERROR" as const, data: error },
-      };
-    }
+try {
+  const response = await fetch(url, { method, body, headers });
+
+  let data: any = null;
+
+  // ✅ SAFE JSON PARSING
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    return {
+      error: {
+        status: response.status,
+        data,
+      },
+    };
+  }
+
+  console.log("API Call:", { url, method, body });
+  console.log("Response:", data);
+
+  return { data };
+} catch (error) {
+  return {
+    error: {
+      status: "FETCH_ERROR" as const,
+      data: error,
+    },
+  };
+}
+
   },
   endpoints: (builder) => ({
     // GET /users/access-group-right/ - List all access group rights
@@ -123,9 +140,7 @@ export const accessGroupRightApi = createApi({
         if (params?.ordering) searchParams.set("ordering", params.ordering);
         if (params?.search) searchParams.set("search", params.search);
         const queryString = searchParams.toString();
-        return `/users/access-group-right/${
-          queryString ? `?${queryString}` : ""
-        }`;
+        return `/users/access-group-right/`;
       },
     }),
 
@@ -142,7 +157,7 @@ export const accessGroupRightApi = createApi({
     }),
 
     // GET /users/access-group-right/{access_code}/ - Get specific access group right
-    getAccessGroupRight: builder.query<AccessGroupRightResponse, string>({
+    getAccessGroupRight: builder.query<AccessGroupRightResponse[], string>({
       query: (access_code) => `/users/access-group-right/${access_code}/`,
     }),
 

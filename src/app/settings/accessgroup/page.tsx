@@ -55,6 +55,7 @@ export default function AccessGroup() {
     isLoading,
     error,
   } = useGetAccessGroupRightsQuery();
+  console.log(accessGroupRights)
 
   // Handle loading state
   if (isLoading) {

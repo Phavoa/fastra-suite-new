@@ -48,7 +48,7 @@ export default function UsersDetails() {
   const router = useRouter();
   const params = useParams();
   const userId = Number(params?.id);
-  console.log(userId)
+  console.log("our id",userId)
 
   const tenant_company_name = useSelector(
     (state: any) => state.auth.tenant_company_name
@@ -289,9 +289,7 @@ export default function UsersDetails() {
                   <FormImageUpload
       label="User Image"
       image={
-        form.user_image_image instanceof File
-          ? URL.createObjectURL(form.user_image_image)
-          : form.user_image_image
+        form.user_image_image 
           ? `data:image/png;base64,${form.user_image_image}`
           : null
       }
@@ -301,9 +299,7 @@ export default function UsersDetails() {
   ) : (
     <img
       src={
-        form.user_image_image instanceof File
-          ? URL.createObjectURL(form.user_image_image)
-          : form.user_image_image
+        form.user_image_image 
           ? `data:image/png;base64,${form.user_image_image}`
           : "/images/userAvatar.png"
       }
