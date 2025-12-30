@@ -8,7 +8,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BreadcrumbItem } from "@/types/purchase";
-import { PageHeader } from "@/components/purchase/products/PageHeader";
+import Breadcrumbs from "@/components/shared/BreadScrumbs";
+import { AutoSaveIcon } from "@/components/shared/icons";
 import { ViewToggle } from "@/components/inventory/location/ViewToggle";
 import { ViewType } from "@/types/purchase";
 import { IncomingProductCards } from "@/components/inventory/operation/IncomingProductCards";
@@ -61,33 +62,38 @@ function StatusCards() {
     label: string,
     value: number,
     icon: React.ReactNode,
-    colorClass = "text-gray-700"
+    colorClass = "text-gray-700",
+    linkHref?: string
   ) => (
-    <Card className="p-4 shadow-none rounded-none cursor-pointer hover:bg-gray-50 transition-colors">
-      <div className="flex flex-col">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="text-lg">{icon}</div>
-          <div className={`text-sm font-medium ${colorClass}`}>{label}</div>
+    <Link href={linkHref || "#"}>
+      <Card className="p-4 rounded-none shadow-none cursor-pointer hover:bg-gray-50 transition-colors border border-b-0 border-t-0 border-l-0 border-r">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="text-lg">{icon}</div>
+            <div className={`text-sm font-medium ${colorClass}`}>{label}</div>
+          </div>
+          <div className={`text-[2rem] font-bold ${colorClass}`}>{value}</div>
         </div>
-        <div className={`text-[2rem] font-bold ${colorClass}`}>{value}</div>
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 
   return (
-    <section className="max-w-[1440px] mx-auto">
+    <section className="max-w-7xl mx-auto">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {card(
           "Incoming Products",
           counts.incomingProducts,
           <PackageIcon color="#3B7CED" />,
-          "text-[#3B7CED]"
+          "text-[#3B7CED]",
+          "/inventory/operation"
         )}
         {card(
           "Delivery Orders",
           counts.deliveryOrders,
           <TruckIcon color="#2BA24D" />,
-          "text-[#2BA24D]"
+          "text-[#2BA24D]",
+          "/inventory/operation/delivery_order"
         )}
         {card(
           "Internal Transfers",
@@ -225,15 +231,25 @@ export default function OperationPage() {
 
   return (
     <main className="min-h-screen text-gray-800 mr-4">
-      <PageHeader items={breadcrumsItem} title="Operation" />
+      <Breadcrumbs
+        items={breadcrumsItem}
+        action={
+          <Button
+            variant="ghost"
+            className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
+          >
+            Autosaved <AutoSaveIcon />
+          </Button>
+        }
+      />
 
       <div className="bg-white rounded-md shadow hover:shadow-lg transition-shadow duration-300 p-6 pb-4 mt-4">
         <StatusCards />
       </div>
 
-      <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
+      <div className="bg-white p-6 rounded-md flex flex-col lg:flex-row items-start md:items-start justify-between gap-4 mt-6">
         <div className="flex items-center space-x-4">
-          <h2 className="text-lg text-nowrap">Incoming Products</h2>
+          <h2 className="text-lg text-nowrap font-medium">Incoming Products</h2>
 
           <div className="relative w-xs">
             <Input

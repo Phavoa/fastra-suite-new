@@ -1,5 +1,9 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
+import {
+  DeliveryOrderConfirmed,
+  DeliveryOrderWithAvailability,
+} from "@/types/deiveryOrder";
 
 // Helper function to get tenant-specific base URL
 const getTenantBaseUrl = (state: RootState): string => {
@@ -11,6 +15,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const deliveryOrderApi = createApi({
   reducerPath: "deliveryOrderApi",
+  tagTypes: ["DeliveryOrder"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -85,6 +90,7 @@ export const deliveryOrderApi = createApi({
 
     getDeliveryOrder: builder.query<any, string>({
       query: (id) => `/inventory/delivery-orders/${id}/`,
+      providesTags: (result, error, id) => [{ type: "DeliveryOrder", id }],
     }),
 
     getActiveDeliveryOrders: builder.query<any[], void>({
@@ -93,6 +99,26 @@ export const deliveryOrderApi = createApi({
 
     getHiddenDeliveryOrders: builder.query<any[], void>({
       query: () => "/inventory/delivery-orders/hidden_list/",
+    }),
+
+    //  GET: /inventory/delivery-order/check-availability/{id}/
+    checkDeliveryOrderAvailability: builder.mutation<
+      DeliveryOrderWithAvailability,
+      string
+    >({
+      query: (id) => ({
+        url: `/inventory/delivery-order/check-availability/${id}/`,
+        method: "GET",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "DeliveryOrder", id }],
+    }),
+
+    confirmDeliveryOrder: builder.mutation<DeliveryOrderConfirmed, string>({
+      query: (id) => ({
+        url: `/inventory/delivery-order/confirm-delivery/${id}/`,
+        method: "GET",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "DeliveryOrder", id }],
     }),
 
     // Mutation endpoints
@@ -148,9 +174,11 @@ export const {
   useGetHiddenDeliveryOrdersQuery,
 
   // Mutation hooks
+  useCheckDeliveryOrderAvailabilityMutation,
   useCreateDeliveryOrderMutation,
   useUpdateDeliveryOrderMutation,
   usePatchDeliveryOrderMutation,
   useDeleteDeliveryOrderMutation,
   useToggleDeliveryOrderHiddenStatusMutation,
+  useConfirmDeliveryOrderMutation,
 } = deliveryOrderApi;
