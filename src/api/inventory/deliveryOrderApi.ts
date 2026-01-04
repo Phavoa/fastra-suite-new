@@ -1,12 +1,9 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
-import type {
-  IncomingProduct,
-  GetIncomingProductsParams,
-  CreateIncomingProductRequest,
-  UpdateIncomingProductRequest,
-  PatchIncomingProductRequest,
-} from "../../types/incomingProduct";
+import {
+  DeliveryOrderConfirmed,
+  DeliveryOrderWithAvailability,
+} from "@/types/deiveryOrder";
 
 // Helper function to get tenant-specific base URL
 const getTenantBaseUrl = (state: RootState): string => {
@@ -16,8 +13,9 @@ const getTenantBaseUrl = (state: RootState): string => {
   return `https://${tenantSchemaName}.${apiDomain}`;
 };
 
-export const incomingProductApi = createApi({
-  reducerPath: "incomingProductApi",
+export const deliveryOrderApi = createApi({
+  reducerPath: "deliveryOrderApi",
+  tagTypes: ["DeliveryOrder"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -83,94 +81,84 @@ export const incomingProductApi = createApi({
   },
   endpoints: (builder) => ({
     // Query endpoints
-    getIncomingProducts: builder.query<
-      IncomingProduct[],
-      GetIncomingProductsParams
-    >({
+    getDeliveryOrders: builder.query<any[], any>({
       query: (params) => ({
-        url: "/inventory/incoming-product/",
+        url: "/inventory/delivery-orders/",
         params,
       }),
     }),
 
-    getIncomingProduct: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/`,
+    getDeliveryOrder: builder.query<any, string>({
+      query: (id) => `/inventory/delivery-orders/${id}/`,
+      providesTags: (result, error, id) => [{ type: "DeliveryOrder", id }],
     }),
 
-    checkIncomingProductEditable: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/check_editable/`,
+    getActiveDeliveryOrders: builder.query<any[], void>({
+      query: () => "/inventory/delivery-orders/active_list/",
     }),
 
-    getIncomingProductBackorder: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/get_backorder/`,
+    getHiddenDeliveryOrders: builder.query<any[], void>({
+      query: () => "/inventory/delivery-orders/hidden_list/",
     }),
 
-    getActiveIncomingProducts: builder.query<IncomingProduct[], void>({
-      query: () => "/inventory/incoming-product/active_list/",
+    //  GET: /inventory/delivery-order/check-availability/{id}/
+    checkDeliveryOrderAvailability: builder.mutation<
+      DeliveryOrderWithAvailability,
+      string
+    >({
+      query: (id) => ({
+        url: `/inventory/delivery-order/check-availability/${id}/`,
+        method: "GET",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "DeliveryOrder", id }],
     }),
 
-    getHiddenIncomingProducts: builder.query<IncomingProduct[], void>({
-      query: () => "/inventory/incoming-product/hidden_list/",
+    confirmDeliveryOrder: builder.mutation<DeliveryOrderConfirmed, string>({
+      query: (id) => ({
+        url: `/inventory/delivery-order/confirm-delivery/${id}/`,
+        method: "GET",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "DeliveryOrder", id }],
     }),
 
     // Mutation endpoints
-    createIncomingProduct: builder.mutation<
-      IncomingProduct,
-      CreateIncomingProductRequest
-    >({
+    createDeliveryOrder: builder.mutation<any, any>({
       query: (body) => ({
-        url: "/inventory/incoming-product/",
+        url: "/inventory/delivery-orders/",
         method: "POST",
         body,
       }),
     }),
 
-    updateIncomingProduct: builder.mutation<
-      IncomingProduct,
-      { id: string; data: UpdateIncomingProductRequest }
-    >({
+    updateDeliveryOrder: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/`,
+        url: `/inventory/delivery-orders/${id}/`,
         method: "PUT",
         body: data,
       }),
     }),
 
-    patchIncomingProduct: builder.mutation<
-      IncomingProduct,
-      { id: string; data: PatchIncomingProductRequest }
-    >({
+    patchDeliveryOrder: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/`,
+        url: `/inventory/delivery-orders/${id}/`,
         method: "PATCH",
         body: data,
       }),
     }),
 
-    deleteIncomingProduct: builder.mutation<void, string>({
+    deleteDeliveryOrder: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/inventory/incoming-product/${id}/soft_delete/`,
+        url: `/inventory/delivery-orders/${id}/soft_delete/`,
         method: "DELETE",
       }),
     }),
 
-    toggleIncomingProductHiddenStatus: builder.mutation<
-      IncomingProduct,
-      { id: string; data?: PatchIncomingProductRequest }
+    toggleDeliveryOrderHiddenStatus: builder.mutation<
+      any,
+      { id: string; data?: any }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/toggle_hidden_status/`,
-        method: "PUT",
-        body: data || {},
-      }),
-    }),
-
-    patchToggleIncomingProductHiddenStatus: builder.mutation<
-      IncomingProduct,
-      { id: string; data?: PatchIncomingProductRequest }
-    >({
-      query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/toggle_hidden_status/`,
+        url: `/inventory/delivery-orders/${id}/toggle_hidden_status/`,
         method: "PATCH",
         body: data || {},
       }),
@@ -180,18 +168,17 @@ export const incomingProductApi = createApi({
 
 export const {
   // Query hooks
-  useGetIncomingProductsQuery,
-  useGetIncomingProductQuery,
-  useCheckIncomingProductEditableQuery,
-  useGetIncomingProductBackorderQuery,
-  useGetActiveIncomingProductsQuery,
-  useGetHiddenIncomingProductsQuery,
+  useGetDeliveryOrdersQuery,
+  useGetDeliveryOrderQuery,
+  useGetActiveDeliveryOrdersQuery,
+  useGetHiddenDeliveryOrdersQuery,
 
   // Mutation hooks
-  useCreateIncomingProductMutation,
-  useUpdateIncomingProductMutation,
-  usePatchIncomingProductMutation,
-  useDeleteIncomingProductMutation,
-  useToggleIncomingProductHiddenStatusMutation,
-  usePatchToggleIncomingProductHiddenStatusMutation,
-} = incomingProductApi;
+  useCheckDeliveryOrderAvailabilityMutation,
+  useCreateDeliveryOrderMutation,
+  useUpdateDeliveryOrderMutation,
+  usePatchDeliveryOrderMutation,
+  useDeleteDeliveryOrderMutation,
+  useToggleDeliveryOrderHiddenStatusMutation,
+  useConfirmDeliveryOrderMutation,
+} = deliveryOrderApi;

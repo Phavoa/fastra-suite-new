@@ -1,12 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
-import type {
-  IncomingProduct,
-  GetIncomingProductsParams,
-  CreateIncomingProductRequest,
-  UpdateIncomingProductRequest,
-  PatchIncomingProductRequest,
-} from "../../types/incomingProduct";
 
 // Helper function to get tenant-specific base URL
 const getTenantBaseUrl = (state: RootState): string => {
@@ -16,8 +9,8 @@ const getTenantBaseUrl = (state: RootState): string => {
   return `https://${tenantSchemaName}.${apiDomain}`;
 };
 
-export const incomingProductApi = createApi({
-  reducerPath: "incomingProductApi",
+export const internalTransferApi = createApi({
+  reducerPath: "internalTransferApi",
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -83,94 +76,63 @@ export const incomingProductApi = createApi({
   },
   endpoints: (builder) => ({
     // Query endpoints
-    getIncomingProducts: builder.query<
-      IncomingProduct[],
-      GetIncomingProductsParams
-    >({
+    getInternalTransfers: builder.query<any[], any>({
       query: (params) => ({
-        url: "/inventory/incoming-product/",
+        url: "/inventory/internal-transfer/",
         params,
       }),
     }),
 
-    getIncomingProduct: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/`,
+    getInternalTransfer: builder.query<any, string>({
+      query: (id) => `/inventory/internal-transfer/${id}/`,
     }),
 
-    checkIncomingProductEditable: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/check_editable/`,
+    getActiveInternalTransfers: builder.query<any[], void>({
+      query: () => "/inventory/internal-transfer/active_list/",
     }),
 
-    getIncomingProductBackorder: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/get_backorder/`,
-    }),
-
-    getActiveIncomingProducts: builder.query<IncomingProduct[], void>({
-      query: () => "/inventory/incoming-product/active_list/",
-    }),
-
-    getHiddenIncomingProducts: builder.query<IncomingProduct[], void>({
-      query: () => "/inventory/incoming-product/hidden_list/",
+    getHiddenInternalTransfers: builder.query<any[], void>({
+      query: () => "/inventory/internal-transfer/hidden_list/",
     }),
 
     // Mutation endpoints
-    createIncomingProduct: builder.mutation<
-      IncomingProduct,
-      CreateIncomingProductRequest
-    >({
+    createInternalTransfer: builder.mutation<any, any>({
       query: (body) => ({
-        url: "/inventory/incoming-product/",
+        url: "/inventory/internal-transfer/",
         method: "POST",
         body,
       }),
     }),
 
-    updateIncomingProduct: builder.mutation<
-      IncomingProduct,
-      { id: string; data: UpdateIncomingProductRequest }
-    >({
+    updateInternalTransfer: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/`,
+        url: `/inventory/internal-transfer/${id}/`,
         method: "PUT",
         body: data,
       }),
     }),
 
-    patchIncomingProduct: builder.mutation<
-      IncomingProduct,
-      { id: string; data: PatchIncomingProductRequest }
-    >({
+    patchInternalTransfer: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/`,
+        url: `/inventory/internal-transfer/${id}/`,
         method: "PATCH",
         body: data,
       }),
     }),
 
-    deleteIncomingProduct: builder.mutation<void, string>({
+    deleteInternalTransfer: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/inventory/incoming-product/${id}/soft_delete/`,
+        url: `/inventory/internal-transfer/${id}/soft_delete/`,
         method: "DELETE",
       }),
     }),
 
-    toggleIncomingProductHiddenStatus: builder.mutation<
-      IncomingProduct,
-      { id: string; data?: PatchIncomingProductRequest }
+    toggleInternalTransferHiddenStatus: builder.mutation<
+      any,
+      { id: string; data?: any }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/toggle_hidden_status/`,
-        method: "PUT",
-        body: data || {},
-      }),
-    }),
-
-    patchToggleIncomingProductHiddenStatus: builder.mutation<
-      IncomingProduct,
-      { id: string; data?: PatchIncomingProductRequest }
-    >({
-      query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/toggle_hidden_status/`,
+        url: `/inventory/internal-transfer/${id}/toggle_hidden_status/`,
         method: "PATCH",
         body: data || {},
       }),
@@ -180,18 +142,15 @@ export const incomingProductApi = createApi({
 
 export const {
   // Query hooks
-  useGetIncomingProductsQuery,
-  useGetIncomingProductQuery,
-  useCheckIncomingProductEditableQuery,
-  useGetIncomingProductBackorderQuery,
-  useGetActiveIncomingProductsQuery,
-  useGetHiddenIncomingProductsQuery,
+  useGetInternalTransfersQuery,
+  useGetInternalTransferQuery,
+  useGetActiveInternalTransfersQuery,
+  useGetHiddenInternalTransfersQuery,
 
   // Mutation hooks
-  useCreateIncomingProductMutation,
-  useUpdateIncomingProductMutation,
-  usePatchIncomingProductMutation,
-  useDeleteIncomingProductMutation,
-  useToggleIncomingProductHiddenStatusMutation,
-  usePatchToggleIncomingProductHiddenStatusMutation,
-} = incomingProductApi;
+  useCreateInternalTransferMutation,
+  useUpdateInternalTransferMutation,
+  usePatchInternalTransferMutation,
+  useDeleteInternalTransferMutation,
+  useToggleInternalTransferHiddenStatusMutation,
+} = internalTransferApi;

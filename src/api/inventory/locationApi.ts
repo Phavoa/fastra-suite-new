@@ -7,6 +7,7 @@ import type {
   CreateLocationRequest,
   UpdateLocationRequest,
   PatchLocationRequest,
+  StockLevelItem,
 } from "../../types/location";
 
 // Helper function to get tenant-specific base URL
@@ -95,7 +96,7 @@ export const locationApi = createApi({
       query: (id) => `/inventory/location/${id}/`,
     }),
 
-    getLocationStockLevels: builder.query<Location, string>({
+    getLocationStockLevels: builder.query<StockLevelItem[], string>({
       query: (id) => `/inventory/location/${id}/location_stock_levels/`,
     }),
 

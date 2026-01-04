@@ -82,3 +82,9 @@ export interface PatchLocationRequest {
   contact_information?: string;
   is_hidden?: boolean;
 }
+
+export interface StockLevelItem {
+  product_id: number;
+  product_name: string;
+  product_unit_of_measure: string;
+}

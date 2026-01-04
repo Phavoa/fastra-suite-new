@@ -222,11 +222,8 @@ const Page = () => {
     }
   };
 
-  const handleConvertToIncomingProduct = async () => {
+  const handleConvertToIncomingProduct = () => {
     try {
-      // TODO: Implement convert to incoming product functionality
-      console.log("Convert to incoming product clicked");
-
       // For now, show a success message
       setNotification({
         message: "Purchase order converted to incoming product successfully!",
@@ -234,12 +231,9 @@ const Page = () => {
         show: true,
       });
 
-      // In a real implementation, you would make an API call here
-      // and then refetch the data or navigate to the new incoming product
-      // await convertToIncomingProduct({ id: purchaseOrderId }).unwrap();
-      // await refetch();
+      // Navigate to the fromPO page with the purchase order ID
+      window.location.href = `/inventory/operation/incoming_product/fromPO?poId=${purchaseOrderId}`;
     } catch (error) {
-      console.error("Failed to convert to incoming product:", error);
       setNotification({
         message: "Failed to convert to incoming product. Please try again.",
         type: "error",
