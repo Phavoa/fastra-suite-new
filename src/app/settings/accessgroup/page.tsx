@@ -8,9 +8,10 @@ import { ReusableTable } from "@/components/Settings/settingsReusableTable";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import { useGetAccessGroupRightsQuery } from "@/api/settings/accessGroupRightApi";
 import { useRouter } from "next/navigation"; 
+import { getUniqueAccessGroups } from "@/lib/utils/filterAccessGroup";
 
 // Access group interface matching API structure
-interface AccessGroupData {
+export interface AccessGroupData {
   id: number;
   access_code: string;
   group_name: string;
@@ -57,6 +58,12 @@ export default function AccessGroup() {
   } = useGetAccessGroupRightsQuery();
   console.log(accessGroupRights)
 
+  const filteredData: AccessGroupData[] = React.useMemo(() => {
+      return getUniqueAccessGroups(accessGroupRights ?? []);
+    }, [accessGroupRights]);
+
+      console.log(filteredData)
+
   // Handle loading state
   if (isLoading) {
     return (
@@ -85,8 +92,8 @@ export default function AccessGroup() {
   // Filter data based on archive state
   // Note: Since the API doesn't include a status/hidden field in the basic response,
   // we'll show all data when archive is false, and handle filtering based on available data
-  const filteredData: AccessGroupData[] = accessGroupRights || [];
-  console.log(filteredData)
+  //const filteredData: AccessGroupData[] = accessGroupRights || [];
+  
 
   const handleUserClick = (access_code?: string | number) => {
     router.push(`/settings/accessgroup/${access_code}`);
