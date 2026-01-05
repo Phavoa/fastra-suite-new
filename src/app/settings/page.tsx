@@ -98,7 +98,7 @@ export default function Settings() {
           headerTextColor="text-[#7A8A98]"
           bodyTextColor="text-[#1A1A1A]"
           iconWrapperClassName="bg-[#E8EFFD]"
-          onRowClick={(row) => router.push(`/settings/company/${row.id}`)}
+          onRowClick={handleCardClick}
         />
       )}
     </div>

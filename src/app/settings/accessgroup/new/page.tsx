@@ -157,13 +157,21 @@ export default function CreateAccessGroupPage() {
         "Access Group Created",
         "The access group has been successfully created and saved."
       );
-    } catch (error) {
-      console.error("Failed to create access group:", error);
-      statusModal.showError(
-        "Creation Failed",
-        "Failed to create access group. Please try again."
-      );
-    }
+    } catch (err: any) {
+  console.error("Failed to create access group:", err);
+
+  // Check if RTK Query returned a validation error
+  if (err?.data) {
+    console.error("Backend error data:", err.data);
+  }
+
+  statusModal.showError(
+    "Creation Failed",
+    err?.data
+      ? JSON.stringify(err.data)
+      : "Failed to create access group. Please try again."
+  );
+}
   };
 
   if (isLoadingApps) {
