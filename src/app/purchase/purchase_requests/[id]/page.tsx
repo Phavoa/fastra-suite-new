@@ -17,7 +17,7 @@ import {
   useGetPurchaseRequestQuery,
   usePatchPurchaseRequestMutation,
 } from "@/api/purchase/purchaseRequestApi";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { RootState } from "@/lib/store/store";
 
 const Page = () => {
   const params = useParams();
+  const router = useRouter();
   const purchaseRequestId = params.id as string;
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserId = loggedInUser?.id;
@@ -188,30 +189,15 @@ const Page = () => {
     }
   };
 
-  const handleEdit = () => {
-    window.location.href = `/purchase/purchase_requests/edit/${purchaseRequestId}`;
-  };
-
   const handleSendForApproval = () => {
     handleStatusUpdate("pending");
   };
 
   const handleConvertToRFQ = async () => {
     try {
-      // TODO: Implement convert to RFQ functionality
-      console.log("Convert to RFQ clicked");
-
-      // For now, show a success message
-      setNotification({
-        message: "Purchase request converted to RFQ successfully!",
-        type: "success",
-        show: true,
-      });
-
-      // In a real implementation, you would make an API call here
-      // and then refetch the data
-      // await convertToRFQ({ id: purchaseRequestId }).unwrap();
-      // await refetch();
+      router.push(
+        `/purchase/request_for_quotations/convert_to_rfq?from_pr=${purchaseRequestId}`
+      );
     } catch (error) {
       console.error("Failed to convert to RFQ:", error);
       setNotification({
@@ -221,7 +207,7 @@ const Page = () => {
       });
     }
   };
-
+  console.log("Rendering Page with status:", purchaseRequest.status);
   return (
     <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader

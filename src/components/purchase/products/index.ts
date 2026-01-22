@@ -1,6 +1,8 @@
 export { ActionBar } from "./ActionBar";
 export { ProductsTable } from "./ProductsTable";
+export { ProductsCards } from "./ProductsCards";
 export { ProductsTableSkeleton } from "./ProductsTableSkeleton";
+export { ProductsCardsSkeleton } from "./ProductsCardsSkeleton";
 export { SkeletonRow } from "./SkeletonRow";
 export { SkeletonMobileItem } from "./SkeletonMobileItem";
 export { SearchBar } from "./SearchBar";

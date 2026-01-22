@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
+import { usePermission } from "@/hooks/usePermission";
 import { PurchaseTable } from "@/components/purchase/purchaseRequest/PurchaseRequestTable";
 import { PurchaseRequestCards } from "@/components/purchase/purchaseRequest/PurchaseRequestCards";
 import { RequestRow } from "@/components/purchase/types";
@@ -54,10 +56,24 @@ const transformPurchaseRequestToRow = (
 export default function PurchaseRequestsPage() {
   const [query, setQuery] = useState("");
   const [currentView, setCurrentView] = useState<"grid" | "list">("list");
+  const router = useRouter();
+  const { can } = usePermission();
 
   // Get logged-in user from Redux store
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserId = loggedInUser?.id;
+
+  useEffect(() => {
+    if (
+      !can({
+        application: "purchase",
+        module: "purchase_requests",
+        action: "view",
+      })
+    ) {
+      router.push("/unauthorized");
+    }
+  }, [can, router]);
 
   // Use the API query hook
   const {

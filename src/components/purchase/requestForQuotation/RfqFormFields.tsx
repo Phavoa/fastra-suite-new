@@ -16,16 +16,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGetActiveLocationsFilteredQuery } from "../../../api/inventory/locationApi";
-import { PurchaseRequestFormData } from "@/schemas/purchaseRequestSchema";
+import { RfqFormData } from "@/schemas/rfqSchema";
 
 type Option = { value: string; label: string };
 
 // Backward compatible props interface
 interface ReactHookFormProps {
-  register: (name: keyof PurchaseRequestFormData) => UseFormRegisterReturn;
-  errors: FieldErrors<PurchaseRequestFormData>;
-  setValue: UseFormSetValue<PurchaseRequestFormData>;
-  watch: UseFormWatch<PurchaseRequestFormData>;
+  register: (name: keyof RfqFormData) => UseFormRegisterReturn;
+  errors: FieldErrors<RfqFormData>;
+  setValue: UseFormSetValue<RfqFormData>;
+  watch: UseFormWatch<RfqFormData>;
   currencyOptions: Option[];
   vendorOptions: Option[];
   isLoadingCurrencies?: boolean;
@@ -36,6 +36,16 @@ interface ReactHookFormProps {
   isLoadingApprovedPRs?: boolean;
   onPurchaseRequestSelection?: (value: string) => void;
   isReadOnly?: boolean;
+  currency_details?: {
+    currency_name: string;
+    currency_code: string;
+    currency_symbol: string;
+  };
+  vendor_details?: { company_name: string };
+  requesting_location_details?: {
+    location_name: string;
+    location_code: string;
+  };
 }
 
 interface SimpleProps {
@@ -58,6 +68,16 @@ interface SimpleProps {
   isLoadingApprovedPRs?: boolean;
   onPurchaseRequestSelection?: (value: string) => void;
   isReadOnly?: boolean;
+  currency_details?: {
+    currency_name: string;
+    currency_code: string;
+    currency_symbol: string;
+  };
+  vendor_details?: { company_name: string };
+  requesting_location_details?: {
+    location_name: string;
+    location_code: string;
+  };
 }
 
 type RfqFormFieldsProps = ReactHookFormProps | SimpleProps;
@@ -69,6 +89,7 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
   // Type guards
   const reactHookFormProps = props as ReactHookFormProps;
   const simpleProps = props as SimpleProps;
+  console.log("RfqFormFields props:", props);
 
   // Fetch active locations
   const { data: activeLocations, isLoading: isLoadingLocations } =
@@ -85,7 +106,7 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
   const getFieldValue = (field: string): string | number | "" | undefined => {
     if (isReactHookForm) {
       // For react-hook-form, use the watch function
-      return reactHookFormProps.watch(field as keyof PurchaseRequestFormData);
+      return reactHookFormProps.watch(field as keyof RfqFormData);
     }
     return simpleProps.formData[field as keyof typeof simpleProps.formData];
   };
@@ -93,10 +114,7 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
   // Helper function to handle field changes
   const handleFieldChange = (field: string, value: string | number | "") => {
     if (isReactHookForm) {
-      reactHookFormProps.setValue(
-        field as keyof PurchaseRequestFormData,
-        value as string
-      );
+      reactHookFormProps.setValue(field as keyof RfqFormData, value as string);
     } else {
       simpleProps.onChange(field, value);
     }
@@ -105,10 +123,7 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
   // Helper function to handle select changes
   const handleSelectChange = (field: string, value: string) => {
     if (isReactHookForm) {
-      reactHookFormProps.setValue(
-        field as keyof PurchaseRequestFormData,
-        value
-      );
+      reactHookFormProps.setValue(field as keyof RfqFormData, value);
     } else {
       simpleProps.onChange(field, value);
     }
@@ -138,78 +153,89 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
               Select Purchase Request *
             </Label>
 
-            <div className="max-w-md">
-              <Select
-                value={(getFieldValue("purchase_request") as string) || ""}
-                onValueChange={(value) => {
-                  handleSelectChange("purchase_request", value);
-                  if (
-                    isReactHookForm
-                      ? reactHookFormProps.onPurchaseRequestSelection
-                      : simpleProps.onPurchaseRequestSelection
-                  ) {
-                    (isReactHookForm
-                      ? reactHookFormProps.onPurchaseRequestSelection
-                      : simpleProps.onPurchaseRequestSelection)!(value);
-                  }
-                }}
-                disabled={
-                  isReactHookForm
-                    ? reactHookFormProps.isLoadingApprovedPRs
-                    : simpleProps.isLoadingApprovedPRs
-                }
-              >
-                <SelectTrigger
-                  className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  size="md"
-                >
-                  <SelectValue
-                    placeholder={
-                      (
-                        isReactHookForm
-                          ? reactHookFormProps.isLoadingApprovedPRs
-                          : simpleProps.isLoadingApprovedPRs
-                      )
-                        ? "Loading purchase requests..."
-                        : "Select purchase request"
+            {(isReactHookForm
+              ? reactHookFormProps.isReadOnly ?? false
+              : simpleProps.isReadOnly ?? false) &&
+            getFieldValue("purchase_request") ? (
+              <div className="h-11 flex items-center px-3 border border-gray-400 rounded bg-gray-50 text-gray-700">
+                PR-{getFieldValue("purchase_request")}
+              </div>
+            ) : (
+              <div className="max-w-md">
+                <Select
+                  value={(getFieldValue("purchase_request") as string) || ""}
+                  onValueChange={(value) => {
+                    handleSelectChange("purchase_request", value);
+                    if (
+                      isReactHookForm
+                        ? reactHookFormProps.onPurchaseRequestSelection
+                        : simpleProps.onPurchaseRequestSelection
+                    ) {
+                      (isReactHookForm
+                        ? reactHookFormProps.onPurchaseRequestSelection
+                        : simpleProps.onPurchaseRequestSelection)!(value);
                     }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {(
+                  }}
+                  disabled={
                     isReactHookForm
-                      ? reactHookFormProps.isLoadingApprovedPRs
-                      : simpleProps.isLoadingApprovedPRs
-                  ) ? (
-                    <SelectItem value="__loading__" disabled>
-                      Loading purchase requests...
-                    </SelectItem>
-                  ) : (isReactHookForm
-                      ? reactHookFormProps.approvedPurchaseRequestOptions
-                      : simpleProps.approvedPurchaseRequestOptions
-                    )?.length === 0 ? (
-                    <SelectItem value="__no_prs__" disabled>
-                      No approved purchase requests available
-                    </SelectItem>
-                  ) : (
-                    (isReactHookForm
-                      ? reactHookFormProps.approvedPurchaseRequestOptions
-                      : simpleProps.approvedPurchaseRequestOptions
-                    )?.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                      ? reactHookFormProps.isLoadingApprovedPRs ||
+                        (reactHookFormProps.isReadOnly ?? false)
+                      : simpleProps.isLoadingApprovedPRs ||
+                        (simpleProps.isReadOnly ?? false)
+                  }
+                >
+                  <SelectTrigger
+                    className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    size="md"
+                  >
+                    <SelectValue
+                      placeholder={
+                        (
+                          isReactHookForm
+                            ? reactHookFormProps.isLoadingApprovedPRs
+                            : simpleProps.isLoadingApprovedPRs
+                        )
+                          ? "Loading purchase requests..."
+                          : "Select purchase request"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(
+                      isReactHookForm
+                        ? reactHookFormProps.isLoadingApprovedPRs
+                        : simpleProps.isLoadingApprovedPRs
+                    ) ? (
+                      <SelectItem value="__loading__" disabled>
+                        Loading purchase requests...
                       </SelectItem>
-                    ))
+                    ) : (isReactHookForm
+                        ? reactHookFormProps.approvedPurchaseRequestOptions
+                        : simpleProps.approvedPurchaseRequestOptions
+                      )?.length === 0 ? (
+                      <SelectItem value="__no_prs__" disabled>
+                        No approved purchase requests available
+                      </SelectItem>
+                    ) : (
+                      (isReactHookForm
+                        ? reactHookFormProps.approvedPurchaseRequestOptions
+                        : simpleProps.approvedPurchaseRequestOptions
+                      )?.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {isReactHookForm &&
+                  reactHookFormProps.errors.purchase_request && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {reactHookFormProps.errors.purchase_request.message}
+                    </p>
                   )}
-                </SelectContent>
-              </Select>
-              {isReactHookForm &&
-                reactHookFormProps.errors.purchase_request && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {reactHookFormProps.errors.purchase_request.message}
-                  </p>
-                )}
-            </div>
+              </div>
+            )}
           </motion.div>
           {/* Currency */}
           <motion.div
@@ -224,44 +250,76 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
             >
               Currency *
             </Label>
-            <motion.div
-              whileFocus={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Select
-                value={(getFieldValue("currency") as string) || ""}
-                onValueChange={(value) => handleSelectChange("currency", value)}
-                disabled={
-                  isReactHookForm
-                    ? reactHookFormProps.isLoadingCurrencies ||
-                      (reactHookFormProps.isReadOnly ?? false)
-                    : simpleProps.isLoadingCurrencies ||
-                      (simpleProps.isReadOnly ?? false)
+            {(isReactHookForm
+              ? reactHookFormProps.isReadOnly ?? false
+              : simpleProps.isReadOnly ?? false) &&
+            (isReactHookForm
+              ? reactHookFormProps.currency_details
+              : simpleProps.currency_details) ? (
+              <div className="h-11 flex items-center px-3 border border-gray-400 rounded bg-gray-50 text-gray-700">
+                {
+                  (isReactHookForm
+                    ? reactHookFormProps.currency_details
+                    : simpleProps.currency_details
+                  )?.currency_name
+                }{" "}
+                (
+                {
+                  (isReactHookForm
+                    ? reactHookFormProps.currency_details
+                    : simpleProps.currency_details
+                  )?.currency_code
                 }
+                ){" "}
+                {
+                  (isReactHookForm
+                    ? reactHookFormProps.currency_details
+                    : simpleProps.currency_details
+                  )?.currency_symbol
+                }
+              </div>
+            ) : (
+              <motion.div
+                whileFocus={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
               >
-                <SelectTrigger
-                  className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  size="md"
+                <Select
+                  value={(getFieldValue("currency") as string) || ""}
+                  onValueChange={(value) =>
+                    handleSelectChange("currency", value)
+                  }
+                  disabled={
+                    isReactHookForm
+                      ? reactHookFormProps.isLoadingCurrencies ||
+                        (reactHookFormProps.isReadOnly ?? false)
+                      : simpleProps.isLoadingCurrencies ||
+                        (simpleProps.isReadOnly ?? false)
+                  }
                 >
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(isReactHookForm
-                    ? reactHookFormProps.currencyOptions
-                    : simpleProps.currencyOptions
-                  ).map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isReactHookForm && reactHookFormProps.errors.currency && (
-                <p className="text-sm text-red-600 mt-1">
-                  {reactHookFormProps.errors.currency.message}
-                </p>
-              )}
-            </motion.div>
+                  <SelectTrigger
+                    className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    size="md"
+                  >
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(isReactHookForm
+                      ? reactHookFormProps.currencyOptions
+                      : simpleProps.currencyOptions
+                    ).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isReactHookForm && reactHookFormProps.errors.currency && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {reactHookFormProps.errors.currency.message}
+                  </p>
+                )}
+              </motion.div>
+            )}
           </motion.div>
 
           {/* Purpose */}
@@ -368,44 +426,60 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
             >
               Vendor *
             </Label>
-            <motion.div
-              whileFocus={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Select
-                value={(getFieldValue("vendor") as string) || ""}
-                onValueChange={(value) => handleSelectChange("vendor", value)}
-                disabled={
-                  isReactHookForm
-                    ? reactHookFormProps.isLoadingVendors ||
-                      (reactHookFormProps.isReadOnly ?? false)
-                    : simpleProps.isLoadingVendors ||
-                      (simpleProps.isReadOnly ?? false)
+            {(isReactHookForm
+              ? reactHookFormProps.isReadOnly ?? false
+              : simpleProps.isReadOnly ?? false) &&
+            (isReactHookForm
+              ? reactHookFormProps.vendor_details
+              : simpleProps.vendor_details) ? (
+              <div className="h-11 flex items-center px-3 border border-gray-400 rounded bg-gray-50 text-gray-700">
+                {
+                  (isReactHookForm
+                    ? reactHookFormProps.vendor_details
+                    : simpleProps.vendor_details
+                  )?.company_name
                 }
+              </div>
+            ) : (
+              <motion.div
+                whileFocus={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
               >
-                <SelectTrigger
-                  className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  size="md"
+                <Select
+                  value={(getFieldValue("vendor") as string) || ""}
+                  onValueChange={(value) => handleSelectChange("vendor", value)}
+                  disabled={
+                    isReactHookForm
+                      ? reactHookFormProps.isLoadingVendors ||
+                        (reactHookFormProps.isReadOnly ?? false)
+                      : simpleProps.isLoadingVendors ||
+                        (simpleProps.isReadOnly ?? false)
+                  }
                 >
-                  <SelectValue placeholder="Select vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(isReactHookForm
-                    ? reactHookFormProps.vendorOptions
-                    : simpleProps.vendorOptions
-                  ).map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isReactHookForm && reactHookFormProps.errors.vendor && (
-                <p className="text-sm text-red-600 mt-1">
-                  {reactHookFormProps.errors.vendor.message}
-                </p>
-              )}
-            </motion.div>
+                  <SelectTrigger
+                    className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    size="md"
+                  >
+                    <SelectValue placeholder="Select vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(isReactHookForm
+                      ? reactHookFormProps.vendorOptions
+                      : simpleProps.vendorOptions
+                    ).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isReactHookForm && reactHookFormProps.errors.vendor && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {reactHookFormProps.errors.vendor.message}
+                  </p>
+                )}
+              </motion.div>
+            )}
           </motion.div>
 
           {/* Requesting Location */}
@@ -421,43 +495,67 @@ export function RfqFormFields(props: RfqFormFieldsProps) {
             >
               Requesting Location *
             </Label>
-            <motion.div
-              whileFocus={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Select
-                value={(getFieldValue("requesting_location") as string) || ""}
-                onValueChange={(value) =>
-                  handleSelectChange("requesting_location", value)
-                }
-                disabled={
-                  isLoadingLocations ||
+            {(isReactHookForm
+              ? reactHookFormProps.isReadOnly ?? false
+              : simpleProps.isReadOnly ?? false) &&
+            (isReactHookForm
+              ? reactHookFormProps.requesting_location_details
+              : simpleProps.requesting_location_details) ? (
+              <div className="h-11 flex items-center px-3 border border-gray-400 rounded bg-gray-50 text-gray-700">
+                {
                   (isReactHookForm
-                    ? reactHookFormProps.isReadOnly ?? false
-                    : simpleProps.isReadOnly ?? false)
+                    ? reactHookFormProps.requesting_location_details
+                    : simpleProps.requesting_location_details
+                  )?.location_name
+                }{" "}
+                (
+                {
+                  (isReactHookForm
+                    ? reactHookFormProps.requesting_location_details
+                    : simpleProps.requesting_location_details
+                  )?.location_code
                 }
+                )
+              </div>
+            ) : (
+              <motion.div
+                whileFocus={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
               >
-                <SelectTrigger
-                  className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  size="md"
+                <Select
+                  value={(getFieldValue("requesting_location") as string) || ""}
+                  onValueChange={(value) =>
+                    handleSelectChange("requesting_location", value)
+                  }
+                  disabled={
+                    isLoadingLocations ||
+                    (isReactHookForm
+                      ? reactHookFormProps.isReadOnly ?? false
+                      : simpleProps.isReadOnly ?? false)
+                  }
                 >
-                  <SelectValue placeholder="Select requesting location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locationOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isReactHookForm &&
-                reactHookFormProps.errors.requesting_location && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {reactHookFormProps.errors.requesting_location.message}
-                  </p>
-                )}
-            </motion.div>
+                  <SelectTrigger
+                    className="w-full h-11 border border-gray-400 rounded bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    size="md"
+                  >
+                    <SelectValue placeholder="Select requesting location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isReactHookForm &&
+                  reactHookFormProps.errors.requesting_location && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {reactHookFormProps.errors.requesting_location.message}
+                    </p>
+                  )}
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </div>

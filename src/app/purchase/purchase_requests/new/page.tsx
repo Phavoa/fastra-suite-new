@@ -80,6 +80,9 @@ export default function Page() {
 
   // Form state
   const [items, setItems] = useState<LineItem[]>(initialItems);
+  const [submitStatus, setSubmitStatus] = useState<"draft" | "pending">(
+    "draft"
+  );
 
   const addRow = () =>
     setItems((prev) => [
@@ -220,8 +223,8 @@ export default function Page() {
           qty: item.qty,
           estimated_unit_price: item.estimated_unit_price.toString(),
         })),
-        status: "draft" as const,
-        is_submitted: false,
+        status: submitStatus,
+        is_submitted: submitStatus === "pending",
       };
 
       // Call the API mutation
@@ -264,6 +267,18 @@ export default function Page() {
   function closeNotification() {
     setNotification((prev) => ({ ...prev, show: false }));
   }
+
+  // Handle save only
+  const handleSaveOnly = () => {
+    setSubmitStatus("draft");
+    formRef.current?.requestSubmit();
+  };
+
+  // Handle save and send
+  const handleSaveAndSend = () => {
+    setSubmitStatus("pending");
+    formRef.current?.requestSubmit();
+  };
 
   // Get currently selected currency symbol
   const getCurrentCurrencySymbol = () => {
@@ -619,10 +634,9 @@ export default function Page() {
           >
             <PurchaseRequestFormActions
               formRef={formRef}
-              submitText={
-                isCreating ? "Creating..." : "Create Purchase Request"
-              }
               isLoading={isCreating}
+              onSaveOnly={handleSaveOnly}
+              onSaveAndSend={handleSaveAndSend}
             />
           </motion.div>
         </form>

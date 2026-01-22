@@ -29,6 +29,7 @@ const mapLegacyStatus = (status: string): PurchaseOrderStatus => {
   const statusMapping: Record<string, PurchaseOrderStatus> = {
     // Legacy purchase order statuses -> new purchase order statuses
     awaiting: "pending_approval",
+    pending: "pending_approval",
     // Direct mappings (no change needed)
     draft: "draft",
     pending_approval: "pending_approval",

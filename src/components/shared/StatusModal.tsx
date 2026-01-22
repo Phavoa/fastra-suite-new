@@ -145,10 +145,14 @@ export function StatusModal({
             onClick={handleAction}
             className={cn(
               "w-full sm:w-auto",
-              type === "success" && "bg-green-600 hover:bg-green-700",
-              type === "error" && "bg-red-600 hover:bg-red-700",
-              type === "warning" && "bg-amber-600 hover:bg-amber-700",
-              type === "info" && "bg-[#3B7CED] hover:bg-[#2d63c7]"
+              type === "success" &&
+                "bg-green-600 hover:bg-green-700  border-green-700 text-white",
+              type === "error" &&
+                "bg-red-600 hover:bg-red-700 border-red-700 text-white",
+              type === "warning" &&
+                "bg-amber-600 hover:bg-amber-700 border-amber-700 text-white",
+              type === "info" &&
+                "bg-[#3B7CED] hover:bg-[#2d63c7] border-[#3B7CED] text-white"
             )}
           >
             {actionText || config.defaultActionText}

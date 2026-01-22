@@ -170,7 +170,10 @@ export const unitOfMeasureApi = createApi({
         url: `/purchase/unit-of-measure/${id}/`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, id) => [{ type: "UnitOfMeasure", id }],
+      invalidatesTags: (result, error, id) => [
+        { type: "UnitOfMeasure", id },
+        "UnitOfMeasure",
+      ],
     }),
   }),
 });

@@ -473,10 +473,10 @@ export default function CurrencyListPage() {
         <StatusModal
           isOpen={statusModal.isOpen}
           onClose={() => setStatusModal({ ...statusModal, isOpen: false })}
+          type={statusModal.status}
           title={statusModal.title}
-          description={statusModal.description}
-          status={statusModal.status}
-          actionLabel="Continue"
+          message={statusModal.description}
+          actionText="Continue"
         />
       </div>
     </div>

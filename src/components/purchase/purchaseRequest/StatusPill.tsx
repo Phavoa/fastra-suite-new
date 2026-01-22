@@ -7,7 +7,9 @@ import { Status, getStatusInfo } from "../types";
 const getStatusStyles = (
   status: Status
 ): { bg: string; text: string; label: string } => {
+  console.log("status", status);
   const info = getStatusInfo(status);
+  // console.log("info", info);
 
   // Map the color classes to pill-appropriate styles
   const colorMap: Record<string, { bg: string; text: string }> = {

@@ -74,7 +74,7 @@ const incomingProductSchema = z.object({
   supplier: z.string().min(1, "Supplier is required"),
   source_location: z.string().min(1, "Source location is required"),
   destination_location: z.string().min(1, "Destination location is required"),
-  related_po: z.string().optional(),
+  related_po: z.string().nullable(),
   notes: z.string().optional(),
 });
 
@@ -255,7 +255,7 @@ export default function Page() {
 
     return {
       receipt_type: data.receipt_type,
-      related_po: data.related_po || null,
+      related_po: data.related_po,
       supplier: parseInt(data.supplier),
       source_location: data.source_location,
       destination_location: data.destination_location,

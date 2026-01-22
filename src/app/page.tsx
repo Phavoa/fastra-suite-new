@@ -1,3 +1,5 @@
+"use client";
+
 // File: src/app/dashboard/page.tsx
 import React from "react";
 import type { ReactElement } from "react";
@@ -31,6 +33,8 @@ import {
   SalesIcon,
   SettingsIcon,
 } from "@/components/shared/icons";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 
 type Module = {
   id: string;
@@ -250,6 +254,12 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
 }
 
 export default function DashboardPage(): ReactElement {
+  console.log("hello");
+  // Get logged-in user from Redux store
+  const loggedInUser = useSelector(
+    (state: RootState) => state.auth.user_accesses
+  );
+  console.log(loggedInUser);
   return (
     <div className="min-h-screen text-slate-900">
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 mb-4">

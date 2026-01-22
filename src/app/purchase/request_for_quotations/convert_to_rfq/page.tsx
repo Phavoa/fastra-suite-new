@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
@@ -16,7 +16,7 @@ import { useGetCurrenciesQuery } from "@/api/purchase/currencyApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import {
-  useGetApprovedPurchaseRequestsQuery,
+  useGetPurchaseRequestQuery,
   PurchaseRequest,
 } from "@/api/purchase/purchaseRequestApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
@@ -68,7 +68,18 @@ const initialItems: LineItem[] = [
 
 export default function Page() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromPr = searchParams.get("from_pr");
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Fetch the PR from query parameter
+  const {
+    data: selectedPurchaseRequest,
+    isLoading: isLoadingPR,
+    error: prError,
+  } = useGetPurchaseRequestQuery(fromPr || "", {
+    skip: !fromPr,
+  });
 
   // API mutations and queries
   const [createRequestForQuotation, { isLoading: isCreating }] =
@@ -82,14 +93,8 @@ export default function Page() {
     error: productsError,
   } = useGetProductsQuery({});
 
-  // Get approved purchase requests for RFQ creation
-  const { data: approvedPurchaseRequests, isLoading: isLoadingApprovedPRs } =
-    useGetApprovedPurchaseRequestsQuery();
-
   // Form state
   const [items, setItems] = useState<LineItem[]>(initialItems);
-  const [selectedPurchaseRequest, setSelectedPurchaseRequest] =
-    useState<PurchaseRequest | null>(null);
 
   const addRow = () =>
     setItems((prev) => [
@@ -140,7 +145,7 @@ export default function Page() {
         date.setDate(date.getDate() + 30); // 30 days from now
         return date.toISOString().split("T")[0]; // YYYY-MM-DD format
       })(),
-      purchase_request: "", // Required but starts empty
+      purchase_request: "", // Will be set from query param
     },
   });
 
@@ -176,11 +181,15 @@ export default function Page() {
       label: product.product_name,
     })) || [];
 
-  const approvedPurchaseRequestOptions: Option[] =
-    approvedPurchaseRequests?.map((pr) => ({
-      value: pr.id,
-      label: `PR-${pr.id} (${pr.purpose})`,
-    })) || [];
+  // For the PR select, since it's pre-selected, provide it as an option
+  const prOptions: Option[] = selectedPurchaseRequest
+    ? [
+        {
+          value: selectedPurchaseRequest.id,
+          label: `PR-${selectedPurchaseRequest.id} - ${selectedPurchaseRequest.purpose}`,
+        },
+      ]
+    : [];
 
   // Debug logging
   console.log("Products data:", products);
@@ -200,6 +209,65 @@ export default function Page() {
     }
   }, [productsError]);
 
+  // Handle PR loading and validation
+  useEffect(() => {
+    if (!fromPr) {
+      setNotification({
+        message: "No purchase request specified. Please provide a valid PR ID.",
+        type: "error",
+        show: true,
+      });
+      return;
+    }
+
+    if (prError) {
+      setNotification({
+        message:
+          "Failed to load purchase request. Please check the PR ID and try again.",
+        type: "error",
+        show: true,
+      });
+      return;
+    }
+
+    if (selectedPurchaseRequest) {
+      // Validate PR status - only approved PRs can be converted
+      if (selectedPurchaseRequest.status !== "approved") {
+        setNotification({
+          message: "Only approved purchase requests can be converted to RFQ.",
+          type: "error",
+          show: true,
+        });
+        return;
+      }
+
+      // Auto-populate form fields from the purchase request
+      setValue("currency", selectedPurchaseRequest.currency.toString());
+      setValue("vendor", selectedPurchaseRequest.vendor.toString());
+      setValue("purpose", selectedPurchaseRequest.purpose);
+      setValue(
+        "requesting_location",
+        selectedPurchaseRequest.requesting_location
+      );
+      setValue("purchase_request", selectedPurchaseRequest.id);
+
+      // Auto-populate items from the purchase request
+      const rfqItems: LineItem[] = selectedPurchaseRequest.items.map(
+        (item, index) => ({
+          id: (index + 1).toString(),
+          product: item.product.toString(),
+          qty: item.qty,
+          estimated_unit_price: item.estimated_unit_price,
+          product_description: item.product_details.product_description,
+          unit_of_measure:
+            item.product_details.unit_of_measure_details.unit_symbol,
+        })
+      );
+
+      setItems(rfqItems.length > 0 ? rfqItems : initialItems);
+    }
+  }, [selectedPurchaseRequest, prError, fromPr, setValue]);
+
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
@@ -209,8 +277,8 @@ export default function Page() {
       current: true,
     },
     {
-      label: "New",
-      href: "/purchase/request_for_quotations/new",
+      label: "Convert to RFQ",
+      href: "/purchase/request_for_quotations/convert_to_rfq",
       current: true,
     },
   ];
@@ -356,35 +424,66 @@ export default function Page() {
     );
   };
 
-  // Handle purchase request selection and auto-population
-  const handlePurchaseRequestSelection = (purchaseRequestId: string) => {
-    const selectedPR = approvedPurchaseRequests?.find(
-      (pr) => pr.id === purchaseRequestId
+  // Loading state while fetching PR
+  if (isLoadingPR) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading purchase request...</p>
+        </div>
+      </div>
     );
-    if (selectedPR) {
-      setSelectedPurchaseRequest(selectedPR);
+  }
 
-      // Auto-populate form fields from the purchase request
-      setValue("currency", selectedPR.currency.toString());
-      setValue("vendor", selectedPR.vendor.toString());
-      setValue("purpose", selectedPR.purpose);
-      setValue("requesting_location", selectedPR.requesting_location);
-      setValue("purchase_request", selectedPR.id);
-
-      // Auto-populate items from the purchase request
-      const rfqItems: LineItem[] = selectedPR.items.map((item, index) => ({
-        id: (index + 1).toString(),
-        product: item.product.toString(),
-        qty: item.qty,
-        estimated_unit_price: item.estimated_unit_price,
-        product_description: item.product_details.product_description,
-        unit_of_measure:
-          item.product_details.unit_of_measure_details.unit_symbol,
-      }));
-
-      setItems(rfqItems.length > 0 ? rfqItems : initialItems);
-    }
-  };
+  // Error state if PR is invalid or missing
+  if (
+    !fromPr ||
+    prError ||
+    (selectedPurchaseRequest && selectedPurchaseRequest.status !== "approved")
+  ) {
+    return (
+      <motion.div
+        className="h-full text-gray-900 font-sans antialiased"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        <PageHeader items={breadcrumsItem} title="Convert to RFQ" />
+        <motion.main
+          className="h-full mx-auto px-6 py-8 bg-white"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+        >
+          <div className="text-center py-12">
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+              Invalid Purchase Request
+            </h2>
+            <p className="text-gray-600 mb-6">
+              {!fromPr
+                ? "No purchase request ID provided in the URL."
+                : prError
+                ? "The specified purchase request could not be found."
+                : "Only approved purchase requests can be converted to RFQ."}
+            </p>
+            <Button
+              onClick={() => router.push("/purchase/request_for_quotations")}
+            >
+              Back to RFQs
+            </Button>
+          </div>
+        </motion.main>
+        <ToastNotification
+          message={notification.message}
+          type={notification.type}
+          show={notification.show}
+          onClose={closeNotification}
+        />
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -398,7 +497,7 @@ export default function Page() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <PageHeader items={breadcrumsItem} title="New Request for Quotation" />
+        <PageHeader items={breadcrumsItem} title="Convert to RFQ" />
       </motion.div>
 
       {/* Main form area */}
@@ -474,20 +573,50 @@ export default function Page() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.5 }}
           >
-            <RfqFormFields
-              register={register}
-              errors={errors}
-              setValue={setValue}
-              watch={watch}
-              currencyOptions={currencyOptions}
-              vendorOptions={vendorOptions}
-              approvedPurchaseRequestOptions={approvedPurchaseRequestOptions}
-              isLoadingCurrencies={isLoadingCurrencies}
-              isLoadingVendors={isLoadingVendors}
-              isLoadingApprovedPRs={isLoadingApprovedPRs}
-              onPurchaseRequestSelection={handlePurchaseRequestSelection}
-              isReadOnly={!!selectedPurchaseRequest}
-            />
+            {selectedPurchaseRequest && (
+              <RfqFormFields
+                register={register}
+                errors={errors}
+                setValue={setValue}
+                watch={watch}
+                currencyOptions={currencyOptions}
+                vendorOptions={vendorOptions}
+                approvedPurchaseRequestOptions={prOptions}
+                isLoadingCurrencies={isLoadingCurrencies}
+                isLoadingVendors={isLoadingVendors}
+                isLoadingApprovedPRs={false} // Not loading since PR is pre-selected
+                onPurchaseRequestSelection={() => {}} // Not needed since PR is pre-selected
+                isReadOnly={true} // Make all fields read-only since PR is pre-selected
+                currency_details={selectedPurchaseRequest.currency_details}
+                vendor_details={selectedPurchaseRequest.vendor_details}
+                requesting_location_details={
+                  selectedPurchaseRequest.requesting_location_details
+                }
+              />
+            )}
+          </motion.div>
+
+          {/* Display selected PR info */}
+          <motion.div
+            className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
+          >
+            <h3 className="text-sm font-medium text-blue-900 mb-2">
+              Selected Purchase Request
+            </h3>
+            <div className="text-sm text-blue-800">
+              <p>
+                <strong>ID:</strong> PR-{selectedPurchaseRequest!.id}
+              </p>
+              <p>
+                <strong>Purpose:</strong> {selectedPurchaseRequest!.purpose}
+              </p>
+              <p>
+                <strong>Status:</strong> {selectedPurchaseRequest!.status}
+              </p>
+            </div>
           </motion.div>
 
           <section className="bg-white  mt-8 border-none">
@@ -530,56 +659,11 @@ export default function Page() {
                           className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150"
                         >
                           <TableCell className="border border-gray-200 align-middle">
-                            {selectedPurchaseRequest ? (
-                              <div className="text-sm text-gray-600 line-clamp-2">
-                                {productOptions.find(
-                                  (p) => p.value === it.product
-                                )?.label || "N/A"}
-                              </div>
-                            ) : (
-                              <Select
-                                value={it.product}
-                                onValueChange={(value) =>
-                                  updateItemWithProductDetails(it.id, {
-                                    product: value,
-                                  })
-                                }
-                                disabled={isLoadingProducts}
-                              >
-                                <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0">
-                                  <SelectValue
-                                    placeholder={
-                                      isLoadingProducts
-                                        ? "Loading products..."
-                                        : "Select product"
-                                    }
-                                  />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {isLoadingProducts ? (
-                                    <SelectItem value="__loading__" disabled>
-                                      Loading products...
-                                    </SelectItem>
-                                  ) : productOptions.length === 0 ? (
-                                    <SelectItem
-                                      value="__no_products__"
-                                      disabled
-                                    >
-                                      No products available
-                                    </SelectItem>
-                                  ) : (
-                                    productOptions.map((option) => (
-                                      <SelectItem
-                                        key={option.value}
-                                        value={option.value}
-                                      >
-                                        {option.label}
-                                      </SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            )}
+                            <div className="text-sm text-gray-600 line-clamp-2">
+                              {productOptions.find(
+                                (p) => p.value === it.product
+                              )?.label || "N/A"}
+                            </div>
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4 align-middle">
@@ -589,27 +673,9 @@ export default function Page() {
                           </TableCell>
 
                           <TableCell className="border border-gray-200  align-middle text-center">
-                            {selectedPurchaseRequest ? (
-                              <div className="text-sm text-gray-700">
-                                {it.qty}
-                              </div>
-                            ) : (
-                              <Input
-                                type="number"
-                                min={1}
-                                aria-label="Quantity"
-                                value={String(it.qty)}
-                                onChange={(e) =>
-                                  updateItemWithProductDetails(it.id, {
-                                    qty: Math.max(
-                                      1,
-                                      Number(e.target.value || 0)
-                                    ),
-                                  })
-                                }
-                                className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
-                              />
-                            )}
+                            <div className="text-sm text-gray-700">
+                              {it.qty}
+                            </div>
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4 align-middle text-center">
@@ -619,28 +685,11 @@ export default function Page() {
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4  align-middle text-right">
-                            {selectedPurchaseRequest ? (
-                              <div className="text-sm text-gray-700 tabular-nums">
-                                {formatCurrency(
-                                  Number(it.estimated_unit_price) || 0
-                                )}
-                              </div>
-                            ) : (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                aria-label="Estimated unit price"
-                                value={String(it.estimated_unit_price)}
-                                onChange={(e) =>
-                                  updateItemWithProductDetails(it.id, {
-                                    estimated_unit_price: e.target.value,
-                                  })
-                                }
-                                placeholder="0.00"
-                                className="h-11 w-28 text-right rounded-none border-0 focus:ring-0 focus:ring-offset-0"
-                              />
-                            )}
+                            <div className="text-sm text-gray-700 tabular-nums">
+                              {formatCurrency(
+                                Number(it.estimated_unit_price) || 0
+                              )}
+                            </div>
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4 align-middle text-right">
@@ -650,16 +699,7 @@ export default function Page() {
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            {!selectedPurchaseRequest && (
-                              <button
-                                onClick={() => removeRow(it.id)}
-                                aria-label="Remove row"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
-                                disabled={items.length === 1}
-                              >
-                                <Trash className="w-4 h-4 text-red-500" />
-                              </button>
-                            )}
+                            {/* No actions since items are read-only */}
                           </TableCell>
                         </TableRow>
                       );
@@ -670,16 +710,7 @@ export default function Page() {
                     <TableRow className="">
                       {/* Empty cells for alignment */}
                       <TableCell className="bg-white">
-                        {!selectedPurchaseRequest && (
-                          <Button
-                            variant="ghost"
-                            onClick={addRow}
-                            className="flex items-center gap-2 px-3 py-0 text-sm m-auto rounded-md hover:bg-gray-50"
-                            aria-label="Add row"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        )}
+                        {/* No add button since items are read-only */}
                       </TableCell>
                       <TableCell className="bg-white" />
                       <TableCell className="bg-white" />
@@ -687,13 +718,6 @@ export default function Page() {
                       <TableCell className="bg-white" />
                       <TableCell className="bg-white" />
                       <TableCell className="bg-white" />
-
-                      {/* <TableCell className="w-28 border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-700">
-                        Total
-                      </TableCell>
-                      <TableCell className="w-16 border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-800 tabular-nums">
-                        {formatCurrency(total)}
-                      </TableCell> */}
                     </TableRow>
                   </TableFooter>
                 </Table>

@@ -4,20 +4,34 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NotifySection from "../shared/Notify";
+import { ProtectedComponent } from "../ProtectedComponent";
 
 export function TopNav() {
   const pathname = usePathname();
 
   const navItems = [
-    { label: "Purchase Requests", href: "/purchase/purchase_requests" },
+    {
+      label: "Purchase Requests",
+      href: "/purchase/purchase_requests",
+      module: "purchase_requests",
+    },
     {
       label: "Request for Quotations",
       href: "/purchase/request_for_quotations",
+      module: "request_for_quotations",
     },
-    { label: "Purchase Orders", href: "/purchase/purchase_orders" },
-    { label: "Vendors", href: "/purchase/vendors" },
-    { label: "Products", href: "/purchase/products" },
-    { label: "Configuration", href: "/purchase/configurations" },
+    {
+      label: "Purchase Orders",
+      href: "/purchase/purchase_orders",
+      module: "purchase_orders",
+    },
+    { label: "Vendors", href: "/purchase/vendors", module: "vendors" },
+    { label: "Products", href: "/purchase/products", module: "products" },
+    {
+      label: "Configuration",
+      href: "/purchase/configurations",
+      module: "configurations",
+    },
   ];
 
   const isActive = (href: string) => {
@@ -36,17 +50,23 @@ export function TopNav() {
           className="hidden md:flex items-center gap-6 text-sm text-gray-600 h-full"
         >
           {navItems.map((item) => (
-            <Link
+            <ProtectedComponent
               key={item.href}
-              href={item.href}
-              className={`h-full flex items-center text-base transition-colors duration-200 ${
-                isActive(item.href)
-                  ? "text-[#3B7CED] border-b-2 border-[#3B7CED]"
-                  : "hover:text-gray-900 hover:border-b-2 hover:border-gray-300"
-              }`}
+              application="purchase"
+              module={item.module}
+              action="view"
             >
-              {item.label}
-            </Link>
+              <Link
+                href={item.href}
+                className={`h-full flex items-center text-base transition-colors duration-200 ${
+                  isActive(item.href)
+                    ? "text-[#3B7CED] border-b-2 border-[#3B7CED]"
+                    : "hover:text-gray-900 hover:border-b-2 hover:border-gray-300"
+                }`}
+              >
+                {item.label}
+              </Link>
+            </ProtectedComponent>
           ))}
         </nav>
         <NotifySection />

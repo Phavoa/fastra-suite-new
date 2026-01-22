@@ -40,7 +40,7 @@ export interface FormErrors {
  * Parse API error response and extract field-specific errors
  */
 export function parseApiError(
-  error: ApiError | { status: number; data?: unknown }
+  error: ApiError | { status: number; data?: Record<string, unknown> }
 ): FormErrors {
   const formErrors: FormErrors = {};
 
@@ -210,13 +210,20 @@ export function validateUnitOfMeasureDuplicates(
 
   // Check for duplicates
   existingUnits.forEach((existing) => {
-    if (existing.unit_name.toLowerCase() === newUnit.name.toLowerCase()) {
+    if (
+      existing.unit_name &&
+      existing.unit_name.toLowerCase() === newUnit.name.toLowerCase()
+    ) {
       hasDuplicates.name = true;
     }
-    if (existing.unit_symbol.toLowerCase() === newUnit.symbol.toLowerCase()) {
+    if (
+      existing.unit_symbol &&
+      existing.unit_symbol.toLowerCase() === newUnit.symbol.toLowerCase()
+    ) {
       hasDuplicates.symbol = true;
     }
     if (
+      existing.unit_category &&
       existing.unit_category.toLowerCase() === newUnit.category.toLowerCase()
     ) {
       hasDuplicates.category = true;

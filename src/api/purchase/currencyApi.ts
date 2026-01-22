@@ -54,6 +54,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const currencyApi = createApi({
   reducerPath: "currencyApi",
+  tagTypes: ["Currency"] as const,
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -124,9 +125,11 @@ export const currencyApi = createApi({
         url: "/purchase/currency/",
         params,
       }),
+      providesTags: ["Currency"],
     }),
     getCurrency: builder.query<Currency, number>({
       query: (id) => `/purchase/currency/${id}/`,
+      providesTags: (result, error, id) => [{ type: "Currency", id }],
     }),
 
     // Mutation endpoints
@@ -136,6 +139,7 @@ export const currencyApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Currency"],
     }),
     updateCurrency: builder.mutation<
       Currency,
@@ -146,6 +150,10 @@ export const currencyApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Currency", id },
+        "Currency",
+      ],
     }),
     patchCurrency: builder.mutation<
       Currency,
@@ -156,12 +164,20 @@ export const currencyApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Currency", id },
+        "Currency",
+      ],
     }),
     deleteCurrency: builder.mutation<void, number>({
       query: (id) => ({
         url: `/purchase/currency/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [
+        { type: "Currency", id },
+        "Currency",
+      ],
     }),
   }),
 });

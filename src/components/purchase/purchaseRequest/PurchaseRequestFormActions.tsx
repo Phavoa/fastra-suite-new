@@ -9,6 +9,8 @@ interface PurchaseRequestFormActionsProps {
   formRef?: React.RefObject<HTMLFormElement | null>;
   onSendForApproval?: () => void;
   isLoadingStatus?: boolean;
+  onSaveOnly?: () => void;
+  onSaveAndSend?: () => void;
 }
 
 export function PurchaseRequestFormActions({
@@ -18,6 +20,8 @@ export function PurchaseRequestFormActions({
   formRef,
   onSendForApproval,
   isLoadingStatus = false,
+  onSaveOnly,
+  onSaveAndSend,
 }: PurchaseRequestFormActionsProps) {
   const handleClick = () => {
     if (formRef?.current) {
@@ -58,26 +62,62 @@ export function PurchaseRequestFormActions({
           </motion.div>
         )}
 
-        {/* Update Purchase Request Button */}
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ duration: 0.15 }}
-        >
-          <Button
-            variant={"contained"}
-            type="submit"
-            disabled={isLoading || isLoadingStatus}
-            className="transition-all duration-200"
-            onClick={onSubmit ? handleClick : undefined}
+        {/* Save Only and Save & Send Buttons for new purchase request */}
+        {onSaveOnly && onSaveAndSend ? (
+          <>
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+            >
+              <Button
+                variant="outline"
+                type="button"
+                disabled={isLoading || isLoadingStatus}
+                className="transition-all duration-200 border-gray-500 text-gray-500 hover:bg-gray-50"
+                onClick={onSaveOnly}
+              >
+                {isLoading ? "Saving..." : "Save Only"}
+              </Button>
+            </motion.div>
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+            >
+              <Button
+                variant={"contained"}
+                type="button"
+                disabled={isLoading || isLoadingStatus}
+                className="transition-all duration-200"
+                onClick={onSaveAndSend}
+              >
+                {isLoading ? "Saving & Sending..." : "Save & Send"}
+              </Button>
+            </motion.div>
+          </>
+        ) : (
+          /* Update Purchase Request Button */
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.15 }}
           >
-            {isLoading
-              ? submitText.includes("...")
-                ? submitText
-                : "Loading..."
-              : submitText}
-          </Button>
-        </motion.div>
+            <Button
+              variant={"contained"}
+              type="submit"
+              disabled={isLoading || isLoadingStatus}
+              className="transition-all duration-200"
+              onClick={onSubmit ? handleClick : undefined}
+            >
+              {isLoading
+                ? submitText.includes("...")
+                  ? submitText
+                  : "Loading..."
+                : submitText}
+            </Button>
+          </motion.div>
+        )}
       </motion.div>
     </>
   );

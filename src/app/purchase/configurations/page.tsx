@@ -265,10 +265,10 @@ export default function PurchaseConfigurationPage() {
           onClose={() =>
             setUnitStatusModal({ ...unitStatusModal, isOpen: false })
           }
+          type={unitStatusModal.status}
           title={unitStatusModal.title}
-          description={unitStatusModal.description}
-          status={unitStatusModal.status}
-          actionLabel="Continue"
+          message={unitStatusModal.description}
+          actionText="Continue"
         />
       </div>
     </div>

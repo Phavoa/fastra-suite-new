@@ -112,8 +112,13 @@ export default function NewLocationPage() {
   const userOptions =
     tenantUsers?.map((tenantUser) => ({
       value: tenantUser.user_id.toString(),
-      label: formatUserName(tenantUser.user, "Unknown User"),
+      label: formatUserName(
+        { first_name: tenantUser.first_name, last_name: tenantUser.last_name },
+        tenantUser.email
+      ),
     })) || [];
+
+  console.log(userOptions);
 
   // Handle location code change with validation
   const handleLocationCodeChange = (value: string) => {
