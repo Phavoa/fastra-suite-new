@@ -28,6 +28,32 @@ export interface TenantUser {
   company_role_details: { id: number; name: string };
 }
 
+export interface ApplicationAccess {
+  application: string;      // e.g., "purchase", "sales"
+  group_name: string;       // the actual group assigned
+  access_code: string;
+}
+
+export interface TenantUserWithAccess {
+  id: number;
+  user_id: number;
+  company_role: number | null;
+  company_role_details: { id: number; name: string } | null;
+  phone_number: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  language: string;
+  timezone: string;
+  in_app_notifications: boolean;
+  email_notifications: boolean;
+  signature?: string | null;
+  user_image?: string | null;
+  temp_password?: string;
+  date_created: string;
+  application_accesses: ApplicationAccess[];
+}
+
 
 export interface NewUserRequest {
   user_id?: number;
@@ -146,7 +172,7 @@ export const usersApi = createApi({
   }),
 
   // ✅ New tenant-specific getUserById
-  getUserById: builder.query<TenantUser, number>({
+  getUserById: builder.query<TenantUserWithAccess, number>({
     query: (id) => `/users/tenant-users/${id}/`,
   }),
 

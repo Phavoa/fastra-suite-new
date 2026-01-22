@@ -11,6 +11,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { setArchive } from "@/components/Settings/viewModeSlice";
 import { RootState } from "@/lib/store/store";
 
+type SettingsSection =
+  | "company"
+  | "user"
+  | "accessgroup"
+  | "application";
+
+
 export default function SettingsLayout({
   children,
 }: {
@@ -21,19 +28,28 @@ export default function SettingsLayout({
   const archive = useSelector((state: RootState) => state.viewMode.archive);
   const router = useRouter();
 
-  const navItems = [
-    { label: "Company", href: "/settings" },
-    { label: "User", href: "/settings/users" },
-    { label: "Access Groups", href: "/settings/accessgroup" },
-    { label: "Application", href: "/settings/application" },
+  const navItems: {
+    label: string;
+    href: string;
+    key: SettingsSection;
+  }[] = [
+    { key: "company", label: "Company", href: "/settings" },
+    { key: "user", label: "User", href: "/settings/users" },
+    { key: "accessgroup", label: "Access Groups", href: "/settings/accessgroup" },
+    //{ label: "Application", href: "/settings/application" },
   ];
+
 
   // Determine active section automatically
   const activeNav = navItems.find((item) => pathname === item.href);
+  const activeSection: SettingsSection =
+  activeNav?.key ?? "company";
 
-  const activeSection =
+
+  /*const activeSection =
     activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||
     "company";
+    */
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
