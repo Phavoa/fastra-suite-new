@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSelector } from "react-redux";
+import { usePermissionContext } from "@/contexts/PermissionContext";
 import moment from "moment-timezone";
 import ISO6391 from "iso-639-1";
 
@@ -19,6 +20,7 @@ import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
 import ReadOnlyField from "@/components/Settings/ReadOnlyField";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
+import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
 import { useGetApplicationsAndAccessRightsQuery } from "@/api/settings/applicationsApi";
 
 import {
@@ -55,12 +57,16 @@ export default function UsersDetails() {
   const userId = Number(params?.id);
 
   const tenant_company_name = useSelector(
-    (state: any) => state.auth.tenant_company_name
+    (state: any) => state.auth.tenant_company_name,
   );
+  const access_token = useSelector((state: any) => state.auth.access_token);
+  const { isAdmin } = usePermissionContext();
   const [updateUser] = useUpdateUserByIdMutation();
 
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"basic" | "access">("basic");
+  const [resetLoading, setResetLoading] = useState(false);
+  const statusModal = useStatusModal();
 
   const [form, setForm] = useState<UserData>({
     first_name: "",
@@ -85,42 +91,50 @@ export default function UsersDetails() {
     accounting: [],
   });
 
-  const { data: userData, isLoading } = useGetUserByIdQuery(userId, {  skip: !userId,});
-  console.log(userData)
-  const {data: accessGroupRights,error,} = useGetAccessGroupRightsQuery();
-  console.log(accessGroupRights)
-  const {data: applicationsData,isLoading: isLoadingApps,error: appsError,} = useGetApplicationsAndAccessRightsQuery();
-  const filteredData: AccessGroupData[] = React.useMemo(() => {return getUniqueAccessGroups(accessGroupRights ?? []); }, [accessGroupRights]);
+  const { data: userData, isLoading } = useGetUserByIdQuery(userId, {
+    skip: !userId,
+  });
+  console.log(userData);
+  const { data: accessGroupRights, error } = useGetAccessGroupRightsQuery();
+  console.log(accessGroupRights);
+  const {
+    data: applicationsData,
+    isLoading: isLoadingApps,
+    error: appsError,
+  } = useGetApplicationsAndAccessRightsQuery();
+  const filteredData: AccessGroupData[] = React.useMemo(() => {
+    return getUniqueAccessGroups(accessGroupRights ?? []);
+  }, [accessGroupRights]);
 
-    // Build options directly from filteredData
-    const accessGroupOptionsByApp = React.useMemo(() => {
-      const result: Record<string, { label: string; value: string }[]> = {};
+  // Build options directly from filteredData
+  const accessGroupOptionsByApp = React.useMemo(() => {
+    const result: Record<string, { label: string; value: string }[]> = {};
 
-      if (!filteredData?.length) return result;
+    if (!filteredData?.length) return result;
 
-      filteredData.forEach((item) => {
-        const app = item.application; // e.g., "purchase"
-        if (!result[app]) result[app] = [];
+    filteredData.forEach((item) => {
+      const app = item.application; // e.g., "purchase"
+      if (!result[app]) result[app] = [];
 
-        result[app].push({
-          label: item.group_name, // show the group name
-          value: item.group_name, // use group name as value
-        });
+      result[app].push({
+        label: item.group_name, // show the group name
+        value: item.group_name, // use group name as value
       });
+    });
 
-      return result;
-    }, [filteredData]);
+    return result;
+  }, [filteredData]);
 
-    const appLabelsByAccessKey: Record<string, string> = {
-      purchase: "PURCHASE",
-      inventory: "INVENTORY",
-      sales: "SALES",
-      human_resources: "HUMAN RESOURCES",
-      accounting: "ACCOUNTING",
-    };
+  const appLabelsByAccessKey: Record<string, string> = {
+    purchase: "PURCHASE",
+    inventory: "INVENTORY",
+    sales: "SALES",
+    human_resources: "HUMAN RESOURCES",
+    accounting: "ACCOUNTING",
+  };
 
-    // Utility to map group name to access_code
-    const getAccessCodesFromSelectedGroups = () => {
+  // Utility to map group name to access_code
+  const getAccessCodesFromSelectedGroups = () => {
     const codes: string[] = [];
 
     Object.values(accessRights).forEach((groupNames) => {
@@ -133,85 +147,90 @@ export default function UsersDetails() {
     return codes;
   };
 
-
-
   // ----------------- Load user data into state -----------------
-    useEffect(() => {
-  if (userData) {
-    setForm({
-      first_name: userData.first_name || "",
-      last_name: userData.last_name || "",
-      email: userData.email || "",
-      company_role: userData.company_role || null,
-      company_role_details: userData.company_role_details || null,
-      phone_number: userData.phone_number || "",
-      language: userData.language || "en",
-      timezone: userData.timezone || "Africa/Abidjan",
-      in_app_notifications: userData.in_app_notifications ?? true,
-      email_notifications: userData.email_notifications ?? true,
-      signature_image: userData.signature || null,
-      user_image_image: userData.user_image || null,
-    });
+  useEffect(() => {
+    if (userData) {
+      setForm({
+        first_name: userData.first_name || "",
+        last_name: userData.last_name || "",
+        email: userData.email || "",
+        company_role: userData.company_role || null,
+        company_role_details: userData.company_role_details || null,
+        phone_number: userData.phone_number || "",
+        language: userData.language || "en",
+        timezone: userData.timezone || "Africa/Abidjan",
+        in_app_notifications: userData.in_app_notifications ?? true,
+        email_notifications: userData.email_notifications ?? true,
+        signature_image: userData.signature || null,
+        user_image_image: userData.user_image || null,
+      });
 
-    const appAccesses: Record<string, string[]> = {
-      purchase: [],
-      inventory: [],
-      sales: [],
-      human_resources: [],
-      accounting: [],
-    };
+      const appAccesses: Record<string, string[]> = {
+        purchase: [],
+        inventory: [],
+        sales: [],
+        human_resources: [],
+        accounting: [],
+      };
 
-    userData.application_accesses?.forEach((access) => {
-      const appKey = access.application as keyof typeof appAccesses;
-      if (!appAccesses[appKey]) appAccesses[appKey] = [];
-      appAccesses[appKey].push(access.group_name);
-    });
+      userData.application_accesses?.forEach((access) => {
+        const appKey = access.application as keyof typeof appAccesses;
+        if (!appAccesses[appKey]) appAccesses[appKey] = [];
+        appAccesses[appKey].push(access.group_name);
+      });
 
-    setAccessRights(appAccesses);
-  }
-}, [userData]);
-
-
+      setAccessRights(appAccesses);
+    }
+  }, [userData]);
 
   // ----------------- Handlers -----------------
-    const handleChange = (
-      e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-    ) => {
-      const { name, type, value, checked } = e.target as HTMLInputElement;
-      setForm((prev) => ({
-        ...prev,
-        [name]:
-          type === "checkbox" ? checked : type === "number" ? Number(value) : value,
-      }));
-    };
-
-    const handleFileChange = (name: "signature_image" | "user_image_image", file: File | null) => {
-      setForm((prev) => ({ ...prev, [name]: file }));
-    };
-
-    const fileToBase64 = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    };
-
-    const handleAccessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value, options } = e.target;
-    const selectedValues = Array.from(options)
-      .filter(option => option.selected)
-      .map(option => option.value);
-
-    setAccessRights(prev => ({ ...prev, [name]: selectedValues }));
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, type, value, checked } = e.target as HTMLInputElement;
+    setForm((prev) => ({
+      ...prev,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : type === "number"
+            ? Number(value)
+            : value,
+    }));
   };
 
-    const base64ToFile = (base64: string, fileName: string) => {
-      if (!base64.startsWith("data:")) {
-        console.warn("Invalid base64 string provided:", base64);
-        return null;
-      }
+  const handleFileChange = (
+    name: "signature_image" | "user_image_image",
+    file: File | null,
+  ) => {
+    setForm((prev) => ({ ...prev, [name]: file }));
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAccessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value, options } = e.target;
+    const selectedValues = Array.from(options)
+      .filter((option) => option.selected)
+      .map((option) => option.value);
+
+    setAccessRights((prev) => ({ ...prev, [name]: selectedValues }));
+  };
+
+  const base64ToFile = (base64: string, fileName: string) => {
+    if (!base64.startsWith("data:")) {
+      console.warn("Invalid base64 string provided:", base64);
+      return null;
+    }
 
     const arr = base64.split(",");
     const mime = arr[0].match(/:(.*?);/)![1];
@@ -224,77 +243,110 @@ export default function UsersDetails() {
     }
 
     return new File([u8arr], fileName, { type: mime });
-    };
-
+  };
 
   const handleSave = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!editMode) return;
+    e.preventDefault();
+    if (!editMode) return;
 
-      try {
-        // Use FormData to send files
-        const formData = new FormData();
+    try {
+      // Use FormData to send files
+      const formData = new FormData();
 
-        // Append normal fields
-        formData.append("first_name", form.first_name);
-        formData.append("last_name", form.last_name);
-        formData.append("email", form.email);
-        if (form.company_role !== null) formData.append("company_role", String(form.company_role));
-        formData.append("phone_number", form.phone_number);
-        formData.append("language", form.language);
-        formData.append("timezone", form.timezone);
-        formData.append("in_app_notifications", String(form.in_app_notifications));
-        formData.append("email_notifications", String(form.email_notifications));
+      // Append normal fields
+      formData.append("first_name", form.first_name);
+      formData.append("last_name", form.last_name);
+      formData.append("email", form.email);
+      if (form.company_role !== null)
+        formData.append("company_role", String(form.company_role));
+      formData.append("phone_number", form.phone_number);
+      formData.append("language", form.language);
+      formData.append("timezone", form.timezone);
+      formData.append(
+        "in_app_notifications",
+        String(form.in_app_notifications),
+      );
+      formData.append("email_notifications", String(form.email_notifications));
 
-        // Append files if they exist
-        if (form.signature_image instanceof File) {
-          formData.append("signature_image", form.signature_image);
-        }
-        if (form.user_image_image instanceof File) {
-          formData.append("user_image_image", form.user_image_image);
-        }
-
-        // Append access_codes
-        const accessCodes = getAccessCodesFromSelectedGroups();
-        accessCodes.forEach((code) => formData.append("access_codes", code));
-
-        for (const [key, value] of formData.entries()) {
-        console.log(key, value);
-    }
-
-        await updateUser({ id: userId, data: formData }).unwrap();
-
-        if (Object.values(accessRights).some(Boolean)) {
-          // TODO: replace this console.log with actual API call
-          console.log("Access rights to update:", accessRights);
-        }
-
-        alert("User updated successfully!");
-        setEditMode(false);
-      } catch (err: any) {
-        console.error(err);
-        if (err?.data) {
-          alert(JSON.stringify(err.data, null, 2));
-        } else {
-          alert("Failed to update user");
-        }
+      // Append files if they exist
+      if (form.signature_image instanceof File) {
+        formData.append("signature_image", form.signature_image);
       }
-    };
+      if (form.user_image_image instanceof File) {
+        formData.append("user_image_image", form.user_image_image);
+      }
 
+      // Append access_codes
+      const accessCodes = getAccessCodesFromSelectedGroups();
+      accessCodes.forEach((code) => formData.append("access_codes", code));
 
+      for (const [key, value] of formData.entries()) {
+        console.log(key, value);
+      }
 
-      // ----------------- Options -----------------
-      const languageOptions = ISO6391.getAllCodes().map((code) => ({
-        label: ISO6391.getName(code),
-        value: code,
-      }));
+      await updateUser({ id: userId, data: formData }).unwrap();
 
-      const timezoneOptions = moment.tz.names().map((tz) => ({
-        label: tz,
-        value: tz,
-      }));
+      if (Object.values(accessRights).some(Boolean)) {
+        // TODO: replace this console.log with actual API call
+        console.log("Access rights to update:", accessRights);
+      }
 
-    if (isLoading) return <LoadingDots />;
+      statusModal.showSuccess("Success", "User updated successfully!");
+      setEditMode(false);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.data) {
+        statusModal.showError("Error", JSON.stringify(err.data, null, 2));
+      } else {
+        statusModal.showError("Error", "Failed to update user");
+      }
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setResetLoading(true);
+    try {
+      const response = await fetch(
+        "https://propconnect.fastrasuiteapi.com.ng/users/tenant-users/reset-password",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(access_token && { Authorization: `Bearer ${access_token}` }),
+          },
+          body: JSON.stringify({ email: form.email }),
+        },
+      );
+      if (response.ok) {
+        statusModal.showSuccess(
+          "Success",
+          "Password reset email sent successfully!",
+        );
+      } else {
+        statusModal.showError(
+          "Error",
+          "Failed to reset password. Please try again.",
+        );
+      }
+    } catch (error) {
+      statusModal.showError("Error", "An error occurred. Please try again.");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // ----------------- Options -----------------
+  const languageOptions = ISO6391.getAllCodes().map((code) => ({
+    label: ISO6391.getName(code),
+    value: code,
+  }));
+
+  const timezoneOptions = moment.tz.names().map((tz) => ({
+    label: tz,
+    value: tz,
+  }));
+
+  if (isLoading) return <LoadingDots />;
 
   // ----------------- Render -----------------
   return (
@@ -340,6 +392,15 @@ export default function UsersDetails() {
         >
           Access Rights
         </button>
+        {isAdmin && (
+          <button
+            onClick={handleResetPassword}
+            disabled={resetLoading}
+            className="ml-auto px-4 py-2 bg-[#3B7CED] text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {resetLoading ? "Resetting..." : "Reset Password"}
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
@@ -349,26 +410,29 @@ export default function UsersDetails() {
           <FormSection title="Basic Information" className="pt-10">
             <div className="flex items-center w-full gap-4 mt-6">
               {editMode ? (
-                  <FormImageUpload
-      label="User Image"
-      image={
-        form.user_image_image 
-          ? `data:image/png;base64,${form.user_image_image}`
-          : null
-      }
-      textToDisplay="Upload User Photo"
-      onChange={(file) => handleFileChange("user_image_image", file)}
-    />
-  ) : (
-    <img
-      src={
-        form.user_image_image 
-          ? `data:image/png;base64,${form.user_image_image}`
-          : "/images/userAvatar.png"
-      }
-      className="w-20 h-20 rounded-full"
-      alt="User"
-    />)}
+                <FormImageUpload
+                  label="User Image"
+                  image={
+                    form.user_image_image
+                      ? `data:image/png;base64,${form.user_image_image}`
+                      : null
+                  }
+                  textToDisplay="Upload User Photo"
+                  onChange={(file) =>
+                    handleFileChange("user_image_image", file)
+                  }
+                />
+              ) : (
+                <img
+                  src={
+                    form.user_image_image
+                      ? `data:image/png;base64,${form.user_image_image}`
+                      : "/images/userAvatar.png"
+                  }
+                  className="w-20 h-20 rounded-full"
+                  alt="User"
+                />
+              )}
               <div className="border-l border-[#E6E6E6] py-2 pl-10 ml-6 grid grid-cols-2 gap-8 w-[60%]">
                 {editMode ? (
                   <>
@@ -392,9 +456,11 @@ export default function UsersDetails() {
                 ) : (
                   <div className="border-r border-[#E6E6E6]">
                     <ReadOnlyField
-                    label="Name"
-                    value={`${form.first_name} ${form.last_name}`.trim() || "—"}
-                  />
+                      label="Name"
+                      value={
+                        `${form.first_name} ${form.last_name}`.trim() || "—"
+                      }
+                    />
                   </div>
                 )}
 
@@ -406,7 +472,10 @@ export default function UsersDetails() {
                     }
                   />
                 ) : (
-                  <ReadOnlyField label="Role" value={form.company_role_details?.name} />
+                  <ReadOnlyField
+                    label="Role"
+                    value={form.company_role_details?.name}
+                  />
                 )}
               </div>
             </div>
@@ -414,7 +483,9 @@ export default function UsersDetails() {
 
           {/* Contact Info */}
           <FormSection title="Contact Information">
-            <div className={`grid ${editMode ? 'grid-cols-3' : "grid-cols-6"} gap-4 mt-4`}>
+            <div
+              className={`grid ${editMode ? "grid-cols-3" : "grid-cols-6"} gap-4 mt-4`}
+            >
               {editMode ? (
                 <FormInput
                   label="Phone Number"
@@ -425,8 +496,11 @@ export default function UsersDetails() {
                   required
                 />
               ) : (
-                 <div className="border-r border-[#E6E6E6]">
-                <ReadOnlyField label="Phone Number" value={form.phone_number} />
+                <div className="border-r border-[#E6E6E6]">
+                  <ReadOnlyField
+                    label="Phone Number"
+                    value={form.phone_number}
+                  />
                 </div>
               )}
 
@@ -441,9 +515,9 @@ export default function UsersDetails() {
                   required
                 />
               ) : (
-               <div className="ml-6">
-                 <ReadOnlyField label="Email" value={form.email} />
-                 </div>
+                <div className="ml-6">
+                  <ReadOnlyField label="Email" value={form.email} />
+                </div>
               )}
             </div>
           </FormSection>
@@ -465,7 +539,9 @@ export default function UsersDetails() {
 
           {/* Preferences */}
           <FormSection title="Preferences">
-            <div className={`grid ${editMode ? 'grid-cols-3' : "grid-cols-6"} gap-4 mt-4`}>
+            <div
+              className={`grid ${editMode ? "grid-cols-3" : "grid-cols-6"} gap-4 mt-4`}
+            >
               {editMode ? (
                 <FormSelect
                   label="Language"
@@ -476,8 +552,8 @@ export default function UsersDetails() {
                   options={languageOptions}
                 />
               ) : (
-                 <div className="border-r border-[#E6E6E6]">
-                <ReadOnlyField label="Language" value={form.language} />
+                <div className="border-r border-[#E6E6E6]">
+                  <ReadOnlyField label="Language" value={form.language} />
                 </div>
               )}
 
@@ -510,7 +586,10 @@ export default function UsersDetails() {
                 >
                   {editMode ? (
                     <>
-                      <label htmlFor={key} className="text-sm text-[#7A8A98] cursor-pointer">
+                      <label
+                        htmlFor={key}
+                        className="text-sm text-[#7A8A98] cursor-pointer"
+                      >
                         {key === "in_app_notifications"
                           ? "In-app Notifications"
                           : "Email Notifications"}
@@ -535,8 +614,8 @@ export default function UsersDetails() {
                       </label>
 
                       <Checkbox
-                        checked={Boolean(form[key as keyof UserData])} 
-                        disabled 
+                        checked={Boolean(form[key as keyof UserData])}
+                        disabled
                       />
                     </div>
                   )}
@@ -548,37 +627,35 @@ export default function UsersDetails() {
           {/* Signature */}
           <FormSection title="Signature">
             {editMode ? (
-             <SignaturePad
-  onChange={(base64) => {
-    // Ignore empty signatures
-    if (!base64) {
-      setForm((prev) => ({ ...prev, signature_image: null }));
-      return;
-    }
+              <SignaturePad
+                onChange={(base64) => {
+                  // Ignore empty signatures
+                  if (!base64) {
+                    setForm((prev) => ({ ...prev, signature_image: null }));
+                    return;
+                  }
 
-    // If base64 does not include the data URL prefix, add it
-    let normalized = base64;
-    if (!base64.startsWith("data:")) {
-          normalized = `data:image/png;base64,${base64}`;
-    }
+                  // If base64 does not include the data URL prefix, add it
+                  let normalized = base64;
+                  if (!base64.startsWith("data:")) {
+                    normalized = `data:image/png;base64,${base64}`;
+                  }
 
-    const file = base64ToFile(normalized, "signature.png");
+                  const file = base64ToFile(normalized, "signature.png");
 
-    setForm((prev) => ({
-      ...prev,
-      signature_image: file,
-    }));
-  }}
-/>
-
-
+                  setForm((prev) => ({
+                    ...prev,
+                    signature_image: file,
+                  }));
+                }}
+              />
             ) : (
               <img
                 src={
-                    form.signature_image
-                      ? `data:image/png;base64,${form.signature_image}`
-                      : "/images/signature-placeholder.png"
-                  }
+                  form.signature_image
+                    ? `data:image/png;base64,${form.signature_image}`
+                    : "/images/signature-placeholder.png"
+                }
                 alt="Signature"
                 className="h-20"
               />
@@ -602,58 +679,73 @@ export default function UsersDetails() {
 
       {/* Access Rights Tab */}
       {activeTab === "access" && (
-      <Form onSubmit={handleSave}>
-        <FormSection title="Applications">
-
-          {/* GRID WRAPPER — outside the map */}
-          <div className={editMode ? "grid grid-cols-3 gap-5 pt-6" : "grid grid-cols-4 gap-5 pt-6"}>
-
-            {Object.entries(accessRights).map(([appKey, value]) => (
-            <div key={appKey}>
-              {editMode ? (
-                <FormMultiSelect
-                    label={appLabelsByAccessKey[appKey] || appKey}
-                    name={appKey}
-                    value={value} // string[]
-                    onChange={(selectedValues) =>
-                      setAccessRights((prev) => ({ ...prev, [appKey]: selectedValues }))
-                    }
-                    options={accessGroupOptionsByApp[appKey] || [{ label: "No groups", value: "" }]}
-                  />
+        <Form onSubmit={handleSave}>
+          <FormSection title="Applications">
+            {/* GRID WRAPPER — outside the map */}
+            <div
+              className={
+                editMode
+                  ? "grid grid-cols-3 gap-5 pt-6"
+                  : "grid grid-cols-4 gap-5 pt-6"
+              }
+            >
+              {Object.entries(accessRights).map(([appKey, value]) => (
+                <div key={appKey}>
+                  {editMode ? (
+                    <FormMultiSelect
+                      label={appLabelsByAccessKey[appKey] || appKey}
+                      name={appKey}
+                      value={value} // string[]
+                      onChange={(selectedValues) =>
+                        setAccessRights((prev) => ({
+                          ...prev,
+                          [appKey]: selectedValues,
+                        }))
+                      }
+                      options={
+                        accessGroupOptionsByApp[appKey] || [
+                          { label: "No groups", value: "" },
+                        ]
+                      }
+                    />
                   ) : (
-                   <ReadOnlyField
-                    label={appLabelsByAccessKey[appKey] || appKey}
-                    value={value?.length ? value.join(", ") : "—"}
-                  />
-                )}
-              </div>
+                    <ReadOnlyField
+                      label={appLabelsByAccessKey[appKey] || appKey}
+                      value={value?.length ? value.join(", ") : "—"}
+                    />
+                  )}
+                </div>
               ))}
+            </div>
+          </FormSection>
 
-          </div>
-
-
-        </FormSection>
-
-        {editMode && (
-          <div className="mt-6 flex justify-end gap-4 px-6">
-            <button
-              type="button"
-              onClick={() => setEditMode(false)}
-              className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
-            >
-              Back
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Save Changes
-            </button>
-          </div>
-        )}
-      </Form>
+          {editMode && (
+            <div className="mt-6 flex justify-end gap-4 px-6">
+              <button
+                type="button"
+                onClick={() => setEditMode(false)}
+                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+        </Form>
       )}
 
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+      />
     </div>
   );
 }

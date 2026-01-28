@@ -52,7 +52,7 @@ const generateLocationCode = (): string => {
 // Helper function to format user name consistently across the application
 const formatUserName = (
   user: { first_name: string; last_name: string } | null,
-  fallback: string
+  fallback: string,
 ): string => {
   if (user && user.first_name && user.last_name) {
     return `${user.first_name} ${user.last_name}`;
@@ -112,10 +112,7 @@ export default function NewLocationPage() {
   const userOptions =
     tenantUsers?.map((tenantUser) => ({
       value: tenantUser.user_id.toString(),
-      label: formatUserName(
-        { first_name: tenantUser.first_name, last_name: tenantUser.last_name },
-        tenantUser.email
-      ),
+      label: formatUserName(tenantUser.user, tenantUser.user.email),
     })) || [];
 
   console.log(userOptions);

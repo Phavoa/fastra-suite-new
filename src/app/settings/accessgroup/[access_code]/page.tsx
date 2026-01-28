@@ -8,8 +8,11 @@ import { useRouter, useParams } from "next/navigation";
 import {
   useGetAccessGroupRightQuery,
   useUpdateAccessGroupRightMutation,
-  usePartialUpdateAccessGroupRightMutation
+  usePartialUpdateAccessGroupRightMutation,
+  AccessGroupRight,
+  AccessRight,
 } from "@/api/settings/accessGroupRightApi";
+import { useGetApplicationsAndAccessRightsQuery } from "@/api/settings/applicationsApi";
 import { BoxIcon } from "@/components/icons/boxIcon";
 
 type RightKey = "view" | "edit" | "create" | "delete" | "approve" | "reject";
@@ -28,8 +31,10 @@ export default function ViewAccessGroupPage() {
   }
 
   const { data, isLoading, error } = useGetAccessGroupRightQuery(
-    access_code as string
+    access_code as string,
   );
+
+  const { data: applicationsData } = useGetApplicationsAndAccessRightsQuery();
 
   const [updateAccessGroup, { isLoading: saving }] =
     usePartialUpdateAccessGroupRightMutation();
@@ -40,32 +45,35 @@ export default function ViewAccessGroupPage() {
   const [modules, setModules] = useState<ModuleRights[]>([]);
 
   // ✅ Build rights from the API using booleans (true/false)
-  const mapAccessGroupData = (data: any): ModuleRights[] => {
+  const mapAccessGroupData = (data: AccessGroupRight[]): ModuleRights[] => {
     if (!data || data.length === 0) return [];
 
-    const defaultRights: Record<RightKey, boolean> = {
-      view: false,
-      edit: false,
-      create: false,
-      delete: false,
-      approve: false,
-      reject: false,
-    };
+    const moduleMap: Record<string, Record<RightKey, boolean>> = {};
 
-    data.forEach((item: any) => {
+    data.forEach((item) => {
+      const mod = item.application_module;
       const name = item?.access_right_details?.name as RightKey;
 
-      if (name && defaultRights[name] !== undefined) {
-        defaultRights[name] = true;
+      if (!moduleMap[mod]) {
+        moduleMap[mod] = {
+          view: false,
+          edit: false,
+          create: false,
+          delete: false,
+          approve: false,
+          reject: false,
+        };
+      }
+
+      if (name && moduleMap[mod][name] !== undefined) {
+        moduleMap[mod][name] = true;
       }
     });
 
-    return [
-      {
-        module: data[0].application_module,
-        rights: defaultRights,
-      },
-    ];
+    return Object.entries(moduleMap).map(([mod, rights]) => ({
+      module: mod,
+      rights,
+    }));
   };
 
   useEffect(() => {
@@ -88,21 +96,40 @@ export default function ViewAccessGroupPage() {
   const handleSave = async () => {
     if (!access_code) return;
 
-    // Convert rights → API format: list of right names that are true
-    const access_rights = Object.entries(modules[0].rights)
-      .filter(([_, enabled]) => enabled)
-      .map(([name]) => ({
-        access_right_name: name,
-      }));
+    // Prepare access rights for API in the correct format
+    const accessRights: AccessRight[] = [];
+
+    modules.forEach((moduleData) => {
+      const selectedRights: number[] = [];
+
+      Object.entries(moduleData.rights).forEach(([right, enabled]) => {
+        if (enabled) {
+          const accessRightId = applicationsData?.access_rights.find(
+            (ar) => ar.name.toLowerCase() === right.toLowerCase(),
+          )?.id;
+
+          if (accessRightId) {
+            selectedRights.push(accessRightId);
+          }
+        }
+      });
+
+      // Only add module if it has selected rights
+      if (selectedRights.length > 0) {
+        accessRights.push({
+          [moduleData.module]: selectedRights.join(","),
+        });
+      }
+    });
 
     await updateAccessGroup({
       access_code,
       data: {
         group_name: groupName,
         application,
-        application_module: modules[0].module,
-        access_rights,
-        access_right: 0
+        application_module: modules[0]?.module || "",
+        access_rights: accessRights,
+        access_right: 0,
       },
     });
 

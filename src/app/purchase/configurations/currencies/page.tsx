@@ -1,6 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/lib/store/store";
+import { usePermissionContext } from "@/contexts/PermissionContext";
+import { usePermission } from "@/hooks/usePermission";
+import {
+  normalizePermissions,
+  NormalizedPermissions,
+} from "@/utils/normalizePermissions";
 import { MoveLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +31,6 @@ import {
 } from "@/lib/utils/error-handling";
 import { validateCurrencyDuplicates } from "@/lib/utils/error-handling";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import { AnimatedWrapper } from "@/components/shared/AnimatedWrapper";
 
 interface EditingCurrency {
@@ -33,6 +41,20 @@ interface EditingCurrency {
 }
 
 export default function CurrencyListPage() {
+  const router = useRouter();
+  const { can } = usePermission();
+  const { isAdmin, permissions } = usePermissionContext();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const user_accesses = useSelector(
+    (state: RootState) => state.auth.user_accesses,
+  );
+  const [loading, setLoading] = useState(true);
+  const [accessChecks, setAccessChecks] = useState<{
+    view: boolean;
+    edit: boolean;
+    delete: boolean;
+  }>({ view: false, edit: false, delete: false });
+
   // API hooks for currency operations
   const {
     data: currencies = [],
@@ -40,10 +62,71 @@ export default function CurrencyListPage() {
     error,
     refetch,
   } = useGetCurrenciesQuery({});
+  const queryLoading = isLoading as boolean;
   const [deleteCurrency, { isLoading: isDeleting }] =
     useDeleteCurrencyMutation();
   const [patchCurrency, { isLoading: isUpdating }] = usePatchCurrencyMutation();
-  const router = useRouter();
+
+  // Direct normalization for demonstration
+  const normalizedDirect: NormalizedPermissions = useMemo(() => {
+    if (user_accesses) {
+      try {
+        return normalizePermissions({ user_accesses });
+      } catch (error) {
+        console.error("Error normalizing permissions:", error);
+        return { isAdmin: false, permissions: {} };
+      }
+    }
+    return { isAdmin: false, permissions: {} };
+  }, [user_accesses]);
+
+  // Comprehensive permission checks
+  useEffect(() => {
+    // Simulate loading delay for demonstration
+    const timer = setTimeout(() => {
+      const hasViewAccess =
+        can({
+          application: "purchase",
+          module: "currencies",
+          action: "view",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:currencies"]?.has("view");
+
+      const hasEditAccess =
+        can({
+          application: "purchase",
+          module: "currencies",
+          action: "edit",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:currencies"]?.has("edit");
+
+      const hasDeleteAccess =
+        can({
+          application: "purchase",
+          module: "currencies",
+          action: "delete",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:currencies"]?.has("delete");
+
+      setAccessChecks({
+        view: hasViewAccess,
+        edit: hasEditAccess,
+        delete: hasDeleteAccess,
+      });
+
+      // Redirect if no view access
+      if (!hasViewAccess) {
+        router.push("/unauthorized");
+      }
+
+      setLoading(false);
+    }, 1000); // Simulate async check
+
+    return () => clearTimeout(timer);
+  }, [can, isAdmin, permissions, normalizedDirect, router]);
 
   // Local state for editing and UI
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -121,7 +204,7 @@ export default function CurrencyListPage() {
           code: editingCurrency.currency_code,
           symbol: editingCurrency.currency_symbol,
         },
-        currencies.filter((c) => c.id !== id)
+        currencies.filter((c) => c.id !== id),
       );
 
       if (!validation.isValid) {
@@ -177,7 +260,7 @@ export default function CurrencyListPage() {
 
     // Confirm deletion
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${currency.currency_name}"? This action cannot be undone.`
+      `Are you sure you want to delete "${currency.currency_name}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -202,6 +285,54 @@ export default function CurrencyListPage() {
       });
     }
   };
+
+  // Handle edge cases
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            Loading User Data
+          </h1>
+          <p className="text-gray-600">
+            Please wait while we load your user information...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            Checking Permissions
+          </h1>
+          <p className="text-gray-600">Verifying your access rights...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!accessChecks.view) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h1>
+          <p className="text-gray-600 mb-4">
+            You do not have the required permissions to view this page.
+          </p>
+          <p className="text-sm text-gray-500">
+            Redirecting to unauthorized page...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen mr-4">
@@ -239,7 +370,7 @@ export default function CurrencyListPage() {
           className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
         >
           {/* Loading State */}
-          {isLoading && (
+          {queryLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3B7CED] mx-auto"></div>
@@ -248,7 +379,7 @@ export default function CurrencyListPage() {
                 </p>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Error State */}
           {error && (
@@ -273,7 +404,7 @@ export default function CurrencyListPage() {
           )}
 
           {/* Content */}
-          {!isLoading && !error && (
+          {!queryLoading && !error && (
             <>
               {/* Table Header */}
               <AnimatedWrapper animation="slideDown" delay={0.1}>
@@ -321,7 +452,7 @@ export default function CurrencyListPage() {
                                 setEditingCurrency((prev) =>
                                   prev
                                     ? { ...prev, currency_name: e.target.value }
-                                    : null
+                                    : null,
                                 )
                               }
                               className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -355,7 +486,7 @@ export default function CurrencyListPage() {
                                         currency_code:
                                           e.target.value.toUpperCase(),
                                       }
-                                    : null
+                                    : null,
                                 )
                               }
                               className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -388,7 +519,7 @@ export default function CurrencyListPage() {
                                         ...prev,
                                         currency_symbol: e.target.value,
                                       }
-                                    : null
+                                    : null,
                                 )
                               }
                               className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -419,13 +550,15 @@ export default function CurrencyListPage() {
                       <div className="col-span-2 flex items-center justify-end gap-2">
                         {editingId === currency.id ? (
                           <>
-                            <Button
-                              onClick={() => handleSave(currency.id)}
-                              disabled={isUpdating}
-                              className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white px-4 h-10 rounded-md font-medium transition-colors text-sm"
-                            >
-                              {isUpdating ? "Saving..." : "Save"}
-                            </Button>
+                            {accessChecks.edit && (
+                              <Button
+                                onClick={() => handleSave(currency.id)}
+                                disabled={isUpdating}
+                                className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white px-4 h-10 rounded-md font-medium transition-colors text-sm"
+                              >
+                                {isUpdating ? "Saving..." : "Save"}
+                              </Button>
+                            )}
                             <button
                               onClick={handleCancel}
                               className="text-gray-500 hover:text-gray-700 transition-colors p-2"
@@ -435,20 +568,24 @@ export default function CurrencyListPage() {
                           </>
                         ) : (
                           <>
-                            <Button
-                              onClick={() => handleEdit(currency)}
-                              variant="outline"
-                              className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white border-0 px-4 h-10 rounded-md font-medium transition-colors text-sm"
-                            >
-                              Edit
-                            </Button>
-                            <button
-                              onClick={() => handleDelete(currency.id)}
-                              disabled={isDeleting}
-                              className="text-red-600 hover:text-red-700 font-medium px-3 h-10 transition-colors text-sm disabled:opacity-50"
-                            >
-                              {isDeleting ? "Deleting..." : "Delete"}
-                            </button>
+                            {accessChecks.edit && (
+                              <Button
+                                onClick={() => handleEdit(currency)}
+                                variant="outline"
+                                className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white border-0 px-4 h-10 rounded-md font-medium transition-colors text-sm"
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            {accessChecks.delete && (
+                              <button
+                                onClick={() => handleDelete(currency.id)}
+                                disabled={isDeleting}
+                                className="text-red-600 hover:text-red-700 font-medium px-3 h-10 transition-colors text-sm disabled:opacity-50"
+                              >
+                                {isDeleting ? "Deleting..." : "Delete"}
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

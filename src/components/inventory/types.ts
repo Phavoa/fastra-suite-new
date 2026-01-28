@@ -8,7 +8,7 @@ export interface StatusInfo {
 }
 
 const mapLegacyStatus = (
-  status: string | null | undefined
+  status: string | null | undefined,
 ): StockAdjustmentStatus => {
   if (!status) return "unknown";
 
@@ -29,7 +29,7 @@ const mapLegacyStatus = (
 };
 
 export const getStatusInfo = (
-  status: string | null | undefined
+  status: string | null | undefined,
 ): StatusInfo => {
   const mappedStatus = mapLegacyStatus(status);
 
@@ -63,4 +63,8 @@ export type StockAdjustmentRow = {
   location: string;
   adjustedDate: string;
   status: StockAdjustmentStatus;
+  product?: string;
+  quantity?: number;
+  amount?: string;
+  requester?: string;
 };

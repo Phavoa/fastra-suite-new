@@ -55,9 +55,7 @@ interface ScrapLineItem {
 
 // Form schema for scrap creation
 const scrapSchema = z.object({
-  adjustment_type: z.enum(["damage", "loss"], {
-    required_error: "Please select a scrap adjustment type",
-  }),
+  adjustment_type: z.enum(["damage", "loss"] as const),
   warehouse_location: z.string().min(1, "Warehouse location is required"),
   notes: z.string().optional(),
 });
@@ -110,7 +108,7 @@ export default function Page() {
 
   const updateItem = (id: string, patch: Partial<ScrapLineItem>) =>
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     );
 
   // React Hook Form setup
@@ -181,10 +179,10 @@ export default function Page() {
   // Helper function to validate and prepare data
   const prepareSubmissionData = (
     data: ScrapFormData,
-    status: "draft" | "done"
+    status: "draft" | "done",
   ) => {
     const validItems = items.filter(
-      (item) => item.product && item.scrap_quantity
+      (item) => item.product && item.scrap_quantity,
     );
 
     if (validItems.length === 0) {
@@ -315,7 +313,7 @@ export default function Page() {
   // Enhanced updateItem function that also populates product details
   const updateItemWithProductDetails = (
     id: string,
-    patch: Partial<ScrapLineItem>
+    patch: Partial<ScrapLineItem>,
   ) => {
     setItems((prev) =>
       prev.map((it) => {
@@ -333,7 +331,7 @@ export default function Page() {
           return updatedItem;
         }
         return it;
-      })
+      }),
     );
   };
 
@@ -396,8 +394,8 @@ export default function Page() {
                         {watch("adjustment_type") === "damage"
                           ? "Product Damage"
                           : watch("adjustment_type") === "loss"
-                          ? "Product Loss"
-                          : "Select type"}
+                            ? "Product Loss"
+                            : "Select type"}
                       </p>
                     </div>
                   </FadeIn>
@@ -555,7 +553,7 @@ export default function Page() {
                     {items.map((it) => {
                       const remainingQty = calculateRemainingQuantity(
                         it.current_quantity,
-                        it.scrap_quantity
+                        it.scrap_quantity,
                       );
                       return (
                         <TableRow

@@ -40,45 +40,46 @@ export interface FormErrors {
  * Parse API error response and extract field-specific errors
  */
 export function parseApiError(
-  error: ApiError | { status: number; data?: Record<string, unknown> }
+  error: ApiError | { status: number; data?: Record<string, unknown> },
 ): FormErrors {
   const formErrors: FormErrors = {};
 
   if (error.data?.errors) {
     // Handle nested error structure
-    if (error.data.errors.currency) {
-      if (error.data.errors.currency.name) {
-        formErrors.currency_name = error.data.errors.currency.name;
+    const errors = error.data.errors as any; // Type assertion for error handling
+    if (errors.currency) {
+      if (errors.currency.name) {
+        formErrors.currency_name = errors.currency.name;
       }
-      if (error.data.errors.currency.code) {
-        formErrors.currency_code = error.data.errors.currency.code;
+      if (errors.currency.code) {
+        formErrors.currency_code = errors.currency.code;
       }
     }
 
     // Handle flat error structure
-    if (error.data.errors.currency_name) {
-      formErrors.currency_name = error.data.errors.currency_name[0];
+    if (errors.currency_name) {
+      formErrors.currency_name = errors.currency_name[0];
     }
-    if (error.data.errors.currency_code) {
-      formErrors.currency_code = error.data.errors.currency_code[0];
+    if (errors.currency_code) {
+      formErrors.currency_code = errors.currency_code[0];
     }
-    if (error.data.errors.currency_symbol) {
-      formErrors.currency_symbol = error.data.errors.currency_symbol[0];
+    if (errors.currency_symbol) {
+      formErrors.currency_symbol = errors.currency_symbol[0];
     }
-    if (error.data.errors.unit_name) {
-      formErrors.unit_name = error.data.errors.unit_name[0];
+    if (errors.unit_name) {
+      formErrors.unit_name = errors.unit_name[0];
     }
-    if (error.data.errors.unit_symbol) {
-      formErrors.unit_symbol = error.data.errors.unit_symbol[0];
+    if (errors.unit_symbol) {
+      formErrors.unit_symbol = errors.unit_symbol[0];
     }
-    if (error.data.errors.unit_category) {
-      formErrors.unit_category = error.data.errors.unit_category[0];
+    if (errors.unit_category) {
+      formErrors.unit_category = errors.unit_category[0];
     }
   }
 
   // Handle general error messages
   if (error.data?.detail) {
-    formErrors.general = error.data.detail;
+    formErrors.general = error.data.detail as string;
   }
 
   return formErrors;
@@ -137,7 +138,7 @@ export function validateCurrencyDuplicates(
     currency_name: string;
     currency_code: string;
     currency_symbol: string;
-  }>
+  }>,
 ): CurrencyValidationResult {
   const errors: FormErrors = {};
   const hasDuplicates = {
@@ -199,7 +200,7 @@ export function validateUnitOfMeasureDuplicates(
     unit_name: string;
     unit_symbol: string;
     unit_category: string;
-  }>
+  }>,
 ): UnitOfMeasureValidationResult {
   const errors: FormErrors = {};
   const hasDuplicates = {

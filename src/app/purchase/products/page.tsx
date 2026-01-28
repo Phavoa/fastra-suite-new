@@ -208,23 +208,23 @@ export default function Page() {
     );
   }
 
-  if (!accessChecks.overall) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">
-            Access Denied
-          </h1>
-          <p className="text-gray-600 mb-4">
-            You do not have the required permissions to view this page.
-          </p>
-          <p className="text-sm text-gray-500">
-            Redirecting to unauthorized page...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // if (!accessChecks.overall) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <div className="text-center">
+  //         <h1 className="text-2xl font-bold text-red-600 mb-4">
+  //           Access Denied
+  //         </h1>
+  //         <p className="text-gray-600 mb-4">
+  //           You do not have the required permissions to view this page.
+  //         </p>
+  //         <p className="text-sm text-gray-500">
+  //           Redirecting to unauthorized page...
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <motion.main

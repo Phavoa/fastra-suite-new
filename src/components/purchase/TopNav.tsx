@@ -13,24 +13,24 @@ export function TopNav() {
     {
       label: "Purchase Requests",
       href: "/purchase/purchase_requests",
-      module: "purchase_requests",
+      module: "purchaserequest",
     },
     {
       label: "Request for Quotations",
       href: "/purchase/request_for_quotations",
-      module: "request_for_quotations",
+      module: "requestforquotation",
     },
     {
       label: "Purchase Orders",
       href: "/purchase/purchase_orders",
-      module: "purchase_orders",
+      module: "purchaseorder",
     },
-    { label: "Vendors", href: "/purchase/vendors", module: "vendors" },
-    { label: "Products", href: "/purchase/products", module: "products" },
+    { label: "Vendors", href: "/purchase/vendors", module: "vendor" },
+    { label: "Products", href: "/purchase/products", module: "product" },
     {
       label: "Configuration",
       href: "/purchase/configurations",
-      module: "configurations",
+      module: "unitofmeasure",
     },
   ];
 

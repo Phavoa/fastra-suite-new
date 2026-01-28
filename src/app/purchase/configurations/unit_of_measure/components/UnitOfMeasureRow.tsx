@@ -22,10 +22,10 @@ interface UnitOfMeasureRowProps {
   editingUnit: EditingUnit | null;
   setEditingUnit: React.Dispatch<React.SetStateAction<EditingUnit | null>>;
   serverErrors: Record<string, string>;
-  handleEdit: (unit: UnitOfMeasure) => void;
+  handleEdit?: (unit: UnitOfMeasure) => void;
   handleCancel: () => void;
-  handleSave: (id: number) => void;
-  handleDelete: (unit: UnitOfMeasure) => void;
+  handleSave?: (id: number) => void;
+  handleDelete?: (unit: UnitOfMeasure) => void;
   isUpdating: boolean;
   isDeleting: boolean;
   formatDate: (dateString: string) => string;
@@ -68,7 +68,7 @@ export function UnitOfMeasureRow({
               value={editingUnit?.unit_name || ""}
               onChange={(e) =>
                 setEditingUnit((prev) =>
-                  prev ? { ...prev, unit_name: e.target.value } : null
+                  prev ? { ...prev, unit_name: e.target.value } : null,
                 )
               }
               className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -94,7 +94,7 @@ export function UnitOfMeasureRow({
               value={editingUnit?.unit_symbol || ""}
               onChange={(e) =>
                 setEditingUnit((prev) =>
-                  prev ? { ...prev, unit_symbol: e.target.value } : null
+                  prev ? { ...prev, unit_symbol: e.target.value } : null,
                 )
               }
               className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -120,7 +120,7 @@ export function UnitOfMeasureRow({
               value={editingUnit?.unit_category || ""}
               onChange={(e) =>
                 setEditingUnit((prev) =>
-                  prev ? { ...prev, unit_category: e.target.value } : null
+                  prev ? { ...prev, unit_category: e.target.value } : null,
                 )
               }
               className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -149,13 +149,15 @@ export function UnitOfMeasureRow({
       <div className="col-span-2 flex items-center justify-end gap-2">
         {editingId === unitId ? (
           <>
-            <Button
-              onClick={() => handleSave(unitId)}
-              disabled={isUpdating}
-              className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white px-4 h-10 rounded-md font-medium transition-colors text-sm"
-            >
-              {isUpdating ? "Saving..." : "Save"}
-            </Button>
+            {handleSave && (
+              <Button
+                onClick={() => handleSave(unitId)}
+                disabled={isUpdating}
+                className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white px-4 h-10 rounded-md font-medium transition-colors text-sm"
+              >
+                {isUpdating ? "Saving..." : "Save"}
+              </Button>
+            )}
             <button
               onClick={handleCancel}
               className="text-gray-500 hover:text-gray-700 transition-colors p-2"
@@ -165,21 +167,25 @@ export function UnitOfMeasureRow({
           </>
         ) : (
           <>
-            <Button
-              onClick={() => handleEdit(unit)}
-              variant="outline"
-              className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white border-0 px-4 h-10 rounded-md font-medium transition-colors text-sm"
-            >
-              <Edit2 className="w-4 h-4 mr-1" />
-              Edit
-            </Button>
-            <button
-              onClick={() => handleDelete(unit)}
-              disabled={isDeleting}
-              className="text-red-600 hover:text-red-700 font-medium px-3 h-10 transition-colors text-sm disabled:opacity-50"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {handleEdit && (
+              <Button
+                onClick={() => handleEdit(unit)}
+                variant="outline"
+                className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white border-0 px-4 h-10 rounded-md font-medium transition-colors text-sm"
+              >
+                <Edit2 className="w-4 h-4 mr-1" />
+                Edit
+              </Button>
+            )}
+            {handleDelete && (
+              <button
+                onClick={() => handleDelete(unit)}
+                disabled={isDeleting}
+                className="text-red-600 hover:text-red-700 font-medium px-3 h-10 transition-colors text-sm disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </>
         )}
       </div>

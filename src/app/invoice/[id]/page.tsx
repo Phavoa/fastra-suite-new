@@ -190,8 +190,8 @@ export default function InvoiceDetailsPage() {
                       Created By
                     </h3>
                     <p className="text-gray-700">
-                      {invoice.created_by_details?.first_name}{" "}
-                      {invoice.created_by_details?.last_name}
+                      {invoice.created_by_details?.user.first_name}{" "}
+                      {invoice.created_by_details?.user.last_name}
                     </p>
                   </div>
                 </FadeIn>

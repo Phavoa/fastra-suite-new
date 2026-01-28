@@ -12,7 +12,7 @@ const Page = () => {
     // Check if user has access to purchase_requests
     const hasAccess = can({
       application: "purchase",
-      module: "purchase_requests",
+      module: "purchaserequest",
       action: "view",
     });
 

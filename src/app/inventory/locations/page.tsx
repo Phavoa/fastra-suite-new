@@ -190,6 +190,7 @@ export default function InventoryLocationPage() {
   } = useGetLocationsQuery({
     search: searchQuery || undefined,
   });
+  const queryLoading = isLoading as boolean;
 
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -210,13 +211,13 @@ export default function InventoryLocationPage() {
         location.location_name.toLowerCase().includes(query) ||
         location.location_code.toLowerCase().includes(query) ||
         location.address.toLowerCase().includes(query) ||
-        location.contact_information?.toLowerCase().includes(query)
+        location.contact_information?.toLowerCase().includes(query),
     );
   }, [locations, searchQuery]);
 
   const toggleLocationSelection = (id: string) => {
     setSelectedLocations((prev) =>
-      prev.includes(id) ? prev.filter((locId) => locId !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((locId) => locId !== id) : [...prev, id],
     );
   };
 
@@ -319,7 +320,7 @@ export default function InventoryLocationPage() {
             </div>
 
             {/* Content States */}
-            {isLoading ? (
+            {queryLoading ? (
               <LoadingState />
             ) : isError ? (
               <ErrorState error={error} onRetry={refetch} />
@@ -337,7 +338,7 @@ export default function InventoryLocationPage() {
             )}
 
             {/* Results count */}
-            {!isLoading && !isError && filteredLocations.length > 0 && (
+            {!queryLoading && !isError && filteredLocations.length > 0 && (
               <div className="mt-4 text-sm text-gray-500">
                 Showing {filteredLocations.length} location
                 {filteredLocations.length !== 1 ? "s" : ""}

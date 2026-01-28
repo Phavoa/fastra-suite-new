@@ -29,7 +29,7 @@ export const SettingsControlBar = ({
   const [search, setSearch] = useState("");
   const dispatch = useDispatch();
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
-  const archive = useSelector((state: RootState) => state.viewMode.archive); 
+  const archive = useSelector((state: RootState) => state.viewMode.archive);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -39,7 +39,7 @@ export const SettingsControlBar = ({
   const handleToggleView = (mode: "grid" | "list") => {
     dispatch(setViewMode(mode));
   };
-  console.log(activeSection)
+  console.log(activeSection);
   const getButtonLabel = () => {
     switch (activeSection) {
       case "company":
@@ -59,7 +59,7 @@ export const SettingsControlBar = ({
     <div
       className={cn(
         "w-full flex flex-wrap items-center justify-between gap-4 bg-white px-6 py-3 border-b border-gray-200",
-        className
+        className,
       )}
     >
       {/* Left: Search */}
@@ -75,7 +75,6 @@ export const SettingsControlBar = ({
 
       {/* Right Controls */}
       <div className="flex gap-3 items-center">
-
         {/* Primary Button */}
         <GrayButton
           size="md"
@@ -86,17 +85,17 @@ export const SettingsControlBar = ({
         </GrayButton>
 
         {/* Secondary Button (ONLY on Users Page) */}
-        {activeSection === "user" && (
+        {activeSection === "user" && onShowArchivedUsers && (
           <GrayButton
             size="md"
-            className={archive
-              ? "bg-[#3B7CED] text-white":
-              "bg-white border border-[#3B7CED] text-[#3B7CED]"
+            className={
+              archive
+                ? "bg-[#3B7CED] text-white"
+                : "bg-white border border-[#3B7CED] text-[#3B7CED]"
             }
-           
             onClick={onShowArchivedUsers}
           >
-            {/* Archived Users */}
+            Archived Users
           </GrayButton>
         )}
 

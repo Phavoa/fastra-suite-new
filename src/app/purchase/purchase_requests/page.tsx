@@ -22,7 +22,7 @@ import { StatusCards } from "@/components/purchase/purchaseRequest";
 // Helper function to transform API data to RequestRow format
 const transformPurchaseRequestToRow = (
   purchaseRequest: PurchaseRequest,
-  loggedInUserId?: number
+  loggedInUserId?: number,
 ): RequestRow => {
   const totalItems =
     purchaseRequest.items?.reduce((sum: number, item) => sum + item.qty, 0) ||
@@ -36,9 +36,9 @@ const transformPurchaseRequestToRow = (
   const requesterName = isOwnRequest
     ? "YOU"
     : purchaseRequest.requester_details?.user?.first_name &&
-      purchaseRequest.requester_details?.user?.last_name
-    ? `${purchaseRequest.requester_details.user.first_name} ${purchaseRequest.requester_details.user.last_name}`
-    : "Unknown Requester";
+        purchaseRequest.requester_details?.user?.last_name
+      ? `${purchaseRequest.requester_details.user.first_name} ${purchaseRequest.requester_details.user.last_name}`
+      : "Unknown Requester";
 
   return {
     id: purchaseRequest.id,
@@ -67,7 +67,7 @@ export default function PurchaseRequestsPage() {
     if (
       !can({
         application: "purchase",
-        module: "purchase_requests",
+        module: "purchaserequest",
         action: "view",
       })
     ) {
@@ -88,7 +88,7 @@ export default function PurchaseRequestsPage() {
   // Transform API data to match component interface
   const rows: RequestRow[] = useMemo(() => {
     return purchaseRequests.map((purchaseRequest) =>
-      transformPurchaseRequestToRow(purchaseRequest, loggedInUserId)
+      transformPurchaseRequestToRow(purchaseRequest, loggedInUserId),
     );
   }, [purchaseRequests, loggedInUserId]);
 
@@ -146,11 +146,18 @@ export default function PurchaseRequestsPage() {
           </div>
         </div>
         <div className="flex space-x-4">
-          <Link href="/purchase/purchase_requests/new">
-            <Button variant="contained" className="px-4 py-2 cursor-pointer">
-              New Purchase Request
-            </Button>
-          </Link>
+          {!can({
+            application: "purchase",
+            module: "purchaserequest",
+            action: "create",
+          }) ? null : (
+            <Link href="/purchase/purchase_requests/new">
+              <Button variant="contained" className="px-4 py-2 cursor-pointer">
+                New Purchase Request
+              </Button>
+            </Link>
+          )}
+
           <ViewToggle
             currentView={currentView}
             onViewChange={handleViewChange}

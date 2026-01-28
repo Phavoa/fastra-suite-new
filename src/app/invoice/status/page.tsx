@@ -10,7 +10,7 @@ import { SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ViewToggle } from "@/components/invoice/ViewToggle";
 import { useGetInvoicesQuery, Invoice } from "@/api/invoice/invoiceApi";
-import { BreadcrumbItem } from "../../products/types";
+import { BreadcrumbItem } from "../../purchase/products/types";
 import { motion } from "framer-motion";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
@@ -134,7 +134,7 @@ export default function InvoiceStatusPage() {
   // Transform API data to match component interface and filter by status
   const rows: InvoiceRow[] = useMemo(() => {
     const transformed = invoices.map((invoice) =>
-      transformInvoiceToRow(invoice)
+      transformInvoiceToRow(invoice),
     );
     return status
       ? transformed.filter((row) => row.status === status)

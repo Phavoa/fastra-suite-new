@@ -26,10 +26,10 @@ interface UnitOfMeasureTableProps {
   editingUnit: EditingUnit | null;
   setEditingUnit: React.Dispatch<React.SetStateAction<EditingUnit | null>>;
   serverErrors: Record<string, string>;
-  handleEdit: (unit: UnitOfMeasure) => void;
+  handleEdit?: (unit: UnitOfMeasure) => void;
   handleCancel: () => void;
-  handleSave: (id: number) => void;
-  handleDelete: (unit: UnitOfMeasure) => void;
+  handleSave?: (id: number) => void;
+  handleDelete?: (unit: UnitOfMeasure) => void;
   isUpdating: boolean;
   isDeleting: boolean;
   formatDate: (dateString: string) => string;
@@ -68,6 +68,8 @@ export function UnitOfMeasureTable({
   searchTerm,
   categoryFilter,
 }: UnitOfMeasureTableProps) {
+  const loading: boolean = Boolean(isLoading);
+  const hasError: boolean = Boolean(error);
   return (
     <div className="mx-auto pb-6">
       <AnimatedWrapper
@@ -75,7 +77,7 @@ export function UnitOfMeasureTable({
         className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
       >
         {/* Loading State */}
-        {isLoading && (
+        {loading && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3B7CED] mx-auto"></div>
@@ -87,12 +89,15 @@ export function UnitOfMeasureTable({
         )}
 
         {/* Error State */}
-        {error && (
+        {hasError && (
           <div className="p-6">
             <Alert variant="destructive">
               <p className="font-medium">Error loading units of measure</p>
               <p className="text-sm mt-1">
-                {error && typeof error === "object" && "data" in error
+                {hasError &&
+                error &&
+                typeof error === "object" &&
+                "data" in error
                   ? formatErrorMessage(error as ApiError)
                   : "An unexpected error occurred"}
               </p>
@@ -109,7 +114,7 @@ export function UnitOfMeasureTable({
         )}
 
         {/* Content */}
-        {!isLoading && !error && (
+        {!loading && !hasError && (
           <>
             {/* Table Header */}
             <AnimatedWrapper animation="slideDown" delay={0.2}>

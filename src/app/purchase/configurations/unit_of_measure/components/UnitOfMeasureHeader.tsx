@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 interface UnitOfMeasureHeaderProps {
   breadcrumbItems: BreadcrumbItem[];
   onBack: () => void;
-  onAddUnit: () => void;
+  onAddUnit?: () => void;
 }
 
 export function UnitOfMeasureHeader({
@@ -48,13 +48,15 @@ export function UnitOfMeasureHeader({
           </Button>
         </motion.div>
 
-        <Button
-          onClick={onAddUnit}
-          className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white px-4 h-10 rounded-md font-medium transition-colors text-sm flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Add Unit
-        </Button>
+        {onAddUnit && (
+          <Button
+            onClick={onAddUnit}
+            className="bg-[#3B7CED] hover:bg-[#3B7CED]/90 text-white px-4 h-10 rounded-md font-medium transition-colors text-sm flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Add Unit
+          </Button>
+        )}
       </div>
     </>
   );

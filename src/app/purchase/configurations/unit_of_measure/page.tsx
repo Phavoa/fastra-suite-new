@@ -1,6 +1,15 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/lib/store/store";
+import { usePermissionContext } from "@/contexts/PermissionContext";
+import { usePermission } from "@/hooks/usePermission";
+import {
+  normalizePermissions,
+  NormalizedPermissions,
+} from "@/utils/normalizePermissions";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { StatusModal } from "@/components/shared/StatusModal";
 import {
@@ -21,7 +30,6 @@ import {
   unitOfMeasureSchema,
   type UnitOfMeasureInput,
 } from "@/lib/validations/currency-validation";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UnitOfMeasureHeader } from "./components/UnitOfMeasureHeader";
@@ -37,6 +45,19 @@ interface EditingUnit {
 
 export default function UnitOfMeasurePage() {
   const router = useRouter();
+  const { can } = usePermission();
+  const { isAdmin, permissions } = usePermissionContext();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const user_accesses = useSelector(
+    (state: RootState) => state.auth.user_accesses,
+  );
+  const [loading, setLoading] = useState(true);
+  const [accessChecks, setAccessChecks] = useState<{
+    view: boolean;
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+  }>({ view: false, create: false, edit: false, delete: false });
 
   // Helper function to extract ID from URL
   const getUnitId = (url: string): number => {
@@ -75,6 +96,7 @@ export default function UnitOfMeasurePage() {
     error,
     refetch,
   } = useGetUnitOfMeasuresQuery({});
+  const queryLoading = isLoading as boolean;
   const [deleteUnit, { isLoading: isDeleting }] =
     useDeleteUnitOfMeasureMutation();
   const [patchUnit, { isLoading: isUpdating }] =
@@ -82,7 +104,76 @@ export default function UnitOfMeasurePage() {
   const [createUnit, { isLoading: isCreating }] =
     useCreateUnitOfMeasureMutation();
 
-  // Create form
+  // Direct normalization for demonstration
+  const normalizedDirect: NormalizedPermissions = useMemo(() => {
+    if (user_accesses) {
+      try {
+        return normalizePermissions({ user_accesses });
+      } catch (error) {
+        console.error("Error normalizing permissions:", error);
+        return { isAdmin: false, permissions: {} };
+      }
+    }
+    return { isAdmin: false, permissions: {} };
+  }, [user_accesses]);
+
+  // Comprehensive permission checks
+  useEffect(() => {
+    // Simulate loading delay for demonstration
+    const timer = setTimeout(() => {
+      const hasViewAccess =
+        can({
+          application: "purchase",
+          module: "unitofmeasure",
+          action: "view",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:unitofeasure"]?.has("view");
+
+      const hasCreateAccess =
+        can({
+          application: "purchase",
+          module: "unit_of_measure",
+          action: "create",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("create");
+
+      const hasEditAccess =
+        can({
+          application: "purchase",
+          module: "unitofmeasure",
+          action: "edit",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("edit");
+      const hasDeleteAccess =
+        can({
+          application: "purchase",
+          module: "unitofmeasure",
+          action: "delete",
+        }) ||
+        isAdmin ||
+        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("delete");
+
+      setAccessChecks({
+        view: hasViewAccess,
+        create: hasCreateAccess,
+        edit: hasEditAccess,
+        delete: hasDeleteAccess,
+      });
+
+      // Redirect if no view access
+      if (!hasViewAccess) {
+        router.push("/unauthorized");
+      }
+
+      setLoading(false);
+    }, 1000); // Simulate async check
+
+    return () => clearTimeout(timer);
+  }, [can, isAdmin, permissions, normalizedDirect, router]);
+
   const {
     register: registerCreate,
     handleSubmit: handleSubmitCreate,
@@ -114,14 +205,14 @@ export default function UnitOfMeasurePage() {
         (unit) =>
           unit.unit_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           unit.unit_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          unit.unit_category.toLowerCase().includes(searchTerm.toLowerCase())
+          unit.unit_category.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Apply category filter
     if (categoryFilter) {
       filtered = filtered.filter(
-        (unit) => unit.unit_category === categoryFilter
+        (unit) => unit.unit_category === categoryFilter,
       );
     }
 
@@ -211,7 +302,7 @@ export default function UnitOfMeasurePage() {
           symbol: editingUnit.unit_symbol.trim(),
           category: editingUnit.unit_category.trim(),
         },
-        units.filter((u) => getUnitId(u.url) !== id)
+        units.filter((u) => getUnitId(u.url) !== id),
       );
 
       if (!validation.isValid) {
@@ -270,7 +361,7 @@ export default function UnitOfMeasurePage() {
 
     // Confirm deletion
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${unit.unit_name}"? This action cannot be undone.`
+      `Are you sure you want to delete "${unit.unit_name}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -307,7 +398,7 @@ export default function UnitOfMeasurePage() {
           symbol: data.unit_symbol,
           category: data.unit_category,
         },
-        units
+        units,
       );
 
       if (!validation.isValid) {
@@ -354,16 +445,66 @@ export default function UnitOfMeasurePage() {
     setCurrentPage(page);
   };
 
+  // Handle edge cases
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            Loading User Data
+          </h1>
+          <p className="text-gray-600">
+            Please wait while we load your user information...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            Checking Permissions
+          </h1>
+          <p className="text-gray-600">Verifying your access rights...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!accessChecks.view) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h1>
+          <p className="text-gray-600 mb-4">
+            You do not have the required permissions to view this page.
+          </p>
+          <p className="text-sm text-gray-500">
+            Redirecting to unauthorized page...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen mr-4">
       <UnitOfMeasureHeader
         breadcrumbItems={items}
         onBack={() => router.back()}
-        onAddUnit={() => setShowCreateForm(true)}
+        onAddUnit={
+          accessChecks.create ? () => setShowCreateForm(true) : undefined
+        }
       />
 
       <UnitOfMeasureTable
-        isLoading={isLoading}
+        isLoading={queryLoading}
         error={error}
         refetch={refetch}
         paginatedUnits={paginatedUnits}
@@ -371,10 +512,10 @@ export default function UnitOfMeasurePage() {
         editingUnit={editingUnit}
         setEditingUnit={setEditingUnit}
         serverErrors={serverErrors}
-        handleEdit={handleEdit}
+        handleEdit={accessChecks.edit ? handleEdit : undefined}
         handleCancel={handleCancel}
-        handleSave={handleSave}
-        handleDelete={handleDelete}
+        handleSave={accessChecks.edit ? handleSave : undefined}
+        handleDelete={accessChecks.delete ? handleDelete : undefined}
         isUpdating={isUpdating}
         isDeleting={isDeleting}
         formatDate={formatDate}
@@ -388,19 +529,21 @@ export default function UnitOfMeasurePage() {
         categoryFilter={categoryFilter}
       />
 
-      <CreateUnitModal
-        showCreateForm={showCreateForm}
-        setShowCreateForm={setShowCreateForm}
-        registerCreate={registerCreate}
-        handleSubmitCreate={handleSubmitCreate}
-        resetCreate={resetCreate}
-        createErrors={createErrors}
-        isCreateValid={isCreateValid}
-        serverErrors={serverErrors}
-        setServerErrors={setServerErrors}
-        onCreateSubmit={onCreateSubmit}
-        isCreating={isCreating}
-      />
+      {accessChecks.create && (
+        <CreateUnitModal
+          showCreateForm={showCreateForm}
+          setShowCreateForm={setShowCreateForm}
+          registerCreate={registerCreate}
+          handleSubmitCreate={handleSubmitCreate}
+          resetCreate={resetCreate}
+          createErrors={createErrors}
+          isCreateValid={isCreateValid}
+          serverErrors={serverErrors}
+          setServerErrors={setServerErrors}
+          onCreateSubmit={onCreateSubmit}
+          isCreating={isCreating}
+        />
+      )}
 
       {/* Status Modal */}
       <StatusModal

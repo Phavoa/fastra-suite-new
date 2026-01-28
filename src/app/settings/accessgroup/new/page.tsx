@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useRouter } from "next/navigation";
-import { useCreateAccessGroupRightMutation } from "@/api/settings/accessGroupRightApi";
+import {
+  useCreateAccessGroupRightMutation,
+  AccessRight,
+} from "@/api/settings/accessGroupRightApi";
 import {
   useGetApplicationsAndAccessRightsQuery,
   ApplicationsResponse,
@@ -95,7 +98,7 @@ export default function CreateAccessGroupPage() {
   // Handle checkbox change for access rights
   const handleRightChange = (
     moduleIndex: number,
-    right: keyof AccessModule["rights"]
+    right: keyof AccessModule["rights"],
   ) => {
     const updatedModules = [...selectedModules];
     updatedModules[moduleIndex].rights[right] =
@@ -108,7 +111,7 @@ export default function CreateAccessGroupPage() {
     if (!groupName || !selectedApplication || selectedModules.length === 0) {
       statusModal.showError(
         "Validation Error",
-        "Please fill in all required fields"
+        "Please fill in all required fields",
       );
       return;
     }
@@ -118,7 +121,7 @@ export default function CreateAccessGroupPage() {
     setGeneratedCode(code);
 
     // Prepare access rights for API in the correct format
-    const accessRights: Array<{ module: string; rights: number[] }> = [];
+    const accessRights: AccessRight[] = [];
 
     selectedModules.forEach((moduleData) => {
       const selectedRights: number[] = [];
@@ -126,7 +129,7 @@ export default function CreateAccessGroupPage() {
       Object.entries(moduleData.rights).forEach(([right, enabled]) => {
         if (enabled) {
           const accessRightId = applicationsData?.access_rights.find(
-            (ar) => ar.name.toLowerCase() === right.toLowerCase()
+            (ar) => ar.name.toLowerCase() === right.toLowerCase(),
           )?.id;
 
           if (accessRightId) {
@@ -138,8 +141,7 @@ export default function CreateAccessGroupPage() {
       // Only add module if it has selected rights
       if (selectedRights.length > 0) {
         accessRights.push({
-          module: moduleData.module,
-          rights: selectedRights,
+          [moduleData.module]: selectedRights.join(","),
         });
       }
     });
@@ -155,23 +157,23 @@ export default function CreateAccessGroupPage() {
 
       statusModal.showSuccess(
         "Access Group Created",
-        "The access group has been successfully created and saved."
+        "The access group has been successfully created and saved.",
       );
     } catch (err: any) {
-  console.error("Failed to create access group:", err);
+      console.error("Failed to create access group:", err);
 
-  // Check if RTK Query returned a validation error
-  if (err?.data) {
-    console.error("Backend error data:", err.data);
-  }
+      // Check if RTK Query returned a validation error
+      if (err?.data) {
+        console.error("Backend error data:", err.data);
+      }
 
-  statusModal.showError(
-    "Creation Failed",
-    err?.data
-      ? JSON.stringify(err.data)
-      : "Failed to create access group. Please try again."
-  );
-}
+      statusModal.showError(
+        "Creation Failed",
+        err?.data
+          ? JSON.stringify(err.data)
+          : "Failed to create access group. Please try again.",
+      );
+    }
   };
 
   if (isLoadingApps) {
@@ -246,7 +248,7 @@ export default function CreateAccessGroupPage() {
                       <SelectItem key={`${index}-${appName}`} value={appName}>
                         {appName}
                       </SelectItem>
-                    ))
+                    )),
                   )}
                 </SelectContent>
               </Select>
@@ -322,7 +324,7 @@ export default function CreateAccessGroupPage() {
                               onCheckedChange={() =>
                                 handleRightChange(
                                   moduleIndex,
-                                  right.name as keyof AccessModule["rights"]
+                                  right.name as keyof AccessModule["rights"],
                                 )
                               }
                               className="w-5 h-5 border-2 border-gray-300 rounded data-[state=checked]:bg-[#3B7CED] data-[state=checked]:border-[#3B7CED]"

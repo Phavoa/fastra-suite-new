@@ -54,7 +54,7 @@ export function MobileStockAdjustmentItem({
             whileHover={{ color: "#1e293b" }}
             transition={{ duration: 0.2 }}
           >
-            {request.product}
+            {request.product || request.adjustmentType}
           </motion.div>
           <motion.div
             className="flex items-center"
