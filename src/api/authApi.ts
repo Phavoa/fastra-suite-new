@@ -67,6 +67,25 @@ export interface ResetPasswordResponse {
   detail: string;
 }
 
+export interface VerifyEmailRequest {
+  token: string;
+  tenant: string;
+}
+
+export interface VerifyEmailResponse {
+  detail: string;
+  message?: string;
+}
+
+export interface ResendVerificationRequest {
+  tenant: string;
+}
+
+export interface ResendVerificationResponse {
+  detail: string;
+  message?: string;
+}
+
 export const authApi = createApi({
   reducerPath: "authApi",
   baseQuery: fetchBaseQuery({ baseUrl: process.env.NEXT_PUBLIC_API_URL }),
@@ -112,6 +131,21 @@ export const authApi = createApi({
         body,
       }),
     }),
+    verifyEmail: builder.query<VerifyEmailResponse, VerifyEmailRequest>({
+      query: ({ token, tenant }) => ({
+        url: `https://${tenant}.fastrasuiteapi.com.ng/company/email-verify?token=${token}`,
+        method: "GET",
+      }),
+    }),
+    resendVerificationEmail: builder.mutation<
+      ResendVerificationResponse,
+      ResendVerificationRequest
+    >({
+      query: ({ tenant }) => ({
+        url: `https://${tenant}.fastrasuiteapi.com.ng/company/resend-verification-email/`,
+        method: "GET",
+      }),
+    }),
   }),
 });
 
@@ -121,4 +155,6 @@ export const {
   useForgetPasswordMutation,
   useVerifyOtpMutation,
   useResetPasswordMutation,
+  useVerifyEmailQuery,
+  useResendVerificationEmailMutation,
 } = authApi;

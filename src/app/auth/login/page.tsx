@@ -14,6 +14,7 @@ import { useLoginMutation } from "@/api/authApi";
 import { useDispatch } from "react-redux";
 import { setAuthData } from "@/lib/store/authSlice";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 6 characters"),
@@ -24,7 +25,7 @@ type FormData = z.infer<typeof formSchema>;
 // -- Mock submit handler (simulates network)
 const fakeSubmit = (_payload: FormData) =>
   new Promise<{ ok: boolean; id?: string }>((resolve) =>
-    setTimeout(() => resolve({ ok: true, id: "company_abc_123" }), 900)
+    setTimeout(() => resolve({ ok: true, id: "company_abc_123" }), 900),
   );
 
 const LoginPage: NextPage = () => {
@@ -59,7 +60,7 @@ const LoginPage: NextPage = () => {
           tenant_company_name: result.tenant_company_name,
           isOnboarded: result.isOnboarded,
           user_accesses: result.user_accesses,
-        })
+        }),
       );
 
       // Set httpOnly cookie via API route for security
@@ -158,7 +159,7 @@ const LoginPage: NextPage = () => {
                     "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
                     !isValid || isLoggingIn
                       ? "opacity-60 cursor-not-allowed"
-                      : "hover:shadow-md"
+                      : "hover:shadow-md",
                   )}
                   disabled={!isValid || isLoggingIn}
                   aria-disabled={!isValid || isLoggingIn}
@@ -167,9 +168,12 @@ const LoginPage: NextPage = () => {
                 </Button>
 
                 <div className="text-center mt-6">
-                  <a href="#" className="text-sky-600 hover:underline text-sm">
+                  <Link
+                    href="/auth/register"
+                    className="text-sky-600 hover:underline text-sm"
+                  >
                     Don&apos;t have an account?
-                  </a>
+                  </Link>
                 </div>
               </>
             ) : (
