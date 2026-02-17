@@ -11,7 +11,7 @@ function isTokenExpired(token: string): boolean {
       atob(base64)
         .split("")
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+        .join(""),
     );
 
     const payload = JSON.parse(jsonPayload);
@@ -35,7 +35,11 @@ export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow access to auth pages without authentication
-  if (pathname.startsWith("/auth")) {
+  if (
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/resend-email-verification")
+  ) {
     return NextResponse.next();
   }
 
@@ -60,7 +64,7 @@ export default function middleware(request: NextRequest) {
   // Check if the access token is expired
   if (isTokenExpired(accessToken)) {
     console.log(
-      "Access token expired, clearing tokens and redirecting to login"
+      "Access token expired, clearing tokens and redirecting to login",
     );
 
     // Create response with token clearing
