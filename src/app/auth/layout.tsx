@@ -16,6 +16,8 @@ import {
   Box,
 } from "lucide-react";
 
+import fastraLogo from "../../../public/fastraLogo.png";
+
 const AuthLayout = ({
   children,
 }: Readonly<{
@@ -34,7 +36,7 @@ const AuthLayout = ({
           {/* Brand */}
           <div className="flex items-center gap-3 w-25 h-10 mb-8">
             <Image
-              src="/public/fastraLogo.png"
+              src={fastraLogo}
               alt="Fastra"
               width={1000}
               height={1000}
@@ -49,7 +51,7 @@ const AuthLayout = ({
               style={{ lineHeight: 1.12 }}
             >
               Maximize the Planning of Projects with{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3B7CED] to-[#2143a9]">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-[#3B7CED] to-[#2143a9]">
                 Fastra Suite
               </span>
             </h1>
@@ -69,7 +71,7 @@ const AuthLayout = ({
 
           {/* Dashboard Preview Mockup - REPLACING the old Card */}
           <div className="relative flex-1 mt-4">
-            <div className="absolute left-0 top-0 right-[-100px] bottom-[-200px] bg-[#F8F9FB] rounded-tl-2xl shadow-2xl overflow-hidden flex flex-row border border-gray-200">
+            <div className="absolute left-0 top-0 -right-25 -bottom-50 bg-[#F8F9FB] rounded-tl-2xl shadow-2xl overflow-hidden flex flex-row border border-gray-200">
               {/* Mock Sidebar */}
               <div className="w-16 bg-white border-r border-gray-100 flex flex-col items-center py-6 space-y-8">
                 <div className="p-2 text-blue-600">

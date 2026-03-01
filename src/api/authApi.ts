@@ -41,16 +41,19 @@ export interface LoginResponse {
 
 export interface ForgetPasswordRequest {
   email: string;
+  tenant?: string;
 }
 
 export interface ForgetPasswordResponse {
   detail: string;
-  role: string;
+  role?: string;
+  message?: string;
 }
 
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
+  tenant?: string;
 }
 
 export interface VerifyOtpResponse {
@@ -65,6 +68,7 @@ export interface ResetPasswordRequest {
 
 export interface ResetPasswordResponse {
   detail: string;
+  message?: string;
 }
 
 export interface VerifyEmailRequest {
@@ -108,17 +112,17 @@ export const authApi = createApi({
       ForgetPasswordResponse,
       ForgetPasswordRequest
     >({
-      query: (body) => ({
-        url: `${process.env.NEXT_PUBLIC_APP_API_URL}request-forgotten-password/`,
+      query: ({ email, tenant }) => ({
+        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/request-forgotten-password/`,
         method: "POST",
-        body,
+        body: { email },
       }),
     }),
     verifyOtp: builder.mutation<VerifyOtpResponse, VerifyOtpRequest>({
-      query: (body) => ({
-        url: `${process.env.NEXT_PUBLIC_APP_API_URL}verify-otp/`,
+      query: ({ email, otp, tenant }) => ({
+        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/verify-otp/`,
         method: "POST",
-        body,
+        body: { email, otp },
       }),
     }),
     resetPassword: builder.mutation<
@@ -126,14 +130,14 @@ export const authApi = createApi({
       ResetPasswordRequest
     >({
       query: (body) => ({
-        url: "/reset-password/",
+        url: `https://${process.env.NEXT_PUBLIC_API_DOMAIN}/reset-password/`,
         method: "POST",
         body,
       }),
     }),
     verifyEmail: builder.query<VerifyEmailResponse, VerifyEmailRequest>({
       query: ({ token, tenant }) => ({
-        url: `https://${tenant}.fastrasuiteapi.com.ng/company/email-verify?token=${token}`,
+        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/company/email-verify?token=${token}`,
         method: "GET",
       }),
     }),
@@ -143,7 +147,8 @@ export const authApi = createApi({
     >({
       query: ({ tenant }) => ({
         url: `https://${tenant}.fastrasuiteapi.com.ng/company/resend-verification-email/`,
-        method: "GET",
+        method: "POST",
+        body: {},
       }),
     }),
   }),
