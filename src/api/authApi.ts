@@ -109,14 +109,14 @@ export const authApi = createApi({
       ForgetPasswordRequest
     >({
       query: (body) => ({
-        url: `${process.env.NEXT_PUBLIC_APP_API_URL}request-forgotten-password/`,
+        url: `${process.env.NEXT_PUBLIC_APP_API_URL}/request-forgotten-password/`,
         method: "POST",
         body,
       }),
     }),
     verifyOtp: builder.mutation<VerifyOtpResponse, VerifyOtpRequest>({
       query: (body) => ({
-        url: `${process.env.NEXT_PUBLIC_APP_API_URL}verify-otp/`,
+        url: `${process.env.NEXT_PUBLIC_APP_API_URL}/verify-otp/`,
         method: "POST",
         body,
       }),
@@ -133,7 +133,7 @@ export const authApi = createApi({
     }),
     verifyEmail: builder.query<VerifyEmailResponse, VerifyEmailRequest>({
       query: ({ token, tenant }) => ({
-        url: `https://${tenant}.fastrasuiteapi.com.ng/company/email-verify?token=${token}`,
+        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/company/email-verify?token=${token}`,
         method: "GET",
       }),
     }),
@@ -143,7 +143,8 @@ export const authApi = createApi({
     >({
       query: ({ tenant }) => ({
         url: `https://${tenant}.fastrasuiteapi.com.ng/company/resend-verification-email/`,
-        method: "GET",
+        method: "POST",
+        body: {},
       }),
     }),
   }),

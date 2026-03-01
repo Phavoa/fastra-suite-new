@@ -16,6 +16,8 @@ import {
   Box,
 } from "lucide-react";
 
+import fastraLogo from "../../../public/fastraLogo.png";
+
 const AuthLayout = ({
   children,
 }: Readonly<{
@@ -34,7 +36,7 @@ const AuthLayout = ({
           {/* Brand */}
           <div className="flex items-center gap-3 w-25 h-10 mb-8">
             <Image
-              src="/public/fastraLogo.png"
+              src={fastraLogo}
               alt="Fastra"
               width={1000}
               height={1000}

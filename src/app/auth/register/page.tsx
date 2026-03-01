@@ -29,7 +29,7 @@ const passwordFormSchema = z
       .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
       .regex(
         /[!@#$%^&*(),.?":{}|<>]/,
-        "Password must contain at least one special character"
+        "Password must contain at least one special character",
       )
       .regex(/\d/, "Password must contain at least one number"),
     confirmPassword: z.string(),
@@ -45,7 +45,7 @@ type PasswordFormData = z.infer<typeof passwordFormSchema>;
 // -- Mock submit handler (simulates network)
 const fakeSubmit = (payload: CompanyFormData & PasswordFormData) =>
   new Promise<{ ok: boolean; id?: string }>((resolve) =>
-    setTimeout(() => resolve({ ok: true, id: "company_abc_123" }), 900)
+    setTimeout(() => resolve({ ok: true, id: "company_abc_123" }), 900),
   );
 
 const RegisterPage: NextPage = () => {
@@ -114,15 +114,17 @@ const RegisterPage: NextPage = () => {
     }
   };
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center">
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 lg:px-20">
         <div className="max-w-md w-full">
           <h2 className="text-xl font-semibold text-gray-900 mb-2 text-center">
             Register
           </h2>
-          <p className="text-sm text-gray-500 mb-6 text-center">
-            Enter your details to register
-          </p>
+          {!submittedId && (
+            <p className="text-sm text-gray-500 mb-6 text-center">
+              Enter your details to register
+            </p>
+          )}
 
           <div className="relative min-h-[400px] flex items-center justify-center">
             {/* Company Information Section */}
@@ -189,7 +191,7 @@ const RegisterPage: NextPage = () => {
                       "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
                       !companyForm.formState.isValid
                         ? "opacity-60 cursor-not-allowed"
-                        : "hover:shadow-md"
+                        : "hover:shadow-md",
                     )}
                     disabled={!companyForm.formState.isValid}
                     aria-disabled={!companyForm.formState.isValid}
@@ -404,7 +406,7 @@ const RegisterPage: NextPage = () => {
                       "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
                       !passwordForm.formState.isValid || loading
                         ? "opacity-60 cursor-not-allowed"
-                        : "hover:shadow-md"
+                        : "hover:shadow-md",
                     )}
                     disabled={!passwordForm.formState.isValid || isRegistering}
                     aria-disabled={!passwordForm.formState.isValid || loading}
@@ -424,9 +426,13 @@ const RegisterPage: NextPage = () => {
             </AnimatePresence>
 
             {submittedId && (
-              <div className="rounded-md border border-green-100 bg-green-50 p-4 text-sm text-green-800">
-                Account created successfully. Reference:{" "}
-                <strong>{submittedId}</strong>
+              <div className="rounded-md border border-green-100 bg-green-50 p-4 text-sm text-green-800 text-center">
+                {/* Account created successfully. Reference:{" "}
+                <strong>{submittedId}</strong> */}
+                <strong> Account Created successfully!.</strong> <br />
+                Verification token has been sent to your registered email
+                address. <br />
+                Visit your email inbox to verify your account in other to login.
               </div>
             )}
           </div>
