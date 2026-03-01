@@ -1,7 +1,7 @@
 "use client";
 
 // src/app/create-password/page.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { NextPage } from "next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Eye, EyeOff, Check, X } from "lucide-react";
-import { StatusModal } from "@/components/shared/StatusModal";
+import { useResetPasswordMutation } from "@/api/authApi";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 const formSchema = z
   .object({
     password: z
@@ -21,7 +23,7 @@ const formSchema = z
       .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
       .regex(
         /[!@#$%^&*(),.?":{}|<>]/,
-        "Password must contain at least one special character"
+        "Password must contain at least one special character",
       )
       .regex(/\d/, "Password must contain at least one number"),
     confirmPassword: z.string(),
@@ -33,18 +35,18 @@ const formSchema = z
 
 type FormData = z.infer<typeof formSchema>;
 
-// -- Mock submit handler (simulates network)
-const fakeSubmit = (_payload: FormData) =>
-  new Promise<{ ok: boolean; id?: string }>((resolve) =>
-    setTimeout(() => resolve({ ok: true, id: "password_created_123" }), 900)
-  );
-
 const CreatePasswordPage: NextPage = () => {
   const [loading, setLoading] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [isFromForgotPassword, setIsFromForgotPassword] = useState(false);
+
+  const router = useRouter();
+  const [resetPassword, { isLoading: isResetting }] =
+    useResetPasswordMutation();
 
   const {
     register,
@@ -58,7 +60,18 @@ const CreatePasswordPage: NextPage = () => {
 
   const watchedPassword = watch("password", "");
 
-  console.log(watchedPassword);
+  useEffect(() => {
+    // Check if this is a forgot password flow
+    const otpVerified = sessionStorage.getItem("otpVerified");
+    const storedEmail = sessionStorage.getItem("forgotPasswordEmail");
+
+    if (otpVerified && storedEmail) {
+      setIsFromForgotPassword(true);
+      setEmail(storedEmail);
+      // Clear the session storage items
+      sessionStorage.removeItem("otpVerified");
+    }
+  }, [router]);
 
   const passwordValidations = {
     minLength: watchedPassword.length >= 8,
@@ -72,14 +85,29 @@ const CreatePasswordPage: NextPage = () => {
     setError(null);
     setLoading(true);
     try {
-      const res = await fakeSubmit(data);
-      if (res.ok) {
-        setSubmittedId(res.id || "ok");
+      if (isFromForgotPassword) {
+        // Call reset password API
+        const result = await resetPassword({
+          email,
+          new_password: data.password,
+          confirm_password: data.confirmPassword,
+        }).unwrap();
+
+        // Clear session storage
+        sessionStorage.removeItem("forgotPasswordEmail");
+        sessionStorage.removeItem("forgotPasswordTenant");
+
+        setSubmittedId("password_reset_success");
       } else {
-        setError("Failed to create password. Please try again.");
+        setError("Failed to reset password. Please try again.");
       }
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (err) {
+      const error = err as { data?: { detail?: string; message?: string } };
+      setError(
+        error?.data?.detail ||
+          error?.data?.message ||
+          "Network error. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -88,12 +116,25 @@ const CreatePasswordPage: NextPage = () => {
     <main className="min-h-screen bg-white flex items-center">
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 lg:px-20">
         <div className="max-w-md w-full">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-            Create Password
-          </h2>
-          <p className="text-sm text-gray-600 mb-8 text-center">
-            Create a strong password for your account
-          </p>
+          {isFromForgotPassword ? (
+            <>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+                Reset Password
+              </h2>
+              <p className="text-sm text-gray-600 mb-8 text-center">
+                Create a new password for your account
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+                Create Password
+              </h2>
+              <p className="text-sm text-gray-600 mb-8 text-center">
+                Create a strong password for your account
+              </p>
+            </>
+          )}
 
           <form
             onSubmit={handleSubmit(onSubmit)}
@@ -273,17 +314,37 @@ const CreatePasswordPage: NextPage = () => {
                     "w-full py-3 rounded-md text-base font-medium transition-all duration-200 mt-6",
                     !isValid || loading
                       ? "bg-gray-300 cursor-not-allowed opacity-60"
-                      : "bg-[#4F86F7] hover:bg-[#3B72E6] text-white shadow-sm hover:shadow-md"
+                      : "bg-[#4F86F7] hover:bg-[#3B72E6] text-white shadow-sm hover:shadow-md",
                   )}
                   disabled={!isValid || loading}
                   aria-disabled={!isValid || loading}
                 >
-                  {loading ? "Creating Password..." : "Create Password"}
+                  {loading
+                    ? "Processing..."
+                    : isFromForgotPassword
+                      ? "Reset Password"
+                      : "Create Password"}
                 </Button>
               </>
             ) : (
               <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 mt-6">
-                Password created successfully! You can now log in.
+                {isFromForgotPassword
+                  ? "Password reset successfully! You can now login with your new password."
+                  : "Password created successfully! You can now login."}
+                <div className="mt-3">
+                  {/* <Link
+                    href="/auth/login"
+                    className="text-[#4F86F7] hover:underline font-medium"
+                  >
+                    Go to Login
+                  </Link> */}
+                  <span
+                    onClick={() => (window.location.href = "/auth/login")}
+                    className="text-[#4F86F7] hover:underline font-medium cursor-pointer"
+                  >
+                    Go to Login
+                  </span>
+                </div>
               </div>
             )}
           </form>

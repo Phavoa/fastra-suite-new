@@ -175,6 +175,14 @@ const LoginPage: NextPage = () => {
                     Don&apos;t have an account?
                   </Link>
                 </div>
+                <div className="text-center mt-2">
+                  <Link
+                    href="/auth/forgot-password"
+                    className="text-red-600 hover:underline text-sm"
+                  >
+                    forgot password?
+                  </Link>
+                </div>
               </>
             ) : (
               <div className="rounded-md border border-green-100 bg-green-50 p-4 text-sm text-green-800">

@@ -126,7 +126,7 @@ const RegisterPage: NextPage = () => {
             </p>
           )}
 
-          <div className="relative min-h-[400px] flex items-center justify-center">
+          <div className="relative min-h-100 flex items-center justify-center">
             {/* Company Information Section */}
             <AnimatePresence mode="wait">
               {!showPasswordSection && (
