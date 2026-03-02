@@ -110,10 +110,21 @@ export default function NewLocationPage() {
 
   // Convert tenant users to option format for dropdown
   const userOptions =
-    tenantUsers?.map((tenantUser) => ({
-      value: tenantUser.user_id.toString(),
-      label: formatUserName(tenantUser.user, tenantUser.user.email),
-    })) || [];
+    tenantUsers?.map((tenantUser) => {
+      // Try to get name from nested user object first, then flat fields
+      const firstName =
+        tenantUser.user?.first_name || tenantUser.first_name || "";
+      const lastName = tenantUser.user?.last_name || tenantUser.last_name || "";
+      const email =
+        tenantUser.user?.email || tenantUser.email || "Unknown User";
+
+      const fullName = firstName && lastName ? `${firstName} ${lastName}` : "";
+
+      return {
+        value: tenantUser.user_id.toString(),
+        label: fullName || email,
+      };
+    }) || [];
 
   console.log(userOptions);
 

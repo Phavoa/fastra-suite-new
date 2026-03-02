@@ -10,7 +10,7 @@ export interface RfqActionButtonsProps {
   rfq: RequestForQuotation;
   isUpdatingStatus: boolean;
   onStatusUpdate: (
-    status: "approved" | "rejected" | "pending"
+    status: "approved" | "rejected" | "pending",
   ) => Promise<void>;
   className?: string;
 }
@@ -81,7 +81,7 @@ export function RfqActionButtons({
       {rfq?.status === "approved" && (
         <SlideUp delay={0.2}>
           <Link
-            href="/purchase/purchase_order/convert"
+            href={`/purchase/purchase_orders/convert/${rfq.id}`}
             className="flex justify-end gap-4"
           >
             <Button variant={"contained"}>Convert to PO</Button>
