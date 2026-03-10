@@ -112,16 +112,16 @@ export default function NewLocationPage() {
   const userOptions =
     tenantUsers?.map((tenantUser) => {
       // Try to get name from nested user object first, then flat fields
-      const firstName =
-        tenantUser.user?.first_name || tenantUser.first_name || "";
-      const lastName = tenantUser.user?.last_name || tenantUser.last_name || "";
-      const email =
-        tenantUser.user?.email || tenantUser.email || "Unknown User";
+      // Using 'as any' to tell TypeScript these fields might exist even if not in the strict TenantUser interface
+      const tu = tenantUser as any;
+      const firstName = tenantUser.user?.first_name || tu.first_name || "";
+      const lastName = tenantUser.user?.last_name || tu.last_name || "";
+      const email = tenantUser.user?.email || tu.email || "Unknown User";
 
       const fullName = firstName && lastName ? `${firstName} ${lastName}` : "";
 
       return {
-        value: tenantUser.user_id.toString(),
+        value: tenantUser.id.toString(),
         label: fullName || email,
       };
     }) || [];
@@ -137,6 +137,7 @@ export default function NewLocationPage() {
 
   async function onSubmit(data: LocationFormData): Promise<void> {
     try {
+      console.log("data", data);
       // Call the API mutation
       await createLocation(data).unwrap();
 

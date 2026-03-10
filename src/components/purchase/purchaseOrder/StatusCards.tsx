@@ -14,7 +14,7 @@ import {
 // Define the status categories for display
 const STATUS_CATEGORIES: PurchaseOrderStatus[] = [
   "draft",
-  "pending_approval",
+  "awaiting",
   "approved",
   "rejected",
   "active",
@@ -27,10 +27,8 @@ const STATUS_CATEGORIES: PurchaseOrderStatus[] = [
 const mapLegacyStatus = (status: string): PurchaseOrderStatus => {
   const statusMapping: Record<string, PurchaseOrderStatus> = {
     // Legacy purchase order statuses -> new purchase order statuses
-    awaiting: "pending_approval",
-    // Direct mappings (no change needed)
-    draft: "draft",
-    pending_approval: "pending_approval",
+    awaiting: "awaiting",
+    pending_approval: "awaiting",
     approved: "approved",
     rejected: "rejected",
     active: "active",
@@ -45,7 +43,7 @@ const mapLegacyStatus = (status: string): PurchaseOrderStatus => {
 // Check if a row's status matches a category status
 const statusMatchesCategory = (
   rowStatus: string,
-  categoryStatus: PurchaseOrderStatus
+  categoryStatus: PurchaseOrderStatus,
 ): boolean => {
   const mappedStatus = mapLegacyStatus(rowStatus);
   return mappedStatus === categoryStatus;
@@ -60,7 +58,7 @@ const getStatusIcon = (status: PurchaseOrderStatus, color: string) => {
     case "completed":
     case "active":
       return <ApprovedIcon color={color} />;
-    case "pending_approval":
+    case "awaiting":
     case "partially_received":
       return <PenddingIcon color={color} />;
     case "rejected":
@@ -84,7 +82,7 @@ export function StatusCards({ rows }: { rows: RequestRow[] }) {
     const countMap: Record<string, number> = {};
     STATUS_CATEGORIES.forEach((status) => {
       countMap[status] = rows.filter((r) =>
-        statusMatchesCategory(r.status, status)
+        statusMatchesCategory(r.status, status),
       ).length;
     });
     return countMap;
@@ -96,7 +94,7 @@ export function StatusCards({ rows }: { rows: RequestRow[] }) {
 
   const renderCard = (
     status: PurchaseOrderStatus,
-    showBorder: boolean = true
+    showBorder: boolean = true,
   ) => {
     const statusInfo = getStatusInfo(status);
     const hexColor = extractHexColor(statusInfo.color);
@@ -153,7 +151,7 @@ export function StatusCards({ rows }: { rows: RequestRow[] }) {
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {primaryStatuses.map((status, index) =>
-          renderCard(status, index < primaryStatuses.length - 1)
+          renderCard(status, index < primaryStatuses.length - 1),
         )}
       </div>
     </section>

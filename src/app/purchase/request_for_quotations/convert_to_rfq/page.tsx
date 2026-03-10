@@ -31,6 +31,7 @@ import {
   SlideUp,
   StaggerContainer,
 } from "@/components/shared/AnimatedWrapper";
+import { extractErrorMessage } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
@@ -114,7 +115,7 @@ export default function Page() {
 
   const updateItem = (id: string, patch: Partial<LineItem>) =>
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     );
 
   const total = useMemo(() => {
@@ -247,7 +248,7 @@ export default function Page() {
       setValue("purpose", selectedPurchaseRequest.purpose);
       setValue(
         "requesting_location",
-        selectedPurchaseRequest.requesting_location
+        selectedPurchaseRequest.requesting_location,
       );
       setValue("purchase_request", selectedPurchaseRequest.id);
 
@@ -261,7 +262,7 @@ export default function Page() {
           product_description: item.product_details.product_description,
           unit_of_measure:
             item.product_details.unit_of_measure_details.unit_symbol,
-        })
+        }),
       );
 
       setItems(rfqItems.length > 0 ? rfqItems : initialItems);
@@ -296,7 +297,7 @@ export default function Page() {
 
     // Validate items
     const validItems = items.filter(
-      (item) => item.product && item.qty > 0 && item.estimated_unit_price
+      (item) => item.product && item.qty > 0 && item.estimated_unit_price,
     );
 
     if (validItems.length === 0) {
@@ -344,16 +345,10 @@ export default function Page() {
       }, 1500);
     } catch (error: unknown) {
       // Handle API errors
-      let errorMessage =
-        "Failed to create request for quotation. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(
+        error,
+        "Failed to create request for quotation. Please try again.",
+      );
 
       setNotification({
         message: errorMessage,
@@ -374,7 +369,7 @@ export default function Page() {
     if (!selectedCurrencyId || !currencies) return "₦"; // Default to Naira
 
     const selectedCurrency = currencies.find(
-      (c) => c.id.toString() === selectedCurrencyId
+      (c) => c.id.toString() === selectedCurrencyId,
     );
     return selectedCurrency?.currency_symbol || "₦";
   };
@@ -403,7 +398,7 @@ export default function Page() {
   // Enhanced updateItem function that also populates product details
   const updateItemWithProductDetails = (
     id: string,
-    patch: Partial<LineItem>
+    patch: Partial<LineItem>,
   ) => {
     setItems((prev) =>
       prev.map((it) => {
@@ -420,7 +415,7 @@ export default function Page() {
           return updatedItem;
         }
         return it;
-      })
+      }),
     );
   };
 
@@ -465,8 +460,8 @@ export default function Page() {
               {!fromPr
                 ? "No purchase request ID provided in the URL."
                 : prError
-                ? "The specified purchase request could not be found."
-                : "Only approved purchase requests can be converted to RFQ."}
+                  ? "The specified purchase request could not be found."
+                  : "Only approved purchase requests can be converted to RFQ."}
             </p>
             <Button
               onClick={() => router.push("/purchase/request_for_quotations")}
@@ -661,7 +656,7 @@ export default function Page() {
                           <TableCell className="border border-gray-200 align-middle">
                             <div className="text-sm text-gray-600 line-clamp-2">
                               {productOptions.find(
-                                (p) => p.value === it.product
+                                (p) => p.value === it.product,
                               )?.label || "N/A"}
                             </div>
                           </TableCell>
@@ -687,7 +682,7 @@ export default function Page() {
                           <TableCell className="border border-gray-200 px-4  align-middle text-right">
                             <div className="text-sm text-gray-700 tabular-nums">
                               {formatCurrency(
-                                Number(it.estimated_unit_price) || 0
+                                Number(it.estimated_unit_price) || 0,
                               )}
                             </div>
                           </TableCell>

@@ -16,6 +16,8 @@ import {
   RfqItem,
 } from "@/api/purchase/requestForQuotationApi";
 import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
+import { useGetPaymentTermsQuery } from "@/api/invoice/invoiceApi";
+import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import type { Resolver } from "react-hook-form";
 import {
@@ -23,6 +25,7 @@ import {
   SlideUp,
   StaggerContainer,
 } from "@/components/shared/AnimatedWrapper";
+import { extractErrorMessage } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
@@ -85,10 +88,13 @@ export default function Page() {
   } = useGetApprovedRfqListQuery();
   const { data: activeLocations, isLoading: isLoadingLocations } =
     useGetActiveLocationsFilteredQuery();
+  const { data: tenantUsers } = useGetTenantUsersQuery({});
+  const { data: paymentTerms, isLoading: isLoadingPaymentTerms } =
+    useGetPaymentTermsQuery();
 
   // Selected RFQ state
   const [selectedRfq, setSelectedRfq] = useState<RequestForQuotation | null>(
-    null
+    null,
   );
 
   // Form state for items (populated from RFQ)
@@ -104,7 +110,7 @@ export default function Page() {
     reset,
   } = useForm<PurchaseOrderFormData>({
     resolver: zodResolver(
-      purchaseOrderSchema
+      purchaseOrderSchema,
     ) as Resolver<PurchaseOrderFormData>,
     defaultValues: {
       related_rfq: "",
@@ -133,7 +139,7 @@ export default function Page() {
     approvedRfqs?.map((rfq) => ({
       value: rfq.id,
       label: `RFQ-${rfq.id} (Expires: ${new Date(
-        rfq.expiry_date
+        rfq.expiry_date,
       ).toLocaleDateString()})`,
     })) || [];
 
@@ -233,7 +239,10 @@ export default function Page() {
         payment_terms: data.payment_terms,
         delivery_terms: data.delivery_terms || "",
         purchase_policy: data.purchase_policy || "",
-        created_by: loggedInUser?.id || 1,
+        created_by:
+          tenantUsers?.find((tu) => tu.user_id === loggedInUser?.id)?.id ||
+          loggedInUser?.id ||
+          1,
         items: items.map((item) => ({
           product: item.product,
           qty: item.qty,
@@ -262,15 +271,10 @@ export default function Page() {
       }, 1500);
     } catch (error: unknown) {
       // Handle API errors
-      let errorMessage = "Failed to create purchase order. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(
+        error,
+        "Failed to create purchase order. Please try again.",
+      );
 
       setNotification({
         message: errorMessage,
@@ -316,7 +320,7 @@ export default function Page() {
           };
         }
         return it;
-      })
+      }),
     );
   };
 
@@ -333,7 +337,7 @@ export default function Page() {
           };
         }
         return it;
-      })
+      }),
     );
   };
 
@@ -590,12 +594,21 @@ export default function Page() {
                   >
                     Payment Terms *
                   </Label>
-                  <Input
-                    id="payment_terms"
-                    placeholder="Enter payment terms"
-                    {...register("payment_terms")}
-                    className="h-11 bg-white border border-gray-400 rounded shadow-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
-                  />
+                  <Select
+                    onValueChange={(value) => setValue("payment_terms", value)}
+                    disabled={isLoadingPaymentTerms}
+                  >
+                    <SelectTrigger className="w-full h-11 border border-gray-400 rounded bg-white">
+                      <SelectValue placeholder="Select payment terms" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentTerms?.map((term) => (
+                        <SelectItem key={term.id} value={term.id.toString()}>
+                          {term.name} ({term.days_until_due} days)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.payment_terms && (
                     <p className="text-sm text-red-600 mt-1">
                       {errors.payment_terms.message}
@@ -720,7 +733,7 @@ export default function Page() {
                                 onChange={(e) =>
                                   updateItemQty(
                                     it.id,
-                                    Number(e.target.value || 0)
+                                    Number(e.target.value || 0),
                                   )
                                 }
                                 className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"

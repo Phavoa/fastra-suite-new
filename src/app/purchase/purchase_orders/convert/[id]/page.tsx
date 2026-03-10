@@ -18,6 +18,8 @@ import {
   RfqItem,
 } from "@/api/purchase/requestForQuotationApi";
 import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
+import { useGetPaymentTermsQuery } from "@/api/invoice/invoiceApi";
+import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import type { Resolver } from "react-hook-form";
 import {
@@ -25,6 +27,7 @@ import {
   SlideUp,
   StaggerContainer,
 } from "@/components/shared/AnimatedWrapper";
+import { extractErrorMessage } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Input } from "@/components/ui/input";
@@ -89,6 +92,9 @@ export default function ConvertRfqPage() {
   const { data: existingPOs } = useGetPurchaseOrdersQuery({
     related_rfq: rfqId,
   });
+  const { data: paymentTerms, isLoading: isLoadingPaymentTerms } =
+    useGetPaymentTermsQuery();
+  const { data: tenantUsers } = useGetTenantUsersQuery({});
 
   // Form state for items (populated from RFQ)
   const [items, setItems] = useState<LineItem[]>([]);
@@ -186,7 +192,7 @@ export default function ConvertRfqPage() {
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
     { label: "Purchase Orders", href: "/purchase/purchase_orders" },
-    { label: "Convert from RFQ", href: "#", current: true },
+    { label: "Convert RFQ", href: "#", current: true },
   ];
 
   async function onSubmit(data: PurchaseOrderFormData): Promise<void> {
@@ -195,20 +201,25 @@ export default function ConvertRfqPage() {
     try {
       const purchaseOrderData = {
         related_rfq: rfqId,
-        currency: rfq.currency,
-        vendor: rfq.vendor,
-        destination_location: data.destination_location,
-        payment_terms: data.payment_terms,
+        currency: Number(rfq.currency),
+        vendor: Number(rfq.vendor),
+        destination_location: Number(data.destination_location),
+        payment_terms: Number(data.payment_terms),
         delivery_terms: data.delivery_terms || "",
         purchase_policy: data.purchase_policy || "",
-        created_by: loggedInUser?.id || 1,
+        created_by:
+          Number(
+            tenantUsers?.find((tu) => tu.user_id === loggedInUser?.id)?.id,
+          ) ||
+          Number(loggedInUser?.id) ||
+          1,
         items: items.map((item) => ({
-          product: item.product,
-          qty: item.qty,
+          product: Number(item.product),
+          qty: Number(item.qty),
           estimated_unit_price: item.estimated_unit_price,
         })),
-        status: "draft" as const,
-        is_submitted: false,
+        status: "awaiting" as const,
+        is_submitted: true,
       };
 
       const result = await createPurchaseOrder(purchaseOrderData).unwrap();
@@ -223,14 +234,10 @@ export default function ConvertRfqPage() {
         router.push(`/purchase/purchase_orders/${result.id}`);
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to create purchase order. Please try again.";
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(
+        error,
+        "Failed to create purchase order. Please try again.",
+      );
       setNotification({
         message: errorMessage,
         type: "error",
@@ -410,12 +417,21 @@ export default function ConvertRfqPage() {
               >
                 Payment Terms *
               </Label>
-              <Input
-                id="payment_terms"
-                placeholder="Enter payment terms"
-                {...register("payment_terms")}
-                className="h-11 bg-white border border-gray-400"
-              />
+              <Select
+                onValueChange={(value) => setValue("payment_terms", value)}
+                disabled={isLoadingPaymentTerms}
+              >
+                <SelectTrigger className="w-full h-11 border border-gray-400 rounded bg-white">
+                  <SelectValue placeholder="Select payment terms" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentTerms?.map((term) => (
+                    <SelectItem key={term.id} value={term.id.toString()}>
+                      {term.name} ({term.days_until_due} days)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.payment_terms && (
                 <p className="text-sm text-red-600 mt-1">
                   {errors.payment_terms.message}
