@@ -3,50 +3,47 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
 import { BreadcrumbItem } from "@/types/purchase";
 import {
-  useUpdateDeliveryOrderMutation,
-  useGetDeliveryOrderQuery,
-} from "@/api/inventory/deliveryOrderApi";
-import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
-import { useGetLocationStockLevelsQuery } from "@/api/inventory/locationApi";
-import { useGetUsersQuery } from "@/api/settings/usersApi";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+  usePatchInternalTransferMutation,
+  useGetInternalTransferQuery,
+} from "@/api/inventory/internalTransferApi";
 import {
-  FadeIn,
-  SlideUp,
-  StaggerContainer,
-} from "@/components/shared/AnimatedWrapper";
+  useGetOtherLocationsForUserQuery,
+  useGetAllUserLocationsQuery,
+  useGetLocationStockLevelsQuery,
+} from "@/api/inventory/locationApi";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 import { StockLevelItem } from "@/types/location";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
-import DeliveryOrderForm from "../../components/DeliveryOrderForm";
-import DeliveryOrderItemsTable from "../../components/DeliveryOrderItemsTable";
+import InternalTransferForm from "../../components/InternalTransferForm";
+import InternalTransferItemsTable from "../../components/InternalTransferItemsTable";
 import {
   Option,
-  DeliveryOrderLineItem,
-  DeliveryOrderFormData,
-  DeliveryOrderSubmissionData,
-} from "../../components/types";
+  InternalTransferLineItem,
+  InternalTransferFormData,
+  InternalTransferSubmissionData,
+} from "@/types/internalTransfer";
 
-// Form schema for delivery order creation
-const deliveryOrderSchema = z.object({
-  source_location: z.string().min(1, "Source location is required"),
-  customer_name: z.string().min(1, "Customer name is required"),
-  delivery_address: z.string().min(1, "Delivery address is required"),
-  delivery_date: z.string().min(1, "Delivery date is required"),
-  shipping_policy: z.string().optional(),
-  return_policy: z.string().optional(),
-  assigned_to: z.string().min(1, "Assigned to is required"),
-});
+// Form schema for internal transfer editing
+const internalTransferSchema = z
+  .object({
+    source_location: z.string().min(1, "Source location is required"),
+    destination_location: z.string().min(1, "Destination location is required"),
+  })
+  .refine((data) => data.source_location !== data.destination_location, {
+    message: "Source and destination locations cannot be the same",
+    path: ["destination_location"],
+  });
 
-const initialItems: DeliveryOrderLineItem[] = [
+const initialItems: InternalTransferLineItem[] = [
   {
     id: "1",
     product: "",
@@ -56,33 +53,36 @@ const initialItems: DeliveryOrderLineItem[] = [
         unit_symbol: "",
       },
     },
-    quantity_to_deliver: "",
-    unit_price: "0",
-    total_price: "0",
+    quantity_requested: "",
   },
 ];
 
-export default function EditDeliveryOrderPage() {
+export default function EditInternalTransferPage() {
   const router = useRouter();
   const params = useParams();
-  const deliveryOrderId = params.id as string;
+  const internalTransferId = params.id as string;
   const formRef = useRef<HTMLFormElement>(null);
 
   // API mutations and queries
-  const [updateDeliveryOrder, { isLoading: isUpdating }] =
-    useUpdateDeliveryOrderMutation();
+  const [patchInternalTransfer, { isLoading: isPatching }] =
+    usePatchInternalTransferMutation();
   const {
-    data: deliveryOrder,
-    isLoading: isLoadingDeliveryOrder,
-    error: deliveryOrderError,
-  } = useGetDeliveryOrderQuery(deliveryOrderId);
-  const { data: locations, isLoading: isLoadingLocations } =
-    useGetActiveLocationsQuery();
-  const { data: users, isLoading: isLoadingUsers } = useGetUsersQuery();
+    data: internalTransfer,
+    isLoading: isLoadingInternalTransfer,
+    error: internalTransferError,
+  } = useGetInternalTransferQuery(internalTransferId);
+  const { data: sourceLocations, isLoading: isLoadingSourceLocations } =
+    useGetOtherLocationsForUserQuery();
+  const {
+    data: destinationLocations,
+    isLoading: isLoadingDestinationLocations,
+  } = useGetAllUserLocationsQuery();
 
   // Form state
-  const [items, setItems] = useState<DeliveryOrderLineItem[]>(initialItems);
+  const [items, setItems] = useState<InternalTransferLineItem[]>(initialItems);
   const [selectedSourceLocation, setSelectedSourceLocation] =
+    useState<string>("");
+  const [selectedDestinationLocation, setSelectedDestinationLocation] =
     useState<string>("");
   const [formPopulated, setFormPopulated] = useState(false);
 
@@ -92,21 +92,15 @@ export default function EditDeliveryOrderPage() {
     handleSubmit,
     setValue,
     watch,
-    control,
     formState: { errors },
     reset,
-  } = useForm<DeliveryOrderFormData>({
+  } = useForm<InternalTransferFormData>({
     resolver: zodResolver(
-      deliveryOrderSchema
-    ) as Resolver<DeliveryOrderFormData>,
+      internalTransferSchema
+    ) as Resolver<InternalTransferFormData>,
     defaultValues: {
       source_location: "",
-      customer_name: "",
-      delivery_address: "",
-      delivery_date: "",
-      shipping_policy: "",
-      return_policy: "",
-      assigned_to: "",
+      destination_location: "",
     },
   });
 
@@ -116,43 +110,27 @@ export default function EditDeliveryOrderPage() {
       skip: !selectedSourceLocation,
     });
 
-  // Populate form when delivery order data is loaded
+  // Populate form when internal transfer data is loaded
   useEffect(() => {
-    if (deliveryOrder) {
-      //small delay to ensure all data is ready
-      const timeoutId = setTimeout(() => {
+    if (internalTransfer) {
+      // Small delay to ensure all data is ready
+      const setTimeoutId = setTimeout(() => {
         // Reset form with loaded data
         reset({
-          source_location: deliveryOrder.source_location.toString(),
-          customer_name: deliveryOrder.customer_name,
-          delivery_address: deliveryOrder.delivery_address,
-          delivery_date: deliveryOrder.delivery_date.split("T")[0], // Format for date input
-          shipping_policy: deliveryOrder.shipping_policy || "",
-          return_policy: deliveryOrder.return_policy || "",
-          assigned_to: deliveryOrder.assigned_to.toString(),
+          source_location: internalTransfer.source_location,
+          destination_location: internalTransfer.destination_location,
         });
 
-        setSelectedSourceLocation(deliveryOrder.source_location.toString());
+        setSelectedSourceLocation(internalTransfer.source_location);
+        setSelectedDestinationLocation(internalTransfer.destination_location);
 
         // Populate items
         if (
-          deliveryOrder.delivery_order_items &&
-          deliveryOrder.delivery_order_items.length > 0
+          internalTransfer.internal_transfer_items &&
+          internalTransfer.internal_transfer_items.length > 0
         ) {
-          const populatedItems = deliveryOrder.delivery_order_items.map(
-            (
-              item: {
-                product_details?: {
-                  id?: number;
-                  product_name?: string;
-                  unit_of_measure_details?: { unit_symbol?: string };
-                };
-                quantity_to_deliver?: number;
-                unit_price?: number;
-                total_price?: number;
-              },
-              index: number
-            ) => ({
+          const populatedItems = internalTransfer.internal_transfer_items.map(
+            (item: any, index: number) => ({
               id: (index + 1).toString(),
               product: item.product_details?.id?.toString() || "",
               product_details: {
@@ -163,19 +141,16 @@ export default function EditDeliveryOrderPage() {
                       ?.unit_symbol || "",
                 },
               },
-              quantity_to_deliver: item.quantity_to_deliver?.toString() || "",
-              unit_price: "0",
-              total_price: "0",
+              quantity_requested: item.quantity_requested || "",
             })
           );
           setItems(populatedItems);
         }
         setFormPopulated(true);
       }, 800);
-
-      return () => clearTimeout(timeoutId);
+      return () => clearTimeout(setTimeoutId);
     }
-  }, [deliveryOrder, reset]);
+  }, [internalTransfer, reset]);
 
   const addRow = () =>
     setItems((prev) => [
@@ -189,16 +164,14 @@ export default function EditDeliveryOrderPage() {
             unit_symbol: "",
           },
         },
-        quantity_to_deliver: "",
-        unit_price: "0",
-        total_price: "0",
+        quantity_requested: "",
       },
     ]);
 
   const removeRow = (id: string) =>
     setItems((prev) => prev.filter((p) => p.id !== id));
 
-  const updateItem = (id: string, patch: Partial<DeliveryOrderLineItem>) =>
+  const updateItem = (id: string, patch: Partial<InternalTransferLineItem>) =>
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
     );
@@ -217,16 +190,16 @@ export default function EditDeliveryOrderPage() {
   });
 
   // Convert API data to option format
-  const locationOptions: Option[] =
-    locations?.map((location) => ({
-      value: location.id.toString(),
+  const sourceLocationOptions: Option[] =
+    sourceLocations?.map((location) => ({
+      value: location.id,
       label: `${location.location_name} (${location.location_code})`,
     })) || [];
 
-  const userOptions: Option[] =
-    users?.map((user) => ({
-      value: user.id.toString(),
-      label: `${user.first_name} ${user.last_name}`,
+  const destinationLocationOptions: Option[] =
+    destinationLocations?.map((location) => ({
+      value: location.id,
+      label: `${location.location_name} (${location.location_code})`,
     })) || [];
 
   // Product options from stock levels
@@ -243,22 +216,22 @@ export default function EditDeliveryOrderPage() {
     { label: "Inventory", href: "/inventory" },
     { label: "Operation", href: "/inventory/operation" },
     {
-      label: "Delivery Order",
-      href: "/inventory/operation/delivery_order",
+      label: "Internal Transfer",
+      href: "/inventory/operation/internal_transfer",
     },
     {
-      label: deliveryOrder?.order_unique_id || "Edit",
-      href: `/inventory/operation/delivery_order/edit/${deliveryOrderId}`,
+      label: internalTransfer?.id || "Edit",
+      href: `/inventory/operation/internal_transfer/edit/${internalTransferId}`,
       current: true,
     },
   ];
 
   // Helper function to validate and prepare data
   const prepareSubmissionData = (
-    data: DeliveryOrderFormData
-  ): DeliveryOrderSubmissionData | null => {
+    data: InternalTransferFormData
+  ): InternalTransferSubmissionData | null => {
     const validItems = items.filter(
-      (item) => item.product && item.quantity_to_deliver
+      (item) => item.product && item.quantity_requested
     );
 
     if (validItems.length === 0) {
@@ -267,29 +240,23 @@ export default function EditDeliveryOrderPage() {
 
     return {
       source_location: data.source_location,
-      customer_name: data.customer_name,
-      delivery_address: data.delivery_address,
-      delivery_date: data.delivery_date,
-      shipping_policy: data.shipping_policy || null,
-      return_policy: data.return_policy || null,
-      assigned_to: parseInt(data.assigned_to),
-      delivery_order_items: validItems.map((item) => ({
-        product_item: parseInt(item.product),
-        quantity_to_deliver: parseFloat(item.quantity_to_deliver),
-        unit_price: 0,
-        total_price: 0,
+      destination_location: data.destination_location,
+      // status: internalTransfer?.status || "draft", // Keep existing status
+      internal_transfer_items: validItems.map((item) => ({
+        product: parseInt(item.product),
+        quantity_requested: parseFloat(item.quantity_requested),
       })),
     };
   };
 
-  // Save delivery order
-  async function onSave(data: DeliveryOrderFormData): Promise<void> {
-    const deliveryOrderData = prepareSubmissionData(data);
+  // Save internal transfer
+  async function onSave(data: InternalTransferFormData): Promise<void> {
+    const internalTransferData = prepareSubmissionData(data);
 
-    if (!deliveryOrderData) {
+    if (!internalTransferData) {
       setNotification({
         message:
-          "Please add at least one valid item with product and quantity to deliver",
+          "Please add at least one valid item with product and quantity to transfer",
         type: "error",
         show: true,
       });
@@ -297,37 +264,50 @@ export default function EditDeliveryOrderPage() {
     }
 
     try {
-      await updateDeliveryOrder({
-        id: deliveryOrderId,
-        data: deliveryOrderData,
+      await patchInternalTransfer({
+        id: internalTransferId,
+        data: internalTransferData,
       }).unwrap();
 
       setNotification({
-        message: "Delivery order updated successfully!",
+        message: "Internal transfer updated successfully!",
         type: "success",
         show: true,
       });
 
       setTimeout(() => {
-        router.push(`/inventory/operation/delivery_order/${deliveryOrderId}`);
+        router.push(
+          `/inventory/operation/internal_transfer/${internalTransferId}`
+        );
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to update delivery order. Please try again.";
+      let errorMessage =
+        "Failed to update internal transfer. Please try again.";
 
       if (error && typeof error === "object" && "data" in error) {
         const apiError = error as {
           data?: {
             detail?: string;
             message?: string;
-            error?: Array<{ non_field_errors?: string }>;
+            error?: Array<{
+              detail: any;
+              messages: any;
+              non_field_errors?: Record<string, string>;
+            }>;
           };
         };
 
         if (apiError.data?.error && Array.isArray(apiError.data.error)) {
           const errorMessages: string[] = [];
           for (const err of apiError.data.error) {
+            if (err.detail) {
+              errorMessages.push(err.detail);
+            }
+            if (err.messages?.message) {
+              errorMessages.push(err.messages.message);
+            }
             if (err.non_field_errors) {
-              errorMessages.push(err.non_field_errors);
+              errorMessages.push(...Object.values(err.non_field_errors));
             }
           }
           if (errorMessages.length > 0) {
@@ -376,7 +356,7 @@ export default function EditDeliveryOrderPage() {
   // Enhanced updateItem function that also populates product details
   const updateItemWithProductDetails = (
     id: string,
-    patch: Partial<DeliveryOrderLineItem>
+    patch: Partial<InternalTransferLineItem>
   ) => {
     setItems((prev) =>
       prev.map((it) => {
@@ -387,8 +367,6 @@ export default function EditDeliveryOrderPage() {
           if (patch.product && patch.product !== it.product) {
             const productDetails = getProductDetails(patch.product);
             updatedItem.product_details = productDetails;
-            updatedItem.unit_price = "0";
-            updatedItem.total_price = "0";
           }
 
           return updatedItem;
@@ -398,30 +376,58 @@ export default function EditDeliveryOrderPage() {
     );
   };
 
-  if (isLoadingDeliveryOrder) {
+  if (isLoadingInternalTransfer) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading delivery order...</p>
+          <p>Loading internal transfer...</p>
         </div>
       </main>
     );
   }
 
-  if (deliveryOrderError || !deliveryOrder) {
+  if (internalTransferError || !internalTransfer) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
         <div className="text-center text-red-600">
-          <p>Error loading delivery order</p>
+          <p>Error loading internal transfer</p>
           <p className="text-sm mt-2">
-            The requested delivery order could not be found.
+            The requested internal transfer could not be found.
           </p>
           <Button
-            onClick={() => router.push("/inventory/operation/delivery_order")}
+            onClick={() =>
+              router.push("/inventory/operation/internal_transfer")
+            }
             className="mt-4"
           >
-            Back to Delivery Orders
+            Back to Internal Transfers
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  // Check if editing is allowed based on status
+  const allowedStatuses = ["draft", "canceled"];
+  if (!allowedStatuses.includes(internalTransfer.status)) {
+    return (
+      <main className="min-h-screen text-gray-800 flex items-center justify-center">
+        <div className="text-center text-red-600">
+          <p>Editing not allowed</p>
+          <p className="text-sm mt-2">
+            Internal transfers with status "{internalTransfer.status}" cannot be
+            edited.
+          </p>
+          <Button
+            onClick={() =>
+              router.push(
+                `/inventory/operation/internal_transfer/${internalTransferId}`
+              )
+            }
+            className="mt-4"
+          >
+            Back to Details
           </Button>
         </div>
       </main>
@@ -442,7 +448,7 @@ export default function EditDeliveryOrderPage() {
       >
         <PageHeader
           items={breadcrumsItem}
-          title={`Edit Delivery Order: ${deliveryOrder.order_unique_id}`}
+          title={`Edit Internal Transfer: ${internalTransfer.id}`}
         />
       </motion.div>
 
@@ -463,20 +469,21 @@ export default function EditDeliveryOrderPage() {
             Basic Information
           </motion.h2>
 
-          <DeliveryOrderForm
+          <InternalTransferForm
             register={register}
             setValue={setValue}
             watch={watch}
-            control={control}
             errors={errors}
-            locationOptions={locationOptions}
-            userOptions={userOptions}
-            isLoadingLocations={isLoadingLocations}
-            isLoadingUsers={isLoadingUsers}
+            sourceLocationOptions={sourceLocationOptions}
+            destinationLocationOptions={destinationLocationOptions}
+            isLoadingSourceLocations={isLoadingSourceLocations}
+            isLoadingDestinationLocations={isLoadingDestinationLocations}
             onSourceLocationChange={setSelectedSourceLocation}
+            onDestinationLocationChange={setSelectedDestinationLocation}
+            dateCreated={internalTransfer.date_created}
           />
 
-          <DeliveryOrderItemsTable
+          <InternalTransferItemsTable
             items={items}
             productOptions={productOptions}
             isLoadingStockLevels={isLoadingStockLevels}
@@ -496,11 +503,11 @@ export default function EditDeliveryOrderPage() {
           >
             <Button
               type="button"
-              disabled={isUpdating}
+              disabled={isPatching}
               onClick={handleSubmit(onSave)}
               variant="contained"
             >
-              {isUpdating ? "Updating..." : "Update Delivery Order"}
+              {isPatching ? "Patching..." : "Save"}
             </Button>
           </motion.div>
         </form>

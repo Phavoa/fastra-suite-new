@@ -35,7 +35,10 @@ export function TopNav() {
       label: "Delivery Order Return",
       href: "/inventory/operation/delivery_order_return",
     },
-    { label: "Inter Transfer", href: "/inventory/operation/inter_transfer" },
+    {
+      label: "Internal Transfer",
+      href: "/inventory/operation/internal_transfer",
+    },
     { label: "Back Order", href: "/inventory/operation/back_order" },
   ];
 

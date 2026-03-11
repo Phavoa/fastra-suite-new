@@ -2,26 +2,26 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Truck, User, MapPin, Calendar } from "lucide-react";
-import type { DeliveryOrder } from "@/types/deiveryOrder";
+import { Truck, MapPin, Calendar, Package } from "lucide-react";
+import type { DeliveryOrderReturn } from "@/types/deliveryOrderReturn";
 import { cn } from "@/lib/utils";
 
-interface DeliveryOrderCardsProps {
-  deliveryOrders: DeliveryOrder[];
+interface DeliveryOrderReturnCardsProps {
+  deliveryOrderReturns: DeliveryOrderReturn[];
   query?: string;
 }
 
-interface DeliveryOrderCardProps {
-  deliveryOrder: DeliveryOrder;
+interface DeliveryOrderReturnCardProps {
+  deliveryOrderReturn: DeliveryOrderReturn;
   index: number;
   query?: string;
 }
 
-function DeliveryOrderCard({
-  deliveryOrder,
+function DeliveryOrderReturnCard({
+  deliveryOrderReturn,
   index,
   query = "",
-}: DeliveryOrderCardProps) {
+}: DeliveryOrderReturnCardProps) {
   const router = useRouter();
 
   // Function to highlight search matches
@@ -30,7 +30,7 @@ function DeliveryOrderCard({
 
     const regex = new RegExp(
       `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-      "gi",
+      "gi"
     );
     const parts = text.split(regex);
 
@@ -41,12 +41,16 @@ function DeliveryOrderCard({
         </span>
       ) : (
         part
-      ),
+      )
     );
   };
 
   const handleCardClick = () => {
-    router.push(`/inventory/operation/delivery_order/${deliveryOrder.id}`);
+    router.push(
+      `/inventory/operation/delivery_order_return/${
+        index + 1 || deliveryOrderReturn.unique_record_id
+      }`
+    );
   };
 
   return (
@@ -65,7 +69,7 @@ function DeliveryOrderCard({
     >
       <Card
         className={cn(
-          "cursor-pointer transition-all duration-200 hover:shadow border-2 border-gray-200 hover:border-gray-300 shadow-none rounded",
+          "cursor-pointer transition-all duration-200 hover:shadow border-2 border-gray-200 hover:border-gray-300 shadow-none rounded"
         )}
         onClick={handleCardClick}
       >
@@ -77,41 +81,15 @@ function DeliveryOrderCard({
                   <Truck size={16} className="text-[#3B7CED]" />
                 </div>
                 <CardTitle className="text-lg font-semibold text-gray-900 truncate">
-                  {highlightText(deliveryOrder.order_unique_id, query)}
+                  {highlightText(deliveryOrderReturn.unique_record_id, query)}
                 </CardTitle>
               </div>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  deliveryOrder.status === "done"
-                    ? "bg-green-100 text-green-500"
-                    : deliveryOrder.status === "draft"
-                      ? "bg-blue-100 text-blue-500"
-                      : deliveryOrder.status === "cancelled"
-                        ? "bg-red-100 text-red-500"
-                        : deliveryOrder.status === "ready"
-                          ? "bg-red-100 text-green-500"
-                          : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {deliveryOrder.status}
-              </span>
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
           <div className="space-y-3">
-            {/* Customer Name */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 flex items-center gap-1">
-                <User size={12} />
-                Customer:
-              </span>
-              <span className="text-sm font-medium text-gray-900 truncate max-w-32">
-                {highlightText(deliveryOrder.customer_name, query)}
-              </span>
-            </div>
-
             {/* Source Location */}
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 flex items-center gap-1">
@@ -119,32 +97,46 @@ function DeliveryOrderCard({
                 Source:
               </span>
               <span className="text-sm font-medium text-gray-900 truncate max-w-32">
+                {highlightText(deliveryOrderReturn.source_location, query)}
+              </span>
+            </div>
+
+            {/* Return Warehouse */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 flex items-center gap-1">
+                <MapPin size={12} />
+                Warehouse:
+              </span>
+              <span className="text-sm font-medium text-gray-900 truncate max-w-32">
                 {highlightText(
-                  deliveryOrder.source_location_details?.location_name || "N/A",
-                  query,
+                  deliveryOrderReturn.return_warehouse_location_details
+                    ?.location_name || "N/A",
+                  query
                 )}
               </span>
             </div>
 
-            {/* Destination */}
+            {/* Items Returned */}
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 flex items-center gap-1">
-                <MapPin size={12} />
-                Destination:
+                <Package size={12} />
+                Items:
               </span>
-              <span className="text-sm font-medium text-gray-900 truncate max-w-32">
-                {highlightText(deliveryOrder.delivery_address, query)}
+              <span className="text-sm font-medium text-gray-900">
+                {deliveryOrderReturn.delivery_order_return_items.length}
               </span>
             </div>
 
-            {/* Date Created */}
+            {/* Date of Return */}
             <div className="flex justify-between items-center pt-2 border-t border-gray-100">
               <span className="text-xs text-gray-500 flex items-center gap-1">
                 <Calendar size={10} />
-                Created:
+                Return Date:
               </span>
               <span className="text-xs text-gray-600">
-                {new Date(deliveryOrder.date_created).toLocaleDateString()}
+                {new Date(
+                  deliveryOrderReturn.date_of_return
+                ).toLocaleDateString()}
               </span>
             </div>
           </div>
@@ -154,10 +146,10 @@ function DeliveryOrderCard({
   );
 }
 
-export function DeliveryOrderCards({
-  deliveryOrders,
+export function DeliveryOrderReturnCards({
+  deliveryOrderReturns,
   query = "",
-}: DeliveryOrderCardsProps) {
+}: DeliveryOrderReturnCardsProps) {
   return (
     <motion.div
       className="bg-white h-full rounded-md"
@@ -165,13 +157,13 @@ export function DeliveryOrderCards({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
-      {/* Delivery Order Cards Grid */}
-      {deliveryOrders.length > 0 ? (
+      {/* Delivery Order Return Cards Grid */}
+      {deliveryOrderReturns.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 py-6">
-          {deliveryOrders.map((deliveryOrder, index) => (
-            <DeliveryOrderCard
-              key={deliveryOrder.id}
-              deliveryOrder={deliveryOrder}
+          {deliveryOrderReturns.map((deliveryOrderReturn, index) => (
+            <DeliveryOrderReturnCard
+              key={deliveryOrderReturn.unique_record_id}
+              deliveryOrderReturn={deliveryOrderReturn}
               index={index}
               query={query}
             />
@@ -188,7 +180,9 @@ export function DeliveryOrderCards({
             <div className="w-16 h-16 mx-auto mb-4 text-gray-300">
               <Truck className="w-full h-full" />
             </div>
-            <p className="text-gray-400 text-sm">No delivery orders found</p>
+            <p className="text-gray-400 text-sm">
+              No delivery order returns found
+            </p>
           </div>
         </motion.div>
       )}

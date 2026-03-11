@@ -20,10 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Option, DeliveryOrderLineItem } from "./types";
+import { Option, InternalTransferLineItem } from "@/types/internalTransfer";
 
-interface DeliveryOrderItemsTableProps {
-  items: DeliveryOrderLineItem[];
+interface InternalTransferItemsTableProps {
+  items: InternalTransferLineItem[];
   productOptions: Option[];
   isLoadingStockLevels: boolean;
   selectedSourceLocation: string;
@@ -31,12 +31,12 @@ interface DeliveryOrderItemsTableProps {
   removeRow: (id: string) => void;
   updateItemWithProductDetails: (
     id: string,
-    patch: Partial<DeliveryOrderLineItem>
+    patch: Partial<InternalTransferLineItem>
   ) => void;
   formPopulated?: boolean;
 }
 
-export default function DeliveryOrderItemsTable({
+export default function InternalTransferItemsTable({
   items,
   productOptions,
   isLoadingStockLevels,
@@ -45,7 +45,7 @@ export default function DeliveryOrderItemsTable({
   removeRow,
   updateItemWithProductDetails,
   formPopulated = true,
-}: DeliveryOrderItemsTableProps) {
+}: InternalTransferItemsTableProps) {
   return (
     <section className="bg-white mt-8 border-none">
       <div className="mx-auto">
@@ -56,11 +56,11 @@ export default function DeliveryOrderItemsTable({
                 <TableHead className="w-48 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
                   Product Name
                 </TableHead>
+                <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                  Quantity to Transfer
+                </TableHead>
                 <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                   Unit
-                </TableHead>
-                <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                  Quantity to Deliver
                 </TableHead>
                 <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                   Action
@@ -113,27 +113,27 @@ export default function DeliveryOrderItemsTable({
                     </Select>
                   </TableCell>
 
-                  <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                    <div className="text-sm text-gray-700">
-                      {it.product_details.unit_of_measure_details.unit_symbol ||
-                        "N/A"}
-                    </div>
-                  </TableCell>
-
                   <TableCell className="border border-gray-200 align-middle text-center">
                     <Input
                       type="number"
                       step="0.01"
-                      aria-label="Quantity to deliver"
-                      value={it.quantity_to_deliver}
+                      aria-label="Quantity to transfer"
+                      value={it.quantity_requested}
                       onChange={(e) =>
                         updateItemWithProductDetails(it.id, {
-                          quantity_to_deliver: e.target.value,
+                          quantity_requested: e.target.value,
                         })
                       }
                       placeholder="0"
                       className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
                     />
+                  </TableCell>
+
+                  <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                    <div className="text-sm text-gray-700">
+                      {it.product_details.unit_of_measure_details.unit_symbol ||
+                        "N/A"}
+                    </div>
                   </TableCell>
 
                   <TableCell className="border border-gray-200 px-4 align-middle text-center">
