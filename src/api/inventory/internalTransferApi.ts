@@ -11,6 +11,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const internalTransferApi = createApi({
   reducerPath: "internalTransferApi",
+  tagTypes: ["InternalTransfer"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -50,8 +51,8 @@ export const internalTransferApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-            ? JSON.stringify(args.body)
-            : undefined,
+              ? JSON.stringify(args.body)
+              : undefined,
       });
 
       if (!response.ok) {
@@ -81,6 +82,16 @@ export const internalTransferApi = createApi({
         url: "/inventory/internal-transfer/",
         params,
       }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({
+                type: "InternalTransfer" as const,
+                id,
+              })),
+              { type: "InternalTransfer", id: "LIST" },
+            ]
+          : [{ type: "InternalTransfer", id: "LIST" }],
     }),
 
     getInternalTransfer: builder.query<any, string>({
@@ -110,6 +121,9 @@ export const internalTransferApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "InternalTransfer", id },
+      ],
     }),
 
     patchInternalTransfer: builder.mutation<any, { id: string; data: any }>({

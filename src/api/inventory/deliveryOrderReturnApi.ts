@@ -50,8 +50,8 @@ export const deliveryOrderReturnApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-            ? JSON.stringify(args.body)
-            : undefined,
+              ? JSON.stringify(args.body)
+              : undefined,
       });
 
       if (!response.ok) {
@@ -111,7 +111,7 @@ export const deliveryOrderReturnApi = createApi({
           method: "PUT",
           body: data,
         }),
-      }
+      },
     ),
 
     patchDeliveryOrderReturn: builder.mutation<any, { id: string; data: any }>({
