@@ -21,18 +21,21 @@ export interface User {
 export interface TenantUser {
   id: number;
   user_id: number;
-  user: User; // Include user details
-  company_role: number;
-  company_role_details: CompanyRole;
+  user: User | null; // Include user details, may be null based on API response
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  company_role: number | null;
+  company_role_details: CompanyRole | null;
   phone_number: string;
   language: string;
   timezone: string;
   in_app_notifications: boolean;
   email_notifications: boolean;
-  temp_password: string;
+  temp_password: string | null;
   date_created: string;
-  signature: string;
-  user_image: string;
+  signature: string | null;
+  user_image: string | null;
 }
 
 // Create/Update Tenant User interface

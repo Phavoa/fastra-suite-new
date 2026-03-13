@@ -273,8 +273,8 @@ export const purchaseOrderApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-            ? JSON.stringify(args.body)
-            : undefined,
+              ? JSON.stringify(args.body)
+              : undefined,
       });
 
       if (!response.ok) {

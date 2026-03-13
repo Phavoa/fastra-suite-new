@@ -15,6 +15,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const multilocationApi = createApi({
   reducerPath: "multilocationApi",
+  tagTypes: ["MultiLocationStatus"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -55,8 +56,8 @@ export const multilocationApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-            ? JSON.stringify(args.body)
-            : undefined,
+              ? JSON.stringify(args.body)
+              : undefined,
       });
 
       if (!response.ok) {
@@ -83,6 +84,7 @@ export const multilocationApi = createApi({
     // Query endpoints
     getMultiLocationStatus: builder.query<MultiLocationStatusResponse, void>({
       query: () => "/inventory/configuration/multi-location/check_status/",
+      providesTags: ["MultiLocationStatus"],
     }),
 
     // Mutation endpoints
@@ -95,6 +97,7 @@ export const multilocationApi = createApi({
         method: "PUT",
         body,
       }),
+      invalidatesTags: ["MultiLocationStatus"],
     }),
 
     patchMultiLocationStatus: builder.mutation<
@@ -106,6 +109,7 @@ export const multilocationApi = createApi({
         method: "PATCH",
         body,
       }),
+      invalidatesTags: ["MultiLocationStatus"],
     }),
   }),
 });

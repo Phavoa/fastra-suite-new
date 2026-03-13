@@ -7,7 +7,6 @@ export type PurchaseRequestStatus =
 export type PurchaseOrderStatus =
   | "draft"
   | "awaiting"
-  | "pending_approval"
   | "approved"
   | "rejected"
   | "active"
@@ -28,11 +27,11 @@ export interface StatusInfo {
 const mapLegacyStatus = (status: string): PurchaseOrderStatus => {
   const statusMapping: Record<string, PurchaseOrderStatus> = {
     // Legacy purchase order statuses -> new purchase order statuses
-    awaiting: "pending_approval",
-    pending: "pending_approval",
-    // Direct mappings (no change needed)
+    awaiting: "awaiting",
+    pending: "awaiting",
+    pending_approval: "awaiting",
+    // Direct mappings
     draft: "draft",
-    pending_approval: "pending_approval",
     approved: "approved",
     rejected: "rejected",
     active: "active",
@@ -46,7 +45,7 @@ const mapLegacyStatus = (status: string): PurchaseOrderStatus => {
 
 // Get status info for purchase order statuses
 export const getStatusInfo = (
-  status: string | null | undefined
+  status: string | null | undefined,
 ): StatusInfo => {
   // Map legacy status to new standardized status
   const mappedStatus = status ? mapLegacyStatus(status) : null;
@@ -58,9 +57,9 @@ export const getStatusInfo = (
       color: "text-[#3B7CED]",
       bgColor: "bg-[#3B7CED]",
     },
-    pending_approval: {
-      label: "Pending Approval",
-      description: "Pending Approval",
+    awaiting: {
+      label: "Awaiting",
+      description: "Awaiting Approval",
       color: "text-[#F0B401]",
       bgColor: "bg-[#F0B401]",
     },

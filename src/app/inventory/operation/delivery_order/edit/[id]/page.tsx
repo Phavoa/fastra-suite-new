@@ -57,8 +57,8 @@ const initialItems: DeliveryOrderLineItem[] = [
       },
     },
     quantity_to_deliver: "",
-    unit_price: "",
-    total_price: "",
+    unit_price: "0",
+    total_price: "0",
   },
 ];
 
@@ -119,56 +119,61 @@ export default function EditDeliveryOrderPage() {
   // Populate form when delivery order data is loaded
   useEffect(() => {
     if (deliveryOrder) {
-      // Reset form with loaded data
-      reset({
-        source_location: deliveryOrder.source_location.toString(),
-        customer_name: deliveryOrder.customer_name,
-        delivery_address: deliveryOrder.delivery_address,
-        delivery_date: deliveryOrder.delivery_date.split("T")[0], // Format for date input
-        shipping_policy: deliveryOrder.shipping_policy || "",
-        return_policy: deliveryOrder.return_policy || "",
-        assigned_to: deliveryOrder.assigned_to.toString(),
-      });
+      //small delay to ensure all data is ready
+      const timeoutId = setTimeout(() => {
+        // Reset form with loaded data
+        reset({
+          source_location: deliveryOrder.source_location.toString(),
+          customer_name: deliveryOrder.customer_name,
+          delivery_address: deliveryOrder.delivery_address,
+          delivery_date: deliveryOrder.delivery_date.split("T")[0], // Format for date input
+          shipping_policy: deliveryOrder.shipping_policy || "",
+          return_policy: deliveryOrder.return_policy || "",
+          assigned_to: deliveryOrder.assigned_to.toString(),
+        });
 
-      setSelectedSourceLocation(deliveryOrder.source_location.toString());
+        setSelectedSourceLocation(deliveryOrder.source_location.toString());
 
-      // Populate items
-      if (
-        deliveryOrder.delivery_order_items &&
-        deliveryOrder.delivery_order_items.length > 0
-      ) {
-        const populatedItems = deliveryOrder.delivery_order_items.map(
-          (
-            item: {
-              product_details?: {
-                id?: number;
-                product_name?: string;
-                unit_of_measure_details?: { unit_symbol?: string };
-              };
-              quantity_to_deliver?: number;
-              unit_price?: number;
-              total_price?: number;
-            },
-            index: number
-          ) => ({
-            id: (index + 1).toString(),
-            product: item.product_details?.id?.toString() || "",
-            product_details: {
-              product_name: item.product_details?.product_name || "",
-              unit_of_measure_details: {
-                unit_symbol:
-                  item.product_details?.unit_of_measure_details?.unit_symbol ||
-                  "",
+        // Populate items
+        if (
+          deliveryOrder.delivery_order_items &&
+          deliveryOrder.delivery_order_items.length > 0
+        ) {
+          const populatedItems = deliveryOrder.delivery_order_items.map(
+            (
+              item: {
+                product_details?: {
+                  id?: number;
+                  product_name?: string;
+                  unit_of_measure_details?: { unit_symbol?: string };
+                };
+                quantity_to_deliver?: number;
+                unit_price?: number;
+                total_price?: number;
               },
-            },
-            quantity_to_deliver: item.quantity_to_deliver?.toString() || "",
-            unit_price: item.unit_price?.toString() || "",
-            total_price: item.total_price?.toString() || "",
-          })
-        );
-        setItems(populatedItems);
-      }
-      setFormPopulated(true);
+              index: number
+            ) => ({
+              id: (index + 1).toString(),
+              product: item.product_details?.id?.toString() || "",
+              product_details: {
+                product_name: item.product_details?.product_name || "",
+                unit_of_measure_details: {
+                  unit_symbol:
+                    item.product_details?.unit_of_measure_details
+                      ?.unit_symbol || "",
+                },
+              },
+              quantity_to_deliver: item.quantity_to_deliver?.toString() || "",
+              unit_price: "0",
+              total_price: "0",
+            })
+          );
+          setItems(populatedItems);
+        }
+        setFormPopulated(true);
+      }, 800);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [deliveryOrder, reset]);
 
@@ -185,8 +190,8 @@ export default function EditDeliveryOrderPage() {
           },
         },
         quantity_to_deliver: "",
-        unit_price: "",
-        total_price: "",
+        unit_price: "0",
+        total_price: "0",
       },
     ]);
 
@@ -253,7 +258,7 @@ export default function EditDeliveryOrderPage() {
     data: DeliveryOrderFormData
   ): DeliveryOrderSubmissionData | null => {
     const validItems = items.filter(
-      (item) => item.product && item.quantity_to_deliver && item.unit_price
+      (item) => item.product && item.quantity_to_deliver
     );
 
     if (validItems.length === 0) {
@@ -271,8 +276,8 @@ export default function EditDeliveryOrderPage() {
       delivery_order_items: validItems.map((item) => ({
         product_item: parseInt(item.product),
         quantity_to_deliver: parseFloat(item.quantity_to_deliver),
-        unit_price: parseFloat(item.unit_price),
-        total_price: parseFloat(item.total_price),
+        unit_price: 0,
+        total_price: 0,
       })),
     };
   };
@@ -284,7 +289,7 @@ export default function EditDeliveryOrderPage() {
     if (!deliveryOrderData) {
       setNotification({
         message:
-          "Please add at least one valid item with product, quantity to deliver, and unit price",
+          "Please add at least one valid item with product and quantity to deliver",
         type: "error",
         show: true,
       });
@@ -311,10 +316,27 @@ export default function EditDeliveryOrderPage() {
 
       if (error && typeof error === "object" && "data" in error) {
         const apiError = error as {
-          data?: { detail?: string; message?: string };
+          data?: {
+            detail?: string;
+            message?: string;
+            error?: Array<{ non_field_errors?: string }>;
+          };
         };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
+
+        if (apiError.data?.error && Array.isArray(apiError.data.error)) {
+          const errorMessages: string[] = [];
+          for (const err of apiError.data.error) {
+            if (err.non_field_errors) {
+              errorMessages.push(err.non_field_errors);
+            }
+          }
+          if (errorMessages.length > 0) {
+            errorMessage = errorMessages.join(" ");
+          }
+        } else {
+          errorMessage =
+            apiError.data?.detail || apiError.data?.message || errorMessage;
+        }
       }
 
       setNotification({
@@ -351,7 +373,7 @@ export default function EditDeliveryOrderPage() {
     };
   };
 
-  // Enhanced updateItem function that also populates product details and calculates total
+  // Enhanced updateItem function that also populates product details
   const updateItemWithProductDetails = (
     id: string,
     patch: Partial<DeliveryOrderLineItem>
@@ -365,12 +387,9 @@ export default function EditDeliveryOrderPage() {
           if (patch.product && patch.product !== it.product) {
             const productDetails = getProductDetails(patch.product);
             updatedItem.product_details = productDetails;
+            updatedItem.unit_price = "0";
+            updatedItem.total_price = "0";
           }
-
-          // Calculate total price
-          const quantity = parseFloat(updatedItem.quantity_to_deliver || "0");
-          const unitPrice = parseFloat(updatedItem.unit_price || "0");
-          updatedItem.total_price = (quantity * unitPrice).toFixed(2);
 
           return updatedItem;
         }

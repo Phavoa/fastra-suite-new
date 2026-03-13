@@ -79,7 +79,7 @@ export default function InventoryConfiguration() {
 
   // Track optimistic state separately
   const [optimisticValue, setOptimisticValue] = React.useState<boolean | null>(
-    null
+    null,
   );
 
   // Determine the displayed value: optimistic value takes precedence during updates
@@ -98,7 +98,7 @@ export default function InventoryConfiguration() {
     if (!checked && !canDeactivate) {
       statusModal.showWarning(
         "Cannot Deactivate Multi Location",
-        `You currently have ${locationCount} active locations. Please reduce to ${MAX_LOCATIONS_FOR_DEACTIVATION} or fewer locations before deactivating Multi Location.`
+        `You currently have ${locationCount} active locations. Please reduce to ${MAX_LOCATIONS_FOR_DEACTIVATION} or fewer locations before deactivating Multi Location.`,
       );
       return;
     }
@@ -111,6 +111,8 @@ export default function InventoryConfiguration() {
         is_activated: checked,
       };
       await updateMultiLocationStatus(request).unwrap();
+      // Force a refetch to ensure we have the latest data from the server
+      await refetch();
       // Clear optimistic value on success - API data will be used
       setOptimisticValue(null);
 
@@ -119,7 +121,7 @@ export default function InventoryConfiguration() {
         checked ? "Multi Location Activated" : "Multi Location Deactivated",
         checked
           ? "Multi Location has been successfully activated. You can now manage multiple inventory locations."
-          : "Multi Location has been successfully deactivated."
+          : "Multi Location has been successfully deactivated.",
       );
     } catch (error) {
       // Revert optimistic value on error
@@ -140,7 +142,7 @@ export default function InventoryConfiguration() {
   };
 
   // Determine if the switch should be disabled
-  const isSwitchDisabled = isLoadingStatus || isUpdating || isLoadingLocations;
+  const isSwitchDisabled = isLoadingStatus || isLoadingLocations;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -227,15 +229,17 @@ export default function InventoryConfiguration() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {isUpdating && (
-                  <Loader2 className="w-4 h-4 text-[#3B7CED] animate-spin" />
-                )}
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 flex items-center justify-center">
+                  {isUpdating && (
+                    <Loader2 className="w-4 h-4 text-[#3B7CED] animate-spin" />
+                  )}
+                </div>
                 <Switch
                   checked={isMultiLocationEnabled}
                   onCheckedChange={handleToggleChange}
                   disabled={isSwitchDisabled}
-                  className="data-[state=checked]:bg-[#3B7CED] disabled:opacity-50"
+                  className="data-[state=checked]:bg-[#3B7CED] disabled:opacity-50 transition-colors"
                 />
               </div>
             </div>

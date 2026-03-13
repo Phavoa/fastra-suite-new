@@ -62,12 +62,6 @@ export default function DeliveryOrderItemsTable({
                 <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                   Quantity to Deliver
                 </TableHead>
-                <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                  Unit Price
-                </TableHead>
-                <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                  Total Price
-                </TableHead>
                 <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                   Action
                 </TableHead>
@@ -142,28 +136,6 @@ export default function DeliveryOrderItemsTable({
                     />
                   </TableCell>
 
-                  <TableCell className="border border-gray-200 align-middle text-center">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      aria-label="Unit price"
-                      value={it.unit_price}
-                      onChange={(e) =>
-                        updateItemWithProductDetails(it.id, {
-                          unit_price: e.target.value,
-                        })
-                      }
-                      placeholder="0.00"
-                      className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
-                    />
-                  </TableCell>
-
-                  <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                    <div className="text-sm text-gray-700">
-                      {it.total_price || "0.00"}
-                    </div>
-                  </TableCell>
-
                   <TableCell className="border border-gray-200 px-4 align-middle text-center">
                     <button
                       type="button"
@@ -192,8 +164,6 @@ export default function DeliveryOrderItemsTable({
                     <Plus className="w-4 h-4" />
                   </Button>
                 </TableCell>
-                <TableCell className="bg-white" />
-                <TableCell className="bg-white" />
                 <TableCell className="bg-white" />
                 <TableCell className="bg-white" />
                 <TableCell className="bg-white" />

@@ -49,8 +49,8 @@ const initialItems: DeliveryOrderLineItem[] = [
       },
     },
     quantity_to_deliver: "",
-    unit_price: "",
-    total_price: "",
+    unit_price: "0",
+    total_price: "0",
   },
 ];
 
@@ -89,8 +89,8 @@ export default function Page() {
           },
         },
         quantity_to_deliver: "",
-        unit_price: "",
-        total_price: "",
+        unit_price: "0",
+        total_price: "0",
       },
     ]);
 
@@ -181,7 +181,7 @@ export default function Page() {
     data: DeliveryOrderFormData
   ): DeliveryOrderSubmissionData | null => {
     const validItems = items.filter(
-      (item) => item.product && item.quantity_to_deliver && item.unit_price
+      (item) => item.product && item.quantity_to_deliver
     );
 
     if (validItems.length === 0) {
@@ -199,8 +199,8 @@ export default function Page() {
       delivery_order_items: validItems.map((item) => ({
         product_item: parseInt(item.product),
         quantity_to_deliver: parseFloat(item.quantity_to_deliver),
-        unit_price: parseFloat(item.unit_price),
-        total_price: parseFloat(item.total_price),
+        unit_price: 0,
+        total_price: 0,
       })),
     };
   };
@@ -212,7 +212,7 @@ export default function Page() {
     if (!deliveryOrderData) {
       setNotification({
         message:
-          "Please add at least one valid item with product, quantity to deliver, and unit price",
+          "Please add at least one valid item with product and quantity to deliver",
         type: "error",
         show: true,
       });
@@ -239,10 +239,27 @@ export default function Page() {
 
       if (error && typeof error === "object" && "data" in error) {
         const apiError = error as {
-          data?: { detail?: string; message?: string };
+          data?: {
+            detail?: string;
+            message?: string;
+            error?: Array<{ non_field_errors?: string }>;
+          };
         };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
+
+        if (apiError.data?.error && Array.isArray(apiError.data.error)) {
+          const errorMessages: string[] = [];
+          for (const err of apiError.data.error) {
+            if (err.non_field_errors) {
+              errorMessages.push(err.non_field_errors);
+            }
+          }
+          if (errorMessages.length > 0) {
+            errorMessage = errorMessages.join(" ");
+          }
+        } else {
+          errorMessage =
+            apiError.data?.detail || apiError.data?.message || errorMessage;
+        }
       }
 
       setNotification({
@@ -279,7 +296,7 @@ export default function Page() {
     };
   };
 
-  // Enhanced updateItem function that also populates product details and calculates total
+  // Enhanced updateItem function that also populates product details
   const updateItemWithProductDetails = (
     id: string,
     patch: Partial<DeliveryOrderLineItem>
@@ -293,12 +310,9 @@ export default function Page() {
           if (patch.product && patch.product !== it.product) {
             const productDetails = getProductDetails(patch.product);
             updatedItem.product_details = productDetails;
+            updatedItem.unit_price = "0";
+            updatedItem.total_price = "0";
           }
-
-          // Calculate total price
-          const quantity = parseFloat(updatedItem.quantity_to_deliver || "0");
-          const unitPrice = parseFloat(updatedItem.unit_price || "0");
-          updatedItem.total_price = (quantity * unitPrice).toFixed(2);
 
           return updatedItem;
         }

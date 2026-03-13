@@ -34,7 +34,8 @@ export default function ViewAccessGroupPage() {
     access_code as string,
   );
 
-  const { data: applicationsData } = useGetApplicationsAndAccessRightsQuery();
+  const { data: applicationsData, isLoading: isLoadingApps } =
+    useGetApplicationsAndAccessRightsQuery();
 
   const [updateAccessGroup, { isLoading: saving }] =
     usePartialUpdateAccessGroupRightMutation();
@@ -45,16 +46,51 @@ export default function ViewAccessGroupPage() {
   const [modules, setModules] = useState<ModuleRights[]>([]);
 
   // ✅ Build rights from the API using booleans (true/false)
-  const mapAccessGroupData = (data: AccessGroupRight[]): ModuleRights[] => {
+  const mapAccessGroupData = (
+    data: AccessGroupRight[],
+    allAppsData: any,
+    currentApp: string
+  ): ModuleRights[] => {
     if (!data || data.length === 0) return [];
 
     const moduleMap: Record<string, Record<RightKey, boolean>> = {};
 
-    data.forEach((item) => {
-      const mod = item.application_module;
-      const name = item?.access_right_details?.name as RightKey;
+    // 1. Initialize all modules for the current application (case-insensitive)
+    const apps = allAppsData?.applications || [];
+    const appData =
+      currentApp &&
+      apps.find((app: any) =>
+        Object.keys(app).some(
+          (key) => key.toLowerCase() === currentApp.toLowerCase()
+        )
+      );
 
-      if (!moduleMap[mod]) {
+    const actualKey =
+      appData && currentApp
+        ? Object.keys(appData).find(
+            (key) => key.toLowerCase() === currentApp.toLowerCase()
+          )
+        : null;
+
+    const allModules = appData && actualKey ? appData[actualKey] : [];
+
+    // Fallback: if app not found in categories, at least show modules present in data
+    if (allModules.length === 0) {
+      data.forEach((item) => {
+        const mod = item.application_module;
+        if (!moduleMap[mod]) {
+          moduleMap[mod] = {
+            view: false,
+            edit: false,
+            create: false,
+            delete: false,
+            approve: false,
+            reject: false,
+          };
+        }
+      });
+    } else {
+      allModules.forEach((mod: string) => {
         moduleMap[mod] = {
           view: false,
           edit: false,
@@ -63,9 +99,15 @@ export default function ViewAccessGroupPage() {
           approve: false,
           reject: false,
         };
-      }
+      });
+    }
 
-      if (name && moduleMap[mod][name] !== undefined) {
+    // 2. Populate rights from the fetched data
+    data.forEach((item) => {
+      const mod = item.application_module;
+      const name = item?.access_right_details?.name as RightKey;
+
+      if (moduleMap[mod] && name && moduleMap[mod][name] !== undefined) {
         moduleMap[mod][name] = true;
       }
     });
@@ -77,14 +119,15 @@ export default function ViewAccessGroupPage() {
   };
 
   useEffect(() => {
-    if (data) {
+    if (data && data.length > 0 && applicationsData) {
       setGroupName(data[0].group_name);
-      setApplication(data[0].application);
+      const appName = data[0].application;
+      setApplication(appName);
 
-      const mappedModules = mapAccessGroupData(data);
+      const mappedModules = mapAccessGroupData(data, applicationsData, appName);
       setModules(mappedModules);
     }
-  }, [data]);
+  }, [data, applicationsData]);
 
   const toggleRight = (moduleIndex: number, right: RightKey) => {
     const updated = [...modules];
@@ -117,7 +160,8 @@ export default function ViewAccessGroupPage() {
       // Only add module if it has selected rights
       if (selectedRights.length > 0) {
         accessRights.push({
-          [moduleData.module]: selectedRights.join(","),
+          module: moduleData.module,
+          rights: selectedRights,
         });
       }
     });
@@ -145,7 +189,7 @@ export default function ViewAccessGroupPage() {
     "reject",
   ];
 
-  if (isLoading) {
+  if (isLoading || isLoadingApps) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         Loading access group…

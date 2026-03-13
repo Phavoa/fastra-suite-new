@@ -141,7 +141,8 @@ export default function CreateAccessGroupPage() {
       // Only add module if it has selected rights
       if (selectedRights.length > 0) {
         accessRights.push({
-          [moduleData.module]: selectedRights.join(","),
+          module: moduleData.module,
+          rights: selectedRights,
         });
       }
     });

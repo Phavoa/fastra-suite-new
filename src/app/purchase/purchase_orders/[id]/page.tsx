@@ -47,9 +47,9 @@ const Page = () => {
   const creatorName = isOwnOrder
     ? "YOU"
     : purchaseOrder?.created_by_details?.user?.first_name &&
-      purchaseOrder?.created_by_details?.user?.last_name
-    ? `${purchaseOrder?.created_by_details.user.first_name} ${purchaseOrder?.created_by_details.user.last_name}`
-    : "Unknown Creator";
+        purchaseOrder?.created_by_details?.user?.last_name
+      ? `${purchaseOrder?.created_by_details.user.first_name} ${purchaseOrder?.created_by_details.user.last_name}`
+      : "Unknown Creator";
 
   // Notification state
   const [notification, setNotification] = useState<{
@@ -155,7 +155,7 @@ const Page = () => {
 
   // Action handlers
   const handleStatusUpdate = async (
-    newStatus: "pending_approval" | "approved" | "rejected"
+    newStatus: "awaiting" | "completed" | "cancelled",
   ) => {
     try {
       await updateStatus({
@@ -168,13 +168,13 @@ const Page = () => {
 
       // Show success notification
       const statusMessages = {
-        pending_approval: "Purchase order sent for approval successfully!",
-        approved: "Purchase order approved successfully!",
-        rejected: "Purchase order rejected successfully!",
+        awaiting: "Purchase order sent for approval successfully!",
+        completed: "Purchase order completed successfully!",
+        cancelled: "Purchase order cancelled successfully!",
       };
 
       setNotification({
-        message: statusMessages[newStatus],
+        message: statusMessages[newStatus as keyof typeof statusMessages],
         type: "success",
         show: true,
       });
@@ -193,7 +193,7 @@ const Page = () => {
   };
 
   const handleSendForApproval = () => {
-    handleStatusUpdate("pending_approval");
+    handleStatusUpdate("awaiting");
   };
 
   const handleActivateOrder = async () => {
@@ -437,11 +437,11 @@ const Page = () => {
             </SlideUp>
           )}
 
-          {purchaseOrder.status === "pending_approval" && (
+          {purchaseOrder.status === "awaiting" && (
             <SlideUp delay={0.2}>
               <div className="flex justify-end gap-4">
                 <Button
-                  onClick={() => handleStatusUpdate("approved")}
+                  onClick={() => handleStatusUpdate("completed")}
                   variant="ghost"
                   disabled={isUpdatingStatus}
                   className="text-white bg-[#2BA24D] hover:bg-[#248d40] hover:text-gray-50"
@@ -449,7 +449,7 @@ const Page = () => {
                   {isUpdatingStatus ? "Processing..." : "Approve"}
                 </Button>
                 <Button
-                  onClick={() => handleStatusUpdate("rejected")}
+                  onClick={() => handleStatusUpdate("cancelled")}
                   variant="outline"
                   disabled={isUpdatingStatus}
                   className="text-[#E43D2B] border-[#E43D2B] hover:bg-[#E43D2B] hover:text-white"

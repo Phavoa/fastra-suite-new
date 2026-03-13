@@ -15,6 +15,7 @@ import { useCreatePurchaseRequestMutation } from "@/api/purchase/purchaseRequest
 import { useGetCurrenciesQuery } from "@/api/purchase/currencyApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
+import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   purchaseRequestSchema,
@@ -27,6 +28,7 @@ import {
   SlideUp,
   StaggerContainer,
 } from "@/components/shared/AnimatedWrapper";
+import { extractErrorMessage } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
@@ -77,11 +79,12 @@ export default function Page() {
     isLoading: isLoadingProducts,
     error: productsError,
   } = useGetProductsQuery({});
+  const { data: tenantUsers } = useGetTenantUsersQuery({});
 
   // Form state
   const [items, setItems] = useState<LineItem[]>(initialItems);
   const [submitStatus, setSubmitStatus] = useState<"draft" | "pending">(
-    "draft"
+    "draft",
   );
 
   const addRow = () =>
@@ -102,7 +105,7 @@ export default function Page() {
 
   const updateItem = (id: string, patch: Partial<LineItem>) =>
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     );
 
   const total = useMemo(() => {
@@ -123,7 +126,7 @@ export default function Page() {
     reset,
   } = useForm<PurchaseRequestFormData>({
     resolver: zodResolver(
-      purchaseRequestSchema
+      purchaseRequestSchema,
     ) as Resolver<PurchaseRequestFormData>,
     defaultValues: {
       currency: "",
@@ -197,7 +200,7 @@ export default function Page() {
   async function onSubmit(data: PurchaseRequestFormData): Promise<void> {
     // Validate items
     const validItems = items.filter(
-      (item) => item.product && item.qty > 0 && item.estimated_unit_price
+      (item) => item.product && item.qty > 0 && item.estimated_unit_price,
     );
 
     if (validItems.length === 0) {
@@ -211,12 +214,20 @@ export default function Page() {
     }
 
     try {
+      // Find the correct TenantUser (profile) ID for the requester
+      // The API expects the TenantUser PK, not the base User PK (which is in loggedInUser.id)
+      const currentUserProfile = tenantUsers?.find(
+        (tu) => tu.user_id === loggedInUser?.id,
+      );
+
+      const requesterId = currentUserProfile?.id || loggedInUser?.id || 1;
+
       // Transform form data to match API format
       const purchaseRequestData = {
         currency: parseInt(data.currency),
         vendor: parseInt(data.vendor),
         purpose: data.purpose,
-        requester: loggedInUser?.id || 1, // Default to 1 or logged in user ID
+        requester: requesterId,
         requesting_location: data.requesting_location,
         items: validItems.map((item) => ({
           product: parseInt(item.product),
@@ -245,15 +256,10 @@ export default function Page() {
       }, 1500);
     } catch (error: unknown) {
       // Handle API errors
-      let errorMessage = "Failed to create purchase request. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(
+        error,
+        "Failed to create purchase request. Please try again.",
+      );
 
       setNotification({
         message: errorMessage,
@@ -286,7 +292,7 @@ export default function Page() {
     if (!selectedCurrencyId || !currencies) return "₦"; // Default to Naira
 
     const selectedCurrency = currencies.find(
-      (c) => c.id.toString() === selectedCurrencyId
+      (c) => c.id.toString() === selectedCurrencyId,
     );
     return selectedCurrency?.currency_symbol || "₦";
   };
@@ -315,7 +321,7 @@ export default function Page() {
   // Enhanced updateItem function that also populates product details
   const updateItemWithProductDetails = (
     id: string,
-    patch: Partial<LineItem>
+    patch: Partial<LineItem>,
   ) => {
     setItems((prev) =>
       prev.map((it) => {
@@ -332,7 +338,7 @@ export default function Page() {
           return updatedItem;
         }
         return it;
-      })
+      }),
     );
   };
 

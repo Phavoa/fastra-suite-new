@@ -51,13 +51,13 @@ const generateLocationCode = (): string => {
 
 // Helper function to format user name consistently across the application
 const formatUserName = (
-  user: { first_name: string; last_name: string } | null,
-  fallback: string,
+  user?: { first_name?: string; last_name?: string; email?: string } | null,
+  fallback: string = "Unknown User",
 ): string => {
-  if (user && user.first_name && user.last_name) {
+  if (user?.first_name && user?.last_name) {
     return `${user.first_name} ${user.last_name}`;
   }
-  return fallback;
+  return user?.email || fallback;
 };
 
 // Main Component
@@ -110,10 +110,23 @@ export default function NewLocationPage() {
 
   // Convert tenant users to option format for dropdown
   const userOptions =
-    tenantUsers?.map((tenantUser) => ({
-      value: tenantUser.user_id.toString(),
-      label: formatUserName(tenantUser.user, tenantUser.user.email),
-    })) || [];
+    tenantUsers?.map((tenantUser) => {
+      // Return early or provide defaults if tenantUser is missing (unlikely but safe)
+      if (!tenantUser) return { value: "", label: "Unknown User" };
+
+      // Safely extract names and email using optional chaining
+      const firstName =
+        tenantUser.user?.first_name || tenantUser.first_name || "";
+      const lastName = tenantUser.user?.last_name || tenantUser.last_name || "";
+      const email = tenantUser.user?.email || tenantUser.email || "";
+
+      const fullName = (firstName + " " + lastName).trim();
+
+      return {
+        value: (tenantUser.id || tenantUser.user_id || "").toString(),
+        label: fullName || email || "Unknown User",
+      };
+    }) || [];
 
   console.log(userOptions);
 
@@ -126,6 +139,7 @@ export default function NewLocationPage() {
 
   async function onSubmit(data: LocationFormData): Promise<void> {
     try {
+      console.log("data", data);
       // Call the API mutation
       await createLocation(data).unwrap();
 

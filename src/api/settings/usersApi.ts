@@ -185,7 +185,7 @@ export const usersApi = createApi({
     }),
   }),
 
-  createUser: builder.mutation<NewUserResponse, NewUserRequest>({
+  createUser: builder.mutation<NewUserResponse, FormData>({
     query: (body) => ({
       url: "/users/tenant-users/",
       method: "POST",
