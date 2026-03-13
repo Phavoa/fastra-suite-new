@@ -27,13 +27,7 @@ import { RootState } from "@/lib/store/store";
 const userCreateSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
-  company_role: z.preprocess(
-    (val) => (val === "" || val === undefined ? undefined : Number(val)),
-    z.number({
-      required_error: "Role is required",
-      invalid_type_error: "Role is required",
-    }).min(1, "Role is required")
-  ),
+  company_role: z.coerce.number().min(1, "Role is required"),
   phone_number: z.string().min(1, "Phone number is required"),
   language: z.string().min(1, "Language is required"),
   timezone: z.string().min(1, "Timezone is required"),
@@ -81,7 +75,7 @@ export default function NewUser() {
     setError,
     clearErrors,
   } = useForm<UserCreateInput>({
-    resolver: zodResolver(userCreateSchema),
+    resolver: zodResolver(userCreateSchema) as any,
     mode: "all", // Still use mode for real-time updates if needed
     defaultValues: {
       name: "",

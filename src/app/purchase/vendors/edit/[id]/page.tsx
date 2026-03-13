@@ -181,7 +181,25 @@ export default function Page() {
   });
 
   // Get available states for dropdown
-  const availableStates = Object.keys(stateLgaData);
+  const allowedStates = [
+    "Lagos",
+    "Federal Capital Territory", // FCT
+    "Ogun",
+    "Oyo",
+    "Rivers",
+    "Ondo",
+    "Anambra",
+    "Akwa Ibom",
+    "Ekiti",
+    "Delta",
+    "Edo",
+    "Osun",
+    "Kwara"
+  ];
+
+  const availableStates = Object.keys(stateLgaData).filter(state =>
+    allowedStates.includes(state)
+  );
 
   // Handle state selection and update available LGAs
   const handleStateChange = (state: string) => {

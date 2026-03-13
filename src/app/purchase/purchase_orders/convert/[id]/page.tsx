@@ -203,8 +203,8 @@ export default function ConvertRfqPage() {
         related_rfq: rfqId,
         currency: Number(rfq.currency),
         vendor: Number(rfq.vendor),
-        destination_location: Number(data.destination_location),
-        payment_terms: Number(data.payment_terms),
+        destination_location: data.destination_location,
+        payment_terms: data.payment_terms,
         delivery_terms: data.delivery_terms || "",
         purchase_policy: data.purchase_policy || "",
         created_by:

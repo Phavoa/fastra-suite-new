@@ -60,7 +60,7 @@ const transformPurchaseOrderToRow = (
 // Valid purchase order statuses
 const VALID_STATUSES: PurchaseOrderStatus[] = [
   "draft",
-  "pending_approval",
+  "awaiting",
   "approved",
   "rejected",
   "active",
@@ -73,10 +73,10 @@ const VALID_STATUSES: PurchaseOrderStatus[] = [
 const mapLegacyStatus = (status: string): PurchaseOrderStatus => {
   const statusMapping: Record<string, PurchaseOrderStatus> = {
     // Legacy purchase order statuses -> new purchase order statuses
-    awaiting: "pending_approval",
+    awaiting: "awaiting",
     // Direct mappings (no change needed)
     draft: "draft",
-    pending_approval: "pending_approval",
+    pending_approval: "awaiting",
     approved: "approved",
     rejected: "rejected",
     active: "active",

@@ -51,13 +51,13 @@ const generateLocationCode = (): string => {
 
 // Helper function to format user name consistently across the application
 const formatUserName = (
-  user: { first_name: string; last_name: string } | null,
-  fallback: string,
+  user?: { first_name?: string; last_name?: string; email?: string } | null,
+  fallback: string = "Unknown User",
 ): string => {
-  if (user && user.first_name && user.last_name) {
+  if (user?.first_name && user?.last_name) {
     return `${user.first_name} ${user.last_name}`;
   }
-  return fallback;
+  return user?.email || fallback;
 };
 
 // Main Component
@@ -111,18 +111,20 @@ export default function NewLocationPage() {
   // Convert tenant users to option format for dropdown
   const userOptions =
     tenantUsers?.map((tenantUser) => {
-      // Try to get name from nested user object first, then flat fields
-      // Using 'as any' to tell TypeScript these fields might exist even if not in the strict TenantUser interface
-      const tu = tenantUser as any;
-      const firstName = tenantUser.user?.first_name || tu.first_name || "";
-      const lastName = tenantUser.user?.last_name || tu.last_name || "";
-      const email = tenantUser.user?.email || tu.email || "Unknown User";
+      // Return early or provide defaults if tenantUser is missing (unlikely but safe)
+      if (!tenantUser) return { value: "", label: "Unknown User" };
 
-      const fullName = firstName && lastName ? `${firstName} ${lastName}` : "";
+      // Safely extract names and email using optional chaining
+      const firstName =
+        tenantUser.user?.first_name || tenantUser.first_name || "";
+      const lastName = tenantUser.user?.last_name || tenantUser.last_name || "";
+      const email = tenantUser.user?.email || tenantUser.email || "";
+
+      const fullName = (firstName + " " + lastName).trim();
 
       return {
-        value: tenantUser.id.toString(),
-        label: fullName || email,
+        value: (tenantUser.id || tenantUser.user_id || "").toString(),
+        label: fullName || email || "Unknown User",
       };
     }) || [];
 
