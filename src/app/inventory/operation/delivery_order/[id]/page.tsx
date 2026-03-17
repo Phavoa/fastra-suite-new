@@ -79,7 +79,8 @@ export default function DeliveryOrderDetailPage() {
 
       if (result.status === "waiting") {
         setNotification({
-          message: "Waiting: Stock is not enough. Please check back later",
+          message:
+            "Status: Waiting. Stock not enough!. Make stock adjustments or check back later",
           type: "error",
           show: true,
         });
