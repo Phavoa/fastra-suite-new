@@ -17,6 +17,13 @@ import { Button } from "@/components/ui/button";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
 import { DeliveryOrderReturnItem } from "@/types/deliveryOrderReturn";
+import { usePermissionContext } from "@/contexts/PermissionContext";
+import { usePermission } from "@/hooks/usePermission";
+import {
+  normalizePermissions,
+  NormalizedPermissions,
+} from "@/utils/normalizePermissions";
+import { UseSelector } from "react-redux";
 
 // Form schema for delivery order return creation
 const deliveryOrderReturnSchema = z.object({
@@ -49,6 +56,47 @@ const initialItems: DeliveryOrderReturnLineItem[] = [];
 
 export default function Page() {
   const router = useRouter();
+
+  const { isAdmin, permissions } = usePermissionContext();
+  const { can } = usePermission();
+
+  const user_accesses = useSelector(
+    (state: RootState) => state.auth.user_accesses,
+  );
+
+  // Direct normalization
+  const normalizedDirect = React.useMemo<NormalizedPermissions>(() => {
+    if (user_accesses) {
+      try {
+        return normalizePermissions({ user_accesses });
+      } catch (err) {
+        console.error("Permisssion normalization failed", err);
+        return { isAdmin: false, permissions: {} };
+      }
+    }
+    return { isAdmin: false, permissions: {} };
+  }, [user_accesses]);
+
+  //What permission are we checking?
+  const reqiredPerm = {
+    application: "inventory",
+    module: "deliveryorderreturn",
+    action: "create",
+  };
+
+  const hasCreatePermission = React.useMemo(() => {
+    return (
+      can(reqiredPerm) ||
+      isAdmin ||
+      permissions[`${reqiredPerm.application}:${reqiredPerm.module}`]?.has(
+        reqiredPerm.action,
+      ) ||
+      normalizedDirect.permissions[
+        `${reqiredPerm.application}:${reqiredPerm.module}`
+      ]?.has(reqiredPerm.action)
+    );
+  }, [can, reqiredPerm, normalizedDirect, permissions, isAdmin]);
+
   const formRef = useRef<HTMLFormElement>(null);
 
   // API mutations and queries
@@ -115,7 +163,7 @@ export default function Page() {
     },
   });
 
-  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  // const loggedInUser = useSelector((state: RootState) => state.auth.user);
 
   // Notification state
   const [notification, setNotification] = React.useState<{
@@ -131,7 +179,10 @@ export default function Page() {
   // Convert API data to option format
   const sourceDocumentOptions = useMemo(() => {
     if (!deliveryOrders) return [];
-    return deliveryOrders.map((order) => ({
+    const doneDeliveryOrders = deliveryOrders.filter(
+      (order) => order.status === "done",
+    );
+    return doneDeliveryOrders.map((order) => ({
       value: order.id.toString(),
       label: order.order_unique_id,
     }));
@@ -314,7 +365,29 @@ export default function Page() {
     setNotification((prev) => ({ ...prev, show: false }));
   }
 
-  const isAdmin = false; // TODO: Fix user type
+  const [pageLoading, setPageLoading] = useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!hasCreatePermission) {
+        router.replace("/unauthorized");
+      }
+      setPageLoading(false);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [hasCreatePermission, router]);
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold">Checking access rights...</h2>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -471,7 +544,7 @@ export default function Page() {
                     <td className="px-4 py-2 text-sm text-gray-900">
                       {item.initial_quantity}
                     </td>
-                    <td className="px-4 py-2">
+                    {/* <td className="px-4 py-2">
                       <input
                         type="number"
                         value={item.returned_quantity}
@@ -483,6 +556,42 @@ export default function Page() {
                         className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         min="0"
                         max={item.initial_quantity}
+                        aria-label={`Quantity to return for ${item.product_name}`}
+                      />
+                      {Number(item.returned_quantity) >
+                        Number(item.initial_quantity) && (
+                        <p className="text-red-500 text-sm mt-1">
+                          cannot be greater than initial qty
+                        </p>
+                      )}
+                    </td> */}
+
+                    <td className="px-4 py-2">
+                      <input
+                        type="number"
+                        value={item.returned_quantity}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Allow empty string (user is typing), otherwise convert to number
+                          const numValue =
+                            inputValue === "" ? "" : Number(inputValue);
+
+                          // Cap at initial_quantity if it's a valid number > initial
+                          const safeValue =
+                            typeof numValue === "number" &&
+                            numValue > item.initial_quantity
+                              ? item.initial_quantity
+                              : numValue;
+
+                          updateItem(item.id, {
+                            returned_quantity: String(safeValue), // always store as string
+                          });
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        // you can keep max — it helps on mobile / shows the limit
+                        max={item.initial_quantity}
+                        step="any" // or "1" if you only want integers
                         aria-label={`Quantity to return for ${item.product_name}`}
                       />
                     </td>
@@ -503,6 +612,47 @@ export default function Page() {
 
           {/* Form actions */}
           <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
+            className="flex justify-end gap-4 mt-8"
+          >
+            {hasCreatePermission ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isCreating}
+                  onClick={() => {
+                    // Optional: add confirmation dialog later
+                    router.back();
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="default" // or "contained" / your primary style
+                  disabled={isCreating}
+                  onClick={handleSubmit(onSave)}
+                >
+                  {isCreating ? "Processing..." : "Create"}
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="default"
+                disabled={isCreating}
+                onClick={handleSubmit(onSave)}
+              >
+                {isCreating ? "Creating..." : "Save"}
+              </Button>
+            )}
+          </motion.div>
+          {/* Form actions */}
+          {/* <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
@@ -537,7 +687,7 @@ export default function Page() {
                 {isCreating ? "Creating..." : "Save"}
               </Button>
             )}
-          </motion.div>
+          </motion.div> */}
         </form>
       </motion.main>
 
