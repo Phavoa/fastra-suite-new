@@ -24,17 +24,30 @@ const AuthLayout = ({
   children: React.ReactNode;
 }>) => {
   return (
-    <div className="flex w-full min-h-screen border">
+    <div className="flex flex-col lg:flex-row w-full min-h-screen border">
       <div
         className="flex-1 overflow-hidden"
-        style={{
-          backgroundImage: "url('/images/bg.svg')",
-        }}
+        // style={
+        //   {
+        //     backgroundImage: "url('/images/bg.svg')",
+        //   }
+        // }
         aria-hidden="true"
       >
-        <div className="min-h-screen relative flex flex-col p-6 md:p-12 lg:pl-20 ">
-          {/* Brand */}
-          <div className="flex items-center gap-3 w-25 h-10 mb-8">
+        {/* Mobile Logo */}
+        <div className="lg:hidden fixed flex items-center gap-3 w-25 h-10 m-4">
+          <Image
+            src={fastraLogo}
+            alt="Fastra"
+            width={1000}
+            height={1000}
+            className="object-fill w-full h-auto"
+          />
+        </div>
+
+        <div className="min-h-screen relative hidden lg:flex flex-col p-6 md:p-12 lg:pl-20 ">
+          {/* Desktop Logo */}
+          <div className="hidden lg:flex items-center gap-3 w-25 h-10 mb-8">
             <Image
               src={fastraLogo}
               alt="Fastra"
@@ -45,7 +58,7 @@ const AuthLayout = ({
           </div>
 
           {/* Hero heading */}
-          <div className="mb-12 max-w-lg space-y-4">
+          <div className="hidden lg:block mb-12 max-w-lg space-y-4">
             <h1
               className="font-[Inter] text-2xl leading-tight font-bold text-gray-900 "
               style={{ lineHeight: 1.12 }}
@@ -70,7 +83,7 @@ const AuthLayout = ({
           </div>
 
           {/* Dashboard Preview Mockup - REPLACING the old Card */}
-          <div className="relative flex-1 mt-4">
+          <div className="hidden lg:flex relative flex-1 mt-4">
             <div className="absolute left-0 top-0 -right-25 -bottom-50 bg-[#F8F9FB] rounded-tl-2xl shadow-2xl overflow-hidden flex flex-row border border-gray-200">
               {/* Mock Sidebar */}
               <div className="w-16 bg-white border-r border-gray-100 flex flex-col items-center py-6 space-y-8">
@@ -225,7 +238,7 @@ const AuthLayout = ({
           </div>
         </div>
       </div>
-      <div className="flex-1 border">{children}</div>
+      <div className="lg:w-1/2 lg:border">{children}</div>
     </div>
   );
 };

@@ -191,7 +191,7 @@ const RegisterPage: NextPage = () => {
                       "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
                       !companyForm.formState.isValid
                         ? "opacity-60 cursor-not-allowed"
-                        : "hover:shadow-md",
+                        : "hover:shadow-md cursor-pointer",
                     )}
                     disabled={!companyForm.formState.isValid}
                     aria-disabled={!companyForm.formState.isValid}
@@ -403,10 +403,10 @@ const RegisterPage: NextPage = () => {
                     type="submit"
                     variant={"default"}
                     className={cn(
-                      "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
+                      "b  g-blue-500 hover:bg-blue-600 text-white w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
                       !passwordForm.formState.isValid || loading
                         ? "opacity-60 cursor-not-allowed"
-                        : "hover:shadow-md",
+                        : "hover:shadow-md cursor-pointer",
                     )}
                     disabled={!passwordForm.formState.isValid || isRegistering}
                     aria-disabled={!passwordForm.formState.isValid || loading}
