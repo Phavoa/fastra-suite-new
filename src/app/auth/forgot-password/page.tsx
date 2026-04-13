@@ -54,6 +54,10 @@ const ForgotPasswordPage = () => {
         tenant,
       }).unwrap();
 
+      // Clear local lockout data if the user successfully requested a forgot password link/otp
+      localStorage.removeItem(`auth_lockout_${data.email}`);
+      localStorage.removeItem(`auth_failures_${data.email}`);
+
       // Check the response to determine the flow
       // Based on requirements:
       // - Admin can proceed to verify-otp page

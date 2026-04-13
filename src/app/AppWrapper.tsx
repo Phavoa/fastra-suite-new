@@ -6,6 +6,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import { usePathname } from "next/navigation";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import Sidebar from "@/components/shared/Sidebar";
+import SessionTimeoutWrapper from "@/components/SessionTimeoutWrapper";
 
 export default function AppWrapper({
   children,
@@ -19,11 +20,12 @@ export default function AppWrapper({
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <PermissionProvider>
-          <div className="flex gap-4 bg-gray-100">
-            {!isAuthPage ? <Sidebar /> : null}
-            <div className="flex-1 min-h-screen">{children}</div>
-            {/* <div className="flex-1 ml-20 min-h-screen">{children}</div> */}
-          </div>
+          <SessionTimeoutWrapper>
+            <div className="flex gap-4 bg-gray-100">
+              {!isAuthPage ? <Sidebar /> : null}
+              <div className="flex-1 min-h-screen">{children}</div>
+            </div>
+          </SessionTimeoutWrapper>
         </PermissionProvider>
       </PersistGate>
     </Provider>
