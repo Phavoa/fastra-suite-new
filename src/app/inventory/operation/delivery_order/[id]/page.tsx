@@ -79,7 +79,8 @@ export default function DeliveryOrderDetailPage() {
 
       if (result.status === "waiting") {
         setNotification({
-          message: "Waiting: Stock is not enough. Please check back later",
+          message:
+            "Status: Waiting. Stock not enough!. Make stock adjustments or check back later",
           type: "error",
           show: true,
         });
@@ -218,7 +219,7 @@ export default function DeliveryOrderDetailPage() {
             <div>
               <span
                 className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(
-                  deliveryOrder.status
+                  deliveryOrder.status,
                 )}`}
               >
                 {deliveryOrder.status}
@@ -293,7 +294,7 @@ export default function DeliveryOrderDetailPage() {
               <h3 className="font-semibold">Assigned To</h3>
               <p>
                 {userOptions.find(
-                  (user) => user.value === deliveryOrder.assigned_to
+                  (user) => user.value === deliveryOrder.assigned_to,
                 )?.label || deliveryOrder.assigned_to}
               </p>
             </div>
@@ -338,12 +339,6 @@ export default function DeliveryOrderDetailPage() {
                   <TableHead className="px-6 py-3 text-center text-sm font-medium text-gray-500">
                     Quantity to Deliver
                   </TableHead>
-                  <TableHead className="px-6 py-3 text-center text-sm font-medium text-gray-500">
-                    Unit Price
-                  </TableHead>
-                  <TableHead className="px-6 py-3 text-center text-sm font-medium text-gray-500">
-                    Total Price
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -364,18 +359,12 @@ export default function DeliveryOrderDetailPage() {
                       <TableCell className="px-6 py-4 text-sm text-center font-medium text-gray-900">
                         {item.quantity_to_deliver}
                       </TableCell>
-                      <TableCell className="px-6 py-4 text-sm text-center font-medium text-gray-900">
-                        {item.unit_price}
-                      </TableCell>
-                      <TableCell className="px-6 py-4 text-sm text-center font-medium text-gray-900">
-                        {item.total_price}
-                      </TableCell>
                     </TableRow>
-                  )
+                  ),
                 ) || (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={4}
                       className="px-6 py-8 text-center text-gray-500"
                     >
                       No delivery order items found

@@ -22,7 +22,8 @@ export interface AccessGroupRight {
 
 // AccessRight interface for access_rights array
 export interface AccessRight {
-  [key: string]: string;
+  module: string;
+  rights: number[];
 }
 
 // Create/Update AccessGroupRight request interface
@@ -38,16 +39,19 @@ export interface CreateAccessGroupRightRequest {
 export type AccessGroupRightResponse = AccessGroupRight;
 
 // AccessGroupsByApplication response interface
-export interface AccessGroupsByApplication {
-  id: number;
-  access_code: string;
+export interface AccessGroup {
   group_name: string;
+  access_code: string;
+}
+
+export interface ApplicationAccessGroups {
   application: string;
-  application_module: string;
-  access_right: number;
-  access_right_details: AccessRightDetails;
-  date_updated: string;
-  date_created: string;
+  access_groups: AccessGroup[];
+}
+
+export interface AccessGroupsByApplicationResponse {
+  tenant_company_name: string;
+  data: ApplicationAccessGroups[];
 }
 
 // Query parameters interface
@@ -241,7 +245,7 @@ try {
 
     // GET /users/access-group-rights/access-groups/ - Get restructured dataset grouped by application
     getAccessGroupsByApplication: builder.query<
-      AccessGroupsByApplication[],
+      AccessGroupsByApplicationResponse,
       void
     >({
       query: () => "/users/access-group-rights/access-groups/",

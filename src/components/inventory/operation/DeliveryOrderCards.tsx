@@ -30,7 +30,7 @@ function DeliveryOrderCard({
 
     const regex = new RegExp(
       `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-      "gi"
+      "gi",
     );
     const parts = text.split(regex);
 
@@ -41,7 +41,7 @@ function DeliveryOrderCard({
         </span>
       ) : (
         part
-      )
+      ),
     );
   };
 
@@ -65,7 +65,7 @@ function DeliveryOrderCard({
     >
       <Card
         className={cn(
-          "cursor-pointer transition-all duration-200 hover:shadow border-2 border-gray-200 hover:border-gray-300 shadow-none rounded"
+          "cursor-pointer transition-all duration-200 hover:shadow border-2 border-gray-200 hover:border-gray-300 shadow-none rounded",
         )}
         onClick={handleCardClick}
       >
@@ -85,12 +85,12 @@ function DeliveryOrderCard({
                   deliveryOrder.status === "done"
                     ? "bg-green-100 text-green-500"
                     : deliveryOrder.status === "draft"
-                    ? "bg-blue-100 text-blue-500"
-                    : deliveryOrder.status === "cancelled"
-                    ? "bg-red-100 text-red-500"
-                    : deliveryOrder.status === "ready"
-                    ? "bg-red-100 text-green-500"
-                    : "bg-gray-100 text-gray-500"
+                      ? "bg-blue-100 text-blue-500"
+                      : deliveryOrder.status === "cancelled"
+                        ? "bg-red-100 text-red-500"
+                        : deliveryOrder.status === "ready"
+                          ? "bg-red-100 text-green-500"
+                          : "bg-gray-100 text-gray-500"
                 }`}
               >
                 {deliveryOrder.status}
@@ -121,7 +121,7 @@ function DeliveryOrderCard({
               <span className="text-sm font-medium text-gray-900 truncate max-w-32">
                 {highlightText(
                   deliveryOrder.source_location_details?.location_name || "N/A",
-                  query
+                  query,
                 )}
               </span>
             </div>

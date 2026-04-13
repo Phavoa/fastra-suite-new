@@ -182,8 +182,8 @@ export interface CreatePurchaseOrderRequest {
   created_by: number;
   vendor: number;
   currency: number;
-  payment_terms: string;
-  destination_location: string;
+  payment_terms: string | number;
+  destination_location: string | number;
   purchase_policy?: string;
   delivery_terms?: string;
   items: CreatePurchaseOrderItemRequest[];
@@ -198,8 +198,8 @@ export interface UpdatePurchaseOrderRequest {
   created_by?: number;
   vendor?: number;
   currency?: number;
-  payment_terms?: string;
-  destination_location?: string;
+  payment_terms?: string | number;
+  destination_location?: string | number;
   purchase_policy?: string;
   delivery_terms?: string;
   items?: UpdatePurchaseOrderItemRequest[];
@@ -214,8 +214,8 @@ export interface PatchPurchaseOrderRequest {
   created_by?: number;
   vendor?: number;
   currency?: number;
-  payment_terms?: string;
-  destination_location?: string;
+  payment_terms?: string | number;
+  destination_location?: string | number;
   purchase_policy?: string;
   delivery_terms?: string;
   items?: PatchPurchaseOrderItemRequest[];
@@ -273,8 +273,8 @@ export const purchaseOrderApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-            ? JSON.stringify(args.body)
-            : undefined,
+              ? JSON.stringify(args.body)
+              : undefined,
       });
 
       if (!response.ok) {

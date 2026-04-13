@@ -63,7 +63,7 @@ function StatusCards() {
     value: number,
     icon: React.ReactNode,
     colorClass = "text-gray-700",
-    linkHref?: string
+    linkHref?: string,
   ) => (
     <Link href={linkHref || "#"}>
       <Card className="p-4 rounded-none shadow-none cursor-pointer hover:bg-gray-50 transition-colors border border-b-0 border-t-0 border-l-0 border-r">
@@ -86,26 +86,28 @@ function StatusCards() {
           counts.incomingProducts,
           <PackageIcon color="#3B7CED" />,
           "text-[#3B7CED]",
-          "/inventory/operation"
+          "/inventory/operation",
         )}
         {card(
           "Delivery Orders",
           counts.deliveryOrders,
           <TruckIcon color="#2BA24D" />,
           "text-[#2BA24D]",
-          "/inventory/operation/delivery_order"
+          "/inventory/operation/delivery_order",
         )}
         {card(
           "Internal Transfers",
           counts.internalTransfers,
           <ArrowRightLeftIcon color="#F0B401" />,
-          "text-[#F0B401]"
+          "text-[#F0B401]",
+          "/inventory/operation/internal_transfer",
         )}
         {card(
           "Delivery Order Returns",
           counts.deliveryOrderReturns,
           <RotateCcwIcon color="#E43D2B" />,
-          "text-[#E43D2B]"
+          "text-[#E43D2B]",
+          "/inventory/operation/delivery_order_return",
         )}
       </div>
     </section>
@@ -158,7 +160,7 @@ export default function OperationPage() {
 
     const regex = new RegExp(
       `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-      "gi"
+      "gi",
     );
     const parts = text.split(regex);
 
@@ -169,14 +171,14 @@ export default function OperationPage() {
         </span>
       ) : (
         part
-      )
+      ),
     );
   };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedItems(
-        incomingProducts.map((item) => item.incoming_product_id)
+        incomingProducts.map((item) => item.incoming_product_id),
       );
     } else {
       setSelectedItems([]);
@@ -323,7 +325,7 @@ export default function OperationPage() {
                       onCheckedChange={(checked) =>
                         handleSelectItem(
                           item.incoming_product_id,
-                          checked as boolean
+                          checked as boolean,
                         )
                       }
                     />
@@ -342,13 +344,13 @@ export default function OperationPage() {
                   <TableCell className="px-4 py-3 text-sm text-gray-900">
                     {highlightText(
                       item.source_location_details?.location_name || "N/A",
-                      query
+                      query,
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-3 text-sm text-gray-900">
                     {highlightText(
                       item.destination_location_details?.location_name || "N/A",
-                      query
+                      query,
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-3 text-sm">
@@ -357,10 +359,10 @@ export default function OperationPage() {
                         item.status === "validated"
                           ? "bg-green-100 text-green-500"
                           : item.status === "draft"
-                          ? "bg-blue-100 text-blue-500"
-                          : item.status === "canceled"
-                          ? "bg-red-100 text-red-500"
-                          : "bg-gray-100 text-gray-500"
+                            ? "bg-blue-100 text-blue-500"
+                            : item.status === "canceled"
+                              ? "bg-red-100 text-red-500"
+                              : "bg-gray-100 text-gray-500"
                       }`}
                     >
                       {item.status}

@@ -17,7 +17,7 @@ export function TopNav() {
 
   const stockOptions: NavOption[] = [
     { label: "Stock Adjustment", href: "/inventory/stocks/adjustment" },
-    { label: "Stock Moves", href: "/inventory/stocks/moves" },
+    { label: "Stock Moves", href: "/inventory/stocks/stock-moves" },
     { label: "Scrap", href: "/inventory/stocks/scrap" },
   ];
 
@@ -35,7 +35,10 @@ export function TopNav() {
       label: "Delivery Order Return",
       href: "/inventory/operation/delivery_order_return",
     },
-    { label: "Inter Transfer", href: "/inventory/operation/inter_transfer" },
+    {
+      label: "Internal Transfer",
+      href: "/inventory/operation/internal_transfer",
+    },
     { label: "Back Order", href: "/inventory/operation/back_order" },
   ];
 

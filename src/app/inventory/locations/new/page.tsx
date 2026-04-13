@@ -51,13 +51,13 @@ const generateLocationCode = (): string => {
 
 // Helper function to format user name consistently across the application
 const formatUserName = (
-  user: { first_name: string; last_name: string } | null,
-  fallback: string,
+  user?: { first_name?: string; last_name?: string; email?: string } | null,
+  fallback: string = "Unknown User",
 ): string => {
-  if (user && user.first_name && user.last_name) {
+  if (user?.first_name && user?.last_name) {
     return `${user.first_name} ${user.last_name}`;
   }
-  return fallback;
+  return user?.email || fallback;
 };
 
 // Main Component
@@ -139,6 +139,7 @@ export default function NewLocationPage() {
 
   async function onSubmit(data: LocationFormData): Promise<void> {
     try {
+      console.log("data", data);
       // Call the API mutation
       await createLocation(data).unwrap();
 
