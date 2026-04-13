@@ -156,7 +156,7 @@ const LoginPage: NextPage = () => {
                   type="submit"
                   variant={"default"}
                   className={cn(
-                    "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
+                    "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4 cursor-pointer",
                     !isValid || isLoggingIn
                       ? "opacity-60 cursor-not-allowed"
                       : "hover:shadow-md",
@@ -170,7 +170,7 @@ const LoginPage: NextPage = () => {
                 <div className="text-center mt-6">
                   <Link
                     href="/auth/register"
-                    className="text-sky-600 hover:underline text-sm"
+                    className="text-sky-600 hover:underline text-sm cursor-pointer"
                   >
                     Don&apos;t have an account?
                   </Link>
@@ -178,7 +178,7 @@ const LoginPage: NextPage = () => {
                 <div className="text-center mt-2">
                   <Link
                     href="/auth/forgot-password"
-                    className="text-red-600 hover:underline text-sm"
+                    className="text-red-600 hover:underline text-sm cursor-pointer"
                   >
                     forgot password?
                   </Link>

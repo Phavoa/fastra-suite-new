@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Eye, EyeOff, Check, X } from "lucide-react";
+import { Check, Eye, EyeOff, X } from "lucide-react";
 import { useResetPasswordMutation } from "@/api/authApi";
+import { StatusModal } from "@/components/shared/StatusModal";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 const formSchema = z
@@ -161,7 +162,7 @@ const CreatePasswordPage: NextPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800 cursor-pointer"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -280,7 +281,7 @@ const CreatePasswordPage: NextPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800 cursor-pointer"
                   aria-label={
                     showConfirmPassword ? "Hide password" : "Show password"
                   }
@@ -305,48 +306,38 @@ const CreatePasswordPage: NextPage = () => {
               </p>
             )}
 
-            {!submittedId ? (
-              <>
-                <Button
-                  type="submit"
-                  variant={"default"}
-                  className={cn(
-                    "w-full py-3 rounded-md text-base font-medium transition-all duration-200 mt-6",
-                    !isValid || loading
-                      ? "bg-gray-300 cursor-not-allowed opacity-60"
-                      : "bg-[#4F86F7] hover:bg-[#3B72E6] text-white shadow-sm hover:shadow-md",
-                  )}
-                  disabled={!isValid || loading}
-                  aria-disabled={!isValid || loading}
-                >
-                  {loading
-                    ? "Processing..."
-                    : isFromForgotPassword
-                      ? "Reset Password"
-                      : "Create Password"}
-                </Button>
-              </>
-            ) : (
-              <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 mt-6">
-                {isFromForgotPassword
-                  ? "Password reset successfully! You can now login with your new password."
-                  : "Password created successfully! You can now login."}
-                <div className="mt-3">
-                  {/* <Link
-                    href="/auth/login"
-                    className="text-[#4F86F7] hover:underline font-medium"
-                  >
-                    Go to Login
-                  </Link> */}
-                  <span
-                    onClick={() => (window.location.href = "/auth/login")}
-                    className="text-[#4F86F7] hover:underline font-medium cursor-pointer"
-                  >
-                    Go to Login
-                  </span>
-                </div>
-              </div>
-            )}
+            <Button
+              type="submit"
+              variant={"default"}
+              className={cn(
+                "w-full py-3 rounded-md text-base font-medium transition-all duration-200 mt-6 cursor-pointer",
+                !isValid || loading
+                  ? "bg-gray-300 cursor-not-allowed opacity-60"
+                  : "bg-[#4F86F7] hover:bg-[#3B72E6] text-white shadow-sm hover:shadow-md",
+              )}
+              disabled={!isValid || loading}
+              aria-disabled={!isValid || loading}
+            >
+              {loading
+                ? "Processing..."
+                : isFromForgotPassword
+                  ? "Reset Password"
+                  : "Create Password"}
+            </Button>
+
+            <StatusModal
+              isOpen={!!submittedId}
+              onClose={() => router.push("/auth/login")}
+              type="info"
+              title="Password Reset Successful"
+              message={
+                isFromForgotPassword
+                  ? "Your password has been reset successfully. You can now login with your new password."
+                  : "Your password has been created successfully. You can now login."
+              }
+              actionText="Done"
+              onAction={() => router.push("/auth/login")}
+            />
           </form>
         </div>
       </div>

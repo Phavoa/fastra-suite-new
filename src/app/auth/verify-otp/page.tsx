@@ -157,7 +157,7 @@ const VerifyOTPPage = () => {
           <div className="w-full mb-4">
             <Link
               href="/auth/forgot-password"
-              className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+              className="flex items-center text-sm text-gray-600 hover:text-gray-800 cursor-pointer"
             >
               <ArrowLeft size={16} className="mr-1" />
               Back to Forgot Password
@@ -207,7 +207,7 @@ const VerifyOTPPage = () => {
             onClick={handleSubmit}
             disabled={otp.some((d) => !d) || loading}
             className={cn(
-              "w-full max-w-100 mx-auto h-12 bg-[#4F86F7] text-white font-medium rounded-lg hover:bg-[#3B72E6] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-lg",
+              "w-full max-w-100 mx-auto h-12 bg-[#4F86F7] text-white font-medium rounded-lg hover:bg-[#3B72E6] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-lg cursor-pointer",
             )}
           >
             {loading ? "Verifying..." : "Verify"}
@@ -219,7 +219,7 @@ const VerifyOTPPage = () => {
               type="button"
               onClick={handleResend}
               disabled={resendLoading}
-              className="text-[#4F86F7] hover:underline disabled:text-gray-400"
+              className="text-[#4F86F7] hover:underline disabled:text-gray-400 cursor-pointer"
             >
               {resendLoading ? "Sending..." : "Resend"}
             </button>

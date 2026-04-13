@@ -119,7 +119,7 @@ const VerifyEmailContent = () => {
                 Redirecting to login in {countdown} seconds...
               </p>
               <Button
-                className="w-full mt-4"
+                className="w-full mt-4 cursor-pointer"
                 onClick={() => router.push("/auth/login")}
               >
                 Go to Login Now

@@ -83,7 +83,7 @@ const ResendVerificationContent = () => {
           )}
 
           <Button
-            className="w-full mt-2"
+            className="w-full mt-2 cursor-pointer"
             onClick={handleResend}
             disabled={isLoading || isSuccess} // Disable if loading or already sent success (prevent spam)
           >
@@ -102,7 +102,7 @@ const ResendVerificationContent = () => {
 
           <Button
             variant="ghost"
-            className="w-full text-sm text-gray-500"
+            className="w-full text-sm text-gray-500 cursor-pointer"
             onClick={() => router.push("/auth/login")}
           >
             Back to Login

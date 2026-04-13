@@ -14,6 +14,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRegisterMutation } from "@/api/authApi";
 import { Eye, EyeOff, Check, X } from "lucide-react";
+import { StatusModal } from "@/components/shared/StatusModal";
+import { useRouter } from "next/navigation";
 
 const companyFormSchema = z.object({
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
@@ -49,6 +51,7 @@ const fakeSubmit = (payload: CompanyFormData & PasswordFormData) =>
   );
 
 const RegisterPage: NextPage = () => {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -120,11 +123,9 @@ const RegisterPage: NextPage = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-2 text-center">
             Register
           </h2>
-          {!submittedId && (
-            <p className="text-sm text-gray-500 mb-6 text-center">
-              Enter your details to register
-            </p>
-          )}
+          <p className="text-sm text-gray-500 mb-6 text-center">
+            Enter your details to register
+          </p>
 
           <div className="relative min-h-100 flex items-center justify-center">
             {/* Company Information Section */}
@@ -188,7 +189,7 @@ const RegisterPage: NextPage = () => {
                     type="submit"
                     variant={"default"}
                     className={cn(
-                      "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
+                      "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4 cursor-pointer",
                       !companyForm.formState.isValid
                         ? "opacity-60 cursor-not-allowed"
                         : "hover:shadow-md",
@@ -202,9 +203,9 @@ const RegisterPage: NextPage = () => {
                   {!showPasswordSection && (
                     <Link
                       href="/auth/login"
-                      className="text-center mt- w-full block"
+                      className="text-center mt- w-full block cursor-pointer"
                     >
-                      <p className="text-[#3B7CED] font-semibold hover:underline text-sm">
+                      <p className="text-[#3B7CED] font-semibold hover:underline text-sm cursor-pointer">
                         Already have an account?
                       </p>
                     </Link>
@@ -215,7 +216,7 @@ const RegisterPage: NextPage = () => {
 
             {/* Password Section */}
             <AnimatePresence mode="wait">
-              {showPasswordSection && !submittedId && (
+              {showPasswordSection && (
                 <motion.form
                   key="password-form"
                   initial={{ opacity: 0, x: 300 }}
@@ -245,7 +246,7 @@ const RegisterPage: NextPage = () => {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800 cursor-pointer"
                         aria-label={
                           showPassword ? "Hide password" : "Show password"
                         }
@@ -372,7 +373,7 @@ const RegisterPage: NextPage = () => {
                         onClick={() =>
                           setShowConfirmPassword(!showConfirmPassword)
                         }
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800 cursor-pointer"
                         aria-label={
                           showConfirmPassword
                             ? "Hide password"
@@ -403,7 +404,7 @@ const RegisterPage: NextPage = () => {
                     type="submit"
                     variant={"default"}
                     className={cn(
-                      "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
+                      "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4 cursor-pointer",
                       !passwordForm.formState.isValid || loading
                         ? "opacity-60 cursor-not-allowed"
                         : "hover:shadow-md",
@@ -417,7 +418,7 @@ const RegisterPage: NextPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowPasswordSection(false)}
-                    className="w-full text-[#3B7CED] font-semibold hover:underline text-sm mt-2"
+                    className="w-full text-[#3B7CED] font-semibold hover:underline text-sm mt-2 cursor-pointer"
                   >
                     Back to Company Info
                   </button>
@@ -425,16 +426,15 @@ const RegisterPage: NextPage = () => {
               )}
             </AnimatePresence>
 
-            {submittedId && (
-              <div className="rounded-md border border-green-100 bg-green-50 p-4 text-sm text-green-800 text-center">
-                {/* Account created successfully. Reference:{" "}
-                <strong>{submittedId}</strong> */}
-                <strong> Account Created successfully!.</strong> <br />
-                Verification token has been sent to your registered email
-                address. <br />
-                Visit your email inbox to verify your account in other to login.
-              </div>
-            )}
+            <StatusModal
+              isOpen={!!submittedId}
+              onClose={() => router.push("/auth/login")}
+              type="info"
+              title="Confirmation Link Sent"
+              message="We sent a confirmation link to your email, click on that link to proceed."
+              actionText="Done"
+              onAction={() => router.push("/auth/login")}
+            />
           </div>
         </div>
       </div>

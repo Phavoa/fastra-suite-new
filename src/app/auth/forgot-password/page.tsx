@@ -12,6 +12,7 @@ import { useForgetPasswordMutation } from "@/api/authApi";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { StatusModal } from "@/components/shared/StatusModal";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -88,31 +89,7 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Show success message for employee
-  if (adminMessage) {
-    return (
-      <main className="min-h-screen bg-white flex items-center">
-        <div className="flex-1 flex items-center justify-center p-6 md:p-12 lg:px-20">
-          <div className="max-w-md w-full">
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-6 text-sm text-blue-800 mb-6">
-              <p className="font-medium mb-2">Request Submitted - {userRole}</p>
-              <p>{adminMessage}</p>
-            </div>
-            <Link href="/auth/login">
-              <Button
-                className={cn(
-                  "w-full py-3 rounded-md text-base font-medium transition-all duration-200 mt-4",
-                  "bg-[#4F86F7] hover:bg-[#3B72E6] text-white shadow-sm hover:shadow-md",
-                )}
-              >
-                Return to Login
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
+
 
   return (
     <main className="min-h-screen bg-white flex items-center">
@@ -121,7 +98,7 @@ const ForgotPasswordPage = () => {
           <div className="mb-6">
             <Link
               href="/auth/login"
-              className="flex items-center text-sm text-gray-600 hover:text-gray-800 mb-4"
+              className="flex items-center text-sm text-gray-600 hover:text-gray-800 mb-4 cursor-pointer"
             >
               <ArrowLeft size={16} className="mr-1" />
               Back to Login
@@ -174,7 +151,7 @@ const ForgotPasswordPage = () => {
               type="submit"
               variant={"default"}
               className={cn(
-                "w-full py-3 rounded-md text-base font-medium transition-all duration-200 mt-6",
+                "w-full py-3 rounded-md text-base font-medium transition-all duration-200 mt-6 cursor-pointer",
                 !isValid || loading
                   ? "bg-gray-300 cursor-not-allowed opacity-60"
                   : "bg-[#4F86F7] hover:bg-[#3B72E6] text-white shadow-sm hover:shadow-md",
@@ -188,12 +165,22 @@ const ForgotPasswordPage = () => {
             <div className="text-center mt-4">
               <Link
                 href="/auth/login"
-                className="text-sky-600 hover:underline text-sm"
+                className="text-sky-600 hover:underline text-sm cursor-pointer"
               >
                 Remember your password? Login
               </Link>
             </div>
           </form>
+
+          <StatusModal
+            isOpen={!!adminMessage}
+            onClose={() => router.push("/auth/login")}
+            type="info"
+            title={`Request Submitted - ${userRole}`}
+            message={adminMessage || ""}
+            actionText="Done"
+            onAction={() => router.push("/auth/login")}
+          />
         </div>
       </div>
     </main>
