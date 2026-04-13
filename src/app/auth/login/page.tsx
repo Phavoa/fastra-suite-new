@@ -15,6 +15,7 @@ import { useDispatch } from "react-redux";
 import { setAuthData } from "@/lib/store/authSlice";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 6 characters"),
@@ -29,6 +30,7 @@ const fakeSubmit = (_payload: FormData) =>
   );
 
 const LoginPage: NextPage = () => {
+  const [showPassword, setShowPassword] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,7 +123,7 @@ const LoginPage: NextPage = () => {
               )}
             </div>
 
-            <div>
+            <div className="relative">
               <Label
                 htmlFor="password"
                 className="text-sm font-medium text-gray-700 mb-2 block"
@@ -130,19 +132,29 @@ const LoginPage: NextPage = () => {
               </Label>
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 {...register("password")}
                 placeholder="Enter your password"
                 aria-required
                 aria-label="Password"
                 className="h-12 rounded-md border-gray-300 placeholder:text-gray-400 focus:border-[#4169E1] focus:ring-4 focus:ring-[rgba(65,105,225,0.08)]"
               />
-              {errors.password && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.password.message}
-                </p>
-              )}
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-10.5 text-gray-600 hover:text-gray-800"
+                // className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
+            {errors.password && (
+              <p className="text-sm text-red-600 mt-1">
+                {errors.password.message}
+              </p>
+            )}
 
             {error && (
               <p role="alert" className="text-sm text-red-600">
@@ -156,10 +168,10 @@ const LoginPage: NextPage = () => {
                   type="submit"
                   variant={"default"}
                   className={cn(
-                    "w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
+                    "bg-blue-500 hover:bg-blue-600 text-white w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
                     !isValid || isLoggingIn
                       ? "opacity-60 cursor-not-allowed"
-                      : "hover:shadow-md",
+                      : "hover:shadow-md cursor-pointer",
                   )}
                   disabled={!isValid || isLoggingIn}
                   aria-disabled={!isValid || isLoggingIn}
