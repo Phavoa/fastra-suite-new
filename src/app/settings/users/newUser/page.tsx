@@ -75,7 +75,7 @@ export default function NewUser() {
     setError,
     clearErrors,
   } = useForm<UserCreateInput>({
-    resolver: zodResolver(userCreateSchema),
+    resolver: zodResolver(userCreateSchema) as any,
     mode: "all", // Still use mode for real-time updates if needed
     defaultValues: {
       name: "",
