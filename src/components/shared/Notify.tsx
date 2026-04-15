@@ -78,9 +78,10 @@ function UserProfile() {
         </DropdownMenuTrigger>
 
         <DropdownMenuContent sideOffset={8} align="end" className="w-48">
-          <DropdownMenuItem>Profile</DropdownMenuItem>
-          <DropdownMenuItem>Settings</DropdownMenuItem>
-          <DropdownMenuItem>Sign out</DropdownMenuItem>
+          <DropdownMenuItem>Company Profile</DropdownMenuItem>
+          <DropdownMenuItem>Change Password</DropdownMenuItem>
+          <DropdownMenuItem>User</DropdownMenuItem>
+          <DropdownMenuItem>Logout</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

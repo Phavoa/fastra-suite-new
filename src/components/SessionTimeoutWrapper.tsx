@@ -7,7 +7,7 @@ import { clearAuthData } from "@/lib/store/authSlice";
 
 // 30 minutes in milliseconds
 // const TIMEOUT_MS = 30 * 60 * 1000;
-const TIMEOUT_MS = 0.5 * 60 * 1000;
+const TIMEOUT_MS = 10 * 60 * 1000;
 
 export default function SessionTimeoutWrapper({
   children,
