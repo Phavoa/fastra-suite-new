@@ -93,7 +93,15 @@ export const companyApi = createApi({
         body: formData, // ← MUST be FormData
       }),
     }),
+
+    changeAdminPassword: builder.mutation<{ detail: string }, { old_password: string; new_password: string; confirm_password: string; user_id: number }>({
+      query: (body) => ({
+        url: "/company/change-admin-password/",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
-export const { useGetCompanyQuery, useUpdateCompanyMutation } = companyApi;
+export const { useGetCompanyQuery, useUpdateCompanyMutation, useChangeAdminPasswordMutation } = companyApi;
