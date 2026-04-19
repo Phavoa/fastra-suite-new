@@ -14,7 +14,26 @@ import FormInput from "@/components/Settings/form/FormInput";
 import FormImageUpload from "@/components/Settings/form/FormImageUpload";
 import FormSubmitButton from "@/components/Settings/form/FormSubmitButton";
 import FormSelect from "@/components/Settings/form/FormSelect";
-import { industries } from "@teclone/industries";
+// import { industries } from "@teclone/industries";
+const INDUSTRIES = [
+  "Agriculture",
+  "Construction",
+  "Education",
+  "Energy & Utilities",
+  "Financial Services",
+  "FMCG (Fast-Moving Consumer Goods)",
+  "Healthcare",
+  "Hospitality & Tourism",
+  "Information Technology",
+  "Manufacturing",
+  "Media & Entertainment",
+  "Oil & Gas",
+  "Professional Services",
+  "Real Estate",
+  "Retail",
+  "Telecommunications",
+  "Transportation & Logistics",
+];
 import { useSelector } from "react-redux";
 import ISO6391 from "iso-639-1";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
@@ -75,11 +94,26 @@ export default function CompanyDetails() {
   };
 
   const handleImageChange = (file: File | null) => {
-    setForm({
-      ...form,
-      logoFile: file,
-      logoPreview: file ? URL.createObjectURL(file) : null,
-    });
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        // Strip the prefix (e.g., "data:image/jpeg;base64,")
+        const rawBase64 = base64String.split(",")[1];
+        setForm({
+          ...form,
+          logoFile: file,
+          logoPreview: rawBase64,
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setForm({
+        ...form,
+        logoFile: null,
+        logoPreview: null,
+      });
+    }
   };
 
   const handleRoleChange = (index: number, value: string) => {
@@ -92,10 +126,7 @@ export default function CompanyDetails() {
     setForm({ ...form, roles: [...form.roles, ""] });
   };
 
-  const languageOptions = ISO6391.getAllCodes().map((code) => ({
-    label: ISO6391.getName(code),
-    value: code,
-  }));
+  const languageOptions = [{ label: "English", value: "en" }];
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -119,8 +150,8 @@ export default function CompanyDetails() {
     fd.append("roles", JSON.stringify(cleanedRoles.map((r) => ({ name: r }))));
 
     // image if changed
-    if (form.logoFile) {
-      fd.append("logo_image", form.logoFile);
+    if (form.logoFile && form.logoPreview) {
+      fd.append("logo_image", form.logoPreview);
     }
 
     for (let pair of fd.entries()) {
@@ -139,9 +170,9 @@ export default function CompanyDetails() {
       </div>
     );
 
-  const industryOptions = industries.map((item) => ({
-    label: item.name,
-    value: item.name,
+  const industryOptions = INDUSTRIES.map((item) => ({
+    label: item,
+    value: item,
   }));
 
   const handleSelect = (name: string, value: string) => {
@@ -149,7 +180,8 @@ export default function CompanyDetails() {
   };
 
   return (
-    <Form onSubmit={handleSubmit}>
+    <div className="max-w-[1440px] mx-auto">
+      <Form onSubmit={handleSubmit}>
       {/* Basic Info */}
       <FormSection title="Basic Information">
         <div className="flex items-center gap-8">
@@ -167,14 +199,14 @@ export default function CompanyDetails() {
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-6 mt-6">
+        <div className="grid grid-cols-3 gap-4 mt-4">
           <div className="flex flex-col justify-center">
             <p className="text-[#1A1A1A] text-base">Company Name</p>
             <input
               name="company Name"
               placeholder="Enter your company name"
               type="text"
-              className="border border-[#7A8A98] p-3"
+              className="border border-[#7A8A98] p-2 text-sm"
             />
           </div>
         </div>
@@ -183,7 +215,7 @@ export default function CompanyDetails() {
       {/* Address */}
       <FormSection title="Contact Information">
         <div className="w-full">
-          <div className="grid grid-cols-3 gap-6 mt-4">
+          <div className="grid grid-cols-3 gap-4 mt-3">
             <div className="flex flex-col justify-center">
               <FormInput
                 label="Email"
@@ -210,7 +242,7 @@ export default function CompanyDetails() {
           </div>
           <div className="mt-6">
             <h3 className="text-[#1A1A1A] font-semibold text-base">Address</h3>
-            <div className="grid grid-cols-3 gap-6 mt-4">
+            <div className="grid grid-cols-3 gap-4 mt-3">
               <FormInput
                 label="Street & Number"
                 placeholder="Enter your street & number"
@@ -246,7 +278,7 @@ export default function CompanyDetails() {
 
       {/* Registration Info */}
       <FormSection title="Company Registration Info">
-        <div className="grid grid-cols-3 gap-6 mt-6">
+        <div className="grid grid-cols-3 gap-4 mt-4">
           <FormInput
             label="Registration Number"
             name="registration_number"
@@ -266,7 +298,7 @@ export default function CompanyDetails() {
 
       {/* Other Info */}
       <FormSection title="Other Information">
-        <div className="grid grid-cols-3 gap-6 mt-6">
+        <div className="grid grid-cols-3 gap-4 mt-4">
           <FormSelect
             label="Industry"
             name="industry"
@@ -292,17 +324,16 @@ export default function CompanyDetails() {
         </div>
       </FormSection>
 
-      {/* Roles Section */}
       <FormSection title="Roles Set-up">
-        <div className="flex items-center mt-4">
+        <div className="grid grid-cols-5 gap-4 mt-4 items-end">
           {form.roles.map((role, idx) => (
-            <div key={idx} className="flex items-center gap-6">
+            <div key={idx} className="flex items-center gap-2">
               <FormInput
                 label="Role"
                 name={`role-${idx}`}
                 value={role}
                 onChange={(e) => handleRoleChange(idx, e.target.value)}
-                className="w-64"
+                className="flex-1"
               />
               {form.roles.length > 1 && (
                 <button
@@ -312,7 +343,7 @@ export default function CompanyDetails() {
                     newRoles.splice(idx, 1);
                     setForm({ ...form, roles: newRoles });
                   }}
-                  className="w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded-full text-xs font-bold"
+                  className="w-5 h-5 shrink-0 flex items-center justify-center bg-red-500 text-white rounded-full text-xs font-bold mt-6"
                 >
                   -
                 </button>
@@ -320,20 +351,23 @@ export default function CompanyDetails() {
             </div>
           ))}
 
-          <button
-            type="button"
-            onClick={addRole}
-            className="flex items-center justify-center gap-2 text-[#7A8A98] text-sm w-[150px]"
-          >
-            <FaPlusCircle className="w-5 h-5" />
-            Add more role
-          </button>
+          <div className="flex items-center h-full pb-1">
+            <button
+              type="button"
+              onClick={addRole}
+              className="flex items-center gap-2 text-[#7A8A98] text-sm hover:text-[#3B7CED] transition-colors"
+            >
+              <FaPlusCircle className="w-5 h-5" />
+              Add more role
+            </button>
+          </div>
         </div>
       </FormSection>
 
       <div className="w-full flex justify-end py-6 px-6">
         <FormSubmitButton label="Save Changes" />
       </div>
-    </Form>
+      </Form>
+    </div>
   );
 }

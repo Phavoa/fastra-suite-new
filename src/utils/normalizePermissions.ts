@@ -1,3 +1,5 @@
+import { PermissionAction } from "../types/permissions";
+
 export interface AccessRightDetails {
   name: string;
 }
@@ -18,15 +20,16 @@ export interface User {
 
 export interface NormalizedPermissions {
   isAdmin: boolean;
-  permissions: Record<string, Set<string>>;
+  permissions: Record<string, Set<PermissionAction>>;
+  isReady: boolean;
 }
 
 export function normalizePermissions(user: User): NormalizedPermissions {
-  const permissions: Record<string, Set<string>> = {};
+  const permissions: Record<string, Set<PermissionAction>> = {};
   let isAdmin = false;
 
   if (!user.user_accesses || !Array.isArray(user.user_accesses)) {
-    return { isAdmin, permissions };
+    return { isAdmin, permissions, isReady: false };
   }
 
   for (const access of user.user_accesses) {
@@ -39,7 +42,6 @@ export function normalizePermissions(user: User): NormalizedPermissions {
     }
 
     if (typeof access.access_groups === "string") {
-      // If it's a string but not 'all_access_groups', skip or handle
       continue;
     }
 
@@ -48,9 +50,11 @@ export function normalizePermissions(user: User): NormalizedPermissions {
       if (!permissions[key]) {
         permissions[key] = new Set();
       }
-      permissions[key].add(group.access_right_details.name);
+      
+      const actionName = group.access_right_details.name.toLowerCase() as PermissionAction;
+      permissions[key].add(actionName);
     }
   }
 
-  return { isAdmin, permissions };
+  return { isAdmin, permissions, isReady: true };
 }

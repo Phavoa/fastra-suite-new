@@ -22,11 +22,10 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     () =>
       user
         ? normalizePermissions({ user_accesses: user })
-        : { isAdmin: false, permissions: {} },
+        : { isAdmin: false, permissions: {}, isReady: false },
     [user]
   );
 
-  console.log("Hello", normalized);
   return (
     <PermissionContext.Provider value={normalized}>
       {children}

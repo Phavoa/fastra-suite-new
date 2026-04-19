@@ -53,7 +53,7 @@ const FormInput = ({
           onChange={onChange}
           placeholder={placeholder}
           required={required} // ✅ apply required
-          className={`border border-[#7A8A98] text-[#7A8A98] rounded-xs p-3 ${className}`}
+          className={`border border-[#7A8A98] text-[#7A8A98] rounded-xs p-2 text-sm ${className}`}
         />
       )}
     </div>

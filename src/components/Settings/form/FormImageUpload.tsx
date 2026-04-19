@@ -33,7 +33,11 @@ const FormImageUpload = ({ label, image,textToDisplay, onChange }: ImageUploadPr
           </div>
         ) : (
           <img
-            src={`data:image/jpeg;base64,${image}`}
+            src={
+              image.startsWith("data:") || image.startsWith("http") || image.startsWith("blob:")
+                ? image
+                : `data:image/jpeg;base64,${image}`
+            }
             alt="Preview"
             className="w-full h-full object-cover rounded-full bg-[#E8EFFD]"
           />

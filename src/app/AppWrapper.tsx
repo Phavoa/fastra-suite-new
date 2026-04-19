@@ -21,8 +21,11 @@ export default function AppWrapper({
         <PermissionProvider>
           <div className="flex gap-4 bg-gray-100">
             {!isAuthPage ? <Sidebar /> : null}
-            <div className="flex-1 min-h-screen">{children}</div>
-            {/* <div className="flex-1 ml-20 min-h-screen">{children}</div> */}
+            <div
+              className={`flex-1 min-h-screen ${!isAuthPage ? "ml-20" : ""}`}
+            >
+              {children}
+            </div>
           </div>
         </PermissionProvider>
       </PersistGate>

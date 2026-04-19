@@ -31,7 +31,7 @@ export default function FormSelect({
     name={name}
     value={value}
     onChange={onChange}
-    className="w-full border border-[#7A8A98] px-4 py-3 pr-10 bg-white text-[#7A8A98] appearance-none rounded"
+    className="w-full border border-[#7A8A98] px-3 py-2 pr-10 bg-white text-[#7A8A98] text-sm appearance-none rounded"
   >
     <option value="" disabled>
       {placeholder}

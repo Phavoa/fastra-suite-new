@@ -9,8 +9,8 @@ interface SectionProps {
 
 const FormSection = ({ title, children, className = "" }: SectionProps) => {
   return (
-    <div className={`p-6 bg-white border ${className}`}>
-      {title && <h2 className="text-lg font-semibold text-[#3B7CED]">{title}</h2>}
+    <div className={`p-4 bg-white border ${className}`}>
+      {title && <h2 className="text-base font-semibold text-[#3B7CED]">{title}</h2>}
       {children}
     </div>
   );
