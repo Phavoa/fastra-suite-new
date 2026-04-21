@@ -33,6 +33,7 @@ const middleItems = [
     route: "/inventory",
   },
   { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
+  { id: "labour-request", icon: HRIcon, label: "Labour Request", route: "/labour-request" },
   {
     id: "logistics",
     icon: LogisticsIcon,
