@@ -353,7 +353,8 @@ export default function EditDeliveryOrderReturnPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="deliveryorderreturn">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -580,6 +581,7 @@ export default function EditDeliveryOrderReturnPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

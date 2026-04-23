@@ -86,10 +86,10 @@ export default function Page() {
     isLoading: isLoadingRfqs,
     error: rfqsError,
   } = useGetApprovedRfqListQuery();
-  const { data: activeLocations, isLoading: isLoadingLocations } =
+  const { data: activeLocations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsFilteredQuery();
-  const { data: tenantUsers } = useGetTenantUsersQuery({});
-  const { data: paymentTerms, isLoading: isLoadingPaymentTerms } =
+  const { data: tenantUsers, error: usersError } = useGetTenantUsersQuery({});
+  const { data: paymentTerms, isLoading: isLoadingPaymentTerms, error: paymentTermsError } =
     useGetPaymentTermsQuery();
 
   // Selected RFQ state
@@ -185,17 +185,46 @@ export default function Page() {
     }, 0);
   }, [items]);
 
-  // Show notification if RFQs fail to load
+  // Handle query errors
   useEffect(() => {
     if (rfqsError) {
       setNotification({
-        message:
-          "Failed to load approved RFQs. Please check your connection and try again.",
+        message: extractErrorMessage(rfqsError, "Failed to load approved RFQs."),
         type: "error",
         show: true,
       });
     }
   }, [rfqsError]);
+
+  useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
+
+  useEffect(() => {
+    if (paymentTermsError) {
+      setNotification({
+        message: extractErrorMessage(paymentTermsError, "Failed to load payment terms."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [paymentTermsError]);
+
+  useEffect(() => {
+    if (usersError) {
+      setNotification({
+        message: extractErrorMessage(usersError, "Failed to load user profiles."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [usersError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },

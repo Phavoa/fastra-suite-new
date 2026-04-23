@@ -27,6 +27,9 @@ import type { RootState } from "@/lib/store/store";
 import { useSelector } from "react-redux";
 import type { DeliveryOrder } from "@/types/deiveryOrder";
 
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
+
 export default function DeliveryOrderPage() {
   const [query, setQuery] = useState("");
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -145,17 +148,27 @@ export default function DeliveryOrderPage() {
   // Show error state
   if (isError) {
     return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading delivery orders</p>
-          <p className="text-sm mt-2">{error?.toString()}</p>
-        </div>
-      </main>
+      <PageGuard application="inventory" module="deliveryorder">
+        <main className="min-h-screen text-gray-800 flex items-center justify-center">
+          <div className="text-center text-red-600 px-4">
+            <p className="text-lg font-semibold">Error loading delivery orders</p>
+            <p className="text-sm mt-2">{extractErrorMessage(error, "An unknown error occurred")}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="mt-6"
+            >
+              Try Again
+            </Button>
+          </div>
+        </main>
+      </PageGuard>
     );
   }
 
   return (
-    <main className="min-h-screen text-gray-800 mr-4">
+    <PageGuard application="inventory" module="deliveryorder">
+      <main className="min-h-screen text-gray-800 mr-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -402,5 +415,6 @@ export default function DeliveryOrderPage() {
         </>
       )}
     </main>
+    </PageGuard>
   );
 }

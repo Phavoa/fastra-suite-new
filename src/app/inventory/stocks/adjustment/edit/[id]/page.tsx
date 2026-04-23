@@ -25,6 +25,8 @@ import {
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 import { Plus, Trash } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -88,7 +90,7 @@ export default function StockAdjustmentEditPage() {
   const [patchStockAdjustment, { isLoading: isUpdating }] =
     usePatchStockAdjustmentMutation();
 
-  const { data: locations, isLoading: isLoadingLocations } =
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
   const {
     data: products,
@@ -186,17 +188,26 @@ export default function StockAdjustmentEditPage() {
     }
   }, [stockAdjustment, setValue]);
 
-  // Show notification if products fail to load
+  // Handle query errors
   useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
+
+  useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -340,15 +351,10 @@ export default function StockAdjustmentEditPage() {
         router.push("/inventory/stocks/adjustment");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to update stock adjustment. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(
+        error,
+        "Failed to update stock adjustment. Please try again."
+      );
 
       setNotification({
         message: errorMessage,
@@ -388,16 +394,10 @@ export default function StockAdjustmentEditPage() {
         router.push("/inventory/stocks/adjustment");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage =
-        "Failed to validate stock adjustment. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(
+        error,
+        "Failed to validate stock adjustment. Please try again."
+      );
 
       setNotification({
         message: errorMessage,
@@ -415,7 +415,8 @@ export default function StockAdjustmentEditPage() {
   // Loading states
   if (isLoadingAdjustment) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased">
+      <PageGuard application="inventory" module="stockadjustment">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -431,26 +432,20 @@ export default function StockAdjustmentEditPage() {
   }
 
   // Error state
-  if (adjustmentError || !stockAdjustment) {
-    const errorMessage =
-      adjustmentError && "data" in adjustmentError
-        ? (adjustmentError.data as { detail?: string; message?: string })
-            ?.detail ||
-          (adjustmentError.data as { detail?: string; message?: string })
-            ?.message ||
-          "Unable to load stock adjustment details"
-        : "Stock adjustment not found";
+    const errorMessage = extractErrorMessage(adjustmentError, "Unable to load stock adjustment details");
 
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased">
-        <div className="h-full mx-auto px-6 py-8 bg-white">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="text-red-500 text-lg font-semibold mb-2">
-                Error Loading Stock Adjustment
-              </div>
-              <p className="text-gray-600">{errorMessage}</p>
-            </div>
+        <div className="h-full mx-auto px-6 py-8 bg-white flex items-center justify-center">
+          <div className="text-center text-red-600 px-4">
+            <p className="text-lg font-semibold">Error Loading Stock Adjustment</p>
+            <p className="text-sm mt-2">{errorMessage}</p>
+            <Button
+              onClick={() => router.push("/inventory/stocks/adjustment")}
+              className="mt-6 pointer-cursor"
+            >
+              Back to Stock Adjustments
+            </Button>
           </div>
         </div>
       </FadeIn>
@@ -479,7 +474,8 @@ export default function StockAdjustmentEditPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="stockadjustment">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -841,6 +837,7 @@ export default function StockAdjustmentEditPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

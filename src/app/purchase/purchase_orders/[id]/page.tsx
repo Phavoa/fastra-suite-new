@@ -19,6 +19,7 @@ import {
 } from "@/api/purchase/purchaseOrderApi";
 import { useParams } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
+import { extractErrorMessage } from "@/lib/utils";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -87,12 +88,6 @@ const Page = () => {
 
   // Error state
   if (error) {
-    const errorMessage =
-      "data" in error
-        ? error.data?.detail ||
-          error.data?.message ||
-          "Unable to load purchase order details"
-        : "Unable to load purchase order details";
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
@@ -101,7 +96,7 @@ const Page = () => {
               <div className="text-red-500 text-lg font-semibold mb-2">
                 Error Loading Purchase Order
               </div>
-              <p className="text-gray-600">{errorMessage}</p>
+              <p className="text-gray-600">{extractErrorMessage(error, "Unable to load purchase order details")}</p>
             </div>
           </div>
         </div>
@@ -178,10 +173,9 @@ const Page = () => {
         type: "success",
         show: true,
       });
-    } catch (error) {
-      console.error("Failed to update status:", error);
+    } catch (error: unknown) {
       setNotification({
-        message: "Failed to update purchase order status. Please try again.",
+        message: extractErrorMessage(error, "Failed to update purchase order status. Please try again."),
         type: "error",
         show: true,
       });
@@ -212,10 +206,9 @@ const Page = () => {
       // and then refetch the data
       // await activateOrder({ id: purchaseOrderId }).unwrap();
       // await refetch();
-    } catch (error) {
-      console.error("Failed to activate order:", error);
+    } catch (error: unknown) {
       setNotification({
-        message: "Failed to activate order. Please try again.",
+        message: extractErrorMessage(error, "Failed to activate order. Please try again."),
         type: "error",
         show: true,
       });
@@ -233,9 +226,9 @@ const Page = () => {
 
       // Navigate to the fromPO page with the purchase order ID
       window.location.href = `/inventory/operation/incoming_product/fromPO?poId=${purchaseOrderId}`;
-    } catch (error) {
+    } catch (error: unknown) {
       setNotification({
-        message: "Failed to convert to incoming product. Please try again.",
+        message: extractErrorMessage(error, "Failed to convert to incoming product. Please try again."),
         type: "error",
         show: true,
       });

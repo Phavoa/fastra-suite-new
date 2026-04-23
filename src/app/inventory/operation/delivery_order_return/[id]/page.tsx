@@ -19,6 +19,7 @@ import {
 import { ArrowLeft, Edit } from "lucide-react";
 import Link from "next/link";
 import { de } from "zod/v4/locales";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 export default function DeliveryOrderReturnDetailPage() {
   const router = useRouter();
@@ -82,7 +83,8 @@ export default function DeliveryOrderReturnDetailPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="deliveryorderreturn">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -238,6 +240,7 @@ export default function DeliveryOrderReturnDetailPage() {
           </div>
         </motion.div>
       </motion.main>
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

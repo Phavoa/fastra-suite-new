@@ -15,6 +15,7 @@ import { StatusCards } from "@/components/invoice/StatusCards";
 import { InvoiceTable } from "@/components/invoice/InvoiceTable";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
 import { FadeIn } from "@/components/shared/AnimatedWrapper";
+import { extractErrorMessage } from "@/lib/utils";
 
 // Helper function to format date to "DD MMM YYYY - HH:mm AM/PM" format
 const formatDateTime = (dateString: string | undefined): string => {
@@ -122,12 +123,7 @@ export default function InvoicePage() {
 
   // Show error state
   if (isError) {
-    const errorMessage =
-      "data" in error
-        ? (error.data as { detail?: string; message?: string })?.detail ||
-          (error.data as { detail?: string; message?: string })?.message ||
-          "Unable to load invoices"
-        : "Unable to load invoices";
+    const errorMessage = extractErrorMessage(error, "Unable to load invoices");
 
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">

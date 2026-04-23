@@ -4,6 +4,8 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
@@ -84,7 +86,7 @@ export default function ScrapEditPage() {
 
   const [patchScrap, { isLoading: isUpdating }] = usePatchScrapMutation();
 
-  const { data: locations, isLoading: isLoadingLocations } =
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
   const {
     data: products,
@@ -202,17 +204,36 @@ export default function ScrapEditPage() {
     }
   }, [scrap, locations, setValue]);
 
-  // Show notification if products fail to load
+  // Show notification if scrap or products fail to load
+  useEffect(() => {
+    if (scrapError) {
+      setNotification({
+        message: extractErrorMessage(scrapError, "Failed to load scrap details."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [scrapError]);
+
   useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products. Please check your connection and try again."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
+
+  useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations. Please check your connection and try again."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -355,15 +376,7 @@ export default function ScrapEditPage() {
         router.push("/inventory/stocks/scrap");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to update scrap record. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to update scrap record. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -403,15 +416,7 @@ export default function ScrapEditPage() {
         router.push("/inventory/stocks/scrap");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to validate scrap record. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to validate scrap record. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -429,7 +434,8 @@ export default function ScrapEditPage() {
   // Loading states
   if (isLoadingScrap) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased">
+      <PageGuard application="inventory" module="scrap">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -439,38 +445,39 @@ export default function ScrapEditPage() {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
   // Error state
   if (scrapError || !scrap) {
-    const errorMessage =
-      scrapError && "data" in scrapError
-        ? (scrapError.data as { detail?: string; message?: string })?.detail ||
-          (scrapError.data as { detail?: string; message?: string })?.message ||
-          "Unable to load scrap details"
-        : "Scrap not found";
-
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased">
-        <div className="h-full mx-auto px-6 py-8 bg-white">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="text-red-500 text-lg font-semibold mb-2">
-                Error Loading Scrap
+      <PageGuard application="inventory" module="scrap">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased">
+          <div className="h-full mx-auto px-6 py-8 bg-white">
+            <div className="flex items-center justify-center h-64 text-center px-4">
+              <div className="text-red-500">
+                <p className="font-semibold text-lg">Error Loading Scrap</p>
+                <p className="text-sm mt-1">{extractErrorMessage(scrapError, "The requested scrap record could not be found.")}</p>
+                <Button
+                  onClick={() => router.push("/inventory/stocks/scrap")}
+                  className="mt-6 pointer-cursor"
+                >
+                  Back to Scrap Management
+                </Button>
               </div>
-              <p className="text-gray-600">{errorMessage}</p>
             </div>
           </div>
-        </div>
-      </FadeIn>
+        </FadeIn>
+      </PageGuard>
     );
   }
 
   // Check if editable
   if (scrap?.status !== "draft") {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased">
+      <PageGuard application="inventory" module="scrap">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -485,11 +492,13 @@ export default function ScrapEditPage() {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="scrap">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -864,6 +873,7 @@ export default function ScrapEditPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

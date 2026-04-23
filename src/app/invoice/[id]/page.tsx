@@ -11,6 +11,7 @@ import {
   SlideUp,
   StaggerContainer,
 } from "@/components/shared/AnimatedWrapper";
+import { extractErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -115,13 +116,12 @@ export default function InvoiceDetailsPage() {
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
         <div className="h-full mx-auto px-6 py-8 bg-white flex items-center justify-center">
-          <div className="text-center text-red-600">
-            <p>Error loading invoice details</p>
-            <p className="text-sm mt-2">{error?.toString()}</p>
+          <div className="text-center text-red-600 px-4">
+            <p className="text-lg font-semibold">Error loading invoice details</p>
+            <p className="text-sm mt-2">{extractErrorMessage(error, "The requested invoice could not be found.")}</p>
             <Button
               onClick={() => router.push("/invoice")}
-              className="mt-4"
-              variant="outline"
+              className="mt-6 pointer-cursor"
             >
               Back to Invoices
             </Button>

@@ -5,7 +5,6 @@ import React from "react";
 import type { ReactElement } from "react";
 import Link from "next/link";
 import {
-  Bell,
   ClipboardList,
   Briefcase,
   MapPin,
@@ -15,13 +14,6 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { Avatar } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import {
   AccountIcon,
   AppIcon,
@@ -35,6 +27,7 @@ import {
 } from "@/components/shared/icons";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
+import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
 
 type Module = {
   id: string;
@@ -213,7 +206,7 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
       purchase: "/purchase",
       sales: "/sales",
       finance: "/finance",
-      inventory: "/inventory",
+      inventory: "/inventory/operation",
       hr: "/hr",
       logistics: "/logistics",
       contacts: "/contact",
@@ -254,60 +247,15 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
 }
 
 export default function DashboardPage(): ReactElement {
-  console.log("hello");
-  // Get logged-in user from Redux store
   const loggedInUser = useSelector(
-    (state: RootState) => state.auth.user_accesses
+    (state: RootState) => state.auth.user_accesses,
   );
-  console.log(loggedInUser);
+
   return (
-    <div className="min-h-screen text-slate-900">
-      <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 mb-4">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="h-16 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold">Home</h1>
-            </div>
+    <div className="min-h-screen flex flex-col text-slate-900">
+      <NavBar title="Home" items={[]} />
 
-            <nav
-              className="flex items-center gap-4"
-              aria-label="Top navigation"
-            >
-              <button
-                className="p-2 rounded-md hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                aria-label="Notifications"
-              >
-                <Bell className="w-5 h-5 text-slate-700" />
-              </button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="flex items-center gap-3 rounded-full p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                    aria-label="User menu"
-                  >
-                    <Avatar>
-                      <div className="h-8 w-8 rounded-full bg-pink-200 flex items-center justify-center text-pink-700 font-medium">
-                        AD
-                      </div>
-                    </Avatar>
-                    <span className="hidden sm:inline-block text-sm">
-                      Administrator
-                    </span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
-                  <DropdownMenuItem>Settings</DropdownMenuItem>
-                  <DropdownMenuItem>Sign out</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main className="py-8 bg-white">
+      <main className="flex-1 py-8 bg-gray-100">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           <section aria-labelledby="dashboard-heading" className="mb-8">
             {/* Grid */}

@@ -20,6 +20,7 @@ import {
 } from "@/api/purchase/purchaseOrderApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import type { Resolver } from "react-hook-form";
+import { extractErrorMessage } from "@/lib/utils";
 import {
   FadeIn,
   SlideUp,
@@ -78,8 +79,8 @@ export default function Page() {
 
   // API mutations and queries
   const [createInvoice, { isLoading: isCreating }] = useCreateInvoiceMutation();
-  const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
-  const { data: purchaseOrders, isLoading: isLoadingPurchaseOrders } =
+  const { data: vendors, isLoading: isLoadingVendors, error: vendorsError } = useGetVendorsQuery({});
+  const { data: purchaseOrders, isLoading: isLoadingPurchaseOrders, error: poError } =
     useGetPurchaseOrdersQuery({ status: "completed" });
 
   // Form state
@@ -133,7 +134,6 @@ export default function Page() {
   // Watch purchase order selection
   const selectedPurchaseOrderId = watch("purchase_order");
 
-  // Auto-fill items when purchase order is selected
   useEffect(() => {
     if (selectedPurchaseOrderId && purchaseOrders) {
       const selectedPO = purchaseOrders.find(
@@ -164,6 +164,27 @@ export default function Page() {
       }
     }
   }, [selectedPurchaseOrderId, purchaseOrders, setValue]);
+
+  // Handle query errors
+  useEffect(() => {
+    if (vendorsError) {
+      setNotification({
+        message: extractErrorMessage(vendorsError, "Failed to load vendors."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [vendorsError]);
+
+  useEffect(() => {
+    if (poError) {
+      setNotification({
+        message: extractErrorMessage(poError, "Failed to load approved purchase orders."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [poError]);
 
   // Notification state
   const [notification, setNotification] = React.useState<{
@@ -256,16 +277,7 @@ export default function Page() {
         router.push("/invoice");
       }, 1500);
     } catch (error: unknown) {
-      // Handle API errors
-      let errorMessage = "Failed to create invoice. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to create invoice. Please try again.");
 
       setNotification({
         message: errorMessage,

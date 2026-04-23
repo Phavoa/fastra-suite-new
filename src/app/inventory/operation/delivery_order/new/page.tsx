@@ -26,6 +26,9 @@ import {
   DeliveryOrderFormData,
   DeliveryOrderSubmissionData,
 } from "../components/types";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
+import { useEffect } from "react";
 
 // Form schema for delivery order creation
 const deliveryOrderSchema = z.object({
@@ -61,9 +64,9 @@ export default function Page() {
   // API mutations and queries
   const [createDeliveryOrder, { isLoading: isCreating }] =
     useCreateDeliveryOrderMutation();
-  const { data: locations, isLoading: isLoadingLocations } =
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
-  const { data: users, isLoading: isLoadingUsers } = useGetUsersQuery();
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsersQuery();
 
   // Form state
   const [items, setItems] = useState<DeliveryOrderLineItem[]>(initialItems);
@@ -71,10 +74,41 @@ export default function Page() {
     useState<string>("");
 
   // Get stock levels for selected source location
-  const { data: stockLevels, isLoading: isLoadingStockLevels } =
+  const { data: stockLevels, isLoading: isLoadingStockLevels, error: stockLevelsError } =
     useGetLocationStockLevelsQuery(selectedSourceLocation, {
       skip: !selectedSourceLocation,
     });
+
+  // Handle query errors
+  useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
+
+  useEffect(() => {
+    if (usersError) {
+      setNotification({
+        message: extractErrorMessage(usersError, "Failed to load users."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [usersError]);
+
+  useEffect(() => {
+    if (stockLevelsError) {
+      setNotification({
+        message: extractErrorMessage(stockLevelsError, "Failed to load stock levels for the selected location."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [stockLevelsError]);
 
   const addRow = () =>
     setItems((prev) => [
@@ -235,32 +269,7 @@ export default function Page() {
         router.push(`/inventory/operation/delivery_order/${result.id}`);
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to create delivery order. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: {
-            detail?: string;
-            message?: string;
-            error?: Array<{ non_field_errors?: string }>;
-          };
-        };
-
-        if (apiError.data?.error && Array.isArray(apiError.data.error)) {
-          const errorMessages: string[] = [];
-          for (const err of apiError.data.error) {
-            if (err.non_field_errors) {
-              errorMessages.push(err.non_field_errors);
-            }
-          }
-          if (errorMessages.length > 0) {
-            errorMessage = errorMessages.join(" ");
-          }
-        } else {
-          errorMessage =
-            apiError.data?.detail || apiError.data?.message || errorMessage;
-        }
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to create delivery order. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -322,7 +331,8 @@ export default function Page() {
   };
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="deliveryorder">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -401,6 +411,7 @@ export default function Page() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

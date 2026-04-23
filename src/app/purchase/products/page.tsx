@@ -18,6 +18,7 @@ import {
 } from "../../../api/purchase/productsApi";
 import type { Product } from "../../../types/purchase";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 export default function Page() {
   const [currentView, setCurrentView] = React.useState<"grid" | "list">("list");
@@ -128,8 +129,11 @@ export default function Page() {
               <ProductsTableSkeleton />
             )
           ) : error ? (
-            <div className="flex items-center justify-center h-64 text-red-500">
-              Error loading products. Please try again.
+            <div className="flex items-center justify-center h-64 text-red-500 text-center px-4">
+              <div>
+                <p className="font-semibold text-lg">Error loading products</p>
+                <p className="text-sm mt-1">{extractErrorMessage(error, "Please check your connection and try again.")}</p>
+              </div>
             </div>
           ) : currentView === "grid" ? (
             <ProductsCards products={products} />

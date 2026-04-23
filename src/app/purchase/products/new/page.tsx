@@ -12,6 +12,7 @@ import { ProductFormActions } from "@/components/purchase/products/ProductFormAc
 import { BreadcrumbItem } from "@/types/purchase";
 import { useCreateProductMutation } from "@/api/purchase/productsApi";
 import { useGetUnitOfMeasuresQuery } from "@/api/purchase/unitOfMeasureApi";
+import { extractErrorMessage } from "@/lib/utils";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { productSchema, type ProductFormData } from "@/schemas/productSchema";
 import type { Resolver } from "react-hook-form";
@@ -30,7 +31,7 @@ export default function Page() {
 
   // API mutations and queries
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
-  const { data: unitMeasures, isLoading: isLoadingUnits } =
+  const { data: unitMeasures, isLoading: isLoadingUnits, error: unitMeasuresError } =
     useGetUnitOfMeasuresQuery({});
 
   // React Hook Form setup
@@ -62,6 +63,17 @@ export default function Page() {
     type: "success",
     show: false,
   });
+
+  // Handle unit measures error
+  React.useEffect(() => {
+    if (unitMeasuresError) {
+      setNotification({
+        message: extractErrorMessage(unitMeasuresError, "Failed to load unit of measures."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [unitMeasuresError]);
 
   // Convert API data to option format
   const unitOptions: Option[] =
@@ -130,19 +142,8 @@ export default function Page() {
         router.push("/purchase/products");
       }, 1500);
     } catch (error: unknown) {
-      // Handle API errors
-      let errorMessage = "Failed to create product. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
-
       setNotification({
-        message: errorMessage,
+        message: extractErrorMessage(error, "Failed to create product. Please try again."),
         type: "error",
         show: true,
       });

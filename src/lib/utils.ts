@@ -20,23 +20,28 @@ export function extractErrorMessage(
     if (typeof data.detail === "string") return data.detail;
     if (typeof data.message === "string") return data.message;
 
-    // Handle nested error array (user's specific case)
+    // Handle nested error array (user's specific case: {"error": [{"detail": "..."}]})
     if (Array.isArray(data.error) && data.error.length > 0) {
       const firstError = data.error[0];
-      if (typeof firstError.non_field_errors === "string")
-        return firstError.non_field_errors;
-      if (
-        typeof firstError.non_field_errors === "object" &&
-        Array.isArray(firstError.non_field_errors)
-      ) {
-        return firstError.non_field_errors[0];
-      }
+      if (typeof firstError === "string") return firstError;
+      if (typeof firstError === "object" && firstError !== null) {
+        if (typeof firstError.detail === "string") return firstError.detail;
+        if (typeof firstError.message === "string") return firstError.message;
+        if (typeof firstError.non_field_errors === "string")
+          return firstError.non_field_errors;
+        if (
+          Array.isArray(firstError.non_field_errors) &&
+          firstError.non_field_errors.length > 0
+        ) {
+          return firstError.non_field_errors[0];
+        }
 
-      // Fallback to other fields in the first error object if non_field_errors isn't present
-      const firstKey = Object.keys(firstError)[0];
-      if (firstKey) {
-        const val = firstError[firstKey];
-        return Array.isArray(val) ? val[0] : String(val);
+        // Fallback to the first available key in the error object
+        const firstKey = Object.keys(firstError)[0];
+        if (firstKey) {
+          const val = firstError[firstKey];
+          return Array.isArray(val) ? val[0] : String(val);
+        }
       }
     }
 

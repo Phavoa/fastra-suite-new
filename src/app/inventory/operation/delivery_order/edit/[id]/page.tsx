@@ -34,6 +34,8 @@ import {
   DeliveryOrderFormData,
   DeliveryOrderSubmissionData,
 } from "../../components/types";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 // Form schema for delivery order creation
 const deliveryOrderSchema = z.object({
@@ -76,9 +78,9 @@ export default function EditDeliveryOrderPage() {
     isLoading: isLoadingDeliveryOrder,
     error: deliveryOrderError,
   } = useGetDeliveryOrderQuery(deliveryOrderId);
-  const { data: locations, isLoading: isLoadingLocations } =
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
-  const { data: users, isLoading: isLoadingUsers } = useGetUsersQuery();
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsersQuery();
 
   // Form state
   const [items, setItems] = useState<DeliveryOrderLineItem[]>(initialItems);
@@ -111,10 +113,41 @@ export default function EditDeliveryOrderPage() {
   });
 
   // Get stock levels for selected source location
-  const { data: stockLevels, isLoading: isLoadingStockLevels } =
+  const { data: stockLevels, isLoading: isLoadingStockLevels, error: stockLevelsError } =
     useGetLocationStockLevelsQuery(selectedSourceLocation, {
       skip: !selectedSourceLocation,
     });
+
+  // Handle query errors
+  useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
+
+  useEffect(() => {
+    if (usersError) {
+      setNotification({
+        message: extractErrorMessage(usersError, "Failed to load users."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [usersError]);
+
+  useEffect(() => {
+    if (stockLevelsError) {
+      setNotification({
+        message: extractErrorMessage(stockLevelsError, "Failed to load stock levels for the selected location."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [stockLevelsError]);
 
   // Populate form when delivery order data is loaded
   useEffect(() => {
@@ -312,32 +345,7 @@ export default function EditDeliveryOrderPage() {
         router.push(`/inventory/operation/delivery_order/${deliveryOrderId}`);
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to update delivery order. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: {
-            detail?: string;
-            message?: string;
-            error?: Array<{ non_field_errors?: string }>;
-          };
-        };
-
-        if (apiError.data?.error && Array.isArray(apiError.data.error)) {
-          const errorMessages: string[] = [];
-          for (const err of apiError.data.error) {
-            if (err.non_field_errors) {
-              errorMessages.push(err.non_field_errors);
-            }
-          }
-          if (errorMessages.length > 0) {
-            errorMessage = errorMessages.join(" ");
-          }
-        } else {
-          errorMessage =
-            apiError.data?.detail || apiError.data?.message || errorMessage;
-        }
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to update delivery order. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -412,10 +420,10 @@ export default function EditDeliveryOrderPage() {
   if (deliveryOrderError || !deliveryOrder) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading delivery order</p>
+        <div className="text-center text-red-600 px-4">
+          <p className="text-lg font-semibold">Error loading delivery order</p>
           <p className="text-sm mt-2">
-            The requested delivery order could not be found.
+            {extractErrorMessage(deliveryOrderError, "The requested delivery order could not be found.")}
           </p>
           <Button
             onClick={() => router.push("/inventory/operation/delivery_order")}
@@ -429,7 +437,8 @@ export default function EditDeliveryOrderPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="deliveryorder">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -513,6 +522,7 @@ export default function EditDeliveryOrderPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

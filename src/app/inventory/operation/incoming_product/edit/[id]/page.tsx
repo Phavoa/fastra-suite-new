@@ -10,11 +10,13 @@ import { BreadcrumbItem } from "@/types/purchase";
 import {
   useUpdateIncomingProductMutation,
   useGetIncomingProductQuery,
+  useCreateIncomingProductBackorderMutation,
 } from "@/api/inventory/incomingProductApi";
 import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import {
   FadeIn,
   SlideUp,
@@ -23,7 +25,8 @@ import {
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash } from "lucide-react";
+import { Plus, Trash, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -45,6 +48,8 @@ import {
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
 import type { UpdateIncomingProductRequest } from "@/types/incomingProduct";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 type Option = { value: string; label: string };
 
@@ -108,9 +113,14 @@ export default function EditIncomingProductPage() {
   // API mutations and queries
   const [updateIncomingProduct, { isLoading: isUpdating }] =
     useUpdateIncomingProductMutation();
-  const { data: incomingProduct, isLoading: isLoadingIncomingProduct } =
-    useGetIncomingProductQuery(incomingProductId);
-  const { data: locations, isLoading: isLoadingLocations } =
+  const [createBackorder, { isLoading: isCreatingBackorder }] =
+    useCreateIncomingProductBackorderMutation();
+  const {
+    data: incomingProduct,
+    isLoading: isLoadingIncomingProduct,
+    error: incomingProductError,
+  } = useGetIncomingProductQuery(incomingProductId);
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
   const {
     data: vendors,
@@ -125,6 +135,17 @@ export default function EditIncomingProductPage() {
 
   // Form state
   const [items, setItems] = useState<IncomingProductLineItem[]>(initialItems);
+
+  // Discrepancy Dialog State
+  const [discrepancyState, setDiscrepancyState] = useState<{
+    isOpen: boolean;
+    type: DiscrepancyType | null;
+    ipId: string | null;
+  }>({
+    isOpen: false,
+    type: null,
+    ipId: null,
+  });
   const [formKey, setFormKey] = useState(0); // Key to force re-render of form components
 
   const addRow = () =>
@@ -248,10 +269,19 @@ export default function EditIncomingProductPage() {
 
   // Show notification if products or vendors fail to load
   React.useEffect(() => {
+    if (incomingProductError) {
+      setNotification({
+        message: extractErrorMessage(incomingProductError, "Failed to load incoming product details."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [incomingProductError]);
+
+  React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products. Please check your connection and try again."),
         type: "error",
         show: true,
       });
@@ -261,13 +291,22 @@ export default function EditIncomingProductPage() {
   React.useEffect(() => {
     if (vendorsError) {
       setNotification({
-        message:
-          "Failed to load vendors. Please check your connection and try again.",
+        message: extractErrorMessage(vendorsError, "Failed to load vendors. Please check your connection and try again."),
         type: "error",
         show: true,
       });
     }
   }, [vendorsError]);
+
+  React.useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations. Please check your connection and try again."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -350,15 +389,7 @@ export default function EditIncomingProductPage() {
         router.push("/inventory/operation");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to update incoming product. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to update incoming product. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -398,16 +429,43 @@ export default function EditIncomingProductPage() {
         router.push("/inventory/operation");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage =
-        "Failed to validate incoming product. Please try again.";
+      // Check for specific backorder/return error codes from backend
+      const err = error as any;
+      const detailRaw = err?.data?.detail?.toString?.() || "";
+      const codeMatch = detailRaw.match(/code='(.*?)'/);
+      const backorderCode = codeMatch?.[1];
 
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
+      // Extract IP_ID from string like "... string='{\"IP_ID\": \"INCP-0001\"}' ..."
+      let IP_ID = null;
+      const jsonMatch = detailRaw.match(/string='(.*?)'/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          IP_ID = parsed?.IP_ID;
+        } catch (e) {
+          console.warn("Failed to parse IP_ID from error detail", e);
+        }
       }
+
+      if (backorderCode === "backorder_required" && IP_ID) {
+        setDiscrepancyState({
+          isOpen: true,
+          type: "backorder",
+          ipId: IP_ID,
+        });
+        return;
+      }
+
+      if (backorderCode === "return_required" && IP_ID) {
+        setDiscrepancyState({
+          isOpen: true,
+          type: "return",
+          ipId: IP_ID,
+        });
+        return;
+      }
+
+      const errorMessage = extractErrorMessage(error, "Failed to validate incoming product. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -416,6 +474,63 @@ export default function EditIncomingProductPage() {
       });
     }
   }
+
+  // Handlers for Discrepancy Dialog
+  const handleBackorderConfirm = async () => {
+    if (!discrepancyState.ipId) return;
+    try {
+      await createBackorder({
+        response: true,
+        incoming_product: discrepancyState.ipId,
+      }).unwrap();
+
+      setNotification({
+        message: "Backorder created successfully!",
+        type: "success",
+        show: true,
+      });
+
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
+    } catch (error) {
+      setNotification({
+        message: extractErrorMessage(error, "Failed to create backorder"),
+        type: "error",
+        show: true,
+      });
+    }
+  };
+
+  const handleBackorderDecline = async () => {
+    if (!discrepancyState.ipId) return;
+    try {
+      await createBackorder({
+        response: false,
+        incoming_product: discrepancyState.ipId,
+      }).unwrap();
+
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
+    } catch (error) {
+      setNotification({
+        message: extractErrorMessage(error, "Failed to acknowledge discrepancy"),
+        type: "error",
+        show: true,
+      });
+    }
+  };
+
+  const handleReturnConfirm = () => {
+    if (!discrepancyState.ipId) return;
+    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+    router.push(`/inventory/operation/incoming_product/return/${discrepancyState.ipId}`);
+  };
+
+  const handleReturnDecline = () => {
+    if (!discrepancyState.ipId) return;
+    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+    router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
+  };
 
   // Close notification
   function closeNotification() {
@@ -458,20 +573,31 @@ export default function EditIncomingProductPage() {
     );
   };
 
-  // Show loading state while fetching existing data
-  if (isLoadingIncomingProduct) {
+  // Show error state if incoming product failed to load
+  if (incomingProductError || !incomingProduct) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading incoming product...</p>
+        <div className="text-center text-red-600 px-4">
+          <p className="font-semibold text-lg">Error loading incoming product</p>
+          <p className="text-sm mt-2">
+            {extractErrorMessage(incomingProductError, "The requested incoming product could not be found.")}
+          </p>
+          <Button
+            onClick={() =>
+              router.push("/inventory/operation")
+            }
+            className="mt-6 pointer-cursor"
+          >
+            Back to Operations
+          </Button>
         </div>
       </main>
     );
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="incomingproduct">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -493,6 +619,40 @@ export default function EditIncomingProductPage() {
         transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
       >
         <form ref={formRef} className="bg-white">
+          {/* Backorder Information Banner */}
+          {incomingProduct.backorder_of && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="mb-6 p-4 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                  <ExternalLink className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-orange-900">
+                    Backorder Record
+                  </p>
+                  <p className="text-xs text-orange-700">
+                    This record is a backorder of{" "}
+                    <span className="font-bold">
+                      {incomingProduct.backorder_of_details
+                        ?.incoming_product_id || incomingProduct.backorder_of}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/inventory/operation/incoming_product/${incomingProduct.backorder_of}`}
+                className="text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1"
+              >
+                View Parent Document
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            </motion.div>
+          )}
+
           <motion.h2
             className="text-lg font-medium text-blue-500 mb-6"
             initial={{ opacity: 0, x: -20 }}
@@ -967,6 +1127,16 @@ export default function EditIncomingProductPage() {
         show={notification.show}
         onClose={closeNotification}
       />
+
+      <DiscrepancyDialog
+        isOpen={discrepancyState.isOpen}
+        type={discrepancyState.type}
+        onClose={() => setDiscrepancyState({ ...discrepancyState, isOpen: false })}
+        onConfirm={discrepancyState.type === "backorder" ? handleBackorderConfirm : handleReturnConfirm}
+        onDecline={discrepancyState.type === "backorder" ? handleBackorderDecline : handleReturnDecline}
+        isLoading={isCreatingBackorder}
+      />
     </motion.div>
+  </PageGuard>
   );
 }

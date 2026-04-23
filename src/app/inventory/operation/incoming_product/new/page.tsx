@@ -7,11 +7,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
 import { BreadcrumbItem } from "@/types/purchase";
-import { useCreateIncomingProductMutation } from "@/api/inventory/incomingProductApi";
+import { useCreateIncomingProductMutation, useCreateIncomingProductBackorderMutation } from "@/api/inventory/incomingProductApi";
 import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import {
   FadeIn,
   SlideUp,
@@ -42,6 +43,8 @@ import {
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
 import type { CreateIncomingProductRequest } from "@/types/incomingProduct";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 type Option = { value: string; label: string };
 
@@ -103,7 +106,9 @@ export default function Page() {
   // API mutations and queries
   const [createIncomingProduct, { isLoading: isCreating }] =
     useCreateIncomingProductMutation();
-  const { data: locations, isLoading: isLoadingLocations } =
+  const [createBackorder, { isLoading: isCreatingBackorder }] =
+    useCreateIncomingProductBackorderMutation();
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
   const {
     data: vendors,
@@ -118,6 +123,17 @@ export default function Page() {
 
   // Form state
   const [items, setItems] = useState<IncomingProductLineItem[]>(initialItems);
+
+  // Discrepancy Dialog State
+  const [discrepancyState, setDiscrepancyState] = useState<{
+    isOpen: boolean;
+    type: DiscrepancyType | null;
+    ipId: string | null;
+  }>({
+    isOpen: false,
+    type: null,
+    ipId: null,
+  });
 
   const addRow = () =>
     setItems((prev) => [
@@ -199,12 +215,11 @@ export default function Page() {
       label: product.product_name,
     })) || [];
 
-  // Show notification if products or vendors fail to load
+  // Show notification if products, vendors, or locations fail to load
   React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products. Please check your connection and try again."),
         type: "error",
         show: true,
       });
@@ -214,13 +229,22 @@ export default function Page() {
   React.useEffect(() => {
     if (vendorsError) {
       setNotification({
-        message:
-          "Failed to load vendors. Please check your connection and try again.",
+        message: extractErrorMessage(vendorsError, "Failed to load vendors. Please check your connection and try again."),
         type: "error",
         show: true,
       });
     }
   }, [vendorsError]);
+
+  React.useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations. Please check your connection and try again."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -300,15 +324,7 @@ export default function Page() {
         router.push("/inventory/operation");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to save incoming product. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to save incoming product. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -347,16 +363,43 @@ export default function Page() {
         router.push("/inventory/operation");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage =
-        "Failed to validate incoming product. Please try again.";
+      // Check for specific backorder/return error codes from backend
+      const err = error as any;
+      const detailRaw = err?.data?.detail?.toString?.() || "";
+      const codeMatch = detailRaw.match(/code='(.*?)'/);
+      const backorderCode = codeMatch?.[1];
 
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
+      // Extract IP_ID from string like "... string='{\"IP_ID\": \"INCP-0001\"}' ..."
+      let IP_ID = null;
+      const jsonMatch = detailRaw.match(/string='(.*?)'/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          IP_ID = parsed?.IP_ID;
+        } catch (e) {
+          console.warn("Failed to parse IP_ID from error detail", e);
+        }
       }
+
+      if (backorderCode === "backorder_required" && IP_ID) {
+        setDiscrepancyState({
+          isOpen: true,
+          type: "backorder",
+          ipId: IP_ID,
+        });
+        return;
+      }
+
+      if (backorderCode === "return_required" && IP_ID) {
+        setDiscrepancyState({
+          isOpen: true,
+          type: "return",
+          ipId: IP_ID,
+        });
+        return;
+      }
+
+      const errorMessage = extractErrorMessage(error, "Failed to validate incoming product. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -365,6 +408,63 @@ export default function Page() {
       });
     }
   }
+
+  // Handlers for Discrepancy Dialog
+  const handleBackorderConfirm = async () => {
+    if (!discrepancyState.ipId) return;
+    try {
+      await createBackorder({
+        response: true,
+        incoming_product: discrepancyState.ipId,
+      }).unwrap();
+
+      setNotification({
+        message: "Backorder created successfully!",
+        type: "success",
+        show: true,
+      });
+
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
+    } catch (error) {
+      setNotification({
+        message: extractErrorMessage(error, "Failed to create backorder"),
+        type: "error",
+        show: true,
+      });
+    }
+  };
+
+  const handleBackorderDecline = async () => {
+    if (!discrepancyState.ipId) return;
+    try {
+      await createBackorder({
+        response: false,
+        incoming_product: discrepancyState.ipId,
+      }).unwrap();
+
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
+    } catch (error) {
+      setNotification({
+        message: extractErrorMessage(error, "Failed to acknowledge discrepancy"),
+        type: "error",
+        show: true,
+      });
+    }
+  };
+
+  const handleReturnConfirm = () => {
+    if (!discrepancyState.ipId) return;
+    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+    router.push(`/inventory/operation/incoming_product/return/${discrepancyState.ipId}`);
+  };
+
+  const handleReturnDecline = () => {
+    if (!discrepancyState.ipId) return;
+    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+    router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
+  };
 
   // Close notification
   function closeNotification() {
@@ -408,7 +508,8 @@ export default function Page() {
   };
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="incomingproduct">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -900,6 +1001,16 @@ export default function Page() {
         show={notification.show}
         onClose={closeNotification}
       />
+
+      <DiscrepancyDialog
+        isOpen={discrepancyState.isOpen}
+        type={discrepancyState.type}
+        onClose={() => setDiscrepancyState({ ...discrepancyState, isOpen: false })}
+        onConfirm={discrepancyState.type === "backorder" ? handleBackorderConfirm : handleReturnConfirm}
+        onDecline={discrepancyState.type === "backorder" ? handleBackorderDecline : handleReturnDecline}
+        isLoading={isCreatingBackorder}
+      />
     </motion.div>
+  </PageGuard>
   );
 }

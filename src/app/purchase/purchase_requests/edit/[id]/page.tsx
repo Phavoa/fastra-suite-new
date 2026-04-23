@@ -24,6 +24,7 @@ import { useGetCurrenciesQuery } from "@/api/purchase/currencyApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
+import { extractErrorMessage } from "@/lib/utils";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   purchaseRequestSchema,
@@ -56,7 +57,7 @@ export default function Page() {
   const purchaseRequestId = params.id as string;
 
   // API mutations and queries
-  const { data: purchaseRequest, isLoading: isLoadingPurchaseRequest } =
+  const { data: purchaseRequest, isLoading: isLoadingPurchaseRequest, error: purchaseRequestError } =
     useGetPurchaseRequestQuery(purchaseRequestId, {
       skip: !purchaseRequestId,
     });
@@ -64,15 +65,15 @@ export default function Page() {
   const [patchPurchaseRequest, { isLoading: isUpdating }] =
     usePatchPurchaseRequestMutation();
 
-  const { data: currencies, isLoading: isLoadingCurrencies } =
+  const { data: currencies, isLoading: isLoadingCurrencies, error: currenciesError } =
     useGetCurrenciesQuery({});
-  const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
+  const { data: vendors, isLoading: isLoadingVendors, error: vendorsError } = useGetVendorsQuery({});
   const {
     data: products,
     isLoading: isLoadingProducts,
     error: productsError,
   } = useGetProductsQuery({});
-  const { data: activeLocations, isLoading: isLoadingLocations } =
+  const { data: activeLocations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsFilteredQuery();
 
   // Use purchase request data as primary source, fall back to API data when needed
@@ -306,17 +307,56 @@ export default function Page() {
   // Enhanced location options now just reference the optimized options above
   const enhancedLocationOptions = locationOptions;
 
-  // Show notification if products fail to load
+  // Handle query errors
+  React.useEffect(() => {
+    if (purchaseRequestError) {
+      setNotification({
+        message: extractErrorMessage(purchaseRequestError, "Failed to load purchase request details."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [purchaseRequestError]);
+
   React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
+
+  React.useEffect(() => {
+    if (vendorsError) {
+      setNotification({
+        message: extractErrorMessage(vendorsError, "Failed to load vendors."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [vendorsError]);
+
+  React.useEffect(() => {
+    if (currenciesError) {
+      setNotification({
+        message: extractErrorMessage(currenciesError, "Failed to load currencies."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [currenciesError]);
+
+  React.useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
 
   // Show notification if purchase request fails to load
   React.useEffect(() => {
@@ -406,16 +446,7 @@ export default function Page() {
         router.back();
       }, 1500);
     } catch (error: unknown) {
-      // Handle API errors
-      let errorMessage = "Failed to update purchase request. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to update purchase request. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -461,17 +492,7 @@ export default function Page() {
         router.push("/purchase/purchase_requests");
       }, 1500);
     } catch (error: unknown) {
-      // Handle API errors
-      let errorMessage =
-        "Failed to send purchase request for approval. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to send purchase request for approval. Please try again.");
 
       setNotification({
         message: errorMessage,

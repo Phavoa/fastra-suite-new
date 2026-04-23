@@ -14,6 +14,7 @@ import {
   usePatchProductMutation,
 } from "@/api/purchase/productsApi";
 import { useGetUnitOfMeasuresQuery } from "@/api/purchase/unitOfMeasureApi";
+import { extractErrorMessage } from "@/lib/utils";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 type Option = { value: string; label: string };
@@ -150,10 +151,9 @@ export default function Page() {
         router.push("/purchase/products");
       }, 1500);
     } catch (error) {
-      console.error("Error updating product:", error);
       setNotification({
         type: "error",
-        message: "Failed to update product. Please try again.",
+        message: extractErrorMessage(error, "Failed to update product. Please try again."),
       });
     }
   }
@@ -220,12 +220,13 @@ export default function Page() {
         >
           <PageHeader items={items} title="Edit Product" />
         </motion.div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-red-600 mb-4">Failed to load unit of measures</p>
+        <div className="flex items-center justify-center h-64 text-center px-4">
+          <div className="text-red-500">
+            <p className="font-semibold text-lg">Error Loading Units</p>
+            <p className="text-sm mt-1">{extractErrorMessage(unitsError, "Failed to load unit of measures")}</p>
             <button
               onClick={() => router.push("/purchase/products")}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors pointer-cursor"
             >
               Back to Products
             </button>
@@ -251,12 +252,13 @@ export default function Page() {
         >
           <PageHeader items={items} title="Edit Product" />
         </motion.div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-red-600 mb-4">Failed to load product details</p>
+        <div className="flex items-center justify-center h-64 text-center px-4">
+          <div className="text-red-500">
+            <p className="font-semibold text-lg">Error Loading Product</p>
+            <p className="text-sm mt-1">{extractErrorMessage(productError, "Failed to load product details")}</p>
             <button
               onClick={() => router.push("/purchase/products")}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors pointer-cursor"
             >
               Back to Products
             </button>

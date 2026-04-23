@@ -10,6 +10,7 @@ import { SettingsControlBar } from "@/components/Settings/SettingsControlBar";
 import { useDispatch, useSelector } from "react-redux";
 import { setArchive } from "@/components/Settings/viewModeSlice";
 import { RootState } from "@/lib/store/store";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 type SettingsSection =
   | "company"
@@ -40,16 +41,22 @@ export default function SettingsLayout({
   ];
 
 
-  // Determine active section automatically
-  const activeNav = navItems.find((item) => pathname === item.href);
-  const activeSection: SettingsSection =
-  activeNav?.key ?? "company";
+  // Determine active section automatically, handling sub-paths
+  const getActiveSection = (path: string): SettingsSection => {
+    if (path.startsWith("/settings/users")) return "user";
+    if (path.startsWith("/settings/accessgroup")) return "accessgroup";
+    if (path.startsWith("/settings/application")) return "application";
+    return "company";
+  };
+
+  const activeSection = getActiveSection(pathname);
+  const activeNav = navItems.find((item) => item.key === activeSection);
 
 
   /*const activeSection =
-    activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||
-    "company";
-    */
+     activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||
+     "company";
+     */
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -98,7 +105,7 @@ export default function SettingsLayout({
     (/^\/settings\/accessgroup\/[^/]+$/.test(pathname) &&
       pathname !== "/settings/accessgroup");
   return (
-    <>
+    <PageGuard application="settings" module={activeSection}>
       <NavBar title="Settings" items={navItems} />
 
       {/* Breadcrumb / secondary top bar */}
@@ -127,6 +134,6 @@ export default function SettingsLayout({
 
       {/* Page content */}
       <main>{children}</main>
-    </>
+    </PageGuard>
   );
 }

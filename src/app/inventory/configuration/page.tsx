@@ -15,6 +15,8 @@ import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
 import type { MultiLocationStatusRequest } from "@/types/multilocation";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { useRouter } from "next/navigation";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 const items: BreadcrumbItem[] = [
   { label: "Home", href: "/" },
@@ -25,37 +27,6 @@ const items: BreadcrumbItem[] = [
 // Maximum locations allowed when multi-location is disabled
 const MAX_LOCATIONS_FOR_DEACTIVATION = 3;
 
-// Helper to extract error message from API error
-const getErrorMessage = (error: unknown): string => {
-  if (!error) return "An unknown error occurred";
-
-  // Handle RTK Query error format
-  if (typeof error === "object" && error !== null) {
-    const err = error as {
-      data?: { detail?: string; message?: string; error?: string };
-      status?: number;
-    };
-
-    // Check for detail field (common in Django REST Framework)
-    if (err.data?.detail) {
-      return err.data.detail;
-    }
-    // Check for message field
-    if (err.data?.message) {
-      return err.data.message;
-    }
-    // Check for error field
-    if (err.data?.error) {
-      return err.data.error;
-    }
-    // Check if data is a string
-    if (typeof err.data === "string") {
-      return err.data;
-    }
-  }
-
-  return "Failed to update. Please try again.";
-};
 
 export default function InventoryConfiguration() {
   const router = useRouter();
@@ -128,7 +99,7 @@ export default function InventoryConfiguration() {
       setOptimisticValue(null);
 
       // Show error message from API
-      const errorMessage = getErrorMessage(error);
+      const errorMessage = extractErrorMessage(error, "Failed to update. Please try again.");
       statusModal.showError("Update Failed", errorMessage);
 
       console.error("Failed to update multi-location status:", error);
@@ -145,7 +116,8 @@ export default function InventoryConfiguration() {
   const isSwitchDisabled = isLoadingStatus || isLoadingLocations;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageGuard application="inventory" module="configuration">
+      <div className="min-h-screen bg-gray-50">
       {/* Status Modal */}
       <StatusModal
         isOpen={statusModal.isOpen}
@@ -250,15 +222,6 @@ export default function InventoryConfiguration() {
               locationCount > 0 && (
                 <div className="px-6 pb-4">
                   <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-blue-800">
-                      You currently have <strong>{locationCount}</strong> active
-                      location{locationCount !== 1 ? "s" : ""}.
-                      {locationCount > MAX_LOCATIONS_FOR_DEACTIVATION && (
-                        <span className="block mt-1">
-                          To deactivate Multi Location, reduce to{" "}
-                          {MAX_LOCATIONS_FOR_DEACTIVATION} or fewer locations.
-                        </span>
                       )}
                     </p>
                   </div>
@@ -268,5 +231,6 @@ export default function InventoryConfiguration() {
         </section>
       </main>
     </div>
+    </PageGuard>
   );
 }

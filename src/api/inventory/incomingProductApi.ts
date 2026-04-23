@@ -175,6 +175,17 @@ export const incomingProductApi = createApi({
         body: data || {},
       }),
     }),
+
+    createIncomingProductBackorder: builder.mutation<
+      any,
+      { response: boolean; incoming_product: string }
+    >({
+      query: (body) => ({
+        url: "/inventory/create-back-order/",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -194,4 +205,5 @@ export const {
   useDeleteIncomingProductMutation,
   useToggleIncomingProductHiddenStatusMutation,
   usePatchToggleIncomingProductHiddenStatusMutation,
+  useCreateIncomingProductBackorderMutation,
 } = incomingProductApi;

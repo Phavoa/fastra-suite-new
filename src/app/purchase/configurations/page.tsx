@@ -6,10 +6,8 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 import { usePermissionContext } from "@/contexts/PermissionContext";
 import { usePermission } from "@/hooks/usePermission";
-import {
-  normalizePermissions,
-  NormalizedPermissions,
-} from "@/utils/normalizePermissions";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/ProtectedComponent";
 import { Bell, CloudUpload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -46,16 +44,7 @@ interface CurrencyOption {
 export default function PurchaseConfigurationPage() {
   const router = useRouter();
   const { can } = usePermission();
-  const { isAdmin, permissions } = usePermissionContext();
   const user = useSelector((state: RootState) => state.auth.user);
-  const user_accesses = useSelector(
-    (state: RootState) => state.auth.user_accesses,
-  );
-  const [loading, setLoading] = useState(true);
-  const [accessChecks, setAccessChecks] = useState<{
-    view: boolean;
-    create: boolean;
-  }>({ view: false, create: false });
 
   const [unitName, setUnitName] = useState("");
   const [unitSymbol, setUnitSymbol] = useState("");
@@ -84,56 +73,6 @@ export default function PurchaseConfigurationPage() {
   const { data: existingCurrencies = [] } = useGetCurrenciesQuery({});
   const [createUnitOfMeasure, { isLoading: isCreatingUnit }] =
     useCreateUnitOfMeasureMutation();
-
-  // Direct normalization for demonstration
-  const normalizedDirect: NormalizedPermissions = useMemo(() => {
-    if (user_accesses) {
-      try {
-        return normalizePermissions({ user_accesses });
-      } catch (error) {
-        console.error("Error normalizing permissions:", error);
-        return { isAdmin: false, permissions: {} };
-      }
-    }
-    return { isAdmin: false, permissions: {} };
-  }, [user_accesses]);
-
-  // Comprehensive permission checks
-  useEffect(() => {
-    // Simulate loading delay for demonstration
-    const timer = setTimeout(() => {
-      const hasViewAccess =
-        can({
-          application: "purchase",
-          module: "unitofmeasure",
-          action: "view",
-        }) ||
-        isAdmin ||
-        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("view");
-
-      const hasCreateAccess =
-        can({
-          application: "purchase",
-          module: "unitofmeasure",
-          action: "create",
-        }) ||
-        isAdmin ||
-        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("create");
-      setAccessChecks({
-        view: hasViewAccess,
-        create: hasCreateAccess,
-      });
-
-      // Redirect if no view access
-      if (!hasViewAccess) {
-        router.push("/unauthorized");
-      }
-
-      setLoading(false);
-    }, 1000); // Simulate async check
-
-    return () => clearTimeout(timer);
-  }, [can, isAdmin, permissions, normalizedDirect, router]);
 
   // Fetch currencies from REST Countries API
   useEffect(() => {
@@ -232,179 +171,135 @@ export default function PurchaseConfigurationPage() {
     }
   };
 
-  // Handle edge cases
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Loading User Data
-          </h1>
-          <p className="text-gray-600">
-            Please wait while we load your user information...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Checking Permissions
-          </h1>
-          <p className="text-gray-600">Verifying your access rights...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!accessChecks.view) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">
-            Access Denied
-          </h1>
-          <p className="text-gray-600 mb-4">
-            You do not have the required permissions to view this page.
-          </p>
-          <p className="text-sm text-gray-500">
-            Redirecting to unauthorized page...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen">
-      {/* Main Content */}
-      <div className="mx-auto px-6 py-4">
-        <h1 className="text-xl text-gray-900 mb-8">Configuration</h1>
+    <PageGuard application="purchase" module="unitofmeasure">
+      <div className="min-h-screen">
+        {/* Main Content */}
+        <div className="mx-auto px-6 py-4">
+          <h1 className="text-xl text-gray-900 mb-8">Configuration</h1>
 
-        {/* Currency Section */}
-        <section className="mb-4 bg-white p-4 rounded-md">
-          <h2 className="text-lg font-medium text-blue-600 mb-6">Currency</h2>
+          {/* Currency Section */}
+          <section className="mb-4 bg-white p-4 rounded-md">
+            <h2 className="text-lg font-medium text-blue-600 mb-6">Currency</h2>
 
-          {accessChecks.create ? (
-            <CurrencyForm
-              currencyOptions={currencyOptions}
-              existingCurrencies={existingCurrencies}
-              onSubmit={async (data) => {
-                await createCurrency(data).unwrap();
-              }}
-              isLoading={isCreatingCurrency || isLoadingCurrencies}
-            />
-          ) : (
-            <div className="text-gray-500 text-center py-8">
-              You do not have permission to create currencies.
+            <PermissionGuard
+              application="purchase"
+              module="currency"
+              action="create"
+            >
+              <CurrencyForm
+                currencyOptions={currencyOptions}
+                existingCurrencies={existingCurrencies}
+                onSubmit={async (data) => {
+                  await createCurrency(data).unwrap();
+                }}
+                isLoading={isCreatingCurrency || isLoadingCurrencies}
+              />
+            </PermissionGuard>
+          </section>
+
+          {/* Unit of Measure Section */}
+          <section>
+            <div className="bg-white rounded-lg p-4">
+              <h2 className="text-lg font-medium text-blue-600 mb-6">
+                Unit of Measure
+              </h2>
+              <PermissionGuard
+                application="purchase"
+                module="unitofmeasure"
+                action="create"
+              >
+                <>
+                  <h3 className="text-base font-semibold text-gray-900 mb-6">
+                    Add Unit of Measure
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                      <label
+                        htmlFor="unit-name"
+                        className="block text-sm font-medium text-gray-900 mb-2"
+                      >
+                        Unit Name
+                      </label>
+                      <Input
+                        id="unit-name"
+                        type="text"
+                        placeholder='Enter the unit name (e.g., "Kilogram", "Liter")'
+                        value={unitName}
+                        onChange={(e) => setUnitName(e.target.value)}
+                        className="py-4 h-11 shadow-none rounded-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="unit-symbol"
+                        className="block text-sm font-medium text-gray-900 mb-2"
+                      >
+                        Unit Symbol
+                      </label>
+                      <Input
+                        id="unit-symbol"
+                        type="text"
+                        placeholder="Enter the symbol (e.g., kg, L)"
+                        value={unitSymbol}
+                        onChange={(e) => setUnitSymbol(e.target.value)}
+                        className="py-4 h-11 shadow-none rounded-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="unit-category"
+                        className="block text-sm font-medium text-gray-900 mb-2"
+                      >
+                        Unit Category
+                      </label>
+                      <Input
+                        id="unit-category"
+                        type="text"
+                        placeholder="Enter the category (e.g., Weight, Volume)"
+                        value={unitCategory}
+                        onChange={(e) => setUnitCategory(e.target.value)}
+                        className="py-4 h-11 shadow-none rounded-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Link href="/purchase/configurations/unit_of_measure">
+                      <Button>View Unit of Measure List</Button>
+                    </Link>
+
+                    <Button
+                      variant={"contained"}
+                      onClick={handleCreateUnitOfMeasure}
+                      disabled={isCreatingUnit}
+                    >
+                      {isCreatingUnit
+                        ? "Creating..."
+                        : "Create Unit of Measure"}
+                    </Button>
+                  </div>
+                </>
+              </PermissionGuard>
             </div>
-          )}
-        </section>
+          </section>
 
-        {/* Unit of Measure Section */}
-        <section>
-          <div className="bg-white rounded-lg p-4">
-            <h2 className="text-lg font-medium text-blue-600 mb-6">
-              Unit of Measure
-            </h2>
-            {accessChecks.create ? (
-              <>
-                <h3 className="text-base font-semibold text-gray-900 mb-6">
-                  Add Unit of Measure
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div>
-                    <label
-                      htmlFor="unit-name"
-                      className="block text-sm font-medium text-gray-900 mb-2"
-                    >
-                      Unit Name
-                    </label>
-                    <Input
-                      id="unit-name"
-                      type="text"
-                      placeholder='Enter the unit name (e.g., "Kilogram", "Liter")'
-                      value={unitName}
-                      onChange={(e) => setUnitName(e.target.value)}
-                      className="py-4 h-11 shadow-none rounded-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="unit-symbol"
-                      className="block text-sm font-medium text-gray-900 mb-2"
-                    >
-                      Unit Symbol
-                    </label>
-                    <Input
-                      id="unit-symbol"
-                      type="text"
-                      placeholder="Enter the symbol (e.g., kg, L)"
-                      value={unitSymbol}
-                      onChange={(e) => setUnitSymbol(e.target.value)}
-                      className="py-4 h-11 shadow-none rounded-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="unit-category"
-                      className="block text-sm font-medium text-gray-900 mb-2"
-                    >
-                      Unit Category
-                    </label>
-                    <Input
-                      id="unit-category"
-                      type="text"
-                      placeholder="Enter the category (e.g., Weight, Volume)"
-                      value={unitCategory}
-                      onChange={(e) => setUnitCategory(e.target.value)}
-                      className="py-4 h-11 shadow-none rounded-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Link href="/purchase/configurations/unit_of_measure">
-                    <Button>View Unit of Measure List</Button>
-                  </Link>
-
-                  <Button
-                    variant={"contained"}
-                    onClick={handleCreateUnitOfMeasure}
-                    disabled={isCreatingUnit}
-                  >
-                    {isCreatingUnit ? "Creating..." : "Create Unit of Measure"}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="text-gray-500 text-center py-8">
-                You do not have permission to create unit of measures.
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Unit of Measure Status Modal */}
-        <StatusModal
-          isOpen={unitStatusModal.isOpen}
-          onClose={() =>
-            setUnitStatusModal({ ...unitStatusModal, isOpen: false })
-          }
-          type={unitStatusModal.status}
-          title={unitStatusModal.title}
-          message={unitStatusModal.description}
-          actionText="Continue"
-        />
+          {/* Unit of Measure Status Modal */}
+          <StatusModal
+            isOpen={unitStatusModal.isOpen}
+            onClose={() =>
+              setUnitStatusModal({ ...unitStatusModal, isOpen: false })
+            }
+            type={unitStatusModal.status}
+            title={unitStatusModal.title}
+            message={unitStatusModal.description}
+            actionText="Continue"
+          />
+        </div>
       </div>
-    </div>
+    </PageGuard>
   );
 }

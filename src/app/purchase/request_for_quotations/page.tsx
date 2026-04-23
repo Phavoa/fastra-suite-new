@@ -15,6 +15,7 @@ import {
   RequestRow,
   StatusCards,
 } from "@/components/purchase/requestForQuotation";
+import { extractErrorMessage } from "@/lib/utils";
 import { ViewToggle } from "@/components/purchase/requestForQuotation/ViewToggle";
 import { RfqTable } from "@/components/purchase/requestForQuotation";
 import { RfqCards } from "@/components/purchase/requestForQuotation/RfqCards";
@@ -89,9 +90,9 @@ export default function RequestForQuotationsPage() {
   if (isError) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading request for quotations</p>
-          <p className="text-sm mt-2">{error?.toString()}</p>
+        <div className="text-center text-red-600 px-4">
+          <p className="text-lg font-semibold">Error loading request for quotations</p>
+          <p className="text-sm mt-2">{extractErrorMessage(error, "An unexpected error occurred while loading request for quotations.")}</p>
         </div>
       </main>
     );

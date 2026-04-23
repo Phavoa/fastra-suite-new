@@ -71,15 +71,15 @@ export default function Page() {
   // API mutations and queries
   const [createPurchaseRequest, { isLoading: isCreating }] =
     useCreatePurchaseRequestMutation();
-  const { data: currencies, isLoading: isLoadingCurrencies } =
+  const { data: currencies, isLoading: isLoadingCurrencies, error: currenciesError } =
     useGetCurrenciesQuery({});
-  const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
+  const { data: vendors, isLoading: isLoadingVendors, error: vendorsError } = useGetVendorsQuery({});
   const {
     data: products,
     isLoading: isLoadingProducts,
     error: productsError,
   } = useGetProductsQuery({});
-  const { data: tenantUsers } = useGetTenantUsersQuery({});
+  const { data: tenantUsers, error: usersError } = useGetTenantUsersQuery({});
 
   // Form state
   const [items, setItems] = useState<LineItem[]>(initialItems);
@@ -174,17 +174,46 @@ export default function Page() {
   console.log("Is loading products:", isLoadingProducts);
   console.log("Products error:", productsError);
 
-  // Show notification if products fail to load
+  // Show notification if initial data fails to load
   React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
+
+  React.useEffect(() => {
+    if (vendorsError) {
+      setNotification({
+        message: extractErrorMessage(vendorsError, "Failed to load vendors."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [vendorsError]);
+
+  React.useEffect(() => {
+    if (currenciesError) {
+      setNotification({
+        message: extractErrorMessage(currenciesError, "Failed to load currencies."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [currenciesError]);
+
+  React.useEffect(() => {
+    if (usersError) {
+      setNotification({
+        message: extractErrorMessage(usersError, "Failed to load user profiles."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [usersError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },

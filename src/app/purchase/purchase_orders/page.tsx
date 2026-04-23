@@ -16,6 +16,7 @@ import {
 } from "@/api/purchase/purchaseOrderApi";
 import type { RootState } from "@/lib/store/store";
 import { StatusCards } from "@/components/purchase/purchaseOrder";
+import { extractErrorMessage } from "@/lib/utils";
 
 // Helper function to transform API data to RequestRow format
 const transformPurchaseOrderToRow = (
@@ -95,9 +96,9 @@ export default function PurchaseOrdersPage() {
   if (isError) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading purchase orders</p>
-          <p className="text-sm mt-2">{error?.toString()}</p>
+        <div className="text-center text-red-600 px-4">
+          <p className="text-lg font-semibold">Error loading purchase orders</p>
+          <p className="text-sm mt-2">{extractErrorMessage(error, "An unexpected error occurred while loading purchase orders.")}</p>
         </div>
       </main>
     );

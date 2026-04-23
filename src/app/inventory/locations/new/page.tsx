@@ -18,6 +18,8 @@ import {
 import { useCreateLocationMutation } from "@/api/inventory/locationApi";
 import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 import {
   locationSchema,
   type LocationFormData,
@@ -67,7 +69,7 @@ export default function NewLocationPage() {
   // API mutations and queries
   const [createLocation, { isLoading: isCreating }] =
     useCreateLocationMutation();
-  const { data: tenantUsers, isLoading: isLoadingUsers } =
+  const { data: tenantUsers, isLoading: isLoadingUsers, isError: isUsersError, error: usersError } =
     useGetTenantUsersQuery({});
 
   // Notification state
@@ -102,11 +104,21 @@ export default function NewLocationPage() {
     },
   });
 
-  // Generate and set location code on component mount
   useEffect(() => {
     const generatedCode = generateLocationCode();
     setValue("location_code", generatedCode);
   }, [setValue]);
+
+  // Handle errors from initial data fetching
+  useEffect(() => {
+    if (isUsersError) {
+      setNotification({
+        message: extractErrorMessage(usersError, "Failed to load users"),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [isUsersError, usersError]);
 
   // Convert tenant users to option format for dropdown
   const userOptions =
@@ -156,16 +168,8 @@ export default function NewLocationPage() {
         router.push("/inventory/locations");
       }, 1500);
     } catch (error: unknown) {
-      // Handle API errors
-      let errorMessage = "Failed to create location. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      // Handle API errors using standardized utility
+      const errorMessage = extractErrorMessage(error, "Failed to create location. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -181,7 +185,8 @@ export default function NewLocationPage() {
   }
 
   return (
-    <div className="min-h-screen flex-1 flex-col flex">
+    <PageGuard application="inventory" module="location">
+      <div className="min-h-screen flex-1 flex-col flex">
       {/* Header */}
       <>
         {/* Header */}
@@ -436,6 +441,7 @@ export default function NewLocationPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </div>
+      </div>
+    </PageGuard>
   );
 }

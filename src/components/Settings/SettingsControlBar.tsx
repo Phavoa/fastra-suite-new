@@ -8,6 +8,7 @@ import { ListViewIcon } from "../icons/ListViewIcon";
 import { RootState } from "@/lib/store/store";
 import { setViewMode } from "./viewModeSlice";
 import { useDispatch, useSelector } from "react-redux";
+import { PermissionGuard } from "../ProtectedComponent";
 
 type SettingsControlBarProps = {
   activeSection: "company" | "user" | "accessgroup" | "application";
@@ -76,13 +77,15 @@ export const SettingsControlBar = ({
       {/* Right Controls */}
       <div className="flex gap-3 items-center">
         {/* Primary Button */}
-        <GrayButton
-          size="md"
-          className="bg-[#3B7CED] text-white"
-          onClick={onNew}
-        >
-          {getButtonLabel()}
-        </GrayButton>
+        <PermissionGuard application="settings" module={activeSection} action="create">
+          <GrayButton
+            size="md"
+            className="bg-[#3B7CED] text-white"
+            onClick={onNew}
+          >
+            {getButtonLabel()}
+          </GrayButton>
+        </PermissionGuard>
 
         {/* Secondary Button (ONLY on Users Page) */}
         {activeSection === "user" && onShowArchivedUsers && (

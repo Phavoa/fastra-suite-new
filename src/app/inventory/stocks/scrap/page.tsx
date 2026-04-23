@@ -17,6 +17,8 @@ import { StockAdjustmentTable } from "@/components/inventory/scrap/StockAdjustme
 import { StockAdjustmentCards } from "@/components/inventory/scrap/StockAdjustmentCards";
 import { getStatusInfo } from "@/components/inventory/types";
 import Link from "next/link";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 // Helper function to transform API data to StockAdjustmentRow format
 const transformScrapToRow = (scrap: Scrap): StockAdjustmentRow => {
@@ -92,85 +94,98 @@ export default function ScrapPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading scraps...</p>
-        </div>
-      </main>
+      <PageGuard application="inventory" module="scrap">
+        <main className="min-h-screen text-gray-800 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Loading scraps...</p>
+          </div>
+        </main>
+      </PageGuard>
     );
   }
 
   // Show error state
   if (isError) {
     return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading scraps</p>
-          <p className="text-sm mt-2">{error?.toString()}</p>
-        </div>
-      </main>
+      <PageGuard application="inventory" module="scrap">
+        <main className="min-h-screen text-gray-800 flex items-center justify-center">
+          <div className="text-center text-red-600 px-4">
+            <p className="text-lg font-semibold">Error loading scraps</p>
+            <p className="text-sm mt-2">{extractErrorMessage(error, "An unknown error occurred")}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="mt-6"
+            >
+              Try Again
+            </Button>
+          </div>
+        </main>
+      </PageGuard>
     );
   }
 
   return (
-    <main className="min-h-screen text-gray-800">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
-      >
-        <Breadcrumbs
-          items={items}
-          action={
-            <Button
-              variant="ghost"
-              className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
-            >
-              Autosaved <AutoSaveIcon />
-            </Button>
-          }
-        />
-      </motion.div>
-      {/* Header */}
-      <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-4 mr-4">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold">Scraps</h2>
-            <div className="relative w-xs">
-              <Input
-                type="text"
-                className="w-full h-11 pl-10 pr-4 border border-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Search scraps"
-              />
-              <SearchIcon
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                size={16}
-              />
+    <PageGuard application="inventory" module="scrap">
+      <main className="min-h-screen text-gray-800">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
+        >
+          <Breadcrumbs
+            items={items}
+            action={
+              <Button
+                variant="ghost"
+                className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
+              >
+                Autosaved <AutoSaveIcon />
+              </Button>
+            }
+          />
+        </motion.div>
+        {/* Header */}
+        <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-4 mr-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">Scraps</h2>
+              <div className="relative w-xs">
+                <Input
+                  type="text"
+                  className="w-full h-11 pl-10 pr-4 border border-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Search scraps"
+                />
+                <SearchIcon
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={16}
+                />
+              </div>
             </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <Link href="/inventory/stocks/scrap/new">
+              <Button variant={"contained"}>New Scrap</Button>
+            </Link>
+            <ViewToggle
+              currentView={currentView}
+              onViewChange={handleViewChange}
+            />
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <Link href="/inventory/stocks/scrap/new">
-            <Button variant={"contained"}>New Scrap</Button>
-          </Link>
-          <ViewToggle
-            currentView={currentView}
-            onViewChange={handleViewChange}
-          />
-        </div>
-      </div>
-
-      {/* Content */}
-      {currentView === "list" ? (
-        <StockAdjustmentTable rows={rows} query={query} />
-      ) : (
-        <StockAdjustmentCards stockAdjustments={rows} />
-      )}
-    </main>
+        {/* Content */}
+        {currentView === "list" ? (
+          <StockAdjustmentTable rows={rows} query={query} />
+        ) : (
+          <StockAdjustmentCards stockAdjustments={rows} />
+        )}
+      </main>
+    </PageGuard>
   );
 }

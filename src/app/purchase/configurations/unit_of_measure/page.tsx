@@ -6,10 +6,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 import { usePermissionContext } from "@/contexts/PermissionContext";
 import { usePermission } from "@/hooks/usePermission";
-import {
-  normalizePermissions,
-  NormalizedPermissions,
-} from "@/utils/normalizePermissions";
+import { PageGuard } from "@/components/auth/PageGuard";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { StatusModal } from "@/components/shared/StatusModal";
 import {
@@ -46,18 +43,7 @@ interface EditingUnit {
 export default function UnitOfMeasurePage() {
   const router = useRouter();
   const { can } = usePermission();
-  const { isAdmin, permissions } = usePermissionContext();
   const user = useSelector((state: RootState) => state.auth.user);
-  const user_accesses = useSelector(
-    (state: RootState) => state.auth.user_accesses,
-  );
-  const [loading, setLoading] = useState(true);
-  const [accessChecks, setAccessChecks] = useState<{
-    view: boolean;
-    create: boolean;
-    edit: boolean;
-    delete: boolean;
-  }>({ view: false, create: false, edit: false, delete: false });
 
   // Helper function to extract ID from URL
   const getUnitId = (url: string): number => {
@@ -103,76 +89,6 @@ export default function UnitOfMeasurePage() {
     usePatchUnitOfMeasureMutation();
   const [createUnit, { isLoading: isCreating }] =
     useCreateUnitOfMeasureMutation();
-
-  // Direct normalization for demonstration
-  const normalizedDirect: NormalizedPermissions = useMemo(() => {
-    if (user_accesses) {
-      try {
-        return normalizePermissions({ user_accesses });
-      } catch (error) {
-        console.error("Error normalizing permissions:", error);
-        return { isAdmin: false, permissions: {} };
-      }
-    }
-    return { isAdmin: false, permissions: {} };
-  }, [user_accesses]);
-
-  // Comprehensive permission checks
-  useEffect(() => {
-    // Simulate loading delay for demonstration
-    const timer = setTimeout(() => {
-      const hasViewAccess =
-        can({
-          application: "purchase",
-          module: "unitofmeasure",
-          action: "view",
-        }) ||
-        isAdmin ||
-        normalizedDirect.permissions["purchase:unitofeasure"]?.has("view");
-
-      const hasCreateAccess =
-        can({
-          application: "purchase",
-          module: "unit_of_measure",
-          action: "create",
-        }) ||
-        isAdmin ||
-        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("create");
-
-      const hasEditAccess =
-        can({
-          application: "purchase",
-          module: "unitofmeasure",
-          action: "edit",
-        }) ||
-        isAdmin ||
-        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("edit");
-      const hasDeleteAccess =
-        can({
-          application: "purchase",
-          module: "unitofmeasure",
-          action: "delete",
-        }) ||
-        isAdmin ||
-        normalizedDirect.permissions["purchase:unitofmeasure"]?.has("delete");
-
-      setAccessChecks({
-        view: hasViewAccess,
-        create: hasCreateAccess,
-        edit: hasEditAccess,
-        delete: hasDeleteAccess,
-      });
-
-      // Redirect if no view access
-      if (!hasViewAccess) {
-        router.push("/unauthorized");
-      }
-
-      setLoading(false);
-    }, 1000); // Simulate async check
-
-    return () => clearTimeout(timer);
-  }, [can, isAdmin, permissions, normalizedDirect, router]);
 
   const {
     register: registerCreate,
@@ -445,115 +361,83 @@ export default function UnitOfMeasurePage() {
     setCurrentPage(page);
   };
 
-  // Handle edge cases
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Loading User Data
-          </h1>
-          <p className="text-gray-600">
-            Please wait while we load your user information...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Checking Permissions
-          </h1>
-          <p className="text-gray-600">Verifying your access rights...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!accessChecks.view) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">
-            Access Denied
-          </h1>
-          <p className="text-gray-600 mb-4">
-            You do not have the required permissions to view this page.
-          </p>
-          <p className="text-sm text-gray-500">
-            Redirecting to unauthorized page...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const hasCreateAccess = can({
+    application: "purchase",
+    module: "unitofmeasure",
+    action: "create",
+  });
+  const hasEditAccess = can({
+    application: "purchase",
+    module: "unitofmeasure",
+    action: "edit",
+  });
+  const hasDeleteAccess = can({
+    application: "purchase",
+    module: "unitofmeasure",
+    action: "delete",
+  });
 
   return (
-    <div className="min-h-screen mr-4">
-      <UnitOfMeasureHeader
-        breadcrumbItems={items}
-        onBack={() => router.back()}
-        onAddUnit={
-          accessChecks.create ? () => setShowCreateForm(true) : undefined
-        }
-      />
-
-      <UnitOfMeasureTable
-        isLoading={queryLoading}
-        error={error}
-        refetch={refetch}
-        paginatedUnits={paginatedUnits}
-        editingId={editingId}
-        editingUnit={editingUnit}
-        setEditingUnit={setEditingUnit}
-        serverErrors={serverErrors}
-        handleEdit={accessChecks.edit ? handleEdit : undefined}
-        handleCancel={handleCancel}
-        handleSave={accessChecks.edit ? handleSave : undefined}
-        handleDelete={accessChecks.delete ? handleDelete : undefined}
-        isUpdating={isUpdating}
-        isDeleting={isDeleting}
-        formatDate={formatDate}
-        getUnitId={getUnitId}
-        totalPages={totalPages}
-        currentPage={currentPage}
-        handlePageChange={handlePageChange}
-        pageSize={pageSize}
-        filteredUnitsLength={filteredUnits.length}
-        searchTerm={searchTerm}
-        categoryFilter={categoryFilter}
-      />
-
-      {accessChecks.create && (
-        <CreateUnitModal
-          showCreateForm={showCreateForm}
-          setShowCreateForm={setShowCreateForm}
-          registerCreate={registerCreate}
-          handleSubmitCreate={handleSubmitCreate}
-          resetCreate={resetCreate}
-          createErrors={createErrors}
-          isCreateValid={isCreateValid}
-          serverErrors={serverErrors}
-          setServerErrors={setServerErrors}
-          onCreateSubmit={onCreateSubmit}
-          isCreating={isCreating}
+    <PageGuard application="purchase" module="unitofmeasure">
+      <div className="min-h-screen mr-4">
+        <UnitOfMeasureHeader
+          breadcrumbItems={items}
+          onBack={() => router.back()}
+          onAddUnit={hasCreateAccess ? () => setShowCreateForm(true) : undefined}
         />
-      )}
 
-      {/* Status Modal */}
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        onClose={() => setStatusModal({ ...statusModal, isOpen: false })}
-        type={statusModal.status}
-        title={statusModal.title}
-        message={statusModal.description}
-        actionText="Continue"
-      />
-    </div>
+        <UnitOfMeasureTable
+          isLoading={queryLoading}
+          error={error}
+          refetch={refetch}
+          paginatedUnits={paginatedUnits}
+          editingId={editingId}
+          editingUnit={editingUnit}
+          setEditingUnit={setEditingUnit}
+          serverErrors={serverErrors}
+          handleEdit={hasEditAccess ? handleEdit : undefined}
+          handleCancel={handleCancel}
+          handleSave={hasEditAccess ? handleSave : undefined}
+          handleDelete={hasDeleteAccess ? handleDelete : undefined}
+          isUpdating={isUpdating}
+          isDeleting={isDeleting}
+          formatDate={formatDate}
+          getUnitId={getUnitId}
+          totalPages={totalPages}
+          currentPage={currentPage}
+          handlePageChange={handlePageChange}
+          pageSize={pageSize}
+          filteredUnitsLength={filteredUnits.length}
+          searchTerm={searchTerm}
+          categoryFilter={categoryFilter}
+        />
+
+        {hasCreateAccess && (
+          <CreateUnitModal
+            showCreateForm={showCreateForm}
+            setShowCreateForm={setShowCreateForm}
+            registerCreate={registerCreate}
+            handleSubmitCreate={handleSubmitCreate}
+            resetCreate={resetCreate}
+            createErrors={createErrors}
+            isCreateValid={isCreateValid}
+            serverErrors={serverErrors}
+            setServerErrors={setServerErrors}
+            onCreateSubmit={onCreateSubmit}
+            isCreating={isCreating}
+          />
+        )}
+
+        {/* Status Modal */}
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={() => setStatusModal({ ...statusModal, isOpen: false })}
+          type={statusModal.status}
+          title={statusModal.title}
+          message={statusModal.description}
+          actionText="Continue"
+        />
+      </div>
+    </PageGuard>
   );
 }

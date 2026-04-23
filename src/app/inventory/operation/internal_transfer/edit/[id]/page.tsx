@@ -32,6 +32,9 @@ import {
   InternalTransferSubmissionData,
 } from "@/types/internalTransfer";
 
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
+
 // Form schema for internal transfer editing
 const internalTransferSchema = z
   .object({
@@ -71,11 +74,12 @@ export default function EditInternalTransferPage() {
     isLoading: isLoadingInternalTransfer,
     error: internalTransferError,
   } = useGetInternalTransferQuery(internalTransferId);
-  const { data: sourceLocations, isLoading: isLoadingSourceLocations } =
+  const { data: sourceLocations, isLoading: isLoadingSourceLocations, error: sourceLocationsError } =
     useGetOtherLocationsForUserQuery();
   const {
     data: destinationLocations,
     isLoading: isLoadingDestinationLocations,
+    error: destinationLocationsError,
   } = useGetAllUserLocationsQuery();
 
   // Form state
@@ -105,10 +109,51 @@ export default function EditInternalTransferPage() {
   });
 
   // Get stock levels for selected source location
-  const { data: stockLevels, isLoading: isLoadingStockLevels } =
+  const { data: stockLevels, isLoading: isLoadingStockLevels, error: stockLevelsError } =
     useGetLocationStockLevelsQuery(selectedSourceLocation, {
       skip: !selectedSourceLocation,
     });
+
+  // Handle errors
+  useEffect(() => {
+    if (internalTransferError) {
+      setNotification({
+        message: extractErrorMessage(internalTransferError, "Failed to load internal transfer details."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [internalTransferError]);
+
+  useEffect(() => {
+    if (stockLevelsError) {
+      setNotification({
+        message: extractErrorMessage(stockLevelsError, "Failed to load stock levels for the source location."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [stockLevelsError]);
+
+  useEffect(() => {
+    if (sourceLocationsError) {
+      setNotification({
+        message: extractErrorMessage(sourceLocationsError, "Failed to load source locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [sourceLocationsError]);
+
+  useEffect(() => {
+    if (destinationLocationsError) {
+      setNotification({
+        message: extractErrorMessage(destinationLocationsError, "Failed to load destination locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [destinationLocationsError]);
 
   // Populate form when internal transfer data is loaded
   useEffect(() => {
@@ -281,43 +326,7 @@ export default function EditInternalTransferPage() {
         );
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage =
-        "Failed to update internal transfer. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: {
-            detail?: string;
-            message?: string;
-            error?: Array<{
-              detail: any;
-              messages: any;
-              non_field_errors?: Record<string, string>;
-            }>;
-          };
-        };
-
-        if (apiError.data?.error && Array.isArray(apiError.data.error)) {
-          const errorMessages: string[] = [];
-          for (const err of apiError.data.error) {
-            if (err.detail) {
-              errorMessages.push(err.detail);
-            }
-            if (err.messages?.message) {
-              errorMessages.push(err.messages.message);
-            }
-            if (err.non_field_errors) {
-              errorMessages.push(...Object.values(err.non_field_errors));
-            }
-          }
-          if (errorMessages.length > 0) {
-            errorMessage = errorMessages.join(" ");
-          }
-        } else {
-          errorMessage =
-            apiError.data?.detail || apiError.data?.message || errorMessage;
-        }
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to update internal transfer. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -390,16 +399,16 @@ export default function EditInternalTransferPage() {
   if (internalTransferError || !internalTransfer) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading internal transfer</p>
+        <div className="text-center text-red-600 px-4">
+          <p className="font-semibold text-lg">Error loading internal transfer</p>
           <p className="text-sm mt-2">
-            The requested internal transfer could not be found.
+            {extractErrorMessage(internalTransferError, "The requested internal transfer could not be found.")}
           </p>
           <Button
             onClick={() =>
               router.push("/inventory/operation/internal_transfer")
             }
-            className="mt-4"
+            className="mt-6 pointer-cursor"
           >
             Back to Internal Transfers
           </Button>
@@ -435,7 +444,8 @@ export default function EditInternalTransferPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="internaltransfer">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -520,6 +530,7 @@ export default function EditInternalTransferPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

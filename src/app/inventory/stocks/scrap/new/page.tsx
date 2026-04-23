@@ -11,6 +11,8 @@ import { useCreateScrapMutation } from "@/api/inventory/scrapApi";
 import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 import {
   FadeIn,
   SlideUp,
@@ -79,7 +81,7 @@ export default function Page() {
 
   // API mutations and queries
   const [createScrap, { isLoading: isCreating }] = useCreateScrapMutation();
-  const { data: locations, isLoading: isLoadingLocations } =
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetActiveLocationsQuery();
   const {
     data: products,
@@ -154,17 +156,25 @@ export default function Page() {
       label: product.product_name,
     })) || [];
 
-  // Show notification if products fail to load
   React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products. Please check your connection and try again."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
+
+  React.useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations. Please check your connection and try again."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -230,15 +240,7 @@ export default function Page() {
         router.push("/inventory/stocks/scrap");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to save scrap record. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to save scrap record. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -277,15 +279,7 @@ export default function Page() {
         router.push("/inventory/stocks/scrap");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage = "Failed to validate scrap record. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to validate scrap record. Please try again.");
 
       setNotification({
         message: errorMessage,
@@ -344,7 +338,8 @@ export default function Page() {
   };
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="scrap">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -723,6 +718,7 @@ export default function Page() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }

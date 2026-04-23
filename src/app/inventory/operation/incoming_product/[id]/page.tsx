@@ -15,8 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Edit } from "lucide-react";
+import { ArrowLeft, Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 export default function IncomingProductDetailPage() {
   const router = useRouter();
@@ -78,7 +79,8 @@ export default function IncomingProductDetailPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="incomingproduct">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -124,6 +126,37 @@ export default function IncomingProductDetailPage() {
             </Link>
           )}
         </div>
+
+        {/* Backorder Information Banner */}
+        {incomingProduct.backorder_of && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="mx-6 mt-4 p-4 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                <ExternalLink className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-orange-900">Backorder Record</p>
+                <p className="text-xs text-orange-700">
+                  This record is a backorder of{" "}
+                  <span className="font-bold">
+                    {incomingProduct.backorder_of_details?.incoming_product_id || incomingProduct.backorder_of}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/inventory/operation/incoming_product/${incomingProduct.backorder_of}`}
+              className="text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-1"
+            >
+              View Parent Document
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </motion.div>
+        )}
 
         {/* Basic Information */}
         <motion.div
@@ -295,6 +328,7 @@ export default function IncomingProductDetailPage() {
           </div>
         </motion.div>
       </motion.main>
-    </motion.div>
+      </motion.div>
+    </PageGuard>
   );
 }

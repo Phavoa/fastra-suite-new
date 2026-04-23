@@ -11,7 +11,9 @@ import { LocationCards } from "@/components/inventory/location/LocationCards";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { PageGuard } from "@/components/auth/PageGuard";
 import type { Location } from "@/types/location";
+import { extractErrorMessage } from "@/lib/utils";
 // Error state component
 interface ErrorStateProps {
   error: unknown;
@@ -19,16 +21,7 @@ interface ErrorStateProps {
 }
 
 function ErrorState({ error, onRetry }: ErrorStateProps) {
-  const getErrorMessage = () => {
-    if (error && typeof error === "object" && "data" in error) {
-      const data = (error as { data: unknown }).data;
-      if (data && typeof data === "object" && "message" in data) {
-        return (data as { message: string }).message;
-      }
-    }
-    return "An error occurred while fetching locations.";
-  };
-  const errorMessage = getErrorMessage();
+  const errorMessage = extractErrorMessage(error, "An error occurred while fetching locations.");
 
   return (
     <div className="bg-white border border-red-200 rounded-lg p-8 text-center">
@@ -234,7 +227,8 @@ export default function InventoryLocationPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <PageGuard application="inventory" module="location">
+      <div className="flex h-screen bg-gray-50">
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Breadcrumb */}
@@ -346,9 +340,10 @@ export default function InventoryLocationPage() {
                   ` (${selectedLocations.length} selected)`}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PageGuard>
   );
 }

@@ -19,11 +19,7 @@ import type { Resolver } from "react-hook-form";
 import { DeliveryOrderReturnItem } from "@/types/deliveryOrderReturn";
 import { usePermissionContext } from "@/contexts/PermissionContext";
 import { usePermission } from "@/hooks/usePermission";
-import {
-  normalizePermissions,
-  NormalizedPermissions,
-} from "@/utils/normalizePermissions";
-import { UseSelector } from "react-redux";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 // Form schema for delivery order return creation
 const deliveryOrderReturnSchema = z.object({
@@ -64,38 +60,15 @@ export default function Page() {
     (state: RootState) => state.auth.user_accesses,
   );
 
-  // Direct normalization
-  const normalizedDirect = React.useMemo<NormalizedPermissions>(() => {
-    if (user_accesses) {
-      try {
-        return normalizePermissions({ user_accesses });
-      } catch (err) {
-        console.error("Permisssion normalization failed", err);
-        return { isAdmin: false, permissions: {} };
-      }
-    }
-    return { isAdmin: false, permissions: {} };
-  }, [user_accesses]);
-
-  //What permission are we checking?
-  const reqiredPerm = {
-    application: "inventory",
-    module: "deliveryorderreturn",
-    action: "create",
-  };
-
   const hasCreatePermission = React.useMemo(() => {
     return (
-      can(reqiredPerm) ||
-      isAdmin ||
-      permissions[`${reqiredPerm.application}:${reqiredPerm.module}`]?.has(
-        reqiredPerm.action,
-      ) ||
-      normalizedDirect.permissions[
-        `${reqiredPerm.application}:${reqiredPerm.module}`
-      ]?.has(reqiredPerm.action)
+      can({
+        application: "inventory",
+        module: "deliveryorderreturn",
+        action: "create",
+      }) || isAdmin
     );
-  }, [can, reqiredPerm, normalizedDirect, permissions, isAdmin]);
+  }, [can, isAdmin]);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -365,37 +338,14 @@ export default function Page() {
     setNotification((prev) => ({ ...prev, show: false }));
   }
 
-  const [pageLoading, setPageLoading] = useState(true);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hasCreatePermission) {
-        router.replace("/unauthorized");
-      }
-      setPageLoading(false);
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [hasCreatePermission, router]);
-
-  if (pageLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold">Checking access rights...</h2>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <motion.div
-      className="h-full text-gray-900 font-sans antialiased"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-    >
+    <PageGuard application="inventory" module="deliveryorderreturn">
+      <motion.div
+        className="h-full text-gray-900 font-sans antialiased"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -699,5 +649,6 @@ export default function Page() {
         onClose={closeNotification}
       />
     </motion.div>
+    </PageGuard>
   );
 }

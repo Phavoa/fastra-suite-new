@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 import { z } from "zod";
 import { useCreateUserMutation } from "@/api/settings/usersApi";
@@ -75,7 +76,7 @@ export default function NewUser() {
     setError,
     clearErrors,
   } = useForm<UserCreateInput>({
-    resolver: zodResolver(userCreateSchema),
+    resolver: zodResolver(userCreateSchema) as any,
     mode: "all", // Still use mode for real-time updates if needed
     defaultValues: {
       name: "",
@@ -233,316 +234,318 @@ export default function NewUser() {
   };
 
   return (
-    <div className="pb-6 w-full mx-auto mw-full rounded-xs bg-white">
-      {/* Top bar */}
-      <div className="flex px-6 items-center border-b py-4 border-[#E2E6E9]">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mr-4 text-2xl text-[#717171] hover:underline"
-        >
-          &larr;
-        </button>
-        <h1 className="text-xl text-[#1A1A1A] font-normal">Create User</h1>
-      </div>
+    <PageGuard application="settings" module="user" action="create">
+      <div className="pb-6 w-full mx-auto mw-full rounded-xs bg-white">
+        {/* Top bar */}
+        <div className="flex px-6 items-center border-b py-4 border-[#E2E6E9]">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="mr-4 text-2xl text-[#717171] hover:underline"
+          >
+            &larr;
+          </button>
+          <h1 className="text-xl text-[#1A1A1A] font-normal">Create User</h1>
+        </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 px-6 items-center">
-        <button
-          type="button"
-          className={`px-4 py-4 -mb-px font-medium ${
-            activeTab === "basic"
-              ? "border-b-2 border-blue-600 text-[#3B7CED]"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("basic")}
-        >
-          Basic Settings
-        </button>
-        <button
-          type="button"
-          className={`px-4 py-2 -mb-px font-medium ${
-            activeTab === "access"
-              ? "border-b-2 border-blue-600 text-[#3B7CED]"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("access")}
-        >
-          Access Rights
-        </button>
-      </div>
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 px-6 items-center">
+          <button
+            type="button"
+            className={`px-4 py-4 -mb-px font-medium ${
+              activeTab === "basic"
+                ? "border-b-2 border-blue-600 text-[#3B7CED]"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("basic")}
+          >
+            Basic Settings
+          </button>
+          <button
+            type="button"
+            className={`px-4 py-2 -mb-px font-medium ${
+              activeTab === "access"
+                ? "border-b-2 border-blue-600 text-[#3B7CED]"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("access")}
+          >
+            Access Rights
+          </button>
+        </div>
 
-      <form onSubmit={handleFormSubmit}>
-        {/* Tab Content */}
-        {activeTab === "basic" && (
-          <div className="w-full bg-white">
-            {/* Basic Info */}
-            <FormSection title="Basic Information" className="pt-10">
-              <div className="flex items-center w-full gap-4">
-                <FormImageUpload
-                  label="User Image"
-                  image={userImage ? URL.createObjectURL(userImage) : null}
-                  textToDisplay="Upload User Photo"
-                  onChange={(file) => setValue("user_image_image", file)}
-                />
+        <form onSubmit={handleFormSubmit}>
+          {/* Tab Content */}
+          {activeTab === "basic" && (
+            <div className="w-full bg-white">
+              {/* Basic Info */}
+              <FormSection title="Basic Information" className="pt-10">
+                <div className="flex items-center w-full gap-4">
+                  <FormImageUpload
+                    label="User Image"
+                    image={userImage ? URL.createObjectURL(userImage) : null}
+                    textToDisplay="Upload User Photo"
+                    onChange={(file) => setValue("user_image_image", file)}
+                  />
 
-                <div className="border-l border-[#E6E6E6] py-6 pl-10 ml-6 grid grid-cols-2 gap-8 w-[60%]">
+                  <div className="border-l border-[#E6E6E6] py-6 pl-10 ml-6 grid grid-cols-2 gap-8 w-[60%]">
+                    <Controller
+                      name="name"
+                      control={control}
+                      render={({ field }) => (
+                        <FormInput
+                          label="Name"
+                          {...field}
+                          value={field.value as string}
+                          placeholder="Enter your Name here"
+                          required
+                        />
+                      )}
+                    />
+                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+
+                    <Controller
+                      name="company_role"
+                      control={control}
+                      render={({ field }) => (
+                        <NewUserRoleSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                    {errors.company_role && <p className="text-red-500 text-xs mt-1">{errors.company_role.message}</p>}
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* Contact Info */}
+              <FormSection title="Contact Information">
+                <div className="grid grid-cols-3 gap-6 mt-4">
                   <Controller
-                    name="name"
+                    name="phone_number"
                     control={control}
                     render={({ field }) => (
                       <FormInput
-                        label="Name"
+                        label="Phone Number"
                         {...field}
                         value={field.value as string}
-                        placeholder="Enter your Name here"
+                        placeholder="Enter phone number"
                         required
                       />
                     )}
                   />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+                  {errors.phone_number && <p className="text-red-500 text-xs mt-1">{errors.phone_number.message}</p>}
 
                   <Controller
-                    name="company_role"
+                    name="email"
                     control={control}
                     render={({ field }) => (
-                      <NewUserRoleSelect
-                        value={field.value}
-                        onChange={field.onChange}
+                      <FormInput
+                        label="Email"
+                        {...field}
+                        value={field.value as string}
+                        placeholder="Enter email address"
+                        type="email"
+                        required
                       />
                     )}
                   />
-                  {errors.company_role && <p className="text-red-500 text-xs mt-1">{errors.company_role.message}</p>}
+                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
                 </div>
-              </div>
-            </FormSection>
+              </FormSection>
 
-            {/* Contact Info */}
-            <FormSection title="Contact Information">
-              <div className="grid grid-cols-3 gap-6 mt-4">
-                <Controller
-                  name="phone_number"
-                  control={control}
-                  render={({ field }) => (
-                    <FormInput
-                      label="Phone Number"
-                      {...field}
-                      value={field.value as string}
-                      placeholder="Enter phone number"
-                      required
-                    />
-                  )}
-                />
-                {errors.phone_number && <p className="text-red-500 text-xs mt-1">{errors.phone_number.message}</p>}
-
-                <Controller
-                  name="email"
-                  control={control}
-                  render={({ field }) => (
-                    <FormInput
-                      label="Email"
-                      {...field}
-                      value={field.value as string}
-                      placeholder="Enter email address"
-                      type="email"
-                      required
-                    />
-                  )}
-                />
-                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
-              </div>
-            </FormSection>
-
-            {/* Companies */}
-            <FormSection title="Companies">
-              <div className="flex items-center gap-4 border border-[#A9B3BC] mt-6 p-4 rounded-xs w-fit">
-                <div className="w-15 h-15 flex items-center justify-center bg-[#E8EFFD] rounded-full">
-                  <GridCardIcon className="w-2 h-2 text-[#3B7CED]" />
+              {/* Companies */}
+              <FormSection title="Companies">
+                <div className="flex items-center gap-4 border border-[#A9B3BC] mt-6 p-4 rounded-xs w-fit">
+                  <div className="w-15 h-15 flex items-center justify-center bg-[#E8EFFD] rounded-full">
+                    <GridCardIcon className="w-2 h-2 text-[#3B7CED]" />
+                  </div>
+                  <div>
+                    <h4 className="text-[#1a1a1a]">Company Name</h4>
+                    <p className="text-[#8C9AA6] font-medium text-base">
+                      {tenant_company_name || "No Company Available"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-[#1a1a1a]">Company Name</h4>
-                  <p className="text-[#8C9AA6] font-medium text-base">
-                    {tenant_company_name || "No Company Available"}
-                  </p>
+              </FormSection>
+
+              {/* Preferences */}
+              <FormSection title="Preferences">
+                <div className="grid grid-cols-2 gap-6">
+                  <Controller
+                    name="language"
+                    control={control}
+                    render={({ field }) => (
+                      <FormSelect
+                        label="Language"
+                        {...field}
+                        value={field.value as string}
+                        placeholder="Select language"
+                        options={languageOptions}
+                      />
+                    )}
+                  />
+                  {errors.language && <p className="text-red-500 text-xs mt-1">{errors.language.message}</p>}
+
+                  <Controller
+                    name="timezone"
+                    control={control}
+                    render={({ field }) => (
+                      <FormSelect
+                        label="Timezone"
+                        {...field}
+                        value={field.value as string}
+                        placeholder="Select timezone"
+                        options={timezoneOptions}
+                      />
+                    )}
+                  />
+                  {errors.timezone && <p className="text-red-500 text-xs mt-1">{errors.timezone.message}</p>}
                 </div>
-              </div>
-            </FormSection>
 
-            {/* Preferences */}
-            <FormSection title="Preferences">
-              <div className="grid grid-cols-2 gap-6">
-                <Controller
-                  name="language"
-                  control={control}
-                  render={({ field }) => (
-                    <FormSelect
-                      label="Language"
-                      {...field}
-                      value={field.value as string}
-                      placeholder="Select language"
-                      options={languageOptions}
-                    />
-                  )}
-                />
-                {errors.language && <p className="text-red-500 text-xs mt-1">{errors.language.message}</p>}
-
-                <Controller
-                  name="timezone"
-                  control={control}
-                  render={({ field }) => (
-                    <FormSelect
-                      label="Timezone"
-                      {...field}
-                      value={field.value as string}
-                      placeholder="Select timezone"
-                      options={timezoneOptions}
-                    />
-                  )}
-                />
-                {errors.timezone && <p className="text-red-500 text-xs mt-1">{errors.timezone.message}</p>}
-              </div>
-
-              {/* Notification Preferences */}
-              <div className="mt-6 flex flex-col gap-4">
-                <label className="font-medium text-sm text-[#1A1A1A]">
-                  Notification Preferences
-                </label>
-
-                <div className="flex items-center gap-3 w-[13%] justify-between">
-                  <label htmlFor="in-app" className="text-sm text-[#4A4A4A] cursor-pointer">
-                    In-app Notifications
+                {/* Notification Preferences */}
+                <div className="mt-6 flex flex-col gap-4">
+                  <label className="font-medium text-sm text-[#1A1A1A]">
+                    Notification Preferences
                   </label>
-                  <Controller
-                    name="in_app_notifications"
-                    control={control}
-                    render={({ field }) => (
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        id="in-app"
-                      />
-                    )}
-                  />
-                </div>
 
-                <div className="flex items-center gap-3 w-[13%] justify-between">
-                  <label
-                    htmlFor="email-notif"
-                    className="text-sm text-[#4A4A4A] cursor-pointer"
-                  >
-                    Email Notifications
-                  </label>
-                  <Controller
-                    name="email_notifications"
-                    control={control}
-                    render={({ field }) => (
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        id="email-notif"
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-            </FormSection>
-
-            {/* Signature Pad */}
-            <FormSection title="Signature">
-              <SignaturePad
-                onChange={(base64) => {
-                  if (base64) {
-                    const file = base64ToFile(
-                      `data:image/png;base64,${base64}`,
-                      "signature.png"
-                    );
-                    setValue("signature_image", file);
-                  } else {
-                    setValue("signature_image", null);
-                  }
-                }}
-              />
-            </FormSection>
-
-            {/* Footer Buttons */}
-            <div className="mt-6 flex justify-end gap-4 px-6 pb-6">
-              <button
-                type="button"
-                className="px-8 py-2 border rounded text-gray-700 hover:bg-gray-100"
-                onClick={() => router.push("/settings/users")}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="px-8 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                onClick={() => setActiveTab("access")}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Access Rights Tab */}
-        {activeTab === "access" && (
-          <div className="w-full bg-white px-6">
-            <FormSection title="Applications">
-              {isLoadingGroups ? (
-                <p>Loading access groups...</p>
-              ) : (
-                <div className="grid grid-cols-3 gap-5 pt-6">
-                  {accessGroupsByApp?.data?.map((app: any) => (
+                  <div className="flex items-center gap-3 w-[13%] justify-between">
+                    <label htmlFor="in-app" className="text-sm text-[#4A4A4A] cursor-pointer">
+                      In-app Notifications
+                    </label>
                     <Controller
-                      key={app.application}
-                      name={`access_codes.${app.application}`}
+                      name="in_app_notifications"
                       control={control}
                       render={({ field }) => (
-                        <FormSelect
-                          label={app.application}
-                          {...field}
-                          value={field.value || ""}
-                          placeholder="Select An Access Group"
-                          options={app.access_groups.map((group: any) => ({
-                            label: group.group_name,
-                            value: group.access_code,
-                          }))}
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          id="in-app"
                         />
                       )}
                     />
-                  ))}
+                  </div>
+
+                  <div className="flex items-center gap-3 w-[13%] justify-between">
+                    <label
+                      htmlFor="email-notif"
+                      className="text-sm text-[#4A4A4A] cursor-pointer"
+                    >
+                      Email Notifications
+                    </label>
+                    <Controller
+                      name="email_notifications"
+                      control={control}
+                      render={({ field }) => (
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          id="email-notif"
+                        />
+                      )}
+                    />
+                  </div>
                 </div>
-              )}
-            </FormSection>
+              </FormSection>
 
-            <div className="mt-12 flex justify-end gap-4 pb-6">
-              <button
-                type="button"
-                onClick={() => setActiveTab("basic")}
-                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
-              >
-                Back
-              </button>
+              {/* Signature Pad */}
+              <FormSection title="Signature">
+                <SignaturePad
+                  onChange={(base64) => {
+                    if (base64) {
+                      const file = base64ToFile(
+                        `data:image/png;base64,${base64}`,
+                        "signature.png"
+                      );
+                      setValue("signature_image", file);
+                    } else {
+                      setValue("signature_image", null);
+                    }
+                  }}
+                />
+              </FormSection>
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
-              >
-                {isSubmitting ? "Saving..." : "Save"}
-              </button>
+              {/* Footer Buttons */}
+              <div className="mt-6 flex justify-end gap-4 px-6 pb-6">
+                <button
+                  type="button"
+                  className="px-8 py-2 border rounded text-gray-700 hover:bg-gray-100"
+                  onClick={() => router.push("/settings/users")}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="px-8 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  onClick={() => setActiveTab("access")}
+                >
+                  Next
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </form>
+          )}
 
-      <ToastNotification
-        message={notification.message}
-        type={notification.type}
-        show={notification.show}
-        onClose={closeNotification}
-      />
-    </div>
+          {/* Access Rights Tab */}
+          {activeTab === "access" && (
+            <div className="w-full bg-white px-6">
+              <FormSection title="Applications">
+                {isLoadingGroups ? (
+                  <p>Loading access groups...</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-5 pt-6">
+                    {accessGroupsByApp?.data?.map((app: any) => (
+                      <Controller
+                        key={app.application}
+                        name={`access_codes.${app.application}`}
+                        control={control}
+                        render={({ field }) => (
+                          <FormSelect
+                            label={app.application}
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="Select An Access Group"
+                            options={app.access_groups.map((group: any) => ({
+                              label: group.group_name,
+                              value: group.access_code,
+                            }))}
+                          />
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
+              </FormSection>
+
+              <div className="mt-12 flex justify-end gap-4 pb-6">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("basic")}
+                  className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
+                >
+                  Back
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+                >
+                  {isSubmitting ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          )}
+        </form>
+
+        <ToastNotification
+          message={notification.message}
+          type={notification.type}
+          show={notification.show}
+          onClose={closeNotification}
+        />
+      </div>
+    </PageGuard>
   );
 }

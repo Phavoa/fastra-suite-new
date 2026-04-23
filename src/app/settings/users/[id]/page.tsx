@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSelector } from "react-redux";
-import { usePermissionContext } from "@/contexts/PermissionContext";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/ProtectedComponent";
 import moment from "moment-timezone";
 import ISO6391 from "iso-639-1";
 
@@ -60,7 +61,6 @@ export default function UsersDetails() {
     (state: any) => state.auth.tenant_company_name,
   );
   const access_token = useSelector((state: any) => state.auth.access_token);
-  const { isAdmin } = usePermissionContext();
   const [updateUser] = useUpdateUserByIdMutation();
 
   const [editMode, setEditMode] = useState(false);
@@ -362,12 +362,14 @@ export default function UsersDetails() {
           </button>
           <h1 className="text-xl text-[#1A1A1A] font-normal">User Details</h1>
         </div>
-        <button
-          className="text-[#3B7CED]"
-          onClick={() => setEditMode((prev) => !prev)}
-        >
-          {editMode ? "Back to View" : "Edit"}
-        </button>
+        <PermissionGuard application="settings" module="user" action="edit">
+          <button
+            className="text-[#3B7CED]"
+            onClick={() => setEditMode((prev) => !prev)}
+          >
+            {editMode ? "Back to View" : "Edit"}
+          </button>
+        </PermissionGuard>
       </div>
 
       {/* Tabs */}
@@ -392,7 +394,7 @@ export default function UsersDetails() {
         >
           Access Rights
         </button>
-        {isAdmin && (
+        <PermissionGuard application="settings" module="user" action="edit">
           <button
             onClick={handleResetPassword}
             disabled={resetLoading}
@@ -400,7 +402,7 @@ export default function UsersDetails() {
           >
             {resetLoading ? "Resetting..." : "Reset Password"}
           </button>
-        )}
+        </PermissionGuard>
       </div>
 
       {/* Tab Content */}

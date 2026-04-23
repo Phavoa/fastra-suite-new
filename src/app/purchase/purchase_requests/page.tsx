@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import { usePermission } from "@/hooks/usePermission";
+import { PageGuard } from "@/components/auth/PageGuard";
 import { PurchaseTable } from "@/components/purchase/purchaseRequest/PurchaseRequestTable";
 import { PurchaseRequestCards } from "@/components/purchase/purchaseRequest/PurchaseRequestCards";
 import { RequestRow } from "@/components/purchase/types";
@@ -18,6 +19,7 @@ import {
 } from "@/api/purchase/purchaseRequestApi";
 import type { RootState } from "@/lib/store/store";
 import { StatusCards } from "@/components/purchase/purchaseRequest";
+import { extractErrorMessage } from "@/lib/utils";
 
 // Helper function to transform API data to RequestRow format
 const transformPurchaseRequestToRow = (
@@ -63,18 +65,6 @@ export default function PurchaseRequestsPage() {
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserId = loggedInUser?.id;
 
-  useEffect(() => {
-    if (
-      !can({
-        application: "purchase",
-        module: "purchaserequest",
-        action: "view",
-      })
-    ) {
-      router.push("/unauthorized");
-    }
-  }, [can, router]);
-
   // Use the API query hook
   const {
     data: purchaseRequests = [],
@@ -112,65 +102,74 @@ export default function PurchaseRequestsPage() {
   if (isError) {
     return (
       <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading purchase requests</p>
-          <p className="text-sm mt-2">{error?.toString()}</p>
+        <div className="text-center text-red-600 px-4">
+          <p className="text-lg font-semibold">Error loading purchase requests</p>
+          <p className="text-sm mt-2">{extractErrorMessage(error, "An unexpected error occurred while loading purchase requests.")}</p>
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            className="mt-6"
+          >
+            Try Again
+          </Button>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen text-gray-800 mr-4">
-      <div className="bg-white rounded-md shadow hover:shadow-lg transition-shadow duration-300 p-6 pb-4 mt-4">
-        <StatusCards rows={rows} />
-      </div>
+    <PageGuard application="purchase" module="purchaserequest">
+      <main className="min-h-screen text-gray-800 mr-4">
+        <div className="bg-white rounded-md shadow hover:shadow-lg transition-shadow duration-300 p-6 pb-4 mt-4">
+          <StatusCards rows={rows} />
+        </div>
 
-      <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-lg text-nowrap">Purchase Requests</h2>
+        <div className="bg-white p-6 rounded-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
+          <div className="flex items-center space-x-4">
+            <h2 className="text-lg text-nowrap">Purchase Requests</h2>
 
-          <div className="relative w-xs">
-            <Input
-              type="text"
-              className="w-full pl-10 pr-4 border border-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search purchase requests"
-            />
-            <SearchIcon
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-              size={16}
+            <div className="relative w-xs">
+              <Input
+                type="text"
+                className="w-full pl-10 pr-4 border border-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Search purchase requests"
+              />
+              <SearchIcon
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                size={16}
+              />
+            </div>
+          </div>
+          <div className="flex space-x-4">
+            {!can({
+              application: "purchase",
+              module: "purchaserequest",
+              action: "create",
+            }) ? null : (
+              <Link href="/purchase/purchase_requests/new">
+                <Button variant="contained" className="px-4 py-2 cursor-pointer">
+                  New Purchase Request
+                </Button>
+              </Link>
+            )}
+
+            <ViewToggle
+              currentView={currentView}
+              onViewChange={handleViewChange}
             />
           </div>
         </div>
-        <div className="flex space-x-4">
-          {!can({
-            application: "purchase",
-            module: "purchaserequest",
-            action: "create",
-          }) ? null : (
-            <Link href="/purchase/purchase_requests/new">
-              <Button variant="contained" className="px-4 py-2 cursor-pointer">
-                New Purchase Request
-              </Button>
-            </Link>
-          )}
 
-          <ViewToggle
-            currentView={currentView}
-            onViewChange={handleViewChange}
-          />
-        </div>
-      </div>
-
-      {/* Conditional rendering based on current view */}
-      {currentView === "list" ? (
-        <PurchaseTable rows={rows} query={query} />
-      ) : (
-        <PurchaseRequestCards purchaseRequests={rows} />
-      )}
-    </main>
+        {/* Conditional rendering based on current view */}
+        {currentView === "list" ? (
+          <PurchaseTable rows={rows} query={query} />
+        ) : (
+          <PurchaseRequestCards purchaseRequests={rows} />
+        )}
+      </main>
+    </PageGuard>
   );
 }

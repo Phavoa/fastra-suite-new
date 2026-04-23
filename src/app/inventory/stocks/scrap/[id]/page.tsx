@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/inventory/stocks/StatusPill";
 import { useGetScrapQuery } from "@/api/inventory/scrapApi";
 import { useParams } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
+import { PageGuard } from "@/components/auth/PageGuard";
 import type { Scrap, ScrapItem } from "@/types/scrap";
 
 // Format date to "DD MMM YYYY - HH:mm AM/PM" format
@@ -172,7 +173,8 @@ const ScrapDetailPage: React.FC = () => {
   // Loading state
   if (isLoading) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="scrap">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -182,6 +184,7 @@ const ScrapDetailPage: React.FC = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
@@ -194,7 +197,8 @@ const ScrapDetailPage: React.FC = () => {
           "Unable to load scrap details"
         : "Unable to load scrap details";
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="scrap">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -206,13 +210,15 @@ const ScrapDetailPage: React.FC = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
   // If no data
   if (!scrap) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="scrap">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -226,6 +232,7 @@ const ScrapDetailPage: React.FC = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
@@ -250,7 +257,8 @@ const ScrapDetailPage: React.FC = () => {
   };
 
   return (
-    <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+    <PageGuard application="inventory" module="scrap">
+      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader
         items={breadcrumbItems}
         title="Scrap"
@@ -402,6 +410,7 @@ const ScrapDetailPage: React.FC = () => {
         <div className="h-16"></div>
       </div>
     </FadeIn>
+    </PageGuard>
   );
 };
 

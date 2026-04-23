@@ -31,7 +31,7 @@ export const GrayButton = ({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded text-[#7A8A98] bg-transparent hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:pointer-events-none",
+        "inline-flex items-center gap-2 rounded text-[#7A8A98] bg-transparent hover:bg-gray-100 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:pointer-events-none",
         sizeClasses[size],
         className
       )}

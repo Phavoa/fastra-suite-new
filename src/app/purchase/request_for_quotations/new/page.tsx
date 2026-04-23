@@ -19,6 +19,7 @@ import {
   useGetApprovedPurchaseRequestsQuery,
   PurchaseRequest,
 } from "@/api/purchase/purchaseRequestApi";
+import { extractErrorMessage } from "@/lib/utils";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   rfqSchema,
@@ -73,9 +74,9 @@ export default function Page() {
   // API mutations and queries
   const [createRequestForQuotation, { isLoading: isCreating }] =
     useCreateRequestForQuotationMutation();
-  const { data: currencies, isLoading: isLoadingCurrencies } =
+  const { data: currencies, isLoading: isLoadingCurrencies, error: currenciesError } =
     useGetCurrenciesQuery({});
-  const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
+  const { data: vendors, isLoading: isLoadingVendors, error: vendorsError } = useGetVendorsQuery({});
   const {
     data: products,
     isLoading: isLoadingProducts,
@@ -83,7 +84,7 @@ export default function Page() {
   } = useGetProductsQuery({});
 
   // Get approved purchase requests for RFQ creation
-  const { data: approvedPurchaseRequests, isLoading: isLoadingApprovedPRs } =
+  const { data: approvedPurchaseRequests, isLoading: isLoadingApprovedPRs, error: purchaseRequestsError } =
     useGetApprovedPurchaseRequestsQuery();
 
   // Form state
@@ -188,17 +189,46 @@ export default function Page() {
   console.log("Is loading products:", isLoadingProducts);
   console.log("Products error:", productsError);
 
-  // Show notification if products fail to load
+  // Handle query errors
   React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
+
+  React.useEffect(() => {
+    if (vendorsError) {
+      setNotification({
+        message: extractErrorMessage(vendorsError, "Failed to load vendors."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [vendorsError]);
+
+  React.useEffect(() => {
+    if (currenciesError) {
+      setNotification({
+        message: extractErrorMessage(currenciesError, "Failed to load currencies."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [currenciesError]);
+
+  React.useEffect(() => {
+    if (purchaseRequestsError) {
+      setNotification({
+        message: extractErrorMessage(purchaseRequestsError, "Failed to load approved purchase requests."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [purchaseRequestsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -275,17 +305,7 @@ export default function Page() {
         router.push("/purchase/request_for_quotations");
       }, 1500);
     } catch (error: unknown) {
-      // Handle API errors
-      let errorMessage =
-        "Failed to create request for quotation. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
+      const errorMessage = extractErrorMessage(error, "Failed to create request for quotation. Please try again.");
 
       setNotification({
         message: errorMessage,

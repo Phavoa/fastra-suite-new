@@ -14,6 +14,7 @@ import {
 } from "@/api/settings/accessGroupRightApi";
 import { useGetApplicationsAndAccessRightsQuery } from "@/api/settings/applicationsApi";
 import { BoxIcon } from "@/components/icons/boxIcon";
+import { PermissionGuard } from "@/components/ProtectedComponent";
 
 type RightKey = "view" | "edit" | "create" | "delete" | "approve" | "reject";
 
@@ -219,12 +220,14 @@ export default function ViewAccessGroupPage() {
           </div>
 
           {!editMode ? (
-            <Button
-              className="bg-white text-[#3B7CED] px-8 border-0"
-              onClick={() => setEditMode(true)}
-            >
-              Edit
-            </Button>
+            <PermissionGuard application="settings" module="accessgroup" action="edit">
+              <Button
+                className="bg-white text-[#3B7CED] px-8 border-0"
+                onClick={() => setEditMode(true)}
+              >
+                Edit
+              </Button>
+            </PermissionGuard>
           ) : (
             <div className="flex gap-2">
               <Button

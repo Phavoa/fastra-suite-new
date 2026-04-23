@@ -25,6 +25,7 @@ import {
   PurchaseRequest,
 } from "@/api/purchase/purchaseRequestApi";
 import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { extractErrorMessage } from "@/lib/utils";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   purchaseRequestSchema,
@@ -86,21 +87,21 @@ export default function Page() {
   } = useGetRequestForQuotationQuery(rfqId);
 
   // Fetch purchase request details for purpose and requesting location
-  const { data: purchaseRequestData, isLoading: isLoadingPurchaseRequest } =
+  const { data: purchaseRequestData, isLoading: isLoadingPurchaseRequest, error: purchaseRequestError } =
     useGetPurchaseRequestQuery(rfqData?.purchase_request || "", {
       skip: !rfqData?.purchase_request,
     });
 
   // Fetch locations for requesting location field
-  const { data: locations, isLoading: isLoadingLocations } =
+  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
     useGetLocationsQuery({});
 
   // API mutations and queries
   const [patchRequestForQuotation, { isLoading: isUpdating }] =
     usePatchRequestForQuotationMutation();
-  const { data: currencies, isLoading: isLoadingCurrencies } =
+  const { data: currencies, isLoading: isLoadingCurrencies, error: currenciesError } =
     useGetCurrenciesQuery({});
-  const { data: vendors, isLoading: isLoadingVendors } = useGetVendorsQuery({});
+  const { data: vendors, isLoading: isLoadingVendors, error: vendorsError } = useGetVendorsQuery({});
   const {
     data: products,
     isLoading: isLoadingProducts,
@@ -108,7 +109,7 @@ export default function Page() {
   } = useGetProductsQuery({});
 
   // Get approved purchase requests for RFQ creation
-  const { data: approvedPurchaseRequests, isLoading: isLoadingApprovedPRs } =
+  const { data: approvedPurchaseRequests, isLoading: isLoadingApprovedPRs, error: approvedPRsError } =
     useGetApprovedPurchaseRequestsQuery();
 
   // Form state
@@ -251,28 +252,76 @@ export default function Page() {
   console.log("Is loading products:", isLoadingProducts);
   console.log("Products error:", productsError);
 
-  // Show notification if products fail to load
+  // Handle query errors
+  React.useEffect(() => {
+    if (rfqError) {
+      setNotification({
+        message: extractErrorMessage(rfqError, "Failed to load Request for Quotation."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [rfqError]);
+
   React.useEffect(() => {
     if (productsError) {
       setNotification({
-        message:
-          "Failed to load products. Please check your connection and try again.",
+        message: extractErrorMessage(productsError, "Failed to load products."),
         type: "error",
         show: true,
       });
     }
   }, [productsError]);
 
-  // Show error if RFQ fails to load
   React.useEffect(() => {
-    if (rfqError) {
+    if (vendorsError) {
       setNotification({
-        message: "Failed to load Request for Quotation. Please try again.",
+        message: extractErrorMessage(vendorsError, "Failed to load vendors."),
         type: "error",
         show: true,
       });
     }
-  }, [rfqError]);
+  }, [vendorsError]);
+
+  React.useEffect(() => {
+    if (currenciesError) {
+      setNotification({
+        message: extractErrorMessage(currenciesError, "Failed to load currencies."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [currenciesError]);
+
+  React.useEffect(() => {
+    if (locationsError) {
+      setNotification({
+        message: extractErrorMessage(locationsError, "Failed to load locations."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [locationsError]);
+
+  React.useEffect(() => {
+    if (purchaseRequestError) {
+      setNotification({
+        message: extractErrorMessage(purchaseRequestError, "Failed to load purchase request details."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [purchaseRequestError]);
+
+  React.useEffect(() => {
+    if (approvedPRsError) {
+      setNotification({
+        message: extractErrorMessage(approvedPRsError, "Failed to load approved purchase requests."),
+        type: "error",
+        show: true,
+      });
+    }
+  }, [approvedPRsError]);
 
   const breadcrumsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -335,19 +384,8 @@ export default function Page() {
         router.push("/purchase/request_for_quotations");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage =
-        "Failed to update request for quotation. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
-
       setNotification({
-        message: errorMessage,
+        message: extractErrorMessage(error, "Failed to update request for quotation. Please try again."),
         type: "error",
         show: true,
       });
@@ -377,19 +415,8 @@ export default function Page() {
         router.push("/purchase/request_for_quotations");
       }, 1500);
     } catch (error: unknown) {
-      let errorMessage =
-        "Failed to send request for quotation for approval. Please try again.";
-
-      if (error && typeof error === "object" && "data" in error) {
-        const apiError = error as {
-          data?: { detail?: string; message?: string };
-        };
-        errorMessage =
-          apiError.data?.detail || apiError.data?.message || errorMessage;
-      }
-
       setNotification({
-        message: errorMessage,
+        message: extractErrorMessage(error, "Failed to send request for quotation for approval. Please try again."),
         type: "error",
         show: true,
       });
@@ -514,8 +541,9 @@ export default function Page() {
       {/* Error state */}
       {rfqError && !isLoadingRfq && (
         <div className="flex items-center justify-center h-64">
-          <div className="text-red-500">
-            Failed to load Request for Quotation. Please try again.
+          <div className="text-red-500 text-center px-4">
+            <p className="font-semibold text-lg">Error Loading Request for Quotation</p>
+            <p className="text-sm mt-1">{extractErrorMessage(rfqError)}</p>
           </div>
         </div>
       )}

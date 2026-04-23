@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/purchase/products";
 import { BreadcrumbItem } from "@/types/purchase";
 import { useGetProductQuery } from "@/api/purchase/productsApi";
+import { extractErrorMessage } from "@/lib/utils";
 import {
   FadeIn,
   SlideUp,
@@ -53,8 +54,11 @@ const Page = () => {
           isEdit={`/purchase/products/edit/${productId}`}
         />
         <div className="h-full mx-auto px-6 py-8 bg-white">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-red-500">Error loading product details</div>
+          <div className="flex items-center justify-center h-64 text-center px-4">
+            <div className="text-red-500">
+              <p className="font-semibold text-lg">Error Loading Product</p>
+              <p className="text-sm mt-1">{extractErrorMessage(error, "Unable to load product details")}</p>
+            </div>
           </div>
         </div>
       </FadeIn>

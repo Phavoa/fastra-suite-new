@@ -34,6 +34,8 @@ import {
   RotateCcwIcon,
 } from "lucide-react";
 import type { IncomingProduct } from "@/types/incomingProduct";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 // StatusCards component for operation overview
 function StatusCards() {
@@ -210,29 +212,41 @@ export default function OperationPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading incoming products...</p>
-        </div>
-      </main>
+      <PageGuard application="inventory" module="incomingproduct">
+        <main className="min-h-screen text-gray-800 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Loading incoming products...</p>
+          </div>
+        </main>
+      </PageGuard>
     );
   }
 
   // Show error state
   if (isError) {
     return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <p>Error loading incoming products</p>
-          <p className="text-sm mt-2">{error?.toString()}</p>
-        </div>
-      </main>
+      <PageGuard application="inventory" module="incomingproduct">
+        <main className="min-h-screen text-gray-800 flex items-center justify-center">
+          <div className="text-center text-red-600 px-4">
+            <p className="text-lg font-semibold">Error loading incoming products</p>
+            <p className="text-sm mt-2">{extractErrorMessage(error, "An unknown error occurred")}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="mt-6"
+            >
+              Try Again
+            </Button>
+          </div>
+        </main>
+      </PageGuard>
     );
   }
 
   return (
-    <main className="min-h-screen text-gray-800 mr-4">
+    <PageGuard application="inventory" module="incomingproduct">
+      <main className="min-h-screen text-gray-800 mr-4">
       <Breadcrumbs
         items={breadcrumsItem}
         action={
@@ -380,5 +394,6 @@ export default function OperationPage() {
         />
       )}
     </main>
+    </PageGuard>
   );
 }

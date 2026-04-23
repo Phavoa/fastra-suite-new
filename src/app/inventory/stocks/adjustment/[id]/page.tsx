@@ -12,10 +12,14 @@ import { StatusPill } from "@/components/inventory/stocks/StatusPill";
 import { useGetStockAdjustmentQuery } from "@/api/inventory/stockAdjustmentApi";
 import { useParams } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
+import { extractErrorMessage } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import type {
   StockAdjustment,
   StockAdjustmentItem,
 } from "@/types/stockAdjustment";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 // Format date to "DD MMM YYYY - HH:mm AM/PM" format
 const formatDateTime = (dateString: string | undefined): string => {
@@ -169,6 +173,7 @@ const ProductItemsTable: React.FC<ProductItemsTableProps> = ({ items }) => {
 
 const StockAdjustmentDetailPage: React.FC = () => {
   const params = useParams();
+  const router = useRouter();
   const adjustmentId = params.id as string;
 
   const {
@@ -180,7 +185,8 @@ const StockAdjustmentDetailPage: React.FC = () => {
   // Loading state
   if (isLoading) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="stockadjustment">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -192,37 +198,38 @@ const StockAdjustmentDetailPage: React.FC = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
   // Error state
   if (error) {
-    const errorMessage =
-      "data" in error
-        ? (error.data as { detail?: string; message?: string })?.detail ||
-          (error.data as { detail?: string; message?: string })?.message ||
-          "Unable to load stock adjustment details"
-        : "Unable to load stock adjustment details";
+    const errorMessage = extractErrorMessage(error, "Unable to load stock adjustment details");
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
-        <div className="h-full mx-auto px-6 py-8 bg-white">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="text-red-500 text-lg font-semibold mb-2">
-                Error Loading Stock Adjustment
-              </div>
-              <p className="text-gray-600">{errorMessage}</p>
+      <PageGuard application="inventory" module="stockadjustment">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased">
+          <div className="h-full mx-auto px-6 py-8 bg-white flex items-center justify-center">
+            <div className="text-center text-red-600 px-4">
+              <p className="text-lg font-semibold">Error Loading Stock Adjustment</p>
+              <p className="text-sm mt-2">{errorMessage}</p>
+              <Button
+                onClick={() => router.push("/inventory/stocks/adjustment")}
+                className="mt-6 pointer-cursor"
+              >
+                Back to Stock Adjustments
+              </Button>
             </div>
           </div>
-        </div>
-      </FadeIn>
+        </FadeIn>
+      </PageGuard>
     );
   }
 
   // If no data
   if (!stockAdjustment) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="stockadjustment">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -236,6 +243,7 @@ const StockAdjustmentDetailPage: React.FC = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
@@ -260,7 +268,8 @@ const StockAdjustmentDetailPage: React.FC = () => {
   };
 
   return (
-    <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+    <PageGuard application="inventory" module="stockadjustment">
+      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader
         items={breadcrumbItems}
         title="Stock Adjustment"
@@ -427,6 +436,7 @@ const StockAdjustmentDetailPage: React.FC = () => {
         <div className="h-16"></div>
       </div>
     </FadeIn>
+    </PageGuard>
   );
 };
 

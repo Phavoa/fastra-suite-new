@@ -12,6 +12,7 @@ import {
   useToggleLocationHiddenStatusMutation,
   useDeleteLocationMutation,
 } from "@/api/inventory/locationApi";
+import { PageGuard } from "@/components/auth/PageGuard";
 import {
   FadeIn,
   SlideUp,
@@ -79,7 +80,8 @@ const Page = () => {
   // Loading state
   if (isLoading) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="location">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -89,6 +91,7 @@ const Page = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
@@ -101,7 +104,8 @@ const Page = () => {
           "Unable to load location details"
         : "Unable to load location details";
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="location">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -113,13 +117,15 @@ const Page = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
   // If no data
   if (!location) {
     return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+      <PageGuard application="inventory" module="location">
+        <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
         <div className="h-full mx-auto px-6 py-8 bg-white">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -133,6 +139,7 @@ const Page = () => {
           </div>
         </div>
       </FadeIn>
+      </PageGuard>
     );
   }
 
@@ -194,7 +201,8 @@ const Page = () => {
   };
 
   return (
-    <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
+    <PageGuard application="inventory" module="location">
+      <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4">
       <PageHeader
         items={items}
         title="Location Details"
@@ -432,6 +440,7 @@ const Page = () => {
         onClose={closeNotification}
       />
     </FadeIn>
+    </PageGuard>
   );
 };
 

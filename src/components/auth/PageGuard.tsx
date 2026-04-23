@@ -1,10 +1,10 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { ReactNode } from "react";
 import { usePermission } from "../../hooks/usePermission";
 import { PermissionAction, ApplicationName } from "../../types/permissions";
 import { LoadingDots } from "../shared/LoadingComponents";
+import { UnauthorizedMessage } from "../shared/UnauthorizedMessage";
 
 interface PageGuardProps {
   application: ApplicationName;
@@ -14,8 +14,8 @@ interface PageGuardProps {
 }
 
 /**
- * specialized guard for protecting entire pages.
- * Handles redirection and loading states consistently.
+ * Specialized guard for protecting entire pages.
+ * Handles loading states consistently and renders an inline unauthorized message.
  */
 export function PageGuard({
   application,
@@ -23,17 +23,9 @@ export function PageGuard({
   action = "view",
   children,
 }: PageGuardProps) {
-  const router = useRouter();
   const { can, isLoading } = usePermission();
 
   const hasAccess = can({ application, module, action });
-
-  useEffect(() => {
-    // Only redirect if NOT loading and user DOES NOT have access
-    if (!isLoading && !hasAccess) {
-      router.replace("/unauthorized");
-    }
-  }, [isLoading, hasAccess, router]);
 
   // Show loading state while permissions are being determined
   if (isLoading) {
@@ -47,9 +39,9 @@ export function PageGuard({
     );
   }
 
-  // If we don't have access and are not loading, don't show anything (redirect will trigger)
+  // If we don't have access and are not loading, show the inline unauthorized message
   if (!hasAccess) {
-    return null;
+    return <UnauthorizedMessage />;
   }
 
   return <>{children}</>;

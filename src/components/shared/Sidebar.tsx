@@ -47,7 +47,13 @@ const bottomItems = [
   { id: "settings", icon: SettingsIcon, label: "Settings", route: "/settings" },
 ];
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose?: () => void;
+  onToggle?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onToggle }) => {
   const [activeItem, setActiveItem] = useState<string>("dashboard");
   const [tooltip, setTooltip] = useState<{
     text: string;
@@ -59,11 +65,12 @@ const Sidebar: React.FC = () => {
   const handleNavigation = (item: (typeof topItems)[0]) => {
     setActiveItem(item.id);
     router.push(item.route);
+    if (onClose) onClose();
   };
 
   const handleMouseEnter = (
     event: React.MouseEvent<HTMLButtonElement>,
-    label: string
+    label: string,
   ) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setTooltip({
@@ -79,31 +86,22 @@ const Sidebar: React.FC = () => {
 
   return (
     <nav
-      className="fixed top-0 left-0 h-screen w-16 bg-white shadow-xs border-r border-gray-100 flex flex-col items-center py-4 z-10 overflow-y-auto scrollbar-hide"
+      className={`fixed top-0 left-0 h-screen w-16 bg-white shadow-xs border-r border-gray-100 flex flex-col items-center py-4 z-40 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out
+        ${isOpen ? "translate-x-0" : "-translate-x-full"}
+        md:translate-x-0`}
       aria-label="Main navigation"
     >
-      {/* Top section: Menu */}
-      <div className="mb-8">
-        {topItems.map((item) => {
-          const IconComponent = item.icon;
-          const isActive = activeItem === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleNavigation(item)}
-              onMouseEnter={(e) => handleMouseEnter(e, item.label)}
-              onMouseLeave={handleMouseLeave}
-              className={`w-11 h-11 flex items-center justify-center mb-6 rounded-lg transition-colors duration-300 ease-in-out ${
-                isActive
-                  ? "text-[#3B7CED] bg-[#3B7CED]/10"
-                  : "text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
-              }`}
-              aria-label={item.label}
-            >
-              <IconComponent color={isActive ? "#3B7CED" : undefined} />
-            </button>
-          );
-        })}
+      {/* Top section: Menu Toggle */}
+      <div className="mb-8 md:hidden">
+        <button
+          onClick={onToggle}
+          onMouseEnter={(e) => handleMouseEnter(e, "Toggle Sidebar")}
+          onMouseLeave={handleMouseLeave}
+          className="w-11 h-11 flex items-center justify-center mb-6 rounded-lg transition-colors duration-300 ease-in-out text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
+          aria-label="Toggle sidebar"
+        >
+          <MenuIcon />
+        </button>
       </div>
 
       {/* Middle section: Main options */}

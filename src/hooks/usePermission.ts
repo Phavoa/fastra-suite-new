@@ -1,25 +1,29 @@
+import { useCallback } from "react";
 import { usePermissionContext } from "../contexts/PermissionContext";
 import { CanParams } from "../types/permissions";
 
 export function usePermission() {
   const { isAdmin, permissions, isReady } = usePermissionContext();
 
-  const can = ({ application, module, action }: CanParams): boolean => {
-    // If admin, they can always perform the action
-    if (isAdmin) {
-      return true;
-    }
+  const can = useCallback(
+    ({ application, module, action }: CanParams): boolean => {
+      // If admin, they can always perform the action
+      if (isAdmin) {
+        return true;
+      }
 
-    const key = `${application}:${module}`;
-    const actions = permissions[key];
-    
-    // Check if the specific action exists in the permission set for this module
-    return actions ? actions.has(action) : false;
-  };
+      const key = `${application}:${module}`;
+      const actions = permissions[key];
 
-  return { 
-    can, 
-    isAdmin, 
-    isLoading: !isReady 
+      // Check if the specific action exists in the permission set for this module
+      return actions ? actions.has(action) : false;
+    },
+    [isAdmin, permissions],
+  );
+
+  return {
+    can,
+    isAdmin,
+    isLoading: !isReady,
   };
 }

@@ -90,6 +90,11 @@ export interface IncomingProduct {
   can_edit: boolean;
   is_hidden: boolean;
   notes: string;
+  backorder_of: string | null;
+  backorder_of_details?: {
+    id: string;
+    incoming_product_id: string;
+  };
 }
 
 // Request/Response types for different endpoints

@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 export default function InternalTransferDetailPage() {
   const router = useRouter();
@@ -233,7 +234,8 @@ export default function InternalTransferDetailPage() {
   }
 
   return (
-    <motion.div
+    <PageGuard application="inventory" module="internaltransfer">
+      <motion.div
       className="h-full text-gray-900 font-sans antialiased"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -409,6 +411,7 @@ export default function InternalTransferDetailPage() {
         show={notification.show}
         onClose={closeNotification}
       />
-    </motion.div>
+    </PageGuard>
+  </motion.div>
   );
 }
