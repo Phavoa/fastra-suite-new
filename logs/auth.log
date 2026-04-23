@@ -1,37 +1,15 @@
-[2026-04-19T20:57:51.110Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T20:59:36.006Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-19T21:10:01.676Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-19T21:16:22.214Z] User: efemiayafavour@gmail.com | Outcome: FAILURE | Details: Invalid email or password.
-[2026-04-19T21:16:31.792Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T21:26:06.518Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:31:40.420Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:32:45.743Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:40:30.407Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:40:30.457Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:40:31.741Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:49:55.418Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T22:56:38.450Z] User: efemiayafavour@gmail.com | Outcome: FAILURE | Details: Invalid email or password.
-[2026-04-19T22:56:47.760Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-19T23:04:57.851Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-20T06:10:44.506Z] User: efemiayafavour@gmail.com | Outcome: FAILURE | Details: Invalid email or password.
-[2026-04-20T06:10:53.399Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-20T06:12:03.435Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T01:28:28.817Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T01:28:29.923Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T01:29:44.948Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T01:33:32.661Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T01:43:14.707Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T02:12:21.406Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T02:21:23.842Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T02:22:42.785Z] User: nefemiaya@gmail.com | Outcome: SUCCESS 
-[2026-04-22T02:34:36.836Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T02:53:38.821Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T03:05:56.055Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T03:15:15.370Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T03:28:05.752Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T07:53:34.849Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T08:20:40.379Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-22T09:43:36.789Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-23T05:31:20.794Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
-[2026-04-23T05:31:20.811Z] User: efemiayafavour@gmail.com | Outcome: FAILURE | Details: Invalid email or password.
-[2026-04-23T05:31:20.821Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
+[2026-04-21T12:35:57.207Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T12:36:52.198Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T13:27:36.658Z] User: eruditeclp@gmail.com | Outcome: FAILURE | Details: Failed to login. Please try again.
+[2026-04-21T13:28:36.280Z] User: eruditeclp@gmail.com | Outcome: FAILURE | Details: Failed to login. Please try again.
+[2026-04-21T13:28:46.017Z] User: eruditeclp@gmail.com | Outcome: FAILURE | Details: Failed to login. Please try again.
+[2026-04-21T13:29:03.586Z] User: eruditeclp@gmail.com | Outcome: FAILURE | Details: Failed to login. Please try again.
+[2026-04-21T13:29:54.780Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T13:30:37.020Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T13:38:40.393Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T13:43:31.121Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T13:58:22.719Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-21T14:06:28.210Z] User: eruditeclp@gmail.com | Outcome: SUCCESS 
+[2026-04-23T06:50:52.536Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
+[2026-04-23T06:50:52.540Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
+[2026-04-23T06:51:52.344Z] User: efemiayafavour@gmail.com | Outcome: SUCCESS 
