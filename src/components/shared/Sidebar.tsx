@@ -34,6 +34,8 @@ const middleItems = [
   },
   { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
   { id: "labour-request", icon: HRIcon, label: "Labour Request", route: "/labour-request" },
+  { id: "material-consumption", icon: InventoryIcon, label: "Material Consumption", route: "/material-consumption-request" },
+  { id: "overrun-queue", icon: FinanceIcon, label: "Overrun Queue", route: "/project-costing/overrun-queue" },
   {
     id: "logistics",
     icon: LogisticsIcon,
