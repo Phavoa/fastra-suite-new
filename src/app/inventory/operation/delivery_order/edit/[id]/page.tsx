@@ -515,14 +515,13 @@ export default function EditDeliveryOrderPage() {
         </form>
       </motion.main>
 
-      {/* Notification */}
       <ToastNotification
         message={notification.message}
         type={notification.type}
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

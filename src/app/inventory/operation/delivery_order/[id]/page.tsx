@@ -413,7 +413,7 @@ export default function DeliveryOrderDetailPage() {
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

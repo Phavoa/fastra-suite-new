@@ -10,6 +10,7 @@ import {
   normalizePermissions,
   NormalizedPermissions,
 } from "@/utils/normalizePermissions";
+import { CanParams } from "@/types/permissions";
 
 export default function ProtectedPage() {
   const router = useRouter();
@@ -34,15 +35,15 @@ export default function ProtectedPage() {
         return normalizePermissions({ user_accesses });
       } catch (error) {
         console.error("Error normalizing permissions:", error);
-        return { isAdmin: false, permissions: {} };
+        return { isAdmin: false, permissions: {}, isReady: false };
       }
     }
-    return { isAdmin: false, permissions: {} };
+    return { isAdmin: false, permissions: {}, isReady: false };
   }, [user_accesses]);
 
   // Comprehensive permission checks
   const checkPermissions = useMemo(() => {
-    const requiredPermissions = [
+    const requiredPermissions: CanParams[] = [
       { application: "inventory", module: "deliveryorder", action: "create" },
       { application: "inventory", module: "deliveryorder", action: "view" },
       { application: "purchase", module: "purchase_requests", action: "view" },

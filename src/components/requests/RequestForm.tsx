@@ -35,7 +35,7 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
     watch,
     reset,
   } = useForm<T>({
-    resolver: zodResolver(config.schema) as any,
+    resolver: zodResolver(config.schema as any),
     defaultValues: config.defaultValues as any,
     mode: "onBlur",
   });

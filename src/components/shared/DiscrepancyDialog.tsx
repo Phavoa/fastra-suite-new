@@ -104,13 +104,13 @@ export function DiscrepancyDialog({
             </Button>
             <Button
               onClick={onConfirm}
-              loading={isLoading}
+              disabled={isLoading}
               className={cn(
                 "w-full sm:flex-1 h-12 font-semibold text-base text-white shadow-md transition-all duration-200",
                 isBackorder ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"
               )}
             >
-              {isBackorder ? "Yes, Place Backorder" : "Yes, Process Return"}
+              {isLoading ? "Processing..." : (isBackorder ? "Yes, Place Backorder" : "Yes, Process Return")}
             </Button>
           </div>
         </div>

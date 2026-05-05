@@ -411,7 +411,7 @@ export default function InternalTransferDetailPage() {
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

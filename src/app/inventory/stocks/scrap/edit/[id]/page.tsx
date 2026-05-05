@@ -873,7 +873,7 @@ export default function ScrapEditPage() {
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

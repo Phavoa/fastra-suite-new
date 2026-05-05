@@ -222,7 +222,13 @@ export default function InventoryConfiguration() {
               locationCount > 0 && (
                 <div className="px-6 pb-4">
                   <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      )}
+                    <Info className="w-5 h-5 text-[#3B7CED] shrink-0 mt-0.5" />
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      Multi Location is currently active with{" "}
+                      <span className="font-semibold text-gray-900">
+                        {locationCount} configured locations
+                      </span>. All inventory operations will require selecting a
+                      specific location for stock management.
                     </p>
                   </div>
                 </div>

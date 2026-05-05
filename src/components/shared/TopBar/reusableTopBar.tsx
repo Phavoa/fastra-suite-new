@@ -132,9 +132,9 @@ export function NavBar({
                           ? ({ children }: { children: React.ReactNode }) => (
                               <ProtectedComponent
                                 key={option.href}
-                                application={option.application!}
+                                application={option.application! as any}
                                 module={option.module!}
-                                action={option.action || "view"}
+                                action={(option.action as any) || "view"}
                               >
                                 {children}
                               </ProtectedComponent>
@@ -175,9 +175,9 @@ export function NavBar({
                 ? ({ children }: { children: React.ReactNode }) => (
                     <ProtectedComponent
                       key={item.href}
-                      application={item.application!}
+                      application={item.application! as any}
                       module={item.module!}
-                      action={item.action || "view"}
+                      action={(item.action as any) || "view"}
                     >
                       {children}
                     </ProtectedComponent>

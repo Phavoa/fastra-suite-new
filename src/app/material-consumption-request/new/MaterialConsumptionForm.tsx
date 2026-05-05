@@ -61,10 +61,10 @@ const MOCK_INVENTORY: Record<
 // --- Schema ---
 const productLineSchema = z.object({
   productId: z.string().min(1, "Product is required"),
-  quantity: z.coerce
-    .number()
-    .positive("Quantity must be positive")
-    .min(1, "Minimum 1"),
+  quantity: z.preprocess(
+    (val) => (val === "" ? undefined : Number(val)),
+    z.number().positive("Quantity must be positive").min(1, "Minimum 1"),
+  ),
   unitCost: z.number(),
   totalCost: z.number(),
 });
@@ -81,7 +81,22 @@ const formSchema = z.object({
     .min(1, "At least one product is required"),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+interface ProductLine {
+  productId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+}
+
+interface FormValues {
+  project: string;
+  wbsElement: string;
+  costCode: string;
+  dateConsumed: string;
+  warehouse: string;
+  notes?: string;
+  productLines: ProductLine[];
+}
 
 export default function MaterialConsumptionForm() {
   const router = useRouter();
@@ -91,7 +106,7 @@ export default function MaterialConsumptionForm() {
   const [stockErrors, setStockErrors] = useState<Record<number, string>>({});
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       project: "",
       wbsElement: "",
