@@ -24,7 +24,9 @@ interface RequestFormProps<T extends Record<string, any>> {
   config: RequestFormConfig<T>;
 }
 
-export function RequestForm<T extends Record<string, any>>({ config }: RequestFormProps<T>) {
+export function RequestForm<T extends Record<string, any>>({
+  config,
+}: RequestFormProps<T>) {
   const router = useRouter();
   const statusModal = useStatusModal();
 
@@ -41,16 +43,23 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
   });
 
   const currentValues = watch();
-  const projectedCost = config.calculateProjectedCost ? config.calculateProjectedCost(currentValues) : null;
+  const projectedCost = config.calculateProjectedCost
+    ? config.calculateProjectedCost(currentValues)
+    : null;
 
   const onSubmit = async (data: T) => {
     try {
+      console.log("Form submitted from RequestForm component:", data);
       await config.onSubmit(data);
-      statusModal.showSuccess(config.successMessage.title, config.successMessage.description);
+      statusModal.showSuccess(
+        config.successMessage.title,
+        config.successMessage.description,
+      );
     } catch (error) {
       statusModal.showError(
         config.errorMessage?.title || "Submission Unsuccessful",
-        config.errorMessage?.description || "There was an error submitting your request. Please check your connection and try again."
+        config.errorMessage?.description ||
+          "There was an error submitting your request. Please check your connection and try again.",
       );
     }
   };
@@ -62,7 +71,7 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
       router.push(config.backPath);
     }
   };
-
+  console.log("config", config);
   return (
     <div className="min-h-screen bg-[#F1F5F9]">
       {/* Header */}
@@ -76,7 +85,9 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-gray-900">{config.title}</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            {config.title}
+          </h1>
         </div>
       </div>
 
@@ -86,19 +97,31 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
           config.renderHeader()
         ) : (
           <div className="bg-white px-4 py-6">
-            <h2 className="text-sm font-medium text-[#3B7CED] mb-4">Request Details</h2>
+            <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
+              Request Details
+            </h2>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">Request ID</span>
-                <span className="text-sm text-gray-600">{config.requestId}</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  Request ID
+                </span>
+                <span className="text-sm text-gray-600">
+                  {config.requestId}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">Date</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  Date
+                </span>
                 <span className="text-sm text-gray-600">{config.date}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">Requested by</span>
-                <span className="text-sm text-gray-600">{config.requesterName}</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  Requested by
+                </span>
+                <span className="text-sm text-gray-600">
+                  {config.requesterName}
+                </span>
               </div>
             </div>
           </div>
@@ -108,11 +131,19 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {config.sections.map((section, sIndex) => (
             <div key={sIndex} className="bg-white px-4 py-6">
-              <h2 className="text-sm font-medium text-[#3B7CED] mb-4">{section.title}</h2>
+              <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
+                {section.title}
+              </h2>
               <div className="grid grid-cols-2 gap-x-4 gap-y-5">
                 {section.fields.map((field) => (
-                  <div key={field.name} className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}>
-                    <Label htmlFor={field.name} className="text-sm font-semibold text-gray-900">
+                  <div
+                    key={field.name}
+                    className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}
+                  >
+                    <Label
+                      htmlFor={field.name}
+                      className="text-sm font-semibold text-gray-900"
+                    >
                       {field.label}
                     </Label>
                     <Controller
@@ -179,20 +210,23 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
                 ))}
 
                 {/* Projected Cost (only shown in the last section for now, or based on logic) */}
-                {sIndex === config.sections.length - 1 && projectedCost !== null && (
-                  <div className="pt-5 border-t border-gray-100">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-semibold text-gray-900">Projected Cost</span>
-                      <span className="text-lg font-bold text-gray-900">
-                        N
-                        {projectedCost.toLocaleString("en-NG", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
+                {sIndex === config.sections.length - 1 &&
+                  projectedCost !== null && (
+                    <div className="pt-5 border-t border-gray-100">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-semibold text-gray-900">
+                          Projected Cost
+                        </span>
+                        <span className="text-lg font-bold text-gray-900">
+                          N
+                          {projectedCost.toLocaleString("en-NG", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             </div>
           ))}

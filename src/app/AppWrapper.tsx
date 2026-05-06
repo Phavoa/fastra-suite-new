@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import Sidebar from "@/components/shared/Sidebar";
 import SessionTimeoutWrapper from "@/components/SessionTimeoutWrapper";
+import DatabaseInitializer from "@/components/DatabaseInitializer";
 
 import { createContext, useContext } from "react";
 
@@ -47,6 +48,7 @@ export default function AppWrapper({
             value={{ toggleSidebar, isOpen: sidebarOpen }}
           >
             <SessionTimeoutWrapper>
+              <DatabaseInitializer />
               <div className="flex bg-gray-100 min-h-screen">
                 {!isAuthPage && (
                   <Sidebar
