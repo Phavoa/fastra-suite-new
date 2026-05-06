@@ -417,28 +417,35 @@ export default function StockAdjustmentEditPage() {
     return (
       <PageGuard application="inventory" module="stockadjustment">
         <FadeIn className="h-full text-gray-900 font-sans antialiased">
-        <div className="h-full mx-auto px-6 py-8 bg-white">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <LoadingDots />
-              <p className="mt-4 text-gray-600">
-                Loading stock adjustment details...
-              </p>
+          <div className="h-full mx-auto px-6 py-8 bg-white">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <LoadingDots />
+                <p className="mt-4 text-gray-600">
+                  Loading stock adjustment details...
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </FadeIn>
+        </FadeIn>
+      </PageGuard>
     );
   }
 
   // Error state
-    const errorMessage = extractErrorMessage(adjustmentError, "Unable to load stock adjustment details");
+  if (adjustmentError) {
+    const errorMessage = extractErrorMessage(
+      adjustmentError,
+      "Unable to load stock adjustment details"
+    );
 
     return (
       <FadeIn className="h-full text-gray-900 font-sans antialiased">
         <div className="h-full mx-auto px-6 py-8 bg-white flex items-center justify-center">
           <div className="text-center text-red-600 px-4">
-            <p className="text-lg font-semibold">Error Loading Stock Adjustment</p>
+            <p className="text-lg font-semibold">
+              Error Loading Stock Adjustment
+            </p>
             <p className="text-sm mt-2">{errorMessage}</p>
             <Button
               onClick={() => router.push("/inventory/stocks/adjustment")}
@@ -830,14 +837,13 @@ export default function StockAdjustmentEditPage() {
         </form>
       </motion.main>
 
-      {/* Notification */}
       <ToastNotification
         message={notification.message}
         type={notification.type}
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

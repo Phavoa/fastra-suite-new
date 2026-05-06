@@ -53,16 +53,19 @@ export default function Page() {
   const params = useParams();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Get the purchase order ID from the URL params
-  const purchaseOrderId = params.id as string;
+  // Get the purchase request ID from the URL params
+  const purchaseRequestId = params.id as string;
 
   // API mutations and queries
-  const { data: purchaseOrder, isLoading: isLoadingPurchaseOrder, error: purchaseOrderError } =
-    useGetPurchaseOrderQuery(purchaseOrderId, {
-      skip: !purchaseOrderId,
-    });
+  const {
+    data: purchaseRequest,
+    isLoading: isLoadingPurchaseRequest,
+    error: purchaseRequestError,
+  } = useGetPurchaseOrderQuery(purchaseRequestId, {
+    skip: !purchaseRequestId,
+  });
 
-  const [patchPurchaseOrder, { isLoading: isUpdating }] =
+  const [patchPurchaseRequest, { isLoading: isUpdating }] =
     usePatchPurchaseOrderMutation();
 
   const { data: currencies, isLoading: isLoadingCurrencies, error: currenciesError } =
@@ -133,8 +136,14 @@ export default function Page() {
         reset({
           currency: purchaseRequest.currency.toString(),
           vendor: purchaseRequest.vendor.toString(),
-          purpose: purchaseRequest.purpose || "",
-          requesting_location: purchaseRequest.requesting_location || "",
+          purpose:
+            (purchaseRequest as any).purpose ||
+            purchaseRequest.payment_terms ||
+            "",
+          requesting_location:
+            (purchaseRequest as any).requesting_location ||
+            purchaseRequest.destination_location ||
+            "",
         });
 
         // Initialize items with existing purchase request items
@@ -278,19 +287,25 @@ export default function Page() {
     const options: Option[] = [];
 
     // Add current purchase request location first (highest priority)
-    if (
-      purchaseRequest?.requesting_location &&
-      purchaseRequest.requesting_location_details
-    ) {
+    const currentLocation =
+      (purchaseRequest as any)?.requesting_location ||
+      purchaseRequest?.destination_location;
+    const currentLocationDetails =
+      (purchaseRequest as any)?.requesting_location_details ||
+      purchaseRequest?.destination_location_details;
+
+    if (currentLocation && currentLocationDetails) {
       options.push({
-        value: purchaseRequest.requesting_location,
-        label: `${purchaseRequest.requesting_location_details.location_name} (${purchaseRequest.requesting_location_details.location_code})`,
+        value: currentLocation,
+        label: `${currentLocationDetails.location_name} (${currentLocationDetails.location_code})`,
       });
     }
 
     // Add remaining locations from API, excluding current one
     if (activeLocations) {
-      const currentLocationId = purchaseRequest?.requesting_location;
+      const currentLocationId =
+        (purchaseRequest as any)?.requesting_location ||
+        purchaseRequest?.destination_location;
       activeLocations.forEach((location) => {
         if (location.id !== currentLocationId) {
           options.push({
@@ -309,14 +324,17 @@ export default function Page() {
 
   // Handle query errors
   React.useEffect(() => {
-    if (purchaseOrderError) {
+    if (purchaseRequestError) {
       setNotification({
-        message: extractErrorMessage(purchaseOrderError, "Failed to load purchase order details."),
+        message: extractErrorMessage(
+          purchaseRequestError,
+          "Failed to load purchase order details."
+        ),
         type: "error",
         show: true,
       });
     }
-  }, [purchaseOrderError]);
+  }, [purchaseRequestError]);
 
   React.useEffect(() => {
     if (productsError) {
@@ -374,13 +392,13 @@ export default function Page() {
     { label: "Home", href: "/" },
     { label: "Purchase", href: "/purchase" },
     {
-      label: "Purchase Requests",
-      href: "/purchase/purchase_requests",
+      label: "Purchase Orders",
+      href: "/purchase/purchase_orders",
       current: true,
     },
     {
       label: "Edit",
-      href: `/purchase/purchase_requests/edit/${purchaseRequestId}`,
+      href: `/purchase/purchase_orders/edit/${purchaseRequestId}`,
       current: true,
     },
   ];
@@ -427,11 +445,11 @@ export default function Page() {
         data: {
           currency: parseInt(data.currency),
           vendor: parseInt(data.vendor),
-          purpose: data.purpose,
-          requesting_location: data.requesting_location,
+          payment_terms: data.purpose,
+          destination_location: data.requesting_location,
           status: "draft", // Always set status to draft when updating
           items: items, // Include all items (existing and new)
-        },
+        } as any,
       }).unwrap();
 
       // Show success notification
@@ -477,7 +495,7 @@ export default function Page() {
       // Update purchase request status to pending
       await patchPurchaseRequest({
         id: purchaseRequest.id,
-        data: { status: "pending" },
+        data: { status: "awaiting" },
       }).unwrap();
 
       // Show success notification
@@ -489,7 +507,7 @@ export default function Page() {
 
       // Navigate back to purchase requests page after a short delay
       setTimeout(() => {
-        router.push("/purchase/purchase_requests");
+        router.push("/purchase/purchase_orders");
       }, 1500);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, "Failed to send purchase order for approval. Please try again.");

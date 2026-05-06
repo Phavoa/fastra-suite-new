@@ -10,7 +10,7 @@ interface UnauthorizedMessageProps {
 }
 
 export const UnauthorizedMessage = ({ fullScreen = false }: UnauthorizedMessageProps) => {
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0, y: 10 },
     visible: {
       opacity: 1,

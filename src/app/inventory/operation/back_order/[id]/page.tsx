@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { PageGuard } from "@/components/auth/PageGuard";
-import { toast } from "sonner";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 import { extractErrorMessage } from "@/lib/utils";
 import { StaggerContainer, SlideUp, FadeIn } from "@/components/shared/AnimatedWrapper";
 
@@ -30,6 +30,16 @@ export default function BackOrderDetailPage() {
   const params = useParams();
   const backOrderId = params.id as string;
   const [activeTab, setActiveTab] = useState<"expected" | "initial">("expected");
+
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+    show: boolean;
+  }>({
+    message: "",
+    type: "success",
+    show: false,
+  });
 
   const {
     data: backOrder,
@@ -43,9 +53,17 @@ export default function BackOrderDetailPage() {
   const handleStatusChange = async (newStatus: "validated" | "canceled") => {
     try {
       await updateBackOrder({ id: backOrderId, data: { status: newStatus } }).unwrap();
-      toast.success(`Back order marked as ${newStatus}`);
+      setNotification({
+        message: `Back order marked as ${newStatus}`,
+        type: "success",
+        show: true,
+      });
     } catch (err) {
-      toast.error(extractErrorMessage(err, `Failed to update status to ${newStatus}`));
+      setNotification({
+        message: extractErrorMessage(err, `Failed to update status to ${newStatus}`),
+        type: "error",
+        show: true,
+      });
     }
   };
 
@@ -53,11 +71,25 @@ export default function BackOrderDetailPage() {
     if (!confirm("Are you sure you want to delete this back order?")) return;
     try {
       await deleteBackOrder(backOrderId).unwrap();
-      toast.success("Back order deleted successfully");
-      router.push("/inventory/operation/back_order");
+      setNotification({
+        message: "Back order deleted successfully",
+        type: "success",
+        show: true,
+      });
+      setTimeout(() => {
+        router.push("/inventory/operation/back_order");
+      }, 1500);
     } catch (err) {
-      toast.error(extractErrorMessage(err, "Failed to delete back order"));
+      setNotification({
+        message: extractErrorMessage(err, "Failed to delete back order"),
+        type: "error",
+        show: true,
+      });
     }
+  };
+
+  const closeNotification = () => {
+    setNotification((prev) => ({ ...prev, show: false }));
   };
 
   const breadcrumbsItem: BreadcrumbItem[] = [
@@ -247,6 +279,13 @@ export default function BackOrderDetailPage() {
           </div>
         </StaggerContainer>
       </div>
+
+      <ToastNotification
+        message={notification.message}
+        type={notification.type}
+        show={notification.show}
+        onClose={closeNotification}
+      />
     </PageGuard>
   );
 }

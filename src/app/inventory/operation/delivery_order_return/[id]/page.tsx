@@ -240,7 +240,7 @@ export default function DeliveryOrderReturnDetailPage() {
           </div>
         </motion.div>
       </motion.main>
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

@@ -46,6 +46,12 @@ export default function InventoryLayout({
           application: "inventory",
           module: "backorder",
         },
+        { 
+          label: "Material Consumption", 
+          href: "/inventory/operation/material-consumption",
+          application: "inventory",
+          module: "materialconsumption",
+        },
       ],
     },
     {

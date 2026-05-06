@@ -523,14 +523,13 @@ export default function EditInternalTransferPage() {
         </form>
       </motion.main>
 
-      {/* Notification */}
       <ToastNotification
         message={notification.message}
         type={notification.type}
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

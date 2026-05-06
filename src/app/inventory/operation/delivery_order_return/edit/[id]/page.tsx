@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
 import { DeliveryOrderReturnItem } from "@/types/deliveryOrderReturn";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 // Form schema for delivery order return editing
 const deliveryOrderReturnSchema = z.object({
@@ -581,7 +582,7 @@ export default function EditDeliveryOrderReturnPage() {
         show={notification.show}
         onClose={closeNotification}
       />
+    </motion.div>
     </PageGuard>
-  </motion.div>
   );
 }

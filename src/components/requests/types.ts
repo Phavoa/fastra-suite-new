@@ -49,7 +49,7 @@ export interface RequestFormConfig<T extends Record<string, any>> {
     title: string;
     fields: FormFieldConfig[];
   }[];
-  schema: z.ZodType<T>;
+  schema: z.ZodSchema<T>;
   defaultValues: T;
   onSubmit: (data: T) => Promise<void>;
   successMessage: {
