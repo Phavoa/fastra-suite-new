@@ -311,7 +311,10 @@ export default function CreateAccessGroupPage() {
                   </thead>
                   <tbody>
                     {selectedModules.map((moduleData, moduleIndex) => (
-                      <tr key={moduleIndex} className="border-b border-gray-100">
+                      <tr
+                        key={moduleIndex}
+                        className="border-b border-gray-100"
+                      >
                         <td className="py-5 pr-8 text-sm font-normal text-gray-900 font-medium">
                           {moduleData.module}
                         </td>
