@@ -84,20 +84,30 @@ export default function NewLabourRequestPage() {
         }, 2000);
       } else {
         // Offline submission - save locally
-        await syncService.createRequestOffline(submitData);
+        try {
+          await syncService.createRequestOffline(submitData);
 
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Saved Locally",
-          description:
-            "Your labour request has been saved locally and will be synchronized when you're back online.",
-        });
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            title: "Request Saved Locally",
+            description:
+              "Your labour request has been saved locally and will be synchronized when you're back online.",
+          });
 
-        // Navigate back to list after a delay
-        setTimeout(() => {
-          router.push("/labour-request");
-        }, 2000);
+          // Navigate back to list after a delay
+          setTimeout(() => {
+            router.push("/labour-request");
+          }, 2000);
+        } catch (error) {
+          console.error("Failed to save request locally:", error);
+          setStatusModal({
+            isOpen: true,
+            type: "error",
+            title: "Error",
+            description: "Failed to save request locally. Please try again.",
+          });
+        }
       }
     } catch (error) {
       console.error("Failed to create labour request:", error);

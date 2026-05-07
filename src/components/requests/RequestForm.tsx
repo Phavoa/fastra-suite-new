@@ -237,7 +237,7 @@ export function RequestForm<T extends Record<string, any>>({
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 md:left-16 md:max-w-[calc(100%-4rem)] mx-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <Button
           variant="contained"
-          className="w-full max-w-2xl mx-auto h-12 text-base font-medium flex items-center justify-center block bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-md"
+          className="w-full max-w-2xl mx-auto h-12 text-base font-medium flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-md"
           onClick={handleSubmit(onSubmit)}
           disabled={isSubmitting}
         >

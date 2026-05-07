@@ -97,11 +97,11 @@ export default function LabourRequestPage() {
       const displayLocalRequests: DisplayLabourRequest[] = localRequests
         .filter((req) => !req.isSynced)
         .map((req) => ({
-          id: req.id,
+          id: req.id || 0,
           referenceId: req.reference_id,
-          project: `${req.project || "Project name"}`,
-          workers: req.number_of_workers,
-          role: req.role_type,
+          project: `${req.project_request.project || "Project name"}`,
+          workers: req.detail.number_of_workers,
+          role: req.detail.role_type,
           requester: "You (Offline)",
           status: req.project_request?.status || "draft",
           isOffline: true,

@@ -29,6 +29,7 @@ import { syncService } from "@/lib/database/syncService";
 import { usePermissionContext } from "@/contexts/PermissionContext";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { format } from "date-fns";
+import { db } from "@/lib/database/labourRequestDb";
 
 interface LabourRequestDetail {
   id: number;
@@ -166,8 +167,14 @@ export default function LabourRequestDetailPage() {
           router.push("/labour-request");
         }, 2000);
       } else {
-        // Offline delete
-        await syncService.deleteRequestOffline(id);
+        // Offline delete - find local request by server id
+        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+        if (localRequests.length > 0) {
+          await syncService.deleteRequestOffline(localRequests[0].localId);
+        } else {
+          // If no local version exists, create a placeholder for deletion
+          await syncService.deleteRequestOffline(`server_${id}`);
+        }
         setStatusModal({
           isOpen: true,
           type: "success",
@@ -203,8 +210,14 @@ export default function LabourRequestDetailPage() {
         });
         refetch();
       } else {
-        // Offline submit
-        await syncService.submitRequestOffline(id);
+        // Offline submit - find local request by server id
+        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+        if (localRequests.length > 0) {
+          await syncService.submitRequestOffline(localRequests[0].localId);
+        } else {
+          // If no local version exists, create a placeholder for submission
+          await syncService.submitRequestOffline(`server_${id}`);
+        }
         setStatusModal({
           isOpen: true,
           type: "success",
@@ -520,10 +533,20 @@ export default function LabourRequestDetailPage() {
                       });
                       refetch();
                     } else {
-                      await syncService.approveRequestOffline(id, {
-                        status: "approved",
-                        approval_notes: notes,
-                      });
+                      // Offline approve - find local request by server id
+                      const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+                      if (localRequests.length > 0) {
+                        await syncService.approveRequestOffline(localRequests[0].localId, {
+                          status: "approved",
+                          approval_notes: notes,
+                        });
+                      } else {
+                        // If no local version exists, create a placeholder
+                        await syncService.approveRequestOffline(`server_${id}`, {
+                          status: "approved",
+                          approval_notes: notes,
+                        });
+                      }
                       setStatusModal({
                         isOpen: true,
                         type: "success",
@@ -569,10 +592,20 @@ export default function LabourRequestDetailPage() {
                       });
                       refetch();
                     } else {
-                      await syncService.rejectRequestOffline(id, {
-                        status: "rejected",
-                        rejection_notes: notes,
-                      });
+                      // Offline reject - find local request by server id
+                      const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+                      if (localRequests.length > 0) {
+                        await syncService.rejectRequestOffline(localRequests[0].localId, {
+                          status: "rejected",
+                          rejection_notes: notes,
+                        });
+                      } else {
+                        // If no local version exists, create a placeholder
+                        await syncService.rejectRequestOffline(`server_${id}`, {
+                          status: "rejected",
+                          rejection_notes: notes,
+                        });
+                      }
                       setStatusModal({
                         isOpen: true,
                         type: "success",

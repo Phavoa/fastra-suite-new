@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { z } from "zod";
 import { RequestForm } from "@/components/requests/RequestForm";
@@ -15,6 +15,7 @@ import { syncService } from "@/lib/database/syncService";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { format } from "date-fns";
 import extractErrorMessage from "@/components/requests/utils/RequestErrorHandler";
+import { db } from "@/lib/database/labourRequestDb";
 import { get } from "http";
 
 const formSchema = z.object({
@@ -108,8 +109,14 @@ export default function EditLabourRequestPage() {
           router.push(`/labour-request/${updatedId}`);
         }, 2000);
       } else {
-        // Offline update
-        await syncService.updateRequestOffline(id, submitData);
+        // Offline update - find local request by server id
+        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+        if (localRequests.length > 0) {
+          await syncService.updateRequestOffline(localRequests[0].localId, submitData);
+        } else {
+          // If no local version exists, create one
+          await syncService.updateRequestOffline(`server_${id}`, submitData);
+        }
 
         setStatusModal({
           isOpen: true,
