@@ -46,8 +46,10 @@ export interface RequestFormConfig<T extends Record<string, any>> {
   requesterName: string;
   date: string;
   sections: {
-    title: string;
+    title?: string;
     fields: FormFieldConfig[];
+    renderTop?: (data: T) => React.ReactNode;
+    renderBottom?: (data: T) => React.ReactNode;
   }[];
   schema: z.ZodSchema<T>;
   defaultValues: T;

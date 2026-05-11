@@ -13,6 +13,8 @@ import extractErrorMessage from "@/components/requests/utils/RequestErrorHandler
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
+  phase: z.string().min(1, "Please select a phase"),
+  task: z.string().min(1, "Please select a task"),
   numberOfWorkers: z.coerce
     .number()
     .positive("Enter a correct number")
@@ -159,12 +161,59 @@ export default function NewLabourRequestPage() {
             type: "text",
             placeholder: "Enter role or trade type",
           },
+        ],
+      },
+      {
+        title: "WBS",
+        fields: [
+          {
+            name: "phase",
+            label: "Phase",
+            type: "select",
+            placeholder: "Select phase",
+            options: [
+              { label: "Phase #1", value: "1" },
+              { label: "Phase #2", value: "2" },
+              { label: "Phase #3", value: "3" },
+              { label: "Phase #4", value: "4" },
+            ],
+          },
+          {
+            name: "task",
+            label: "Task",
+            type: "select",
+            placeholder: "Select task",
+            options: [
+              { label: "Task #1", value: "1" },
+              { label: "Task #2", value: "2" },
+              { label: "Task #3", value: "3" },
+              { label: "Task #4", value: "4" },
+            ],
+          },
+        ],
+        renderBottom: (data: FormValues) => (
+          <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-semibold text-gray-500">Cost Code</span>
+              <span className="text-sm font-semibold text-gray-500">-</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-900">Available Budget</span>
+              <span className="text-sm font-semibold text-[#3B7CED]">₦5,000,000.00</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        title: "Cost Details",
+        fields: [
           {
             name: "duration",
             label: "Duration",
             type: "number",
             placeholder: "Enter duration",
             hintText: "Number of days/weeks/months",
+            halfWidth: true,
           },
           {
             name: "durationUnit",
@@ -176,6 +225,7 @@ export default function NewLabourRequestPage() {
               // { label: "Weeks", value: "weeks" },
               // { label: "Months", value: "months" },
             ],
+            halfWidth: true,
           },
           {
             name: "dailyRate",
@@ -183,19 +233,39 @@ export default function NewLabourRequestPage() {
             type: "number",
             placeholder: "Enter estimated daily rate",
           },
+        ],
+      },
+      {
+        fields: [
           {
             name: "justification",
-            label: "Justification Notes",
+            label: "Notes / Justification",
             type: "textarea",
             placeholder: "Enter justification notes (optional)",
             rows: 4,
           },
         ],
+        renderTop: (data: FormValues) => (
+          <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-semibold text-gray-900">Available Budget</span>
+              <span className="text-sm font-semibold text-[#3B7CED]">₦5,000,000.00</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-900">Total Cost</span>
+              <span className="text-sm font-semibold text-[#3B7CED]">
+                ₦{((data.numberOfWorkers || 0) * (data.dailyRate || 0) * (data.duration || 1)).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        ),
       },
     ],
     schema: formSchema,
     defaultValues: {
       project: "",
+      phase: "",
+      task: "",
       numberOfWorkers: 0,
       role: "",
       duration: 1,

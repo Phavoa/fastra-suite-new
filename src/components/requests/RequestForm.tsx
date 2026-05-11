@@ -131,103 +131,90 @@ export function RequestForm<T extends Record<string, any>>({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {config.sections.map((section, sIndex) => (
             <div key={sIndex} className="bg-white px-4 py-6">
-              <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
-                {section.title}
-              </h2>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                {section.fields.map((field) => (
-                  <div
-                    key={field.name}
-                    className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}
-                  >
-                    <Label
-                      htmlFor={field.name}
-                      className="text-sm font-semibold text-gray-900"
+              {section.title && (
+                <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
+                  {section.title}
+                </h2>
+              )}
+              {section.renderTop && section.renderTop(currentValues)}
+              {section.fields && section.fields.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                  {section.fields.map((field) => (
+                    <div
+                      key={field.name}
+                      className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}
                     >
-                      {field.label}
-                    </Label>
-                    <Controller
-                      name={field.name as any}
-                      control={control}
-                      render={({ field: controllerField }) => {
-                        if (field.type === "select") {
+                      <Label
+                        htmlFor={field.name}
+                        className="text-sm font-semibold text-gray-900"
+                      >
+                        {field.label}
+                      </Label>
+                      <Controller
+                        name={field.name as any}
+                        control={control}
+                        render={({ field: controllerField }) => {
+                          if (field.type === "select") {
+                            return (
+                              <Select
+                                onValueChange={controllerField.onChange}
+                                value={controllerField.value}
+                              >
+                                <SelectTrigger id={field.name} className="w-full">
+                                  <SelectValue placeholder={field.placeholder} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {field.options?.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            );
+                          }
+                          if (field.type === "textarea") {
+                            return (
+                              <Textarea
+                                id={field.name}
+                                placeholder={field.placeholder}
+                                rows={field.rows || 4}
+                                className="resize-none"
+                                {...controllerField}
+                              />
+                            );
+                          }
                           return (
-                            <Select
-                              onValueChange={controllerField.onChange}
-                              value={controllerField.value}
-                            >
-                              <SelectTrigger id={field.name} className="w-full">
-                                <SelectValue placeholder={field.placeholder} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {field.options?.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          );
-                        }
-                        if (field.type === "textarea") {
-                          return (
-                            <Textarea
+                            <Input
                               id={field.name}
+                              type={field.type}
                               placeholder={field.placeholder}
-                              rows={field.rows || 4}
-                              className="resize-none"
                               {...controllerField}
+                              aria-invalid={!!errors[field.name]}
+                              className={
+                                errors[field.name]
+                                  ? "border-red-500 focus-visible:ring-red-500/40"
+                                  : ""
+                              }
                             />
                           );
-                        }
-                        return (
-                          <Input
-                            id={field.name}
-                            type={field.type}
-                            placeholder={field.placeholder}
-                            {...controllerField}
-                            aria-invalid={!!errors[field.name]}
-                            className={
-                              errors[field.name]
-                                ? "border-red-500 focus-visible:ring-red-500/40"
-                                : ""
-                            }
-                          />
-                        );
-                      }}
-                    />
-                    {errors[field.name] && (
-                      <p className="text-sm text-red-500">
-                        {(errors[field.name] as any).message}
-                      </p>
-                    )}
-                    {!errors[field.name] && field.hintText && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {field.hintText}
-                      </p>
-                    )}
-                  </div>
-                ))}
-
-                {/* Projected Cost (only shown in the last section for now, or based on logic) */}
-                {sIndex === config.sections.length - 1 &&
-                  projectedCost !== null && (
-                    <div className="pt-5 border-t border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-semibold text-gray-900">
-                          Projected Cost
-                        </span>
-                        <span className="text-lg font-bold text-gray-900">
-                          N
-                          {projectedCost.toLocaleString("en-NG", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
+                        }}
+                      />
+                      {errors[field.name] && (
+                        <p className="text-sm text-red-500">
+                          {(errors[field.name] as any).message}
+                        </p>
+                      )}
+                      {!errors[field.name] && field.hintText && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {field.hintText}
+                        </p>
+                      )}
                     </div>
-                  )}
-              </div>
+                  ))}
+                </div>
+              )}
+              {section.renderBottom && section.renderBottom(currentValues)}
             </div>
           ))}
         </form>
