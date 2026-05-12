@@ -116,13 +116,24 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
           </div>
 
           {/* List */}
-          <div className="space-y-4">
-            {filteredRequests.map((request, index) => (
-              <React.Fragment key={index}>
-                {config.renderItem(request)}
-              </React.Fragment>
-            ))}
-          </div>
+          {filteredRequests.length === 0 && (
+            <div className="flex items-center justify-center h-48">
+              <div className="text-center">
+                <p className="text-gray-600">
+                  No {config.title.toLowerCase()} found
+                </p>
+              </div>
+            </div>
+          )}
+          {filteredRequests.length > 0 && (
+            <div className="space-y-4">
+              {filteredRequests.map((request, index) => (
+                <React.Fragment key={index}>
+                  {config.renderItem(request)}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
