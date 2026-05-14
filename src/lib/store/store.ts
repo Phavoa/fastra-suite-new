@@ -10,6 +10,7 @@ import {
   PURGE,
   REGISTER,
 } from "redux-persist";
+
 import { authApi } from "../../api/authApi";
 import { userApi } from "../../api/userApi";
 import { productsApi } from "../../api/purchase/productsApi";
@@ -29,8 +30,10 @@ import { multilocationApi } from "../../api/inventory/multilocationApi";
 import { stockAdjustmentApi } from "../../api/inventory/stockAdjustmentApi";
 import { scrapApi } from "../../api/inventory/scrapApi";
 import { invoiceApi } from "../../api/invoice/invoiceApi";
+
 import authReducer from "./authSlice";
 import viewModeReducer from "../../components/Settings/viewModeSlice";
+
 import { incomingProductApi } from "@/api/inventory/incomingProductApi";
 import { deliveryOrderApi } from "@/api/inventory/deliveryOrderApi";
 import { deliveryOrderReturnApi } from "@/api/inventory/deliveryOrderReturnApi";
@@ -38,13 +41,16 @@ import { internalTransferApi } from "@/api/inventory/internalTransferApi";
 import { stockMoveApi } from "@/api/inventory/stockMoveApi";
 import { incomingProductReturnsApi } from "@/api/inventory/incomingProductReturns";
 import { backOrderApi } from "@/api/inventory/backOrderApi";
+
 import { subcontractorRequestApi } from "@/api/subcontractorRequestApi";
 import { projectApi } from "@/api/projectApi";
+import { labourRequestApi } from "@/api/requests/labourRequestApi";
 
 const authPersistConfig = {
   key: "auth",
   storage,
 };
+
 const viewModePersistConfig = {
   key: "viewMode",
   storage,
@@ -54,42 +60,55 @@ const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
 
 const rootReducer = combineReducers({
   auth: persistedAuthReducer,
+
   viewMode: persistReducer(viewModePersistConfig, viewModeReducer),
+
   [authApi.reducerPath]: authApi.reducer,
   [userApi.reducerPath]: userApi.reducer,
-  [usersApi.reducerPath]: usersApi.reducer, // for settings
-  [tenantUserApi.reducerPath]: tenantUserApi.reducer, // for tenant-specific users
+  [usersApi.reducerPath]: usersApi.reducer,
+  [tenantUserApi.reducerPath]: tenantUserApi.reducer,
+
   [productsApi.reducerPath]: productsApi.reducer,
   [unitOfMeasureApi.reducerPath]: unitOfMeasureApi.reducer,
   [vendorsApi.reducerPath]: vendorsApi.reducer,
   [purchaseRequestApi.reducerPath]: purchaseRequestApi.reducer,
   [purchaseOrderApi.reducerPath]: purchaseOrderApi.reducer,
   [requestForQuotationApi.reducerPath]: requestForQuotationApi.reducer,
+
   [currencyApi.reducerPath]: currencyApi.reducer,
+
   [locationApi.reducerPath]: locationApi.reducer,
   [multilocationApi.reducerPath]: multilocationApi.reducer,
   [stockAdjustmentApi.reducerPath]: stockAdjustmentApi.reducer,
   [scrapApi.reducerPath]: scrapApi.reducer,
-  [invoiceApi.reducerPath]: invoiceApi.reducer,
-  [companyApi.reducerPath]: companyApi.reducer,
   [incomingProductApi.reducerPath]: incomingProductApi.reducer,
   [deliveryOrderApi.reducerPath]: deliveryOrderApi.reducer,
   [deliveryOrderReturnApi.reducerPath]: deliveryOrderReturnApi.reducer,
   [internalTransferApi.reducerPath]: internalTransferApi.reducer,
   [stockMoveApi.reducerPath]: stockMoveApi.reducer,
   [incomingProductReturnsApi.reducerPath]: incomingProductReturnsApi.reducer,
-  [accessGroupRightApi.reducerPath]: accessGroupRightApi.reducer,
   [backOrderApi.reducerPath]: backOrderApi.reducer,
+
   [subcontractorRequestApi.reducerPath]: subcontractorRequestApi.reducer,
+
   [projectApi.reducerPath]: projectApi.reducer,
+
+  [labourRequestApi.reducerPath]: labourRequestApi.reducer,
+
+  [invoiceApi.reducerPath]: invoiceApi.reducer,
+
+  [companyApi.reducerPath]: companyApi.reducer,
+
+  [accessGroupRightApi.reducerPath]: accessGroupRightApi.reducer,
 
   [applicationsApi.reducerPath]: applicationsApi.reducer,
 });
 
 export const store = configureStore({
   reducer: rootReducer,
-  middleware: (getDefaultMiddleware) => {
-    return getDefaultMiddleware({
+
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
@@ -98,36 +117,41 @@ export const store = configureStore({
       userApi.middleware,
       usersApi.middleware,
       tenantUserApi.middleware,
+
       productsApi.middleware,
       unitOfMeasureApi.middleware,
       vendorsApi.middleware,
       purchaseRequestApi.middleware,
       purchaseOrderApi.middleware,
       requestForQuotationApi.middleware,
+
       currencyApi.middleware,
+
       locationApi.middleware,
       multilocationApi.middleware,
       stockAdjustmentApi.middleware,
       scrapApi.middleware,
-      invoiceApi.middleware,
-      companyApi.middleware,
       incomingProductApi.middleware,
       deliveryOrderApi.middleware,
       deliveryOrderReturnApi.middleware,
       internalTransferApi.middleware,
       stockMoveApi.middleware,
       incomingProductReturnsApi.middleware,
-      accessGroupRightApi.middleware,
       backOrderApi.middleware,
+
       subcontractorRequestApi.middleware,
       projectApi.middleware,
+      labourRequestApi.middleware,
 
+      invoiceApi.middleware,
+      companyApi.middleware,
+      accessGroupRightApi.middleware,
       applicationsApi.middleware,
-    );
-  },
+    ),
 });
 
 export const persistor = persistStore(store);
 
 export type RootState = ReturnType<typeof store.getState>;
+
 export type AppDispatch = typeof store.dispatch;

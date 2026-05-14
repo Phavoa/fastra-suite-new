@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import Sidebar from "@/components/shared/Sidebar";
 import SessionTimeoutWrapper from "@/components/SessionTimeoutWrapper";
+import DatabaseInitializer from "@/components/DatabaseInitializer";
 
 import { createContext, useContext } from "react";
 
@@ -15,9 +16,13 @@ import { createContext, useContext } from "react";
 export const SidebarContext = createContext<{
   toggleSidebar: () => void;
   isOpen: boolean;
+  isExpanded: boolean;
+  toggleExpanded: () => void;
 }>({
   toggleSidebar: () => {},
   isOpen: false,
+  isExpanded: false,
+  toggleExpanded: () => {},
 });
 
 export const useSidebarContext = () => useContext(SidebarContext);
@@ -30,9 +35,14 @@ export default function AppWrapper({
   const pathname = usePathname();
   const isAuthPage = pathname.startsWith("/auth");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const toggleExpanded = () => {
+    setSidebarExpanded(!sidebarExpanded);
   };
 
   const closeSidebar = () => {
@@ -44,15 +54,18 @@ export default function AppWrapper({
       <PersistGate loading={null} persistor={persistor}>
         <PermissionProvider>
           <SidebarContext.Provider
-            value={{ toggleSidebar, isOpen: sidebarOpen }}
+            value={{ toggleSidebar, isOpen: sidebarOpen, isExpanded: sidebarExpanded, toggleExpanded }}
           >
             <SessionTimeoutWrapper>
+              <DatabaseInitializer />
               <div className="flex bg-gray-100 min-h-screen">
                 {!isAuthPage && (
                   <Sidebar
                     isOpen={sidebarOpen}
                     onClose={closeSidebar}
                     onToggle={toggleSidebar}
+                    isExpanded={sidebarExpanded}
+                    onToggleExpanded={toggleExpanded}
                   />
                 )}
 
@@ -66,7 +79,7 @@ export default function AppWrapper({
                 )}
 
                 <div
-                  className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${!isAuthPage ? "md:ml-16" : ""}`}
+                  className={`flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ${!isAuthPage ? (sidebarExpanded ? "md:ml-64" : "md:ml-16") : ""}`}
                 >
                   {children}
                 </div>

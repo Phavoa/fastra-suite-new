@@ -1,64 +1,141 @@
 "use client";
 
-import React from "react";
-import { FileText, CheckCircle, Clock, XCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  FileText,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { RequestDashboard } from "@/components/requests/RequestDashboard";
-import { RequestDashboardConfig, RequestStatus } from "@/components/requests/types";
+import {
+  RequestDashboardConfig,
+  RequestStatus,
+} from "@/components/requests/types";
+import { useGetLabourRequestsQuery } from "@/api/requests/labourRequestApi";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { db } from "@/lib/database/labourRequestDb";
+import { syncService } from "@/lib/database/syncService";
+import { LocalLabourRequest } from "@/lib/database/labourRequestDb";
+import { LabourRequest } from "@/api/requests/labourRequestApi";
 
-interface LabourRequest {
-  id: string;
-  project: string;
+// Combined interface for both online and offline data
+interface DisplayLabourRequest {
+  id: number;
+  referenceId: string;
+  project?: string;
   workers: number;
   role: string;
   requester: string;
   status: RequestStatus;
+  isOffline?: boolean;
+  localId?: string;
 }
 
-const mockRequests: LabourRequest[] = [
-  {
-    id: "LR00001",
-    project: "Project #1",
-    workers: 4,
-    role: "Carpenter",
-    requester: "Firstname Lastname",
-    status: "approved",
-  },
-  {
-    id: "LR00002",
-    project: "Project #2",
-    workers: 6,
-    role: "Electrician",
-    requester: "Firstname Lastname",
-    status: "pending",
-  },
-  {
-    id: "LR00003",
-    project: "Project #3",
-    workers: 2,
-    role: "Plumber",
-    requester: "Firstname Lastname",
-    status: "draft",
-  },
-  {
-    id: "LR00004",
-    project: "Project #4",
-    workers: 8,
-    role: "Mason",
-    requester: "Firstname Lastname",
-    status: "approved",
-  },
-];
-
-const statusCounts: Record<RequestStatus, number> = {
-  draft: 12,
-  approved: 12,
-  pending: 12,
-  rejected: 12,
-};
-
 export default function LabourRequestPage() {
+  const router = useRouter();
+  const networkStatus = useNetworkStatus();
+  const {
+    data: apiData,
+    isLoading,
+    error,
+    refetch,
+  } = useGetLabourRequestsQuery({});
+  const [localData, setLocalData] = useState<LocalLabourRequest[]>([]);
+  const [combinedData, setCombinedData] = useState<DisplayLabourRequest[]>([]);
+  const [statusCounts, setStatusCounts] = useState<
+    Record<RequestStatus, number>
+  >({
+    draft: 0,
+    approved: 0,
+    pending: 0,
+    rejected: 0,
+  });
+
+  // Load local data on mount
+  useEffect(() => {
+    const loadLocalData = async () => {
+      try {
+        const localRequests = await db.labourRequests.toArray();
+        setLocalData(localRequests);
+      } catch (error) {
+        console.error("Failed to load local data:", error);
+      }
+    };
+    loadLocalData();
+  }, []);
+
+  // Combine API and local data
+  useEffect(() => {
+    const combineData = () => {
+      const apiRequests = apiData || [];
+      const localRequests = localData;
+      console.log("API requests:", apiRequests);
+      console.log("Local requests:", localRequests);
+
+      // Convert API data to display format
+      const displayApiRequests: DisplayLabourRequest[] = apiRequests.map(
+        (req) => ({
+          id: req.id,
+          referenceId: req.reference_id,
+          // project: `${req?.project || "Name here"}`, // to be added later
+          workers: req.detail.number_of_workers,
+          role: req.detail.role_type,
+          requester: req.detail.created_by_name || "Requester",
+          status: req.status || "draft",
+          isOffline: false,
+        }),
+      );
+
+      // Convert local data to display format (only show unsynced ones)
+      const displayLocalRequests: DisplayLabourRequest[] = localRequests
+        .filter((req) => !req.isSynced)
+        .map((req) => ({
+          id: req.id || 0,
+          referenceId: req.reference_id,
+          project: `${req.project_request.project || "Project name"}`,
+          workers: req.detail.number_of_workers,
+          role: req.detail.role_type,
+          requester: "You (Offline)",
+          status: req.project_request?.status || "draft",
+          isOffline: true,
+          localId: req.localId,
+        }));
+
+      // Combine and deduplicate (prefer API data for synced items)
+      const allRequests = [...displayLocalRequests, ...displayApiRequests];
+      const uniqueRequests = allRequests.filter(
+        (req, index, self) => index === self.findIndex((r) => r.id === req.id),
+      );
+
+      setCombinedData(uniqueRequests);
+
+      // Calculate status counts
+      const counts = uniqueRequests.reduce(
+        (acc, req) => {
+          acc[req.status] = (acc[req.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<RequestStatus, number>,
+      );
+
+      setStatusCounts({
+        draft: counts.draft || 0,
+        approved: counts.approved || 0,
+        pending: counts.pending || 0,
+        rejected: counts.rejected || 0,
+      });
+    };
+
+    combineData();
+  }, [apiData, localData]);
+
   const getStatusBadgeVariant = (status: RequestStatus) => {
     switch (status) {
       case "approved":
@@ -72,7 +149,7 @@ export default function LabourRequestPage() {
     }
   };
 
-  const config: RequestDashboardConfig<LabourRequest> = {
+  const config: RequestDashboardConfig<DisplayLabourRequest> = {
     title: "Labour Request",
     idPrefix: "LR",
     newRequestPath: "/labour-request/new",
@@ -112,9 +189,22 @@ export default function LabourRequestPage() {
       },
     ],
     renderItem: (request) => (
-      <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+      <Card
+        className={`p-4 hover:shadow-md transition-shadow cursor-pointer ${request.isOffline ? "border-orange-200 bg-orange-50/30" : ""}`}
+        onClick={() => router.push(`/labour-request/${request.id}`)}
+      >
         <div className="flex justify-between items-start">
-          <span className="text-sm font-semibold text-blue-500">{request.id}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-blue-500">
+              {request.referenceId}
+            </span>
+            {request.isOffline && (
+              <div className="flex items-center gap-1 text-orange-600 text-xs">
+                <WifiOff className="h-3 w-3" />
+                <span>Offline</span>
+              </div>
+            )}
+          </div>
           <Badge variant={getStatusBadgeVariant(request.status)}>
             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
           </Badge>
@@ -140,8 +230,53 @@ export default function LabourRequestPage() {
         </div>
       </Card>
     ),
-    mockData: mockRequests,
+    mockData: combinedData,
   };
 
-  return <RequestDashboard config={config} />;
+  if (isLoading && combinedData.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-[#3B7CED]" />
+          <p className="text-gray-600">Loading labour requests...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Network Status Indicator */}
+      <div className="bg-white px-4 py-2 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {networkStatus.isOnline ? (
+              <>
+                <Wifi className="h-4 w-4 text-green-500" />
+                <span className="text-sm text-green-600">Online</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-4 w-4 text-orange-500" />
+                <span className="text-sm text-orange-600">
+                  Offline - Changes saved locally
+                </span>
+              </>
+            )}
+          </div>
+          {!networkStatus.isOnline && (
+            <button
+              onClick={() => syncService.performSync()}
+              className="text-sm text-[#3B7CED] hover:text-[#2d63c7] flex items-center gap-1"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Sync Now
+            </button>
+          )}
+        </div>
+      </div>
+
+      <RequestDashboard config={config} />
+    </div>
+  );
 }

@@ -21,7 +21,14 @@ export interface RequestDashboardConfig<T> {
   mockData: T[];
 }
 
-export type FormFieldType = "text" | "number" | "select" | "textarea" | "date" | "milestones" | "checkbox";
+export type FormFieldType =
+  | "text"
+  | "number"
+  | "select"
+  | "textarea"
+  | "date"
+  | "milestones"
+  | "checkbox";
 
 export interface FormFieldOption {
   label: string;

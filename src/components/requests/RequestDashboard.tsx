@@ -2,11 +2,10 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bell, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
 import { RequestDashboardConfig, RequestStatus } from "./types";
+import { NavBar } from "../shared/TopBar/reusableTopBar";
 
 interface RequestDashboardProps<T extends { status: RequestStatus }> {
   config: RequestDashboardConfig<T>;
@@ -16,44 +15,28 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
   config,
 }: RequestDashboardProps<T>) {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState<RequestStatus | "all">("all");
-
-  const filteredRequests = config.mockData.filter(
-    (req) => activeFilter === "all" || req.status === activeFilter
+  const [activeFilter, setActiveFilter] = useState<RequestStatus | "all">(
+    "all",
   );
 
-  const filters: (RequestStatus | "all")[] = ["all", "draft", "approved", "pending", "rejected"];
+  const filteredRequests = config.mockData.filter(
+    (req) => activeFilter === "all" || req.status === activeFilter,
+  );
 
+  const filters: (RequestStatus | "all")[] = [
+    "all",
+    "draft",
+    "approved",
+    "pending",
+    "rejected",
+  ];
+  console.log(config);
+  console.log(config.mockData, "mockData");
+  console.log(filteredRequests, "filteredRequests");
   return (
     <div className="min-h-screen bg-[#F1F5F9]">
-      {/* Header */}
-      <div className="bg-white px-4 py-4 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-semibold text-gray-900">{config.title}</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            >
-              <Bell className="h-5 w-5" />
-            </Button>
-            <Avatar className="h-9 w-9 bg-[#3B7CED] text-white">
-              <span className="text-sm font-medium">{config.idPrefix}</span>
-            </Avatar>
-          </div>
-        </div>
-      </div>
+      {/* Header - Top Bar */}
+      <NavBar title={config.title} items={[]} />
 
       <div className="max-w-7xl mx-auto pb-24 space-y-4 pt-4">
         {/* Status Cards */}
@@ -67,7 +50,9 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
                 <div className="flex flex-col">
                   <div className="flex gap-2 items-center mb-2">
                     <summary.icon className={`h-4 w-4 ${summary.colorClass}`} />
-                    <p className={`text-sm font-medium ${summary.colorClass}`}>{summary.label}</p>
+                    <p className={`text-sm font-medium ${summary.colorClass}`}>
+                      {summary.label}
+                    </p>
                   </div>
                   <p className={`text-3xl font-normal ${summary.colorClass}`}>
                     {config.statusCounts[summary.status]}
@@ -79,11 +64,13 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
         </div>
 
         {/* List Section */}
-        <div className="bg-white px-4 py-6">
-          <h2 className="text-sm font-medium text-[#3B7CED] mb-4">{config.title}</h2>
-          
+        <div className="bg-white px-4 py-6 w-full overflow-hidden">
+          <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
+            {config.title}
+          </h2>
+
           {/* Filter Tabs */}
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
             {filters.map((filter) => (
               <button
                 key={filter}
@@ -100,11 +87,24 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
           </div>
 
           {/* List */}
-          <div className="space-y-4">
-            {filteredRequests.map((request, index) => (
-              <React.Fragment key={index}>{config.renderItem(request)}</React.Fragment>
-            ))}
-          </div>
+          {filteredRequests.length === 0 && (
+            <div className="flex items-center justify-center h-48">
+              <div className="text-center">
+                <p className="text-gray-600">
+                  No {config.title.toLowerCase()} found
+                </p>
+              </div>
+            </div>
+          )}
+          {filteredRequests.length > 0 && (
+            <div className="space-y-4">
+              {filteredRequests.map((request, index) => (
+                <React.Fragment key={index}>
+                  {config.renderItem(request)}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

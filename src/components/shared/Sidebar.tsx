@@ -33,9 +33,24 @@ const middleItems = [
     route: "/inventory",
   },
   { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
-  { id: "labour-request", icon: HRIcon, label: "Labour Request", route: "/labour-request" },
-  { id: "material-consumption", icon: InventoryIcon, label: "Material Consumption", route: "/material-consumption-request" },
-  { id: "overrun-queue", icon: FinanceIcon, label: "Overrun Queue", route: "/project-costing/overrun-queue" },
+  {
+    id: "labour-request",
+    icon: HRIcon,
+    label: "Labour Request",
+    route: "/labour-request",
+  },
+  {
+    id: "material-consumption",
+    icon: InventoryIcon,
+    label: "Material Consumption",
+    route: "/material-consumption-request",
+  },
+  {
+    id: "overrun-queue",
+    icon: FinanceIcon,
+    label: "Overrun Queue",
+    route: "/project-costing/overrun-queue",
+  },
   {
     id: "logistics",
     icon: LogisticsIcon,
@@ -54,9 +69,17 @@ interface SidebarProps {
   isOpen: boolean;
   onClose?: () => void;
   onToggle?: () => void;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  isOpen,
+  onClose,
+  onToggle,
+  isExpanded = false,
+  onToggleExpanded,
+}) => {
   const [activeItem, setActiveItem] = useState<string>("dashboard");
   const [tooltip, setTooltip] = useState<{
     text: string;
@@ -88,77 +111,114 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onToggle }) => {
   };
 
   return (
-    <nav
-      className={`fixed top-0 left-0 h-screen w-16 bg-white shadow-xs border-r border-gray-100 flex flex-col items-center py-4 z-40 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out
+    <>
+      <nav
+        className={`fixed top-0 left-0 h-screen bg-white shadow-xs border-r border-gray-100 flex flex-col py-4 z-40 overflow-y-auto scrollbar-hide transition-all duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0`}
-      aria-label="Main navigation"
-    >
-      {/* Top section: Menu Toggle */}
-      <div className="mb-8 md:hidden">
-        <button
-          onClick={onToggle}
-          onMouseEnter={(e) => handleMouseEnter(e, "Toggle Sidebar")}
-          onMouseLeave={handleMouseLeave}
-          className="w-11 h-11 flex items-center justify-center mb-6 rounded-lg transition-colors duration-300 ease-in-out text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
-          aria-label="Toggle sidebar"
+        md:translate-x-0 w-64 ${isExpanded ? "md:w-64" : "md:w-16"}`}
+        aria-label="Main navigation"
+      >
+        {/* Top section: Menu Toggle */}
+        <div
+          className={`mb-8 flex items-center ${isExpanded ? "px-4 justify-start" : "justify-center px-4 md:px-0"}`}
         >
-          <MenuIcon />
-        </button>
-      </div>
+          <button
+            onClick={onToggle}
+            className="md:hidden w-11 h-11 flex items-center justify-center rounded-lg transition-colors duration-300 ease-in-out text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
+            aria-label="Toggle sidebar"
+          >
+            <MenuIcon />
+          </button>
+          <button
+            onClick={onToggleExpanded}
+            className="hidden md:flex w-11 h-11 items-center justify-center rounded-lg transition-colors duration-300 ease-in-out text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
+            aria-label="Toggle sidebar expansion"
+          >
+            <MenuIcon />
+          </button>
+        </div>
 
-      {/* Middle section: Main options */}
-      <div className="flex-1 flex flex-col items-center">
-        {middleItems.map((item) => {
-          const IconComponent = item.icon;
-          const isActive = activeItem === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleNavigation(item)}
-              onMouseEnter={(e) => handleMouseEnter(e, item.label)}
-              onMouseLeave={handleMouseLeave}
-              className={`w-11 h-11 flex items-center justify-center mb-6 rounded-lg transition-colors duration-300 ease-in-out ${
-                isActive
-                  ? "text-[#3B7CED] bg-[#3B7CED]/10"
-                  : "text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
-              }`}
-              aria-label={item.label}
-            >
-              <IconComponent color={isActive ? "#3B7CED" : undefined} />
-            </button>
-          );
-        })}
-      </div>
+        {/* Middle section: Main options */}
+        <div
+          className={`flex-1 flex flex-col space-y-2 ${isExpanded ? "px-4" : "px-4 md:px-0 md:items-center"}`}
+        >
+          {middleItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = activeItem === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavigation(item)}
+                onMouseEnter={(e) => {
+                  if (!isExpanded) handleMouseEnter(e, item.label);
+                }}
+                onMouseLeave={() => {
+                  if (!isExpanded) handleMouseLeave();
+                }}
+                className={`w-full h-11 flex items-center rounded-lg transition-colors duration-300 ease-in-out
+                ${isExpanded ? "px-3 gap-3" : "px-3 gap-3 md:w-11 md:px-0 md:justify-center md:gap-0"}
+                ${isActive ? "text-[#3B7CED] bg-[#3B7CED]/10" : "text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"}
+              `}
+                aria-label={item.label}
+              >
+                <div
+                  className={`flex items-center justify-center ${isExpanded ? "w-5" : "w-5 md:w-auto"}`}
+                >
+                  <IconComponent color={isActive ? "#3B7CED" : undefined} />
+                </div>
+                <span
+                  className={`text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis ${!isExpanded ? "md:hidden" : ""} ${isActive ? "text-[#3B7CED]" : "text-gray-600"}`}
+                >
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Bottom section: App and Settings */}
-      <div className="mt-50">
-        {bottomItems.map((item) => {
-          const IconComponent = item.icon;
-          const isActive = activeItem === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleNavigation(item)}
-              onMouseEnter={(e) => handleMouseEnter(e, item.label)}
-              onMouseLeave={handleMouseLeave}
-              className={`w-11 h-11 flex items-center justify-center mb-6 rounded-lg transition-colors duration-300 ease-in-out ${
-                isActive
-                  ? "text-[#3B7CED] bg-[#3B7CED]/10"
-                  : "text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"
-              }`}
-              aria-label={item.label}
-            >
-              <IconComponent color={isActive ? "#3B7CED" : undefined} />
-            </button>
-          );
-        })}
-      </div>
+        {/* Bottom section: App and Settings */}
+        <div
+          className={`mt-auto pb-4 pt-8 flex flex-col space-y-2 ${isExpanded ? "px-4" : "px-4 md:px-0 md:items-center"}`}
+        >
+          {bottomItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = activeItem === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavigation(item)}
+                onMouseEnter={(e) => {
+                  if (!isExpanded) handleMouseEnter(e, item.label);
+                }}
+                onMouseLeave={() => {
+                  if (!isExpanded) handleMouseLeave();
+                }}
+                className={`w-full h-11 flex items-center rounded-lg transition-colors duration-300 ease-in-out
+                ${isExpanded ? "px-3 gap-3" : "px-3 gap-3 md:w-11 md:px-0 md:justify-center md:gap-0"}
+                ${isActive ? "text-[#3B7CED] bg-[#3B7CED]/10" : "text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"}
+              `}
+                aria-label={item.label}
+              >
+                <div
+                  className={`flex items-center justify-center ${isExpanded ? "w-5" : "w-5 md:w-auto"}`}
+                >
+                  <IconComponent color={isActive ? "#3B7CED" : undefined} />
+                </div>
+                <span
+                  className={`text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis ${!isExpanded ? "md:hidden" : ""} ${isActive ? "text-[#3B7CED]" : "text-gray-600"}`}
+                >
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* Custom Tooltip */}
       {tooltip && (
         <div
-          className="fixed z-50 px-3 py-2 bg-gray-800 text-white text-sm rounded-md shadow-lg pointer-events-none"
+          className="fixed z-100 px-3 py-2 bg-gray-800 text-white text-sm rounded-md shadow-lg pointer-events-none"
           style={{
             left: tooltip.x,
             top: tooltip.y - 20,
@@ -176,7 +236,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onToggle }) => {
           ></div>
         </div>
       )}
-    </nav>
+    </>
   );
 };
 
