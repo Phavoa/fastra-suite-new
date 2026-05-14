@@ -2,9 +2,11 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, AlertCircle } from "lucide-react";
+import { useGetProjectQuery, useGetAvailableBudgetQuery } from "@/api/projectApi";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,14 +16,133 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { RequestFormConfig } from "./types";
+import { extractErrorMessage } from "@/lib/utils";
 
 interface RequestFormProps<T extends Record<string, any>> {
   config: RequestFormConfig<T>;
+}
+
+function MilestonesField({ control, name, errors }: { control: any; name: string; errors: any }) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: name as any,
+  });
+
+  return (
+    <div className="space-y-4 col-span-2">
+      <div className="space-y-3">
+        {fields.map((field, index) => (
+          <div key={field.id} className="flex gap-3 items-start p-3 border border-gray-100 rounded-lg bg-gray-50/50">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Name</Label>
+                <Controller
+                  name={`${name}.${index}.name` as any}
+                  control={control}
+                  render={({ field: inputField }) => (
+                    <Input {...inputField} placeholder="e.g. Foundation" className="bg-white h-9 text-sm" />
+                  )}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Percentage (%)</Label>
+                <Controller
+                  name={`${name}.${index}.percentage` as any}
+                  control={control}
+                  render={({ field: inputField }) => (
+                    <Input {...inputField} type="number" placeholder="0" className="bg-white h-9 text-sm" />
+                  )}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Criteria</Label>
+                <Controller
+                  name={`${name}.${index}.completion_criteria` as any}
+                  control={control}
+                  render={({ field: inputField }) => (
+                    <Input {...inputField} placeholder="e.g. Concrete poured" className="bg-white h-9 text-sm" />
+                  )}
+                />
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => remove(index)}
+              className="text-red-500 hover:text-red-600 hover:bg-red-50 mt-5"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => append({ name: "", percentage: "" })}
+        className="w-full border-2 border-dashed border-gray-200 text-[#3B7CED] hover:bg-[#3B7CED]/5 h-10"
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Add Milestone
+      </Button>
+
+      <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg">
+        <span className="text-sm font-bold text-gray-700">Total Percentage</span>
+        <span className={cn(
+          "text-lg font-black",
+          fields.reduce((sum, f, i) => sum + Number(control._formValues[name]?.[i]?.percentage || 0), 0) === 100 
+            ? "text-green-600" 
+            : "text-red-600"
+        )}>
+          {fields.reduce((sum, f, i) => sum + Number(control._formValues[name]?.[i]?.percentage || 0), 0)}%
+        </span>
+      </div>
+      {fields.reduce((sum, f, i) => sum + Number(control._formValues[name]?.[i]?.percentage || 0), 0) !== 100 && (
+        <p className="text-[10px] text-red-500 italic text-right">* Must total exactly 100%</p>
+      )}
+    </div>
+  );
+}
+
+function BudgetIndicator({ config, values }: { config: any; values: any }) {
+  const projectId = values[config.projectField];
+  const wbsId = values[config.wbsField];
+  
+  const { data: budget, isLoading } = useGetAvailableBudgetQuery(
+    { project_id: Number(projectId), wbs_id: Number(wbsId), cost_code: config.costCode },
+    { skip: !projectId || !wbsId }
+  );
+
+  if (!projectId || !wbsId) return null;
+  if (isLoading) return <div className="p-4 bg-gray-50 animate-pulse rounded-lg text-sm text-gray-500">Checking available budget...</div>;
+
+  const available = Number(budget?.available_budget || 0);
+
+  return (
+    <div className={cn(
+      "mb-6 p-4 rounded-xl flex items-start gap-3 border shadow-sm transition-all",
+      available > 0 ? "bg-blue-50/50 border-blue-100" : "bg-red-50/50 border-red-100"
+    )}>
+      <AlertCircle className={cn("h-5 w-5 mt-0.5", available > 0 ? "text-blue-500" : "text-red-500")} />
+      <div>
+        <p className={cn("text-sm font-semibold", available > 0 ? "text-blue-900" : "text-red-900")}>
+          Available Budget
+        </p>
+        <p className={cn("text-lg font-bold", available > 0 ? "text-[#3B7CED]" : "text-red-600")}>
+          ₦{available.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function RequestForm<T extends Record<string, any>>({ config }: RequestFormProps<T>) {
@@ -50,7 +171,7 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
     } catch (error) {
       statusModal.showError(
         config.errorMessage?.title || "Submission Unsuccessful",
-        config.errorMessage?.description || "There was an error submitting your request. Please check your connection and try again."
+        extractErrorMessage(error, config.errorMessage?.description || "There was an error submitting your request. Please check your connection and try again.")
       );
     }
   };
@@ -109,9 +230,22 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
           {config.sections.map((section, sIndex) => (
             <div key={sIndex} className="bg-white px-4 py-6">
               <h2 className="text-sm font-medium text-[#3B7CED] mb-4">{section.title}</h2>
+              
+              {/* Budget Indicator (if configured for this section) */}
+              {config.budgetConfig && sIndex === 0 && (
+                <BudgetIndicator config={config.budgetConfig} values={currentValues} />
+              )}
+
               <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                {section.fields.map((field) => (
-                  <div key={field.name} className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}>
+                {section.fields.map((field) => {
+                  // Handle visibility logic
+                  if (field.visibleIf) {
+                    const actualValue = currentValues[field.visibleIf.field];
+                    if (actualValue !== field.visibleIf.value) return null;
+                  }
+
+                  return (
+                    <div key={field.name} className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}>
                     <Label htmlFor={field.name} className="text-sm font-semibold text-gray-900">
                       {field.label}
                     </Label>
@@ -120,6 +254,20 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
                       control={control}
                       render={({ field: controllerField }) => {
                         if (field.type === "select") {
+                          let options = field.options || [];
+                          
+                          // Handle dynamic WBS filtering (dependsOn project)
+                          if (field.name === "wbsElement" && field.dependsOn) {
+                            const depValue = currentValues[field.dependsOn];
+                            // eslint-disable-next-line react-hooks/rules-of-hooks
+                            const { data: project } = useGetProjectQuery(Number(depValue), { skip: !depValue });
+                            if (project) {
+                              options = project.wbs
+                                .filter(w => w.is_activity) // PRD: Site workers only select activity elements
+                                .map(w => ({ label: w.name, value: String(w.id) }));
+                            }
+                          }
+
                           return (
                             <Select
                               onValueChange={controllerField.onChange}
@@ -129,7 +277,7 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
                                 <SelectValue placeholder={field.placeholder} />
                               </SelectTrigger>
                               <SelectContent>
-                                {field.options?.map((opt) => (
+                                {options.map((opt) => (
                                   <SelectItem key={opt.value} value={opt.value}>
                                     {opt.label}
                                   </SelectItem>
@@ -149,10 +297,36 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
                             />
                           );
                         }
+                        if (field.type === "milestones") {
+                          return (
+                            <MilestonesField
+                              control={control}
+                              name={field.name}
+                              errors={errors}
+                            />
+                          );
+                        }
+                        if (field.type === "checkbox") {
+                          return (
+                            <div className="flex items-center space-x-2 py-2">
+                              <Checkbox
+                                id={field.name}
+                                checked={controllerField.value}
+                                onCheckedChange={controllerField.onChange}
+                              />
+                              <Label
+                                htmlFor={field.name}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {field.placeholder || field.label}
+                              </Label>
+                            </div>
+                          );
+                        }
                         return (
                           <Input
                             id={field.name}
-                            type={field.type}
+                            type={field.type as any}
                             placeholder={field.placeholder}
                             {...controllerField}
                             aria-invalid={!!errors[field.name]}
@@ -176,7 +350,8 @@ export function RequestForm<T extends Record<string, any>>({ config }: RequestFo
                       </p>
                     )}
                   </div>
-                ))}
+                );
+              })}
 
                 {/* Projected Cost (only shown in the last section for now, or based on logic) */}
                 {sIndex === config.sections.length - 1 && projectedCost !== null && (

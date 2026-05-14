@@ -38,6 +38,8 @@ import { internalTransferApi } from "@/api/inventory/internalTransferApi";
 import { stockMoveApi } from "@/api/inventory/stockMoveApi";
 import { incomingProductReturnsApi } from "@/api/inventory/incomingProductReturns";
 import { backOrderApi } from "@/api/inventory/backOrderApi";
+import { subcontractorRequestApi } from "@/api/subcontractorRequestApi";
+import { projectApi } from "@/api/projectApi";
 
 const authPersistConfig = {
   key: "auth",
@@ -78,6 +80,8 @@ const rootReducer = combineReducers({
   [incomingProductReturnsApi.reducerPath]: incomingProductReturnsApi.reducer,
   [accessGroupRightApi.reducerPath]: accessGroupRightApi.reducer,
   [backOrderApi.reducerPath]: backOrderApi.reducer,
+  [subcontractorRequestApi.reducerPath]: subcontractorRequestApi.reducer,
+  [projectApi.reducerPath]: projectApi.reducer,
 
   [applicationsApi.reducerPath]: applicationsApi.reducer,
 });
@@ -115,6 +119,8 @@ export const store = configureStore({
       incomingProductReturnsApi.middleware,
       accessGroupRightApi.middleware,
       backOrderApi.middleware,
+      subcontractorRequestApi.middleware,
+      projectApi.middleware,
 
       applicationsApi.middleware,
     );

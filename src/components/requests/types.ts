@@ -21,14 +21,14 @@ export interface RequestDashboardConfig<T> {
   mockData: T[];
 }
 
-export type FormFieldType = "text" | "number" | "select" | "textarea" | "date";
+export type FormFieldType = "text" | "number" | "select" | "textarea" | "date" | "milestones" | "checkbox";
 
 export interface FormFieldOption {
   label: string;
   value: string;
 }
 
-export interface FormFieldConfig {
+export interface RequestFormField {
   name: string;
   label: string;
   type: FormFieldType;
@@ -38,6 +38,8 @@ export interface FormFieldConfig {
   className?: string;
   hintText?: string;
   halfWidth?: boolean;
+  dependsOn?: string;
+  visibleIf?: { field: string; value: any }; // New: only show if field equals value
 }
 
 export interface RequestFormConfig<T extends Record<string, any>> {
@@ -47,7 +49,7 @@ export interface RequestFormConfig<T extends Record<string, any>> {
   date: string;
   sections: {
     title: string;
-    fields: FormFieldConfig[];
+    fields: RequestFormField[];
   }[];
   schema: z.ZodSchema<T>;
   defaultValues: T;
@@ -63,4 +65,9 @@ export interface RequestFormConfig<T extends Record<string, any>> {
   backPath: string;
   calculateProjectedCost?: (data: T) => number;
   renderHeader?: () => React.ReactNode;
+  budgetConfig?: {
+    projectField: string;
+    wbsField: string;
+    costCode: string;
+  };
 }
