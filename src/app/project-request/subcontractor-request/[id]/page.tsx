@@ -52,10 +52,10 @@ export default function SubcontractorRequestDetailsPage() {
 
   const breadcrumbs = [
     { label: "Home", href: "/" },
-    { label: "Subcontractor Request", href: "/subcontractor-request" },
+    { label: "Subcontractor Request", href: "/project-request/subcontractor-request" },
     {
       label: request?.reference_id || (request?.id ? `SR-${String(request.id).padStart(5, '0')}` : "Details"),
-      href: `/subcontractor-request/${requestId}`,
+      href: `/project-request/subcontractor-request/${requestId}`,
       current: true,
     },
   ];
@@ -122,7 +122,7 @@ export default function SubcontractorRequestDetailsPage() {
   const handleModalClose = () => {
     statusModal.close();
     if (statusModal.type === "success") {
-      router.push("/subcontractor-request");
+      router.push("/project-request/subcontractor-request");
     }
   };
 

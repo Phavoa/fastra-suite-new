@@ -257,7 +257,7 @@ export default function NewSubcontractorRequestPage() {
       title: "Submission Unsuccessful",
       description: "Your request submission was unsuccessful. Please check your data and try again.",
     },
-    backPath: "/subcontractor-request",
+    backPath: "/project-request/subcontractor-request",
   };
 
   return <RequestForm config={config} />;

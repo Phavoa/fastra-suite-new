@@ -158,6 +158,14 @@ const MODULES: Module[] = [
     color: "green",
     Icon: AppIcon,
   },
+  {
+    id: "project-request",
+    title: "Project Request",
+    description:
+      "Submit and manage various project-related requests including labour, material consumption, petty cash, and subcontractor engagements.",
+    color: "purple",
+    Icon: ClipboardList,
+  },
 ];
 
 const colorMap: Record<
@@ -212,6 +220,7 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
       contacts: "/contact",
       settings: "/settings",
       apps: "/app",
+      "project-request": "/project-request",
     };
     return routeMap[id] || null;
   };

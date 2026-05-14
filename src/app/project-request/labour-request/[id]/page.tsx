@@ -145,7 +145,7 @@ export default function LabourRequestDetailPage() {
   };
 
   const handleEdit = () => {
-    router.push(`/labour-request/edit/${id}`);
+    router.push(`/project-request/labour-request/edit/${id}`);
   };
 
   const handleDelete = async () => {
@@ -164,7 +164,7 @@ export default function LabourRequestDetailPage() {
           description: "The labour request has been deleted successfully.",
         });
         setTimeout(() => {
-          router.push("/labour-request");
+          router.push("/project-request/labour-request");
         }, 2000);
       } else {
         // Offline delete - find local request by server id
@@ -182,7 +182,7 @@ export default function LabourRequestDetailPage() {
           description: "The request will be deleted when you're back online.",
         });
         setTimeout(() => {
-          router.push("/labour-request");
+          router.push("/project-request/labour-request");
         }, 2000);
       }
     } catch (error) {
@@ -653,7 +653,7 @@ export default function LabourRequestDetailPage() {
                         description: "The labour request has been cancelled.",
                       });
                       setTimeout(() => {
-                        router.push("/labour-request");
+                        router.push("/project-request/labour-request");
                       }, 2000);
                     } else {
                       await syncService.cancelRequestOffline(id, {
@@ -668,7 +668,7 @@ export default function LabourRequestDetailPage() {
                           "The request will be cancelled when you're back online.",
                       });
                       setTimeout(() => {
-                        router.push("/labour-request");
+                        router.push("/project-request/labour-request");
                       }, 2000);
                     }
                   } catch (error) {

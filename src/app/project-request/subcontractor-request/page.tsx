@@ -60,7 +60,7 @@ export default function SubcontractorRequestPage() {
   const config: RequestDashboardConfig<any> = {
     title: "Subcontractor Request",
     idPrefix: "SC",
-    newRequestPath: "/subcontractor-request/new",
+    newRequestPath: "/project-request/subcontractor-request/new",
     statusCounts,
     summaryConfigs: [
       {
@@ -99,7 +99,7 @@ export default function SubcontractorRequestPage() {
     renderItem: (request: any) => (
       <div 
         key={request.id}
-        onClick={() => router.push(`/subcontractor-request/${request.id}`)}
+        onClick={() => router.push(`/project-request/subcontractor-request/${request.id}`)}
         className="p-4 border border-gray-200 rounded-lg bg-white hover:border-[#3B7CED] hover:shadow-md transition-all cursor-pointer group"
       >
         <div className="flex justify-between items-start">

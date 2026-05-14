@@ -1,22 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { RequestForm } from "@/components/requests/RequestForm";
 import { RequestFormConfig } from "@/components/requests/types";
-import {
-  useGetLabourRequestQuery,
-  useUpdateLabourRequestMutation,
-  usePatchLabourRequestMutation,
-} from "@/api/requests/labourRequestApi";
+import { useCreateLabourRequestMutation } from "@/api/requests/labourRequestApi";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { syncService } from "@/lib/database/syncService";
 import { StatusModal } from "@/components/shared/StatusModal";
-import { format } from "date-fns";
 import extractErrorMessage from "@/components/requests/utils/RequestErrorHandler";
-import { db } from "@/lib/database/labourRequestDb";
-import { get } from "http";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -45,26 +38,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function EditLabourRequestPage() {
-  const params = useParams();
+export default function NewLabourRequestPage() {
   const router = useRouter();
-  const id = parseInt(params.id as string);
   const networkStatus = useNetworkStatus();
-
-  const {
-    data: request,
-    isLoading,
-    error,
-    refetch,
-  } = useGetLabourRequestQuery(id, {
-    skip: isNaN(id),
-  });
-
-  const [updateLabourRequest, { isLoading: isUpdating }] =
-    useUpdateLabourRequestMutation();
-  const [patchLabourRequest, { isLoading: isPatching }] =
-    usePatchLabourRequestMutation();
-
+  const [createLabourRequest, { isLoading: isCreating }] =
+    useCreateLabourRequestMutation();
   const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
     type: "success" | "error";
@@ -81,9 +59,7 @@ export default function EditLabourRequestPage() {
     try {
       const submitData = {
         project: parseInt(data.project),
-        date_required:
-          request?.detail.date_required ||
-          new Date().toISOString().split("T")[0],
+        date_required: new Date().toISOString().split("T")[0], // Today's date
         number_of_workers: data.numberOfWorkers,
         role_type: data.role,
         duration: data.duration,
@@ -93,81 +69,69 @@ export default function EditLabourRequestPage() {
       };
 
       if (networkStatus.isOnline) {
-        // Prefer PATCH for partial updates
-        await patchLabourRequest({ id, data: submitData }).unwrap();
-
-        const refetchResult = await refetch();
-        const updatedId = refetchResult.data?.detail.id || id;
+        // Online submission
+        console.log("submitData from new page", submitData);
+        const result = await createLabourRequest(submitData).unwrap();
 
         setStatusModal({
           isOpen: true,
           type: "success",
-          title: "Request Updated",
-          description: "Your labour request has been updated successfully.",
+          title: "Request Created",
+          description: "Your labour request has been submitted successfully.",
         });
 
-        // Navigate back to detail page after a delay
+        // Navigate to list page after a delay (since we don't have the full object with id)
         setTimeout(() => {
-          router.push(`/labour-request/${updatedId}`);
+          router.push(`/project-request/labour-request`);
         }, 2000);
       } else {
-        // Offline update - find local request by server id
-        const localRequests = await db.labourRequests
-          .where("id")
-          .equals(id)
-          .toArray();
-        if (localRequests.length > 0) {
-          await syncService.updateRequestOffline(
-            localRequests[0].localId,
-            submitData,
-          );
-        } else {
-          // If no local version exists, create one
-          await syncService.updateRequestOffline(`server_${id}`, submitData);
+        // Offline submission - save locally
+        try {
+          await syncService.createRequestOffline(submitData);
+
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            title: "Request Saved Locally",
+            description:
+              "Your labour request has been saved locally and will be synchronized when you're back online.",
+          });
+
+          // Navigate back to list after a delay
+          setTimeout(() => {
+            router.push("/project-request/labour-request");
+          }, 2000);
+        } catch (error) {
+          console.error("Failed to save request locally:", error);
+          setStatusModal({
+            isOpen: true,
+            type: "error",
+            title: "Error",
+            description: "Failed to save request locally. Please try again.",
+          });
         }
-
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Updated Locally",
-          description:
-            "Your changes have been saved locally and will be synchronized when you're back online.",
-        });
-
-        // Navigate back to detail page after a delay
-        setTimeout(() => {
-          router.push(`/labour-request/${id}`);
-        }, 2000);
       }
     } catch (error) {
-      console.error("Failed to update labour request:", error);
+      console.error("Failed to create labour request:", error);
       const errorMessage = extractErrorMessage(error);
       setStatusModal({
         isOpen: true,
         type: "error",
         title: "Error",
-        description:
-          errorMessage || "Failed to update labour request. Please try again.",
+        description: errorMessage,
       });
     }
   };
 
-  if (isLoading || !request) {
-    return (
-      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3B7CED] mx-auto mb-2"></div>
-          <p className="text-gray-600">Loading request...</p>
-        </div>
-      </div>
-    );
-  }
-
   const config: RequestFormConfig<FormValues> = {
-    title: "Edit Labour Request",
-    requestId: request.reference_id,
-    requesterName: request.detail.created_by_name || "John Doe",
-    date: format(new Date(request.created_at), "d MMM yyyy"),
+    title: "Labour Request",
+    requestId: "", // Will be generated
+    requesterName: "You", // Will be populated from auth
+    date: new Date().toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
     sections: [
       {
         title: "Labour Details",
@@ -179,10 +143,6 @@ export default function EditLabourRequestPage() {
             placeholder: "Select a project",
             options: [
               // TODO: Load real projects from API
-              // {
-              //   label: `Project #${request.project_request.project}`,
-              //   value: request.project_request.project.toString(),
-              // },
               { label: "Project #1", value: "1" },
               { label: "Project #2", value: "2" },
               { label: "Project #3", value: "3" },
@@ -303,22 +263,22 @@ export default function EditLabourRequestPage() {
     ],
     schema: formSchema,
     defaultValues: {
-      project: request?.project_request?.project.toString() || "",
-      numberOfWorkers: request.detail.number_of_workers,
-      role: request.detail.role_type,
-      duration: request.detail.duration,
-      durationUnit: request.detail.duration_unit,
-      dailyRate: parseFloat(request.detail.estimated_daily_rate),
-      justification: request.detail.justification_notes || "",
-      phase: "1",
-      task: "1",
+      project: "",
+      phase: "",
+      task: "",
+      numberOfWorkers: 0,
+      role: "",
+      duration: 1,
+      durationUnit: "days" as const,
+      dailyRate: 0,
+      justification: "",
     },
     onSubmit: handleSubmit,
     successMessage: {
-      title: "Request Updated",
-      description: "Your labour request has been updated successfully.",
+      title: "Request Submitted",
+      description: "Your labour request has been submitted successfully.",
     },
-    backPath: `/labour-request/${id}`,
+    backPath: "/project-request/labour-request",
     calculateProjectedCost: (data) => {
       return (
         (data.numberOfWorkers || 0) *

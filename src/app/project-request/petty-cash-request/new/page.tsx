@@ -104,7 +104,7 @@ export default function NewPettyCashRequestPage() {
       title: "Submission Unsuccessful",
       description: "Your request submission was unsuccessful. Please try again.",
     },
-    backPath: "/petty-cash-request",
+    backPath: "/project-request/petty-cash-request",
   };
 
   return <RequestForm config={config} />;
