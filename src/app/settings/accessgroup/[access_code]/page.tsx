@@ -50,7 +50,7 @@ export default function ViewAccessGroupPage() {
   const mapAccessGroupData = (
     data: AccessGroupRight[],
     allAppsData: any,
-    currentApp: string
+    currentApp: string,
   ): ModuleRights[] => {
     if (!data || data.length === 0) return [];
 
@@ -62,14 +62,14 @@ export default function ViewAccessGroupPage() {
       currentApp &&
       apps.find((app: any) =>
         Object.keys(app).some(
-          (key) => key.toLowerCase() === currentApp.toLowerCase()
-        )
+          (key) => key.toLowerCase() === currentApp.toLowerCase(),
+        ),
       );
 
     const actualKey =
       appData && currentApp
         ? Object.keys(appData).find(
-            (key) => key.toLowerCase() === currentApp.toLowerCase()
+            (key) => key.toLowerCase() === currentApp.toLowerCase(),
           )
         : null;
 
@@ -171,7 +171,7 @@ export default function ViewAccessGroupPage() {
       access_code,
       data: {
         group_name: groupName,
-        application,
+        application: application.split(" ").join("_"),
         application_module: modules[0]?.module || "",
         access_rights: accessRights,
         access_right: 0,
@@ -209,8 +209,10 @@ export default function ViewAccessGroupPage() {
         <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              className="text-gray-600 hover:text-gray-900 mr-4"
+              className="text-gray-600 hover:text-gray-900 mr-4 cursor-pointer"
               onClick={() => router.push("/settings/accessgroup")}
+              aria-label="Back"
+              type="button"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -220,7 +222,11 @@ export default function ViewAccessGroupPage() {
           </div>
 
           {!editMode ? (
-            <PermissionGuard application="settings" module="accessgroup" action="edit">
+            <PermissionGuard
+              application="settings"
+              module="accessgroup"
+              action="edit"
+            >
               <Button
                 className="bg-white text-[#3B7CED] px-8 border-0"
                 onClick={() => setEditMode(true)}
