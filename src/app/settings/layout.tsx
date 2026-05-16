@@ -103,7 +103,7 @@ export default function SettingsLayout({
       pathname !== "/settings/accessgroup");
   return (
     <PageGuard application="settings" module={activeSection}>
-      <NavBar title="Settings" items={navItems} />
+      <NavBar title="Settings" items={navItems} activeHref={activeNav?.href} />
 
       {/* Breadcrumb / secondary top bar */}
       <div className="flex justify-between items-center w-full border-b border-gray-200 px-6 py-2">
