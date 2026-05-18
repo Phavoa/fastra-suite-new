@@ -9,12 +9,14 @@ import {
   useGetAccessGroupRightQuery,
   useUpdateAccessGroupRightMutation,
   usePartialUpdateAccessGroupRightMutation,
+  useDeleteAccessGroupRightMutation,
   AccessGroupRight,
   AccessRight,
 } from "@/api/settings/accessGroupRightApi";
 import { useGetApplicationsAndAccessRightsQuery } from "@/api/settings/applicationsApi";
 import { BoxIcon } from "@/components/icons/boxIcon";
 import { PermissionGuard } from "@/components/ProtectedComponent";
+import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
 
 type RightKey = "view" | "edit" | "create" | "delete" | "approve" | "reject";
 
@@ -41,10 +43,28 @@ export default function ViewAccessGroupPage() {
   const [updateAccessGroup, { isLoading: saving }] =
     usePartialUpdateAccessGroupRightMutation();
 
+  const [deleteAccessGroup, { isLoading: deleting }] =
+    useDeleteAccessGroupRightMutation();
+
   const [editMode, setEditMode] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [application, setApplication] = useState("");
   const [modules, setModules] = useState<ModuleRights[]>([]);
+
+  const [statusModal, setStatusModal] = useState<{
+    isOpen: boolean;
+    type: "success" | "error" | "warning";
+    title: string;
+    message: string;
+    onAction?: () => void;
+    secondaryText?: string;
+    onSecondary?: () => void;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
 
   // ✅ Build rights from the API using booleans (true/false)
   const mapAccessGroupData = (
@@ -181,6 +201,42 @@ export default function ViewAccessGroupPage() {
     setEditMode(false);
   };
 
+  const handleDelete = () => {
+    setStatusModal({
+      isOpen: true,
+      type: "warning",
+      title: "Confirm Delete",
+      message:
+        "Are you sure you want to delete this access group? This action cannot be undone.",
+      secondaryText: "Cancel",
+      onSecondary: () => setStatusModal((prev) => ({ ...prev, isOpen: false })),
+      onAction: async () => {
+        setStatusModal((prev) => ({ ...prev, isOpen: false }));
+        if (!access_code) return;
+        try {
+          await deleteAccessGroup(access_code as string).unwrap();
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            title: "Deleted Successfully",
+            message: "Access group has been deleted.",
+            onAction: () => {
+              setStatusModal((prev) => ({ ...prev, isOpen: false }));
+              router.push("/settings/accessgroup");
+            },
+          });
+        } catch (err) {
+          setStatusModal({
+            isOpen: true,
+            type: "error",
+            title: "Delete Failed",
+            message: "Could not delete access group.",
+          });
+        }
+      },
+    });
+  };
+
   const rightKeys: RightKey[] = [
     "view",
     "edit",
@@ -222,18 +278,34 @@ export default function ViewAccessGroupPage() {
           </div>
 
           {!editMode ? (
-            <PermissionGuard
-              application="settings"
-              module="accessgroup"
-              action="edit"
-            >
-              <Button
-                className="bg-white text-[#3B7CED] px-8 border-0"
-                onClick={() => setEditMode(true)}
+            <div className="flex gap-2">
+              <PermissionGuard
+                application="settings"
+                module="accessgroup"
+                action="delete"
               >
-                Edit
-              </Button>
-            </PermissionGuard>
+                <Button
+                  variant="destructive"
+                  className="px-2"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? "Deleting..." : "Delete"}
+                </Button>
+              </PermissionGuard>
+              <PermissionGuard
+                application="settings"
+                module="accessgroup"
+                action="edit"
+              >
+                <Button
+                  className="bg-white text-[#3B7CED] px-8 border-0"
+                  onClick={() => setEditMode(true)}
+                >
+                  Edit
+                </Button>
+              </PermissionGuard>
+            </div>
           ) : (
             <div className="flex gap-2">
               <Button
@@ -322,6 +394,18 @@ export default function ViewAccessGroupPage() {
           </table>
         </div>
       </div>
+
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        actionText={statusModal.type === "warning" ? "Delete" : undefined}
+        onAction={statusModal.onAction}
+        secondaryText={statusModal.secondaryText}
+        onSecondary={statusModal.onSecondary}
+      />
     </div>
   );
 }
