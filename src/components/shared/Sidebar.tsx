@@ -83,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   } | null>(null);
   const router = useRouter();
 
-  const handleNavigation = (item: (typeof topItems)[0]) => {
+  const handleNavigation = (item: { id: string; icon: any; label: string; route: string }) => {
     setActiveItem(item.id);
     router.push(item.route);
     if (onClose) onClose();

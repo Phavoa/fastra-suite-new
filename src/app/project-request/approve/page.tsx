@@ -85,9 +85,9 @@ export default function ApproveRequestPage() {
             </button>
             <div className="w-8 h-8 bg-[#ffcdd2] rounded-full flex items-center justify-center overflow-hidden">
               {/* In a real app we'd use the user's avatar image here if available */}
-              {user?.avatar_url ? (
+              {user?.user_image ? (
                 <img
-                  src={user.avatar_url}
+                  src={user.user_image}
                   alt="Avatar"
                   className="w-full h-full object-cover"
                 />

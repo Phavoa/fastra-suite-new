@@ -71,8 +71,8 @@ export default function RequestDetailsPage() {
               <Bell size={24} className="text-gray-900" />
             </button>
             <div className="w-8 h-8 bg-[#ffcdd2] rounded-full flex items-center justify-center overflow-hidden">
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              {user?.user_image ? (
+                <img src={user.user_image} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <User size={18} className="text-red-900" />
               )}

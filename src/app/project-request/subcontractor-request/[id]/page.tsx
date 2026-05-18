@@ -8,7 +8,7 @@ import {
   StaggerContainer,
 } from "@/components/shared/AnimatedWrapper";
 import { PageHeader } from "@/components/purchase/products/PageHeader";
-import { StatusPill } from "@/components/purchase/purchaseRequest/StatusPill";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -41,6 +41,35 @@ export default function SubcontractorRequestDetailsPage() {
   const router = useRouter();
   const statusModal = useStatusModal();
   const requestId = Number(params.id);
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "approved":
+      case "completed":
+        return "validated";
+      case "submitted":
+      case "clarification_needed":
+      case "in_progress":
+        return "pending";
+      case "draft":
+        return "draft";
+      case "rejected":
+        return "rejected";
+      default:
+        return "pending";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "clarification_needed":
+        return "Clarification Needed";
+      case "in_progress":
+        return "In Progress";
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  };
   
   const { data: request, isLoading, error } = useGetSubcontractorRequestQuery(requestId);
   const [updateRequest, { isLoading: isUpdating }] = useUpdateSubcontractorRequestMutation();
@@ -160,7 +189,9 @@ export default function SubcontractorRequestDetailsPage() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <StatusPill status={request.status} />
+              <Badge variant={getStatusBadgeVariant(request.status)}>
+                {getStatusLabel(request.status)}
+              </Badge>
             </div>
           </div>
         </FadeIn>

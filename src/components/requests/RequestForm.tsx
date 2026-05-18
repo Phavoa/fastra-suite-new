@@ -335,9 +335,11 @@ export function RequestForm<T extends Record<string, any>>({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {config.sections.map((section, sIndex) => (
             <div key={sIndex} className="bg-white px-4 py-6">
-              <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
-                {section.title}
-              </h2>
+              {section.title && (
+                <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
+                  {section.title}
+                </h2>
+              )}
 
               {/* Budget Indicator (if configured for this section) */}
               {config.budgetConfig && sIndex === 0 && (
@@ -346,6 +348,9 @@ export function RequestForm<T extends Record<string, any>>({
                   values={currentValues}
                 />
               )}
+
+              {/* Custom section top renderer */}
+              {section.renderTop && section.renderTop(currentValues)}
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-5">
                 {section.fields.map((field) => {
@@ -506,6 +511,9 @@ export function RequestForm<T extends Record<string, any>>({
                     </div>
                   )}
               </div>
+
+              {/* Custom section bottom renderer */}
+              {section.renderBottom && section.renderBottom(currentValues)}
             </div>
           ))}
         </form>
