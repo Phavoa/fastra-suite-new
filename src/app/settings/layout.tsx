@@ -12,12 +12,7 @@ import { setArchive } from "@/components/Settings/viewModeSlice";
 import { RootState } from "@/lib/store/store";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-type SettingsSection =
-  | "company"
-  | "user"
-  | "accessgroup"
-  | "application";
-
+type SettingsSection = "company" | "user" | "accessgroup" | "application";
 
 export default function SettingsLayout({
   children,
@@ -36,10 +31,13 @@ export default function SettingsLayout({
   }[] = [
     { key: "company", label: "Company", href: "/settings" },
     { key: "user", label: "User", href: "/settings/users" },
-    { key: "accessgroup", label: "Access Groups", href: "/settings/accessgroup" },
+    {
+      key: "accessgroup",
+      label: "Access Groups",
+      href: "/settings/accessgroup",
+    },
     //{ label: "Application", href: "/settings/application" },
   ];
-
 
   // Determine active section automatically, handling sub-paths
   const getActiveSection = (path: string): SettingsSection => {
@@ -51,7 +49,6 @@ export default function SettingsLayout({
 
   const activeSection = getActiveSection(pathname);
   const activeNav = navItems.find((item) => item.key === activeSection);
-
 
   /*const activeSection =
      activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||
@@ -106,7 +103,7 @@ export default function SettingsLayout({
       pathname !== "/settings/accessgroup");
   return (
     <PageGuard application="settings" module={activeSection}>
-      <NavBar title="Settings" items={navItems} />
+      <NavBar title="Settings" items={navItems} activeHref={activeNav?.href} />
 
       {/* Breadcrumb / secondary top bar */}
       <div className="flex justify-between items-center w-full border-b border-gray-200 px-6 py-2">
