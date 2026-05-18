@@ -77,7 +77,7 @@ export default function MaterialConsumptionRequestPage() {
   const config: RequestDashboardConfig<MaterialConsumptionRequest> = {
     title: "Material Consumption Request",
     idPrefix: "MCR",
-    newRequestPath: "/material-consumption-request/new",
+    newRequestPath: "/project-request/material-consumption-request/new",
     statusCounts,
     summaryConfigs: [
       {

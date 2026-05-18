@@ -152,7 +152,7 @@ export default function LabourRequestPage() {
   const config: RequestDashboardConfig<DisplayLabourRequest> = {
     title: "Labour Request",
     idPrefix: "LR",
-    newRequestPath: "/labour-request/new",
+    newRequestPath: "/project-request/labour-request/new",
     statusCounts,
     summaryConfigs: [
       {
@@ -191,7 +191,7 @@ export default function LabourRequestPage() {
     renderItem: (request) => (
       <Card
         className={`p-4 hover:shadow-md transition-shadow cursor-pointer ${request.isOffline ? "border-orange-200 bg-orange-50/30" : ""}`}
-        onClick={() => router.push(`/labour-request/${request.id}`)}
+        onClick={() => router.push(`/project-request/labour-request/${request.id}`)}
       >
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">

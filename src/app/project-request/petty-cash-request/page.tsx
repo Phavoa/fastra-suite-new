@@ -62,7 +62,7 @@ export default function PettyCashRequestPage() {
   const config: RequestDashboardConfig<PettyCashRequest> = {
     title: "Petty Cash Request",
     idPrefix: "PC",
-    newRequestPath: "/petty-cash-request/new",
+    newRequestPath: "/project-request/petty-cash-request/new",
     statusCounts,
     summaryConfigs: [
       {

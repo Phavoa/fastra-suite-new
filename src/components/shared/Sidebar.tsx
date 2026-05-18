@@ -16,6 +16,7 @@ import {
   AppIcon,
   SettingsIcon,
 } from "./icons";
+import { ClipboardList } from "lucide-react";
 
 // Navigation items grouped into sections
 const topItems = [{ id: "menu", icon: MenuIcon, label: "Menu", route: "/" }];
@@ -34,16 +35,10 @@ const middleItems = [
   },
   { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
   {
-    id: "labour-request",
-    icon: HRIcon,
-    label: "Labour Request",
-    route: "/labour-request",
-  },
-  {
-    id: "material-consumption",
-    icon: InventoryIcon,
-    label: "Material Consumption",
-    route: "/material-consumption-request",
+    id: "project-request",
+    icon: ClipboardList,
+    label: "Project Request",
+    route: "/project-request",
   },
   {
     id: "overrun-queue",
@@ -88,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   } | null>(null);
   const router = useRouter();
 
-  const handleNavigation = (item: (typeof topItems)[0]) => {
+  const handleNavigation = (item: { id: string; icon: any; label: string; route: string }) => {
     setActiveItem(item.id);
     router.push(item.route);
     if (onClose) onClose();

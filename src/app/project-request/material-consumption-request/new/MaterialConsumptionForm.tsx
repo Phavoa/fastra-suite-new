@@ -214,10 +214,10 @@ export default function MaterialConsumptionForm() {
     statusModal.close();
     if (statusModal.type === "success") {
       form.reset();
-      router.push("/material-consumption-request");
+      router.push("/project-request/material-consumption-request");
     } else if (statusModal.title === "Budget Review Required") {
       form.reset();
-      router.push("/material-consumption-request");
+      router.push("/project-request/material-consumption-request");
     }
   };
 
