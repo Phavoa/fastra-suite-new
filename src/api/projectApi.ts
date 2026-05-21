@@ -36,8 +36,9 @@ export const projectApi = createApi({
         name: "Project Beta - Office Complex",
         code: "PRJ-2026-002",
         wbs: [
-          { id: 201, name: "Site Prep", is_activity: true },
-          { id: 202, name: "Masonry", is_activity: true },
+          { id: 200, name: "Phase 1 - Preparation", is_activity: false },
+          { id: 201, name: "Site Prep", is_activity: true, parent: 200 },
+          { id: 202, name: "Masonry", is_activity: true, parent: 200 },
         ],
       },
     ];
@@ -61,15 +62,28 @@ export const projectApi = createApi({
         committed_amount: "0",
         available_budget: "2000000",
       },
+      {
+        project_id: 2,
+        wbs_id: 201,
+        cost_code: "CC-05",
+        budgeted_amount: "8000000",
+        actual_amount: "0",
+        committed_amount: "0",
+        available_budget: "8000000",
+      },
     ];
 
     if (typeof args === "string") {
-      if (args.includes("/projects/")) {
-        const id = parseInt(args.split("/").pop() || "0");
-        return { data: mockProjects.find(p => p.id === id) };
-      }
       if (args === "/projects/") {
         return { data: mockProjects };
+      }
+      if (args.includes("/projects/")) {
+        const parts = args.split("/").filter(Boolean);
+        const lastPart = parts[parts.length - 1];
+        const id = parseInt(lastPart || "0");
+        if (!isNaN(id)) {
+          return { data: mockProjects.find(p => p.id === id) };
+        }
       }
     } else {
       if (args.url === "/budget/available/") {

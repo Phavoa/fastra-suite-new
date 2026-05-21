@@ -8,7 +8,7 @@ import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
 export default function ApproverDashboardPage() {
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
-      <NavBar title="Approver Dashboard" items={[]} />
+      <NavBar title="Approver Dashboard" items={[]} backUrl="/" />
       
       <main className="max-w-2xl mx-auto p-4 pt-6">
         <div className="space-y-4">

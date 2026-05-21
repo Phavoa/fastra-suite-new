@@ -11,7 +11,7 @@ export default function MakeRequestPage() {
       title: "Purchase Request",
       description: "Request to procure goods or materials needed on-site",
       icon: Calculator,
-      href: "/purchase/purchase_requests",
+      href: "/project-request/purchase-request",
       iconColor: "text-green-600",
       borderColor: "border-green-200",
       titleColor: "text-green-600",
@@ -47,7 +47,7 @@ export default function MakeRequestPage() {
       title: "Plant & Equipment Request",
       description: "Request for machinery, tools, or equipment needed on-site",
       icon: Settings, // Alternative to Calculator for variety
-      href: "/plant-equipment-request",
+      href: "/project-request/plant-equipment-request",
       iconColor: "text-[#3B7CED]",
       borderColor: "border-blue-200",
       titleColor: "text-[#3B7CED]",
