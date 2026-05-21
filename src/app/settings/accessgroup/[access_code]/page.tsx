@@ -257,7 +257,7 @@ export default function ViewAccessGroupPage() {
   if (error) {
     return <div>Error loading access group.</div>;
   }
-
+  console.log("applicationsData", applicationsData);
   return (
     <div className="min-h-screen bg-white">
       {/* HEADER */}
