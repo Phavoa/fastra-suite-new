@@ -14,6 +14,7 @@ export interface AccessGroupRight {
   group_name: string;
   application: string;
   application_module: string;
+  application_module_display: string;
   access_right: number;
   access_right_details: AccessRightDetails;
   date_updated: string;
@@ -98,40 +99,39 @@ export const accessGroupRightApi = createApi({
       }
     }
 
-try {
-  const response = await fetch(url, { method, body, headers });
+    try {
+      const response = await fetch(url, { method, body, headers });
 
-  let data: any = null;
+      let data: any = null;
 
-  // ✅ SAFE JSON PARSING
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
+      // ✅ SAFE JSON PARSING
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
 
-  if (!response.ok) {
-    return {
-      error: {
-        status: response.status,
-        data,
-      },
-    };
-  }
+      if (!response.ok) {
+        return {
+          error: {
+            status: response.status,
+            data,
+          },
+        };
+      }
 
-  console.log("API Call:", { url, method, body });
-  console.log("Response:", data);
+      console.log("API Call:", { url, method, body });
+      console.log("Response:", data);
 
-  return { data };
-} catch (error) {
-  return {
-    error: {
-      status: "FETCH_ERROR" as const,
-      data: error,
-    },
-  };
-}
-
+      return { data };
+    } catch (error) {
+      return {
+        error: {
+          status: "FETCH_ERROR" as const,
+          data: error,
+        },
+      };
+    }
   },
   endpoints: (builder) => ({
     // GET /users/access-group-right/ - List all access group rights
@@ -233,14 +233,14 @@ try {
     getActiveAccessGroupRights: builder.query<AccessGroupRightResponse[], void>(
       {
         query: () => "/users/access-group-right/active_list/",
-      }
+      },
     ),
 
     // GET /users/access-group-right/hidden_list/ - Get only hidden access group rights
     getHiddenAccessGroupRights: builder.query<AccessGroupRightResponse[], void>(
       {
         query: () => "/users/access-group-right/hidden_list/",
-      }
+      },
     ),
 
     // GET /users/access-group-rights/access-groups/ - Get restructured dataset grouped by application
