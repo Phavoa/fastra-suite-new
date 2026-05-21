@@ -41,6 +41,7 @@ interface TopNavProps {
   showNotify?: boolean;
   onMenuToggle?: () => void;
   backUrl?: string;
+  activeHref?: string;
 }
 
 export function NavBar({
@@ -49,6 +50,7 @@ export function NavBar({
   showNotify = true,
   onMenuToggle,
   backUrl,
+  activeHref,
 }: TopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -61,10 +63,18 @@ export function NavBar({
 
   const isActive = (href?: string) => {
     if (!href) return false;
+    
+    // If activeHref is explicitly provided (e.g., from parent), use it for comparison
+    if (activeHref !== undefined) {
+      return href === activeHref;
+    }
+    
     if (href === "/" || href.endsWith("/")) {
       return pathname === href || pathname === href.slice(0, -1);
     }
-    return pathname.startsWith(href);
+    // Exact match for the href, or match with a slash for sub-paths
+    // BUT NOT if another href is more specific and matches
+    return pathname === href || pathname.startsWith(href + "/");
   };
 
   useEffect(() => {

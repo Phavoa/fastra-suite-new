@@ -151,7 +151,7 @@ export default function CreateAccessGroupPage() {
     try {
       await createAccessGroup({
         group_name: groupName,
-        application: selectedApplication,
+        application: selectedApplication.split(" ").join("_").toLowerCase(),
         application_module: selectedModules[0]?.module || "", // Take first module, max 50 chars
         access_rights: accessRights,
         access_right: applicationsData?.access_rights[0]?.id || 1,
@@ -211,7 +211,9 @@ export default function CreateAccessGroupPage() {
           <div className="px-6 py-4 flex items-center gap-3">
             <button
               onClick={() => router.push("/settings/accessgroup")}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+              aria-label="Go back"
+              type="button"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
