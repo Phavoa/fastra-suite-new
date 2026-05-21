@@ -22,6 +22,7 @@ type RightKey = "view" | "edit" | "create" | "delete" | "approve" | "reject";
 
 interface ModuleRights {
   module: string;
+  module_display?: string;
   rights: Record<RightKey, boolean>;
 }
 
@@ -67,6 +68,14 @@ export default function ViewAccessGroupPage() {
   });
 
   // ✅ Build rights from the API using booleans (true/false)
+
+  function normaliseString(str: string): string {
+    return str
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  }
+
   const mapAccessGroupData = (
     data: AccessGroupRight[],
     allAppsData: any,
@@ -75,6 +84,7 @@ export default function ViewAccessGroupPage() {
     if (!data || data.length === 0) return [];
 
     const moduleMap: Record<string, Record<RightKey, boolean>> = {};
+    const moduleDisplayMap: Record<string, string> = {};
 
     // 1. Initialize all modules for the current application (case-insensitive)
     const apps = allAppsData?.applications || [];
@@ -108,11 +118,18 @@ export default function ViewAccessGroupPage() {
             approve: false,
             reject: false,
           };
+          if (item.application_module_display) {
+            moduleDisplayMap[mod] = item.application_module_display;
+          }
         }
       });
     } else {
-      allModules.forEach((mod: string) => {
-        moduleMap[mod] = {
+      allModules.forEach((mod: any) => {
+        const moduleKey = typeof mod === "string" ? mod : mod.module;
+        const moduleDisplay =
+          typeof mod === "string" ? mod : mod.module_display || moduleKey;
+
+        moduleMap[moduleKey] = {
           view: false,
           edit: false,
           create: false,
@@ -120,6 +137,17 @@ export default function ViewAccessGroupPage() {
           approve: false,
           reject: false,
         };
+        moduleDisplayMap[moduleKey] = moduleDisplay;
+      });
+    }
+
+    // Keep module_display values for display if available
+    if (allModules.length === 0) {
+      data.forEach((item) => {
+        if (item.application_module_display) {
+          moduleDisplayMap[item.application_module] =
+            item.application_module_display;
+        }
       });
     }
 
@@ -135,6 +163,7 @@ export default function ViewAccessGroupPage() {
 
     return Object.entries(moduleMap).map(([mod, rights]) => ({
       module: mod,
+      module_display: moduleDisplayMap[mod] || mod,
       rights,
     }));
   };
@@ -338,7 +367,7 @@ export default function ViewAccessGroupPage() {
           <div>
             <label className="text-lg text-[#1a1a1a]">Application</label>
             <div className="text-sm mt-1 text-[#7A8A98] capitalize">
-              {application}
+              {normaliseString(application) || application}
             </div>
           </div>
 
@@ -346,8 +375,8 @@ export default function ViewAccessGroupPage() {
 
           <div>
             <label className="text-lg text-[#1a1a1a]">Group Name</label>
-            <div className="text-sm mt-1 text-[#7A8A98] capitalize">
-              {groupName}
+            <div className="text-sm mt-1 text-[#7A8A98]">
+              {normaliseString(groupName) || groupName}
             </div>
           </div>
         </div>
@@ -376,7 +405,9 @@ export default function ViewAccessGroupPage() {
             <tbody>
               {modules.map((mod, index) => (
                 <tr key={index} className="border-b border-gray-100">
-                  <td className="py-4 text-sm text-gray-900">{mod.module}</td>
+                  <td className="py-4 text-sm text-gray-900">
+                    {normaliseString(mod.module_display || mod.module)}
+                  </td>
 
                   {rightKeys.map((right) => (
                     <td key={right} className="py-4 text-center">

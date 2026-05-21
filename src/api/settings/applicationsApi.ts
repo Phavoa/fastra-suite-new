@@ -7,9 +7,14 @@ export interface AccessRightDetails {
   name: string;
 }
 
+export interface ApplicationModule {
+  module: string;
+  module_display: string;
+}
+
 // Application and Access Right interfaces
 export interface ApplicationData {
-  [key: string]: string[];
+  [key: string]: ApplicationModule[];
 }
 
 export interface ApplicationsResponse {
