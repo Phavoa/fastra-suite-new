@@ -5,12 +5,11 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react";
+import { Check, AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type StatusType = "success" | "error" | "warning" | "info";
@@ -49,31 +48,31 @@ const statusConfig: Record<
   }
 > = {
   success: {
-    icon: CheckCircle2,
-    iconColor: "text-green-500",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
-    defaultActionText: "Continue",
+    icon: Check,
+    iconColor: "text-[#3B7CED]",
+    bgColor: "bg-[#EEF4FF]",
+    borderColor: "border-[#D0E1FD]",
+    defaultActionText: "Done",
   },
   error: {
-    icon: XCircle,
-    iconColor: "text-red-500",
-    bgColor: "bg-red-50",
-    borderColor: "border-red-200",
-    defaultActionText: "Try Again",
+    icon: AlertTriangle,
+    iconColor: "text-[#E43D2B]",
+    bgColor: "bg-[#FFF2F0]",
+    borderColor: "border-[#FFE0DB]",
+    defaultActionText: "Try again",
   },
   warning: {
     icon: AlertTriangle,
-    iconColor: "text-amber-500",
-    bgColor: "bg-amber-50",
-    borderColor: "border-amber-200",
+    iconColor: "text-[#F0B401]",
+    bgColor: "bg-[#FFFDF0]",
+    borderColor: "border-[#FFEFC2]",
     defaultActionText: "Understood",
   },
   info: {
     icon: Info,
-    iconColor: "text-blue-500",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
+    iconColor: "text-[#3B7CED]",
+    bgColor: "bg-[#EEF4FF]",
+    borderColor: "border-[#D0E1FD]",
     defaultActionText: "OK",
   },
 };
@@ -103,61 +102,49 @@ export function StatusModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        {showCloseButton && (
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-        )}
-
-        <DialogHeader className="flex flex-col items-center text-center">
-          <div
-            className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center mb-4",
-              config.bgColor,
-              config.borderColor,
-              "border"
-            )}
-          >
-            <Icon className={cn("w-8 h-8", config.iconColor)} />
-          </div>
-          <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
-          <DialogDescription className="text-gray-600 mt-2">
-            {message}
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">
-          {secondaryText && onSecondary && (
-            <Button
-              variant="outline"
-              onClick={onSecondary}
-              className="w-full sm:w-auto"
+      <DialogContent className="max-w-[400px] w-[calc(100%-2rem)] p-6 rounded-2xl bg-white gap-0 border-none shadow-xl" showCloseButton={showCloseButton}>
+        <div className="flex flex-col items-start w-full">
+          {/* Header section with Icon, Title and Message */}
+          <DialogHeader className="flex flex-col items-start text-left gap-0 p-0 w-full">
+            <div
+              className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center border",
+                config.bgColor,
+                config.borderColor
+              )}
             >
-              {secondaryText}
+              <Icon className={cn("w-6 h-6", config.iconColor)} />
+            </div>
+            
+            <DialogTitle className="text-lg font-bold text-gray-900 mt-5 leading-snug">
+              {title}
+            </DialogTitle>
+            
+            <DialogDescription className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
+              {message}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Action buttons list */}
+          <div className="w-full mt-6 flex flex-col gap-2">
+            <Button
+              onClick={handleAction}
+              className="w-full h-12 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none"
+            >
+              {actionText || config.defaultActionText}
             </Button>
-          )}
-          <Button
-            onClick={handleAction}
-            className={cn(
-              "w-full sm:w-auto",
-              type === "success" &&
-                "bg-green-600 hover:bg-green-700  border-green-700 text-white",
-              type === "error" &&
-                "bg-red-600 hover:bg-red-700 border-red-700 text-white",
-              type === "warning" &&
-                "bg-amber-600 hover:bg-amber-700 border-amber-700 text-white",
-              type === "info" &&
-                "bg-[#3B7CED] hover:bg-[#2d63c7] border-[#3B7CED] text-white"
+
+            {secondaryText && onSecondary && (
+              <Button
+                variant="outline"
+                onClick={onSecondary}
+                className="w-full h-12 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center"
+              >
+                {secondaryText}
+              </Button>
             )}
-          >
-            {actionText || config.defaultActionText}
-          </Button>
-        </DialogFooter>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
