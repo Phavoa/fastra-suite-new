@@ -27,6 +27,7 @@ import { PageGuard } from "@/components/auth/PageGuard";
 
 interface AccessModule {
   module: string;
+  module_display: string;
   rights: {
     create: boolean;
     view: boolean;
@@ -58,6 +59,14 @@ export default function CreateAccessGroupPage() {
   // Status modal hook for success and error messages
   const statusModal = useStatusModal();
 
+  // Function to normalise string
+  function normaliseString(str: string): string {
+    return str
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  }
+
   // Function to generate access code
   const getGeneratedCode = React.useCallback(() => {
     if (selectedApplication && selectedModules.length > 0) {
@@ -82,7 +91,8 @@ export default function CreateAccessGroupPage() {
 
     // Initialize modules with unchecked rights
     const initialModules: AccessModule[] = modules.map((module) => ({
-      module,
+      module: module.module,
+      module_display: module.module_display,
       rights: {
         create: false,
         view: false,
@@ -251,7 +261,7 @@ export default function CreateAccessGroupPage() {
                     {applicationsData?.applications.map((appData, index) =>
                       Object.keys(appData).map((appName) => (
                         <SelectItem key={`${index}-${appName}`} value={appName}>
-                          {appName}
+                          {normaliseString(appName) || appName}
                         </SelectItem>
                       )),
                     )}
@@ -303,7 +313,7 @@ export default function CreateAccessGroupPage() {
                       {accessRightNames.map((right) => (
                         <th
                           key={right.id}
-                          className="text-center py-4 px-4 text-sm font-normal text-[#3B7CED] min-w-[80px]"
+                          className="text-center py-4 px-4 text-sm font-normal text-[#3B7CED] min-w-20"
                         >
                           {right.name.charAt(0).toUpperCase() +
                             right.name.slice(1)}
@@ -317,8 +327,10 @@ export default function CreateAccessGroupPage() {
                         key={moduleIndex}
                         className="border-b border-gray-100"
                       >
-                        <td className="py-5 pr-8 text-sm font-normal text-gray-900 font-medium">
-                          {moduleData.module}
+                        <td className="py-5 pr-8 text-sm font-normal text-gray-900">
+                          {normaliseString(
+                            moduleData.module_display || moduleData.module,
+                          )}
                         </td>
                         {accessRightNames.map((right) => (
                           <td key={right.id} className="py-5 px-4">

@@ -7,7 +7,7 @@ import { SettingsGrid } from "@/components/Settings/settingsGrid";
 import { ReusableTable } from "@/components/Settings/settingsReusableTable";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import { useGetAccessGroupRightsQuery } from "@/api/settings/accessGroupRightApi";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 import { getUniqueAccessGroups } from "@/lib/utils/filterAccessGroup";
 
 // Access group interface matching API structure
@@ -17,6 +17,7 @@ export interface AccessGroupData {
   group_name: string;
   application: string;
   application_module: string;
+  application_module_display: string;
   access_right: number;
   access_right_details: {
     id: number;
@@ -48,7 +49,7 @@ const formatDate = (dateString: string): string => {
 export default function AccessGroup() {
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const archive = useSelector((state: RootState) => state.viewMode.archive);
-  const router = useRouter()
+  const router = useRouter();
 
   // Fetch access group rights data
   const {
@@ -56,13 +57,13 @@ export default function AccessGroup() {
     isLoading,
     error,
   } = useGetAccessGroupRightsQuery();
-  console.log(accessGroupRights)
+  console.log(accessGroupRights);
 
   const filteredData: AccessGroupData[] = React.useMemo(() => {
-      return getUniqueAccessGroups(accessGroupRights ?? []);
-    }, [accessGroupRights]);
+    return getUniqueAccessGroups(accessGroupRights ?? []);
+  }, [accessGroupRights]);
 
-      console.log(filteredData)
+  console.log(filteredData);
 
   // Handle loading state
   if (isLoading) {
@@ -93,7 +94,13 @@ export default function AccessGroup() {
   // Note: Since the API doesn't include a status/hidden field in the basic response,
   // we'll show all data when archive is false, and handle filtering based on available data
   //const filteredData: AccessGroupData[] = accessGroupRights || [];
-  
+
+  function normaliseString(str: string): string {
+    return str
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  }
 
   const handleUserClick = (access_code?: string | number) => {
     router.push(`/settings/accessgroup/${access_code}`);
@@ -103,30 +110,29 @@ export default function AccessGroup() {
     <div className="w-full py-4">
       {viewMode === "grid" ? (
         <SettingsGrid
-            type="company"
-            dataList={filteredData.map((item) => ({
-              id: item.id,
-              access_code: item.access_code, // ✅ include this explicitly
-              name: item.group_name, 
-              access_right_details_name: item.access_right_details?.name || "N/A",
-              date_created_formatted: formatDate(item.date_created),
-            }))}
-            fieldsToShow={[
-              "application",
-              "access_right_details_name",
-              "date_created_formatted",
-            ]}
-            icon={<GridCardIcon />}
-            clickKey="access_code"
-            onItemClick={handleUserClick}
-          />
-
+          type="company"
+          dataList={filteredData.map((item) => ({
+            id: item.id,
+            access_code: item.access_code, // ✅ include this explicitly
+            name: item.group_name,
+            access_right_details_name: item.access_right_details?.name || "N/A",
+            date_created_formatted: formatDate(item.date_created),
+          }))}
+          fieldsToShow={[
+            "application",
+            "access_right_details_name",
+            "date_created_formatted",
+          ]}
+          icon={<GridCardIcon />}
+          clickKey="access_code"
+          onItemClick={handleUserClick}
+        />
       ) : (
         <ReusableTable
           headers={[
             { key: "group_name", label: "Access Group Name" },
             { key: "application", label: "Application" },
-            { key: "application_module", label: "Module" },
+            { key: "application_module_display", label: "Module" },
             { key: "access_right_details", label: "Access Right" },
             { key: "date_created", label: "Creation Date" },
           ]}
@@ -148,18 +154,23 @@ export default function AccessGroup() {
                   <span className="inline-flex items-center justify-center w-10 h-10 rounded-full mr-2 bg-[#E8EFFD]">
                     <GridCardIcon className="w-6 h-6 text-blue-500" />
                   </span>
-                  {row[key]}
+                  {normaliseString(row[key]) || "N/A"}
                 </div>
               );
             }
+            if (key === "application") return normaliseString(row[key]);
+            if (key === "application_module_display")
+              return normaliseString(row[key]);
             if (key === "access_right_details")
-              return row.access_right_details?.name || "N/A";
+              return normaliseString(row[key]?.name) || "N/A";
+
             if (key === "date_created") return formatDate(row.date_created);
             return row[key] ?? "—";
           }}
-         clickKey="access_code"
-         onRowClick={(access_code) => router.push(`/settings/accessgroup/${access_code}`)}
-
+          clickKey="access_code"
+          onRowClick={(access_code) =>
+            router.push(`/settings/accessgroup/${access_code}`)
+          }
         />
       )}
     </div>
