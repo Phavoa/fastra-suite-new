@@ -65,7 +65,7 @@ export default function MakeRequestPage() {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
-      <NavBar title="Home" items={[]} />
+      <NavBar title="Make Request" items={[]} backUrl="/project-request" />
       
       <main className="max-w-2xl mx-auto p-4 pt-6 pb-24">
         <div className="space-y-4">

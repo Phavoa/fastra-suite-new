@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ArrowLeft, Bell, FileText, CheckCircle, Clock, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -27,6 +27,9 @@ interface PlantEquipmentRequestItem {
 
 export default function PlantEquipmentRequestDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeStatusQuery = searchParams.get("status") as "draft" | "approved" | "pending" | "rejected" | null;
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const [requests, setRequests] = useState<PlantEquipmentRequestItem[]>([]);
   const [filter, setFilter] = useState<"All" | "Draft" | "Approved" | "Pending" | "Rejected">("All");
@@ -77,8 +80,9 @@ export default function PlantEquipmentRequestDashboard() {
   };
 
   const filteredRequests = requests.filter((r) => {
-    if (filter === "All") return true;
-    return r.status.toLowerCase() === filter.toLowerCase();
+    const matchesFilter = filter === "All" || r.status.toLowerCase() === filter.toLowerCase();
+    const matchesStatusQuery = !activeStatusQuery || r.status === activeStatusQuery;
+    return matchesFilter && matchesStatusQuery;
   });
 
   const getStatusBadgeClass = (status: string) => {
@@ -103,7 +107,13 @@ export default function PlantEquipmentRequestDashboard() {
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push("/project-request/make-request")}
+              onClick={() => {
+                if (activeStatusQuery) {
+                  router.push(pathname);
+                } else {
+                  router.push("/project-request/make-request");
+                }
+              }}
               className="p-1 rounded-lg hover:bg-gray-50 transition-colors"
               aria-label="Back"
             >
@@ -129,68 +139,120 @@ export default function PlantEquipmentRequestDashboard() {
 
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 pt-4 space-y-6">
-        {/* Status Counts Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Draft */}
-          <div className="p-4 border border-[#3B7CED]/20 bg-[#EEF4FF] rounded-xl flex flex-col justify-between h-24">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#3B7CED]">
-              <FileText size={14} />
-              <span>Draft</span>
+        {/* Status Title Header (shown when status query is active) */}
+        {activeStatusQuery && (
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs flex items-center justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              {(() => {
+                const getStatusStyle = (st: string) => {
+                  switch (st) {
+                    case "approved":
+                      return { color: "text-[#2BA24D]", bgColor: "bg-[#2BA24D]", label: "Approved" };
+                    case "pending":
+                      return { color: "text-[#F0B401]", bgColor: "bg-[#F0B401]", label: "Pending" };
+                    case "draft":
+                      return { color: "text-[#3B7CED]", bgColor: "bg-[#3B7CED]", label: "Draft" };
+                    case "rejected":
+                      return { color: "text-[#E43D2B]", bgColor: "bg-[#E43D2B]", label: "Rejected" };
+                    default:
+                      return { color: "text-[#F0B401]", bgColor: "bg-[#F0B401]", label: "Pending" };
+                  }
+                };
+                const style = getStatusStyle(activeStatusQuery);
+                return (
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 rounded-full ${style.bgColor}`}></div>
+                    <h2 className="text-xl font-semibold">
+                      {style.label} Plant & Equipment Requests
+                    </h2>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${style.color} bg-gray-100`}>
+                      {filteredRequests.length} {filteredRequests.length === 1 ? "request" : "requests"}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
-            <span className="text-3xl font-extrabold text-[#3B7CED]">{counts.draft}</span>
           </div>
+        )}
 
-          {/* Approved */}
-          <div className="p-4 border border-[#2BA24D]/20 bg-[#EAFDF0] rounded-xl flex flex-col justify-between h-24">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2BA24D]">
-              <CheckCircle size={14} />
-              <span>Approved</span>
+        {/* Status Counts Grid (hidden when status query is active) */}
+        {!activeStatusQuery && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Draft */}
+            <div
+              onClick={() => router.push(`${pathname}?status=draft`)}
+              className="p-4 border border-[#3B7CED]/20 bg-[#EEF4FF] rounded-xl flex flex-col justify-between h-24 cursor-pointer hover:shadow-xs transition-shadow"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#3B7CED]">
+                <FileText size={14} />
+                <span>Draft</span>
+              </div>
+              <span className="text-3xl font-extrabold text-[#3B7CED]">{counts.draft}</span>
             </div>
-            <span className="text-3xl font-extrabold text-[#2BA24D]">{counts.approved}</span>
-          </div>
 
-          {/* Pending */}
-          <div className="p-4 border border-[#F0B401]/20 bg-[#FFFDF0] rounded-xl flex flex-col justify-between h-24">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#F0B401]">
-              <Clock size={14} />
-              <span>Pending</span>
+            {/* Approved */}
+            <div
+              onClick={() => router.push(`${pathname}?status=approved`)}
+              className="p-4 border border-[#2BA24D]/20 bg-[#EAFDF0] rounded-xl flex flex-col justify-between h-24 cursor-pointer hover:shadow-xs transition-shadow"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2BA24D]">
+                <CheckCircle size={14} />
+                <span>Approved</span>
+              </div>
+              <span className="text-3xl font-extrabold text-[#2BA24D]">{counts.approved}</span>
             </div>
-            <span className="text-3xl font-extrabold text-[#F0B401]">{counts.pending}</span>
-          </div>
 
-          {/* Rejected */}
-          <div className="p-4 border border-[#E43D2B]/20 bg-[#FFF2F0] rounded-xl flex flex-col justify-between h-24">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#E43D2B]">
-              <XCircle size={14} />
-              <span>Rejected</span>
+            {/* Pending */}
+            <div
+              onClick={() => router.push(`${pathname}?status=pending`)}
+              className="p-4 border border-[#F0B401]/20 bg-[#FFFDF0] rounded-xl flex flex-col justify-between h-24 cursor-pointer hover:shadow-xs transition-shadow"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#F0B401]">
+                <Clock size={14} />
+                <span>Pending</span>
+              </div>
+              <span className="text-3xl font-extrabold text-[#F0B401]">{counts.pending}</span>
             </div>
-            <span className="text-3xl font-extrabold text-[#E43D2B]">{counts.rejected}</span>
-          </div>
-        </div>
 
-        {/* Section Heading */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-[#3B7CED]">
-            Plant & Equipment Request
-          </h2>
-
-          {/* Filter Pills */}
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {(["All", "Draft", "Approved", "Pending", "Rejected"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 whitespace-nowrap ${
-                  filter === tab
-                    ? "bg-[#3B7CED] text-white shadow-none"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+            {/* Rejected */}
+            <div
+              onClick={() => router.push(`${pathname}?status=rejected`)}
+              className="p-4 border border-[#E43D2B]/20 bg-[#FFF2F0] rounded-xl flex flex-col justify-between h-24 cursor-pointer hover:shadow-xs transition-shadow"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#E43D2B]">
+                <XCircle size={14} />
+                <span>Rejected</span>
+              </div>
+              <span className="text-3xl font-extrabold text-[#E43D2B]">{counts.rejected}</span>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Section Heading (hidden when status query is active) */}
+        {!activeStatusQuery && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-[#3B7CED]">
+              Plant & Equipment Request
+            </h2>
+
+            {/* Filter Pills */}
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {(["All", "Draft", "Approved", "Pending", "Rejected"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setFilter(tab)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 whitespace-nowrap ${
+                    filter === tab
+                      ? "bg-[#3B7CED] text-white shadow-none"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Request List */}
         <div className="space-y-3">

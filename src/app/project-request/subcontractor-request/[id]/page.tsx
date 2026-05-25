@@ -42,7 +42,8 @@ export default function SubcontractorRequestDetailsPage() {
   const statusModal = useStatusModal();
   const requestId = Number(params.id);
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status?: string) => {
+    if (!status) return "pending";
     switch (status) {
       case "approved":
       case "completed":
@@ -60,7 +61,8 @@ export default function SubcontractorRequestDetailsPage() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status?: string) => {
+    if (!status) return "Pending";
     switch (status) {
       case "clarification_needed":
         return "Clarification Needed";

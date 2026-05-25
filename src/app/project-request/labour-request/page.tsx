@@ -276,7 +276,7 @@ export default function LabourRequestPage() {
         </div>
       </div>
 
-      <RequestDashboard config={config} />
+      <RequestDashboard config={config} backUrl="/project-request/make-request" />
     </div>
   );
 }

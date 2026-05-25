@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ArrowLeft, Bell, FileText, CheckCircle, Clock, XCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,9 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
 
 export default function PurchaseRequestsDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeStatusQuery = searchParams.get("status") as "draft" | "approved" | "pending" | "rejected" | null;
   const [requests, setRequests] = useState<PurchaseRequestItem[]>([]);
   const [activeFilter, setActiveFilter] = useState<"all" | "draft" | "approved" | "pending" | "rejected">("all");
 
@@ -149,7 +152,11 @@ export default function PurchaseRequestsDashboard() {
   const statusCounts = getStatusCounts();
 
   const filteredRequests = requests.filter(
-    (req) => activeFilter === "all" || req.status === activeFilter
+    (req) => {
+      const matchesFilter = activeFilter === "all" || req.status === activeFilter;
+      const matchesStatusQuery = !activeStatusQuery || req.status === activeStatusQuery;
+      return matchesFilter && matchesStatusQuery;
+    }
   );
 
   return (
@@ -159,7 +166,13 @@ export default function PurchaseRequestsDashboard() {
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push("/project-request/make-request")}
+              onClick={() => {
+                if (activeStatusQuery) {
+                  router.push(pathname);
+                } else {
+                  router.push("/project-request/make-request");
+                }
+              }}
               className="p-1 rounded-lg hover:bg-gray-50 transition-colors"
               aria-label="Back"
             >
@@ -188,69 +201,123 @@ export default function PurchaseRequestsDashboard() {
 
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-        {/* Status Summary Grid */}
-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs">
-          <div className="grid grid-cols-2 gap-3">
-            {/* Draft */}
-            <div className="p-4 border border-[#D0E0FB] bg-[#F3F8FF] rounded-lg">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <FileText size={16} className="text-[#3B7CED]" />
-                <span className="text-xs font-semibold text-[#3B7CED]">Draft</span>
-              </div>
-              <span className="text-3xl font-bold text-[#3B7CED]">{statusCounts.draft}</span>
-            </div>
-
-            {/* Approved */}
-            <div className="p-4 border border-[#D7F4DF] bg-[#F2FDF5] rounded-lg">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <CheckCircle size={16} className="text-[#2BA24D]" />
-                <span className="text-xs font-semibold text-[#2BA24D]">Approved</span>
-              </div>
-              <span className="text-3xl font-bold text-[#2BA24D]">{statusCounts.approved}</span>
-            </div>
-
-            {/* Pending */}
-            <div className="p-4 border border-[#FFF2CC] bg-[#FFFDF5] rounded-lg">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Clock size={16} className="text-[#F0B401]" />
-                <span className="text-xs font-semibold text-[#F0B401]">Pending</span>
-              </div>
-              <span className="text-3xl font-bold text-[#F0B401]">{statusCounts.pending}</span>
-            </div>
-
-            {/* Rejected */}
-            <div className="p-4 border border-[#F9D6D2] bg-[#FFF7F6] rounded-lg">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <XCircle size={16} className="text-[#E43D2B]" />
-                <span className="text-xs font-semibold text-[#E43D2B]">Rejected</span>
-              </div>
-              <span className="text-3xl font-bold text-[#E43D2B]">{statusCounts.rejected}</span>
+        {/* Status Title Header (shown when status query is active) */}
+        {activeStatusQuery && (
+          <div className="bg-white p-6 rounded-md flex items-center justify-between gap-4 border border-gray-100 shadow-xs">
+            <div className="flex items-center space-x-4">
+              {(() => {
+                const getStatusStyle = (st: string) => {
+                  switch (st) {
+                    case "approved":
+                      return { color: "text-[#2BA24D]", bgColor: "bg-[#2BA24D]", label: "Approved" };
+                    case "pending":
+                      return { color: "text-[#F0B401]", bgColor: "bg-[#F0B401]", label: "Pending" };
+                    case "draft":
+                      return { color: "text-[#3B7CED]", bgColor: "bg-[#3B7CED]", label: "Draft" };
+                    case "rejected":
+                      return { color: "text-[#E43D2B]", bgColor: "bg-[#E43D2B]", label: "Rejected" };
+                    default:
+                      return { color: "text-[#F0B401]", bgColor: "bg-[#F0B401]", label: "Pending" };
+                  }
+                };
+                const style = getStatusStyle(activeStatusQuery);
+                return (
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 rounded-full ${style.bgColor}`}></div>
+                    <h2 className="text-xl font-semibold">
+                      {style.label} Purchase Requests
+                    </h2>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${style.color} bg-gray-100`}>
+                      {filteredRequests.length} {filteredRequests.length === 1 ? "request" : "requests"}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Status Summary Grid (hidden when status query is active) */}
+        {!activeStatusQuery && (
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Draft */}
+              <div
+                onClick={() => router.push(`${pathname}?status=draft`)}
+                className="p-4 border border-[#D0E0FB] bg-[#F3F8FF] rounded-lg cursor-pointer hover:shadow-xs transition-shadow"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <FileText size={16} className="text-[#3B7CED]" />
+                  <span className="text-xs font-semibold text-[#3B7CED]">Draft</span>
+                </div>
+                <span className="text-3xl font-bold text-[#3B7CED]">{statusCounts.draft}</span>
+              </div>
+
+              {/* Approved */}
+              <div
+                onClick={() => router.push(`${pathname}?status=approved`)}
+                className="p-4 border border-[#D7F4DF] bg-[#F2FDF5] rounded-lg cursor-pointer hover:shadow-xs transition-shadow"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <CheckCircle size={16} className="text-[#2BA24D]" />
+                  <span className="text-xs font-semibold text-[#2BA24D]">Approved</span>
+                </div>
+                <span className="text-3xl font-bold text-[#2BA24D]">{statusCounts.approved}</span>
+              </div>
+
+              {/* Pending */}
+              <div
+                onClick={() => router.push(`${pathname}?status=pending`)}
+                className="p-4 border border-[#FFF2CC] bg-[#FFFDF5] rounded-lg cursor-pointer hover:shadow-xs transition-shadow"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Clock size={16} className="text-[#F0B401]" />
+                  <span className="text-xs font-semibold text-[#F0B401]">Pending</span>
+                </div>
+                <span className="text-3xl font-bold text-[#F0B401]">{statusCounts.pending}</span>
+              </div>
+
+              {/* Rejected */}
+              <div
+                onClick={() => router.push(`${pathname}?status=rejected`)}
+                className="p-4 border border-[#F9D6D2] bg-[#FFF7F6] rounded-lg cursor-pointer hover:shadow-xs transition-shadow"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <XCircle size={16} className="text-[#E43D2B]" />
+                  <span className="text-xs font-semibold text-[#E43D2B]">Rejected</span>
+                </div>
+                <span className="text-3xl font-bold text-[#E43D2B]">{statusCounts.rejected}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Requests List Section */}
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs space-y-4">
-          <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider">
-            Purchase Requests
-          </h2>
+          {!activeStatusQuery && (
+            <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider">
+              Purchase Requests
+            </h2>
+          )}
 
-          {/* Filter Pills */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {(["all", "draft", "approved", "pending", "rejected"] as const).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
-                  activeFilter === filter
-                    ? "bg-[#3B7CED] text-white"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-              >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
-              </button>
-            ))}
-          </div>
+          {/* Filter Pills (hidden when status query is active) */}
+          {!activeStatusQuery && (
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {(["all", "draft", "approved", "pending", "rejected"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
+                    activeFilter === filter
+                      ? "bg-[#3B7CED] text-white"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* List items */}
           <div className="space-y-3">

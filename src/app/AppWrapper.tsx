@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Provider } from "react-redux";
 import { store, persistor } from "@/lib/store/store";
 import { PersistGate } from "redux-persist/integration/react";
@@ -36,6 +36,14 @@ export default function AppWrapper({
   const isAuthPage = pathname.startsWith("/auth");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+
+  // Automatically close mobile sidebar and collapse desktop sidebar on route changes
+  useEffect(() => {
+    setSidebarOpen(false);
+    if (pathname !== "/") {
+      setSidebarExpanded(false);
+    }
+  }, [pathname]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);

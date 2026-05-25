@@ -189,19 +189,10 @@ export default function MaterialConsumptionForm() {
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // On-submission Budget Check
-      if (availableBudget !== null && totalRequestCost > availableBudget) {
-        statusModal.showError(
-          "Budget Review Required",
-          "This request exceeds the available budget and will be held in the Overrun Queue for PM review. Stock will not be deducted until approved.",
-        );
-      } else {
-        statusModal.showSuccess(
-          "Request Submitted",
-          "Material consumption logged successfully. Actual costs and inventory have been updated.",
-        );
-      }
+      statusModal.showSuccess(
+        "Request Submitted",
+        "Material consumption logged successfully. Actual costs and inventory have been updated.",
+      );
     } catch (error) {
       statusModal.showError(
         "Submission Failed",
@@ -213,9 +204,6 @@ export default function MaterialConsumptionForm() {
   const handleModalAction = () => {
     statusModal.close();
     if (statusModal.type === "success") {
-      form.reset();
-      router.push("/project-request/material-consumption-request");
-    } else if (statusModal.title === "Budget Review Required") {
       form.reset();
       router.push("/project-request/material-consumption-request");
     }

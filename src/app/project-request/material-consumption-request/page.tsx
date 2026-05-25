@@ -151,5 +151,5 @@ export default function MaterialConsumptionRequestPage() {
     mockData: mockRequests,
   };
 
-  return <RequestDashboard config={config} />;
+  return <RequestDashboard config={config} backUrl="/project-request/make-request" />;
 }

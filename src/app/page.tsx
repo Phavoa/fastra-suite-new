@@ -35,9 +35,11 @@ type Module = {
   description: string;
   color: string;
   Icon: React.ComponentType<{ className?: string; color?: string }>;
+  isFunctional: boolean;
 };
 
 const MODULES: Module[] = [
+  // --- Functional Modules ---
   {
     id: "invoice",
     title: "Invoice",
@@ -45,6 +47,7 @@ const MODULES: Module[] = [
       "Manage all financial transactions, including invoicing, billing, and ledger entries, to ensure accurate accounting records and financial reporting.",
     color: "green",
     Icon: AccountIcon,
+    isFunctional: true,
   },
   {
     id: "purchase",
@@ -53,22 +56,7 @@ const MODULES: Module[] = [
       "Streamline procurement processes by tracking purchase orders, vendor management, and inventory replenishment to optimize supply chain efficiency and cost savings.",
     color: "blue",
     Icon: PurchaseIcon,
-  },
-  {
-    id: "sales",
-    title: "Sales",
-    description:
-      "Track sales leads, manage customer relationships, and monitor sales performance to drive revenue growth and customer satisfaction.",
-    color: "green",
-    Icon: SalesIcon,
-  },
-  {
-    id: "finance",
-    title: "Finance",
-    description:
-      "Finance is the management of money and investments to achieve personal or organizational goals.",
-    color: "blue",
-    Icon: FinanceIcon,
+    isFunctional: true,
   },
   {
     id: "inventory",
@@ -77,30 +65,7 @@ const MODULES: Module[] = [
       "Monitor stock levels, track inventory movements, and optimize warehouse operations to ensure optimal inventory management and minimize stockouts.",
     color: "green",
     Icon: InventoryIcon,
-  },
-  {
-    id: "hr",
-    title: "HR",
-    description:
-      "Manage employee information, track attendance, process payroll, and oversee performance evaluations to support efficient HR administration and talent management.",
-    color: "blue",
-    Icon: HRIcon,
-  },
-  {
-    id: "project",
-    title: "Project Costing",
-    description:
-      "Track project expenses, monitor budget allocations, and analyze project profitability to ensure projects are delivered on time and within budget.",
-    color: "yellow",
-    Icon: Briefcase,
-  },
-  {
-    id: "crm",
-    title: "CRM",
-    description:
-      "Maintain a centralized database of customer information, track interactions, and manage sales pipelines to enhance customer relationships and boost sales effectiveness.",
-    color: "blue",
-    Icon: ClipboardList,
+    isFunctional: true,
   },
   {
     id: "contacts",
@@ -109,54 +74,7 @@ const MODULES: Module[] = [
       "Store and organize contact information for customers, vendors, and other stakeholders to facilitate communication and collaboration.",
     color: "yellow",
     Icon: ContactIcon,
-  },
-  {
-    id: "planning",
-    title: "Planning",
-    description:
-      "Collaborate on strategic planning, set goals, allocate resources, and track progress towards objectives to drive organizational growth and success.",
-    color: "blue",
-    Icon: MapPin,
-  },
-  {
-    id: "manufacturing",
-    title: "Manufacturing",
-    description:
-      "Manage production processes, track work orders, and optimize resource allocation to maximize manufacturing efficiency and product quality.",
-    color: "yellow",
-    Icon: Truck,
-  },
-  {
-    id: "logistics",
-    title: "Logistics",
-    description:
-      "Coordinate transportation, manage delivery schedules, and track shipment statuses to ensure timely and cost-effective logistics operations.",
-    color: "blue",
-    Icon: LogisticsIcon,
-  },
-  {
-    id: "reports",
-    title: "Reports",
-    description:
-      "Generate customizable reports, analyze key performance metrics, and gain actionable insights to support data-driven decision-making and business optimization.",
-    color: "green",
-    Icon: BarChart2,
-  },
-  {
-    id: "settings",
-    title: "Settings",
-    description:
-      "Configure system preferences, manage user permissions, and customize application settings to align with organizational requirements and user preferences.",
-    color: "blue",
-    Icon: SettingsIcon,
-  },
-  {
-    id: "apps",
-    title: "Apps",
-    description:
-      "Explore additional applications and integrations to extend the functionality of the Fastra suite and address specific business needs and requirements.",
-    color: "green",
-    Icon: AppIcon,
+    isFunctional: true,
   },
   {
     id: "project-request",
@@ -165,6 +83,107 @@ const MODULES: Module[] = [
       "Submit and manage various project-related requests including labour, material consumption, petty cash, and subcontractor engagements.",
     color: "purple",
     Icon: ClipboardList,
+    isFunctional: true,
+  },
+  {
+    id: "settings",
+    title: "Settings",
+    description:
+      "Configure system preferences, manage user permissions, and customize application settings to align with organizational requirements and user preferences.",
+    color: "blue",
+    Icon: SettingsIcon,
+    isFunctional: true,
+  },
+  // --- Non-Functional Modules (Coming Soon) ---
+  {
+    id: "sales",
+    title: "Sales",
+    description:
+      "Track sales leads, manage customer relationships, and monitor sales performance to drive revenue growth and customer satisfaction.",
+    color: "green",
+    Icon: SalesIcon,
+    isFunctional: false,
+  },
+  {
+    id: "finance",
+    title: "Finance",
+    description:
+      "Finance is the management of money and investments to achieve personal or organizational goals.",
+    color: "blue",
+    Icon: FinanceIcon,
+    isFunctional: false,
+  },
+  {
+    id: "hr",
+    title: "HR",
+    description:
+      "Manage employee information, track attendance, process payroll, and oversee performance evaluations to support efficient HR administration and talent management.",
+    color: "blue",
+    Icon: HRIcon,
+    isFunctional: false,
+  },
+  {
+    id: "project",
+    title: "Project Costing",
+    description:
+      "Track project expenses, monitor budget allocations, and analyze project profitability to ensure projects are delivered on time and within budget.",
+    color: "yellow",
+    Icon: Briefcase,
+    isFunctional: false,
+  },
+  {
+    id: "crm",
+    title: "CRM",
+    description:
+      "Maintain a centralized database of customer information, track interactions, and manage sales pipelines to enhance customer relationships and boost sales effectiveness.",
+    color: "blue",
+    Icon: ClipboardList,
+    isFunctional: false,
+  },
+  {
+    id: "planning",
+    title: "Planning",
+    description:
+      "Collaborate on strategic planning, set goals, allocate resources, and track progress towards objectives to drive organizational growth and success.",
+    color: "blue",
+    Icon: MapPin,
+    isFunctional: false,
+  },
+  {
+    id: "manufacturing",
+    title: "Manufacturing",
+    description:
+      "Manage production processes, track work orders, and optimize resource allocation to maximize manufacturing efficiency and product quality.",
+    color: "yellow",
+    Icon: Truck,
+    isFunctional: false,
+  },
+  {
+    id: "logistics",
+    title: "Logistics",
+    description:
+      "Coordinate transportation, manage delivery schedules, and track shipment statuses to ensure timely and cost-effective logistics operations.",
+    color: "blue",
+    Icon: LogisticsIcon,
+    isFunctional: false,
+  },
+  {
+    id: "reports",
+    title: "Reports",
+    description:
+      "Generate customizable reports, analyze key performance metrics, and gain actionable insights to support data-driven decision-making and business optimization.",
+    color: "green",
+    Icon: BarChart2,
+    isFunctional: false,
+  },
+  {
+    id: "apps",
+    title: "Apps",
+    description:
+      "Explore additional applications and integrations to extend the functionality of the Fastra suite and address specific business needs and requirements.",
+    color: "green",
+    Icon: AppIcon,
+    isFunctional: false,
   },
 ];
 
@@ -207,52 +226,63 @@ const colorMap: Record<
 function ModuleCard({ module }: { module: Module }): ReactElement {
   const palette = colorMap[module.color] ?? colorMap.blue;
   const Icon = module.Icon;
+  const isFunctional = module.isFunctional;
 
   const getRoute = (id: string): string | null => {
     const routeMap: Record<string, string> = {
       invoice: "/invoice",
       purchase: "/purchase",
-      sales: "/sales",
-      finance: "/finance",
       inventory: "/inventory/operation",
-      hr: "/hr",
-      logistics: "/logistics",
       contacts: "/contact",
       settings: "/settings",
-      apps: "/app",
       "project-request": "/project-request",
     };
     return routeMap[id] || null;
   };
 
-  const route = getRoute(module.id);
+  const route = isFunctional ? getRoute(module.id) : null;
 
-  return (
-    <Link href={route || "/"}>
-      <Card
-        className={`h-full p-4 group border shadow-none ${palette.border} hover:shadow-lg transition-transform transform-gpu hover:-translate-y-1 focus-within:scale-[1.01] focus-within:shadow-lg flex flex-col cursor-pointer`}
-      >
+  const cardContent = (
+    <Card
+      className={`h-full p-4 group border shadow-none ${palette.border} ${
+        isFunctional
+          ? "hover:shadow-lg transition-transform transform-gpu hover:-translate-y-1 focus-within:scale-[1.01] focus-within:shadow-lg cursor-pointer bg-white"
+          : "opacity-75 cursor-not-allowed bg-slate-50/50"
+      } flex flex-col`}
+    >
+      <div className="flex justify-between items-start mb-3">
         <div
-          className={`w-12 h-12 shrink-0  rounded-lg flex items-center justify-center ${palette.text}`}
+          className={`w-12 h-12 shrink-0 rounded-lg flex items-center justify-center ${palette.text}`}
           aria-hidden="true"
         >
           <Icon className="w-10 h-10" />
         </div>
+        {!isFunctional && (
+          <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase tracking-wider">
+            Coming Soon
+          </span>
+        )}
+      </div>
 
-        <div className="flex-1 min-w-0">
-          <h3
-            id={`module-title-${module.id}`}
-            className={`text-lg font-semibold ${palette.text} leading-tight`}
-          >
-            {module.title}
-          </h3>
-          <p className="mt-3 text-sm text-slate-500 leading-relaxed line-clamp-4">
-            {module.description}
-          </p>
-        </div>
-      </Card>
-    </Link>
+      <div className="flex-1 min-w-0">
+        <h3
+          id={`module-title-${module.id}`}
+          className={`text-lg font-semibold ${palette.text} leading-tight`}
+        >
+          {module.title}
+        </h3>
+        <p className="mt-3 text-sm text-slate-500 leading-relaxed line-clamp-4">
+          {module.description}
+        </p>
+      </div>
+    </Card>
   );
+
+  if (isFunctional && route) {
+    return <Link href={route}>{cardContent}</Link>;
+  }
+
+  return cardContent;
 }
 
 export default function DashboardPage(): ReactElement {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   MenuIcon,
   DashboardIcon,
@@ -22,42 +22,38 @@ import { ClipboardList } from "lucide-react";
 const topItems = [{ id: "menu", icon: MenuIcon, label: "Menu", route: "/" }];
 
 const middleItems = [
+  // --- Functional Modules ---
   { id: "dashboard", icon: DashboardIcon, label: "Dashboard", route: "/" },
-  { id: "account", icon: AccountIcon, label: "Account", route: "/account" },
+  { id: "account", icon: AccountIcon, label: "Invoice", route: "/invoice" },
   { id: "purchase", icon: PurchaseIcon, label: "Purchase", route: "/purchase" },
-  { id: "sales", icon: SalesIcon, label: "Sales", route: "/sales" },
-  { id: "finance", icon: FinanceIcon, label: "Finance", route: "/finance" },
   {
     id: "inventory",
     icon: InventoryIcon,
     label: "Inventory",
     route: "/inventory",
   },
-  { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
   {
     id: "project-request",
     icon: ClipboardList,
     label: "Project Request",
     route: "/project-request",
   },
-  {
-    id: "overrun-queue",
-    icon: FinanceIcon,
-    label: "Overrun Queue",
-    route: "/project-costing/overrun-queue",
-  },
+  { id: "contact", icon: ContactIcon, label: "Contact", route: "/contact" },
+  // --- Non-Functional Modules (Coming Soon) ---
+  { id: "sales", icon: SalesIcon, label: "Sales", route: "/sales" },
+  { id: "finance", icon: FinanceIcon, label: "Finance", route: "/finance" },
+  { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
   {
     id: "logistics",
     icon: LogisticsIcon,
     label: "Logistics",
     route: "/logistics",
   },
-  { id: "contact", icon: ContactIcon, label: "Contact", route: "/contact" },
 ];
 
 const bottomItems = [
-  { id: "app", icon: AppIcon, label: "App", route: "/app" },
   { id: "settings", icon: SettingsIcon, label: "Settings", route: "/settings" },
+  { id: "app", icon: AppIcon, label: "App", route: "/app" },
 ];
 
 interface SidebarProps {
@@ -75,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isExpanded = false,
   onToggleExpanded,
 }) => {
-  const [activeItem, setActiveItem] = useState<string>("dashboard");
+  const pathname = usePathname();
   const [tooltip, setTooltip] = useState<{
     text: string;
     x: number;
@@ -83,10 +79,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   } | null>(null);
   const router = useRouter();
 
-  const handleNavigation = (item: { id: string; icon: any; label: string; route: string }) => {
-    setActiveItem(item.id);
-    router.push(item.route);
+  const handleNavigation = (item: {
+    id: string;
+    icon: any;
+    label: string;
+    route: string;
+  }) => {
     if (onClose) onClose();
+    router.push(item.route);
+  };
+
+  const isActiveItem = (route: string) => {
+    if (route === "/") {
+      return pathname === "/";
+    }
+    return pathname?.startsWith(route);
   };
 
   const handleMouseEnter = (
@@ -139,7 +146,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           {middleItems.map((item) => {
             const IconComponent = item.icon;
-            const isActive = activeItem === item.id;
+            const isActive = isActiveItem(item.route);
             return (
               <button
                 key={item.id}
@@ -177,7 +184,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           {bottomItems.map((item) => {
             const IconComponent = item.icon;
-            const isActive = activeItem === item.id;
+            const isActive = isActiveItem(item.route);
             return (
               <button
                 key={item.id}

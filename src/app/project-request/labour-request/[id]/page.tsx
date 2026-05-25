@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Edit,
   Trash2,
   Send,
@@ -16,19 +15,34 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/purchase/products/PageHeader";
+import {
+  FadeIn,
+  SlideUp,
+  StaggerContainer,
+} from "@/components/shared/AnimatedWrapper";
 import {
   useGetLabourRequestQuery,
   useDeleteLabourRequestMutation,
   useSubmitLabourRequestMutation,
   useApproveLabourRequestMutation,
   useRejectLabourRequestMutation,
-  useCancelLabourRequestMutation,
 } from "@/api/requests/labourRequestApi";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { syncService } from "@/lib/database/syncService";
 import { usePermissionContext } from "@/contexts/PermissionContext";
-import { StatusModal } from "@/components/shared/StatusModal";
-import { format } from "date-fns";
 import { db } from "@/lib/database/labourRequestDb";
 
 interface LabourRequestDetail {
@@ -37,7 +51,6 @@ interface LabourRequestDetail {
   number_of_workers: number;
   role_type: string;
   duration: number;
-  // duration_unit: "days" | "weeks" | "months";
   duration_unit: "days";
   estimated_daily_rate: string;
   projected_cost: string;
@@ -85,6 +98,7 @@ export default function LabourRequestDetailPage() {
   const id = parseInt(params.id as string);
   const networkStatus = useNetworkStatus();
   const { permissions, isAdmin } = usePermissionContext();
+  const statusModal = useStatusModal();
 
   const {
     data: request,
@@ -103,24 +117,15 @@ export default function LabourRequestDetailPage() {
     useApproveLabourRequestMutation();
   const [rejectLabourRequest, { isLoading: isRejecting }] =
     useRejectLabourRequestMutation();
-  const [cancelLabourRequest, { isLoading: isCancelling }] =
-    useCancelLabourRequestMutation();
 
-  const [statusModal, setStatusModal] = useState<{
-    isOpen: boolean;
-    type: "success" | "error" | "warning";
-    title: string;
-    description: string;
-  }>({
-    isOpen: false,
-    type: "success",
-    title: "",
-    description: "",
-  });
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [approvalNotes, setApprovalNotes] = useState("");
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status?: string) => {
+    if (!status) return "draft";
     switch (status) {
       case "approved":
         return "validated";
@@ -135,13 +140,9 @@ export default function LabourRequestDetailPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return format(date, "MMM d, yyyy - HH:mm:ss");
-    } catch {
-      return dateString;
-    }
+  const getStatusLabel = (status?: string) => {
+    if (!status) return "Draft";
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const handleEdit = () => {
@@ -149,52 +150,30 @@ export default function LabourRequestDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-
     try {
       if (networkStatus.isOnline) {
         await deleteRequest(id).unwrap();
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Deleted",
-          description: "The labour request has been deleted successfully.",
-        });
-        setTimeout(() => {
-          router.push("/project-request/labour-request");
-        }, 2000);
+        setIsConfirmDeleteOpen(false);
+        statusModal.showSuccess(
+          "Request Deleted",
+          "The labour request has been deleted successfully."
+        );
       } else {
-        // Offline delete - find local request by server id
         const localRequests = await db.labourRequests.where('id').equals(id).toArray();
         if (localRequests.length > 0) {
           await syncService.deleteRequestOffline(localRequests[0].localId);
         } else {
-          // If no local version exists, create a placeholder for deletion
           await syncService.deleteRequestOffline(`server_${id}`);
         }
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Marked for Deletion",
-          description: "The request will be deleted when you're back online.",
-        });
-        setTimeout(() => {
-          router.push("/project-request/labour-request");
-        }, 2000);
+        setIsConfirmDeleteOpen(false);
+        statusModal.showSuccess(
+          "Request Marked for Deletion",
+          "The request will be deleted when you're back online."
+        );
       }
     } catch (error) {
       console.error("Failed to delete request:", error);
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        title: "Error",
-        description: "Failed to delete the request. Please try again.",
-      });
-    } finally {
-      setConfirmDelete(false);
+      statusModal.showError("Error", "Failed to delete the request. Please try again.");
     }
   };
 
@@ -202,38 +181,101 @@ export default function LabourRequestDetailPage() {
     try {
       if (networkStatus.isOnline) {
         await submitRequest({ id, data: {} }).unwrap();
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Submitted",
-          description: "The labour request has been submitted for approval.",
-        });
+        statusModal.showSuccess(
+          "Request Submitted",
+          "The labour request has been submitted for approval."
+        );
         refetch();
       } else {
-        // Offline submit - find local request by server id
         const localRequests = await db.labourRequests.where('id').equals(id).toArray();
         if (localRequests.length > 0) {
           await syncService.submitRequestOffline(localRequests[0].localId);
         } else {
-          // If no local version exists, create a placeholder for submission
           await syncService.submitRequestOffline(`server_${id}`);
         }
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Marked for Submission",
-          description: "The request will be submitted when you're back online.",
-        });
+        statusModal.showSuccess(
+          "Request Marked for Submission",
+          "The request will be submitted when you're back online."
+        );
         refetch();
       }
     } catch (error) {
       console.error("Failed to submit request:", error);
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        title: "Error",
-        description: "Failed to submit the request. Please try again.",
-      });
+      statusModal.showError("Error", "Failed to submit the request. Please try again.");
+    }
+  };
+
+  const handleApprove = async () => {
+    try {
+      if (networkStatus.isOnline) {
+        await approveLabourRequest({
+          id,
+          data: { status: "approved", approval_notes: approvalNotes },
+        }).unwrap();
+        setIsApproveModalOpen(false);
+        statusModal.showSuccess(
+          "Request Approved",
+          "The labour request has been approved successfully."
+        );
+        refetch();
+      } else {
+        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+        const localId = localRequests.length > 0 ? localRequests[0].localId : `server_${id}`;
+        await syncService.approveRequestOffline(localId, {
+          status: "approved",
+          approval_notes: approvalNotes,
+        });
+        setIsApproveModalOpen(false);
+        statusModal.showSuccess(
+          "Request Approved Locally",
+          "The request will be approved when you're back online."
+        );
+        refetch();
+      }
+    } catch (error) {
+      console.error("Failed to approve request:", error);
+      statusModal.showError("Error", "Failed to approve the request. Please try again.");
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectionReason.trim()) return;
+    try {
+      if (networkStatus.isOnline) {
+        await rejectLabourRequest({
+          id,
+          data: { status: "rejected", rejection_notes: rejectionReason },
+        }).unwrap();
+        setIsRejectModalOpen(false);
+        statusModal.showSuccess(
+          "Request Rejected",
+          "The labour request has been rejected."
+        );
+        refetch();
+      } else {
+        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
+        const localId = localRequests.length > 0 ? localRequests[0].localId : `server_${id}`;
+        await syncService.rejectRequestOffline(localId, {
+          status: "rejected",
+          rejection_notes: rejectionReason,
+        });
+        setIsRejectModalOpen(false);
+        statusModal.showSuccess(
+          "Request Rejected Locally",
+          "The request will be rejected when you're back online."
+        );
+        refetch();
+      }
+    } catch (error) {
+      console.error("Failed to reject request:", error);
+      statusModal.showError("Error", "Failed to reject the request. Please try again.");
+    }
+  };
+
+  const handleModalClose = () => {
+    statusModal.close();
+    if (statusModal.type === "success" && !isApproveModalOpen && !isRejectModalOpen && !isConfirmDeleteOpen) {
+      router.push("/project-request/labour-request");
     }
   };
 
@@ -242,463 +284,384 @@ export default function LabourRequestDetailPage() {
     request?.status === "draft" &&
     (isAdmin || permissions["labour-request"]?.has("edit"));
   const canDelete =
-    request?.status === "draft" ||
-    (request?.status === "pending" &&
-      (isAdmin || permissions["labour-request"]?.has("delete")));
+    request?.status === "draft" &&
+    (isAdmin || permissions["labour-request"]?.has("delete"));
   const canSubmit = request?.status === "draft";
   const canApproveReject =
     isAdmin || permissions["labour-request"]?.has("approve");
 
+  const breadcrumbs = [
+    { label: "Home", href: "/" },
+    { label: "Labour Request", href: "/project-request/labour-request" },
+    {
+      label: request?.reference_id || "Details",
+      href: `/project-request/labour-request/${id}`,
+      current: true,
+    },
+  ];
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-[#3B7CED]" />
-          <p className="text-gray-600">Loading request details...</p>
-        </div>
+      <div className="p-8 space-y-4">
+        <Skeleton className="h-12 w-1/3" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   if (error || !request) {
     return (
-      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center">
-        <div className="text-center">
-          <XCircle className="h-8 w-8 mx-auto mb-2 text-red-500" />
-          <p className="text-gray-600 mb-4">Failed to load request details</p>
-          <Button onClick={() => router.back()}>Go Back</Button>
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
+        <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-sm w-full">
+          <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+          <p className="text-gray-700 font-semibold mb-4">Failed to load request details</p>
+          <Button onClick={() => router.back()} className="w-full bg-[#3B7CED] text-white hover:bg-blue-600">Go Back</Button>
         </div>
       </div>
     );
   }
 
-  console.log("params", params);
-  console.log("request", request);
-
   return (
-    <div className="min-h-screen bg-[#F1F5F9]">
-      {/* Header */}
-      <div className="bg-white px-4 py-4 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+    <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4 bg-[#F9FAFB]">
+      <PageHeader items={breadcrumbs} title="Labour Request Details" />
+
+      <div className="max-w-5xl mx-auto px-6 py-8 bg-white min-h-screen shadow-sm rounded-lg my-4">
+        <FadeIn delay={0.2}>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                Labour Request Details
+              <h2 className="text-sm font-medium text-[#3B7CED] uppercase tracking-wider mb-1">
+                Basic Information
+              </h2>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {request.reference_id}
               </h1>
-              <p className="text-sm text-gray-500">{request.reference_id}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant={getStatusBadgeVariant(request.status)}>
+                {getStatusLabel(request.status)}
+              </Badge>
+              
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+                {networkStatus.isOnline ? (
+                  <>
+                    <Wifi size={14} className="text-green-500" />
+                    <span className="text-green-600">Online</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff size={14} className="text-orange-500" />
+                    <span className="text-orange-600">Offline</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {networkStatus.isOnline ? (
-              <>
-                <Wifi className="h-4 w-4 text-green-500" />
-                <span className="text-sm text-green-600">Online</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-4 w-4 text-orange-500" />
-                <span className="text-sm text-orange-600">Offline</span>
-              </>
+        </FadeIn>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <SlideUp delay={0.3}>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Workers Count</Label>
+                <p className="text-gray-900 font-semibold text-lg">{request.detail.number_of_workers} Workers</p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Role / Trade Type</Label>
+                <p className="text-gray-900 font-medium capitalize">{request.detail.role_type}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Duration</Label>
+                <p className="text-gray-900 font-medium capitalize">{request.detail.duration} {request.detail.duration_unit}</p>
+              </div>
+            </div>
+          </SlideUp>
+
+          <SlideUp delay={0.4}>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Daily Rate</Label>
+                <p className="text-gray-900 font-semibold">
+                  ₦{parseFloat(request.detail.estimated_daily_rate || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Projected Cost</Label>
+                <p className="text-2xl font-black text-[#3B7CED]">
+                  ₦{parseFloat(request.detail.projected_cost || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Destination Module</Label>
+                <p className="text-gray-950 capitalize">{request.module_destination.replace("_", " ")}</p>
+              </div>
+            </div>
+          </SlideUp>
+
+          <SlideUp delay={0.5}>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Project</Label>
+                <p className="text-gray-900 font-semibold">Project #{request.project_request?.project || "N/A"}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Requester</Label>
+                <p className="text-gray-900">{request.detail.created_by_name || "Unknown Submit"}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 font-bold uppercase">Date Created</Label>
+                <p className="text-gray-900">
+                  {new Date(request.created_at).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+            </div>
+          </SlideUp>
+        </div>
+
+        {/* Audit Trail Timeline */}
+        <div className="mt-12">
+          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <span className="w-2 h-6 bg-amber-500 rounded-full"></span>
+            Audit Trail & History
+          </h3>
+          <div className="space-y-6 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
+            <div className="relative pl-10">
+              <span className="absolute left-0 top-0 w-9 h-9 bg-blue-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              </span>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Request Created</p>
+                <p className="text-xs text-gray-500">
+                  {new Date(request.created_at).toLocaleString("en-GB")}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">Initiated by {request.detail.created_by_name || "requester"}</p>
+              </div>
+            </div>
+
+            {request.status !== "draft" && (
+              <div className="relative pl-10">
+                <span className="absolute left-0 top-0 w-9 h-9 bg-amber-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Submitted for Approval</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(request.updated_at || request.created_at).toLocaleString("en-GB")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {request.status === "approved" && (
+              <div className="relative pl-10">
+                <span className="absolute left-0 top-0 w-9 h-9 bg-green-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Request Approved</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(request.updated_at).toLocaleString("en-GB")}
+                  </p>
+                  {approvalNotes && (
+                    <p className="text-sm text-gray-600 mt-1 italic font-medium text-green-700">
+                      "Notes: {approvalNotes}"
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {request.status === "rejected" && (
+              <div className="relative pl-10">
+                <span className="absolute left-0 top-0 w-9 h-9 bg-red-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Request Rejected</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(request.updated_at).toLocaleString("en-GB")}
+                  </p>
+                  {rejectionReason && (
+                    <p className="text-sm text-red-600 mt-1 italic font-medium">
+                      "Reason: {rejectionReason}"
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto pb-24 space-y-4 pt-4">
-        {/* Status and Actions */}
-        <div className="bg-white px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex gap-2 flex-wrap">
-              {canEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleEdit}
-                  className="flex items-center gap-2"
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Button>
-              )}
-
-              {canSubmit && (
-                <Button
-                  variant="contained"
-                  size="sm"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex items-center gap-2 bg-[#3B7CED] hover:bg-[#2d63c7]"
-                >
-                  <Send className="h-4 w-4" />
-                  {isSubmitting ? "Submitting..." : "Submit for Approval"}
-                </Button>
-              )}
-
-              {canDelete && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="flex items-center gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {confirmDelete ? "Confirm Delete" : "Delete"}
-                </Button>
-              )}
-            </div>
+        {/* Justification Notes */}
+        {request.detail.justification_notes && (
+          <div className="mt-10 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+            <Label className="text-[10px] font-black uppercase text-blue-600">Justification Notes</Label>
+            <p className="mt-1 text-gray-700 text-sm leading-relaxed">
+              "{request.detail.justification_notes}"
+            </p>
           </div>
-        </div>
+        )}
 
-        {/* Request Details */}
-
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-6">Labour Details</h2>
-          <div>
-            <Badge
-              variant={getStatusBadgeVariant(request.status || "draft")}
-              className="text-base px-3 py-1"
-            >
-              {request.status.charAt(0).toUpperCase() +
-                request?.status?.slice(1)}
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Identification Section */}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reference ID
-              </label>
-              <p className="text-sm text-gray-900 font-medium">
-                {request.reference_id}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Request Type
-              </label>
-              <p className="text-sm text-gray-900">
-                {request.request_type.charAt(0).toUpperCase() +
-                  request.request_type.slice(1)}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Project
-              </label>
-              <p className="text-sm text-gray-900">
-                Project {request?.project_request?.project || "N/A"}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Requester
-              </label>
-              <p className="text-sm text-gray-900">
-                {request.detail.created_by_name}
-              </p>
-            </div>
-
-            {/* Labour Information */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Number of Workers
-              </label>
-              <p className="text-sm text-gray-900">
-                {request.detail.number_of_workers}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Role / Trade Type
-              </label>
-              <p className="text-sm text-gray-900">
-                {request.detail.role_type}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Duration
-              </label>
-              <p className="text-sm text-gray-900">
-                {request.detail.duration} {request.detail.duration_unit}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estimated Daily Rate
-              </label>
-              <p className="text-sm text-gray-900">
-                ₦
-                {parseFloat(
-                  request.detail.estimated_daily_rate || "0",
-                ).toLocaleString()}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Projected Cost
-              </label>
-              <p className="text-sm text-gray-900 font-semibold">
-                ₦
-                {parseFloat(
-                  request.detail.projected_cost || "0",
-                ).toLocaleString()}
-              </p>
-            </div>
-
-            {/* Timestamps */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date Created
-              </label>
-              <p className="text-sm text-gray-900">
-                {formatDate(request.created_at)}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Updated
-              </label>
-              <p className="text-sm text-gray-900">
-                {formatDate(request.created_at)}
-              </p>
-            </div>
-
-            {/* Destination */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Destination
-              </label>
-              <p className="text-sm text-gray-900">
-                {request.module_destination.charAt(0).toUpperCase() +
-                  request.module_destination.slice(1)}
-              </p>
-            </div>
-          </div>
-
-          {/* Justification Notes - Full Width */}
-          {request.detail.justification_notes && (
-            <div className="mt-8">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Justification Notes
-              </label>
-              <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 text-sm text-gray-800 leading-relaxed">
-                {request.detail.justification_notes}
-              </div>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Approve/Reject/Cancel Buttons */}
-      {canApproveReject && request.status === "pending" && (
-        <div className="bg-white px-4 py-4 border-t border-gray-100">
-          <div className="max-w-7xl mx-auto flex gap-3">
-            <Button
-              variant="default"
-              className="flex items-center gap-2 bg-[#2BA24D] hover:bg-[#238c3f] text-white"
-              onClick={async () => {
-                const notes = prompt("Enter approval notes (optional):");
-                if (notes !== null) {
-                  try {
-                    if (networkStatus.isOnline) {
-                      await approveLabourRequest({
-                        id,
-                        data: { status: "approved", approval_notes: notes },
-                      }).unwrap();
-                      setStatusModal({
-                        isOpen: true,
-                        type: "success",
-                        title: "Request Approved",
-                        description: "The labour request has been approved.",
-                      });
-                      refetch();
-                    } else {
-                      // Offline approve - find local request by server id
-                      const localRequests = await db.labourRequests.where('id').equals(id).toArray();
-                      if (localRequests.length > 0) {
-                        await syncService.approveRequestOffline(localRequests[0].localId, {
-                          status: "approved",
-                          approval_notes: notes,
-                        });
-                      } else {
-                        // If no local version exists, create a placeholder
-                        await syncService.approveRequestOffline(`server_${id}`, {
-                          status: "approved",
-                          approval_notes: notes,
-                        });
-                      }
-                      setStatusModal({
-                        isOpen: true,
-                        type: "success",
-                        title: "Request Approved Locally",
-                        description:
-                          "The request will be approved when you're back online.",
-                      });
-                    }
-                  } catch (error) {
-                    console.error("Failed to approve request:", error);
-                    setStatusModal({
-                      isOpen: true,
-                      type: "error",
-                      title: "Error",
-                      description:
-                        "Failed to approve the request. Please try again.",
-                    });
-                  }
-                }
-              }}
-              disabled={isApproving}
-            >
-              <CheckCircle className="h-4 w-4" />
-              {isApproving ? "Approving..." : "Approve"}
-            </Button>
+        {/* Action Buttons */}
+        <div className="mt-16 pt-8 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-4">
+          {canEdit && (
             <Button
               variant="outline"
-              className="flex items-center gap-2 border-[#F0B401] text-[#F0B401] hover:bg-[#F0B401] hover:text-white"
-              onClick={async () => {
-                const notes = prompt("Enter rejection notes:");
-                if (notes !== null) {
-                  try {
-                    if (networkStatus.isOnline) {
-                      await rejectLabourRequest({
-                        id,
-                        data: { status: "rejected", rejection_notes: notes },
-                      }).unwrap();
-                      setStatusModal({
-                        isOpen: true,
-                        type: "success",
-                        title: "Request Rejected",
-                        description: "The labour request has been rejected.",
-                      });
-                      refetch();
-                    } else {
-                      // Offline reject - find local request by server id
-                      const localRequests = await db.labourRequests.where('id').equals(id).toArray();
-                      if (localRequests.length > 0) {
-                        await syncService.rejectRequestOffline(localRequests[0].localId, {
-                          status: "rejected",
-                          rejection_notes: notes,
-                        });
-                      } else {
-                        // If no local version exists, create a placeholder
-                        await syncService.rejectRequestOffline(`server_${id}`, {
-                          status: "rejected",
-                          rejection_notes: notes,
-                        });
-                      }
-                      setStatusModal({
-                        isOpen: true,
-                        type: "success",
-                        title: "Request Rejected Locally",
-                        description:
-                          "The request will be rejected when you're back online.",
-                      });
-                    }
-                  } catch (error) {
-                    console.error("Failed to reject request:", error);
-                    setStatusModal({
-                      isOpen: true,
-                      type: "error",
-                      title: "Error",
-                      description:
-                        "Failed to reject the request. Please try again.",
-                    });
-                  }
-                }
-              }}
-              disabled={isRejecting}
+              onClick={handleEdit}
+              className="px-8 h-12 rounded-xl font-bold border-gray-300 text-gray-700 hover:bg-gray-50"
             >
-              <XCircle className="h-4 w-4" />
-              {isRejecting ? "Rejecting..." : "Reject"}
+              <Edit size={16} className="mr-2" />
+              Edit Request
             </Button>
-            {/* <Button
-              variant="destructive"
-              className="flex items-center gap-2"
-              onClick={async () => {
-                const notes = prompt("Enter cancellation notes:");
-                if (notes !== null) {
-                  try {
-                    if (networkStatus.isOnline) {
-                      await cancelLabourRequest({
-                        id,
-                        data: {
-                          status: "cancelled",
-                          cancellation_notes: notes,
-                        },
-                      }).unwrap();
-                      setStatusModal({
-                        isOpen: true,
-                        type: "success",
-                        title: "Request Cancelled",
-                        description: "The labour request has been cancelled.",
-                      });
-                      setTimeout(() => {
-                        router.push("/project-request/labour-request");
-                      }, 2000);
-                    } else {
-                      await syncService.cancelRequestOffline(id, {
-                        status: "cancelled",
-                        cancellation_notes: notes,
-                      });
-                      setStatusModal({
-                        isOpen: true,
-                        type: "success",
-                        title: "Request Cancelled Locally",
-                        description:
-                          "The request will be cancelled when you're back online.",
-                      });
-                      setTimeout(() => {
-                        router.push("/project-request/labour-request");
-                      }, 2000);
-                    }
-                  } catch (error) {
-                    console.error("Failed to cancel request:", error);
-                    setStatusModal({
-                      isOpen: true,
-                      type: "error",
-                      title: "Error",
-                      description:
-                        "Failed to cancel the request. Please try again.",
-                    });
-                  }
-                }
-              }}
-              disabled={isCancelling}
+          )}
+
+          {canDelete && (
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmDeleteOpen(true)}
+              disabled={isDeleting}
+              className="px-8 h-12 rounded-xl font-bold border-red-200 text-red-600 hover:bg-red-50"
             >
-              Cancel Request
-            </Button> */}
-          </div>
+              <Trash2 size={16} className="mr-2" />
+              Delete Request
+            </Button>
+          )}
+
+          {canSubmit && (
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="px-12 h-12 rounded-xl font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white shadow-lg shadow-blue-200"
+            >
+              <Send size={16} className="mr-2" />
+              {isSubmitting ? "Submitting..." : "Submit for Approval"}
+            </Button>
+          )}
+
+          {canApproveReject && request.status === "pending" && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsRejectModalOpen(true)}
+                disabled={isRejecting}
+                className="px-8 h-12 rounded-xl font-bold border-red-200 text-red-600 hover:bg-red-50"
+              >
+                <XCircle size={16} className="mr-2" />
+                Reject Request
+              </Button>
+              <Button
+                onClick={() => setIsApproveModalOpen(true)}
+                disabled={isApproving}
+                className="px-12 h-12 rounded-xl font-bold bg-[#2BA24D] hover:bg-[#238c3f] text-white shadow-lg shadow-green-200 animate-pulse-subtle"
+              >
+                <CheckCircle size={16} className="mr-2" />
+                Approve Request
+              </Button>
+            </>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Reject Modal */}
+      <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Reject Request</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this labour request. This will be logged in the history.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="reason" className="mb-2 block">Rejection Reason *</Label>
+            <Textarea
+              id="reason"
+              placeholder="e.g. Rate exceeds WBS allocation limit."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleReject}
+              disabled={!rejectionReason.trim() || isRejecting}
+            >
+              {isRejecting ? "Rejecting..." : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Modal */}
+      <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-green-600">Approve Request</DialogTitle>
+            <DialogDescription>
+              Optional: Enter approval notes for reference.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="notes" className="mb-2 block">Approval Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="e.g. Budget check passed."
+              value={approvalNotes}
+              onChange={(e) => setApprovalNotes(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsApproveModalOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-[#2BA24D] hover:bg-green-700 text-white"
+              onClick={handleApprove}
+              disabled={isApproving}
+            >
+              {isApproving ? "Approving..." : "Approve Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Modal */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this labour request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsConfirmDeleteOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Confirm Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Status Modal */}
       <StatusModal
         isOpen={statusModal.isOpen}
-        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        onClose={handleModalClose}
         type={statusModal.type}
         title={statusModal.title}
-        message={statusModal.description}
+        message={statusModal.message}
+        actionText="Back to List"
+        onAction={handleModalClose}
+        showCloseButton={false}
       />
-    </div>
+    </FadeIn>
   );
 }

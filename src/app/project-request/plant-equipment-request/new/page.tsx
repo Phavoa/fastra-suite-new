@@ -19,6 +19,7 @@ import { useCreatePlantEquipmentRequestMutation } from "@/api/requests/plantEqui
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { motion, AnimatePresence } from "framer-motion";
+import { StatusModal } from "@/components/shared/StatusModal";
 
 export default function NewPlantEquipmentRequestPage() {
   const router = useRouter();
@@ -493,158 +494,51 @@ export default function NewPlantEquipmentRequestPage() {
       </div>
 
       {/* Above Available Budget Dialog */}
-      <AnimatePresence>
-        {modalType === "above_budget" && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 max-w-sm w-[calc(100%-2rem)] relative shadow-lg"
-            >
-              {/* Close Button */}
-              <button
-                onClick={() => setModalType(null)}
-                className="absolute right-4 top-4 p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <div className="flex flex-col items-start w-full text-left">
-                <div className="w-12 h-12 rounded-full bg-[#EEF4FF] border border-[#D0E1FD] flex items-center justify-center text-[#3B7CED]">
-                  <AlertTriangle size={24} className="text-[#3B7CED]" />
-                </div>
-                
-                <h3 className="text-lg font-bold text-gray-900 mt-5 leading-snug">
-                  Above Available Budget
-                </h3>
-                
-                <p className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
-                  The total cost for your request is above the available budget and might be held. Will you like to submit anyways?
-                </p>
-
-                <div className="grid grid-cols-2 gap-3 w-full mt-6">
-                  <button
-                    onClick={() => setModalType(null)}
-                    className="w-full h-11 border border-[#3B7CED] hover:bg-[#EEF4FF]/50 text-[#3B7CED] text-xs font-bold rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      setModalType(null);
-                      executeSubmission();
-                    }}
-                    className="w-full h-11 bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs font-bold rounded-lg transition-colors shadow-none"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <StatusModal
+        isOpen={modalType === "above_budget"}
+        onClose={() => setModalType(null)}
+        type="warning"
+        title="Above Available Budget"
+        message="The total cost for your request is above the available budget and might be held. Will you like to submit anyways?"
+        actionText="Submit"
+        onAction={() => {
+          setModalType(null);
+          executeSubmission();
+        }}
+        secondaryText="Cancel"
+        onSecondary={() => setModalType(null)}
+        showCloseButton={true}
+      />
 
       {/* Submission Unsuccessful Dialog */}
-      <AnimatePresence>
-        {modalType === "unsuccessful" && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 max-w-sm w-[calc(100%-2rem)] relative shadow-lg"
-            >
-              {/* Close Button */}
-              <button
-                onClick={() => setModalType(null)}
-                className="absolute right-4 top-4 p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <div className="flex flex-col items-start w-full text-left">
-                <div className="w-12 h-12 rounded-full bg-[#FFF2F0] border border-[#FFE0DB] flex items-center justify-center text-[#E43D2B]">
-                  <AlertCircle size={24} className="text-[#E43D2B]" />
-                </div>
-                
-                <h3 className="text-lg font-bold text-gray-900 mt-5 leading-snug">
-                  Submission Unsuccessful
-                </h3>
-                
-                <p className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
-                  Your request submission was unsuccessfully. Please try again.
-                </p>
-
-                <button
-                  onClick={() => setModalType(null)}
-                  className="w-full h-11 bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs font-bold rounded-lg transition-colors shadow-none mt-6 flex items-center justify-center"
-                >
-                  Try again
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <StatusModal
+        isOpen={modalType === "unsuccessful"}
+        onClose={() => setModalType(null)}
+        type="error"
+        title="Submission Unsuccessful"
+        message="Your request submission was unsuccessfully. Please try again."
+        actionText="Try again"
+        onAction={() => setModalType(null)}
+        showCloseButton={true}
+      />
 
       {/* Request Submitted Dialog */}
-      <AnimatePresence>
-        {modalType === "submitted" && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 max-w-sm w-[calc(100%-2rem)] relative shadow-lg"
-            >
-              {/* Close Button */}
-              <button
-                onClick={() => {
-                  setModalType(null);
-                  router.push("/project-request/plant-equipment-request");
-                }}
-                className="absolute right-4 top-4 p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <div className="flex flex-col items-start w-full text-left">
-                <div className="w-12 h-12 rounded-full bg-[#EEF4FF] border border-[#D0E1FD] flex items-center justify-center text-[#3B7CED]">
-                  <svg className="w-6 h-6 text-[#3B7CED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                
-                <h3 className="text-lg font-bold text-gray-900 mt-5 leading-snug">
-                  Request Submitted
-                </h3>
-                
-                <p className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
-                  Your request has successfully been submitted
-                </p>
-
-                <button
-                  onClick={() => {
-                    setModalType(null);
-                    router.push("/project-request/plant-equipment-request");
-                  }}
-                  className="w-full h-11 bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs font-bold rounded-lg transition-colors shadow-none mt-6 flex items-center justify-center"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <StatusModal
+        isOpen={modalType === "submitted"}
+        onClose={() => {
+          setModalType(null);
+          router.push("/project-request/plant-equipment-request");
+        }}
+        type="success"
+        title="Request Submitted"
+        message="Your request has successfully been submitted"
+        actionText="Done"
+        onAction={() => {
+          setModalType(null);
+          router.push("/project-request/plant-equipment-request");
+        }}
+        showCloseButton={true}
+      />
 
       {/* Validation Error Banner / Popup */}
       <AnimatePresence>

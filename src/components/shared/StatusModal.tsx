@@ -63,9 +63,9 @@ const statusConfig: Record<
   },
   warning: {
     icon: AlertTriangle,
-    iconColor: "text-[#F0B401]",
-    bgColor: "bg-[#FFFDF0]",
-    borderColor: "border-[#FFEFC2]",
+    iconColor: "text-[#3B7CED]",
+    bgColor: "bg-[#EEF4FF]",
+    borderColor: "border-[#D0E1FD]",
     defaultActionText: "Understood",
   },
   info: {
@@ -103,9 +103,9 @@ export function StatusModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[400px] w-[calc(100%-2rem)] p-6 rounded-2xl bg-white gap-0 border-none shadow-xl" showCloseButton={showCloseButton}>
-        <div className="flex flex-col items-start w-full">
-          {/* Header section with Icon, Title and Message */}
-          <DialogHeader className="flex flex-col items-start text-left gap-0 p-0 w-full">
+        <div className="flex flex-col items-start w-full text-left">
+          {/* Header section with Icon, Title and Message (Left-aligned) */}
+          <div className="flex flex-col items-start text-left gap-0 p-0 w-full">
             <div
               className={cn(
                 "w-12 h-12 rounded-full flex items-center justify-center border",
@@ -123,24 +123,32 @@ export function StatusModal({
             <DialogDescription className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
               {message}
             </DialogDescription>
-          </DialogHeader>
+          </div>
 
           {/* Action buttons list */}
-          <div className="w-full mt-6 flex flex-col gap-2">
-            <Button
-              onClick={handleAction}
-              className="w-full h-12 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none"
-            >
-              {actionText || config.defaultActionText}
-            </Button>
-
-            {secondaryText && onSecondary && (
+          <div className="w-full mt-6">
+            {secondaryText && onSecondary ? (
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <Button
+                  variant="outline"
+                  onClick={onSecondary}
+                  className="w-full h-12 border border-[#3B7CED] hover:bg-[#EEF4FF]/50 text-[#3B7CED] bg-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center shadow-none"
+                >
+                  {secondaryText}
+                </Button>
+                <Button
+                  onClick={handleAction}
+                  className="w-full h-12 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none"
+                >
+                  {actionText || config.defaultActionText}
+                </Button>
+              </div>
+            ) : (
               <Button
-                variant="outline"
-                onClick={onSecondary}
-                className="w-full h-12 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center"
+                onClick={handleAction}
+                className="w-full h-12 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none"
               >
-                {secondaryText}
+                {actionText || config.defaultActionText}
               </Button>
             )}
           </div>

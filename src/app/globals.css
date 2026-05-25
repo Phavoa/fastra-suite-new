@@ -118,6 +118,19 @@
   body {
     @apply bg-background text-foreground;
   }
+  button,
+  [role="button"],
+  select,
+  label,
+  a {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"]:disabled,
+  select:disabled,
+  label:disabled {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {

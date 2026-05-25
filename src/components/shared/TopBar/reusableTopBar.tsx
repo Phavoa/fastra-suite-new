@@ -96,21 +96,32 @@ export function NavBar({
     router.push("/auth/login");
   };
 
+  const isHome = title.toLowerCase() === "home" || title.toLowerCase() === "dashboard";
+  const showBackButton = !!backUrl || !isHome;
+
+  const handleBack = () => {
+    if (backUrl) {
+      router.push(backUrl);
+    } else {
+      router.back();
+    }
+  };
+
   console.log("user", user);
   return (
     <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
       <div className="max-w-360 mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2 md:gap-4">
-          {backUrl && (
-            <Link
-              href={backUrl}
+          {showBackButton && (
+            <button
+              onClick={handleBack}
               className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center"
               aria-label="Go back"
             >
               <ArrowLeft size={24} className="text-gray-600" />
-            </Link>
+            </button>
           )}
-          {!backUrl && (
+          {!showBackButton && (
             <button
               onClick={onMenuToggle || toggleSidebar}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors md:hidden"

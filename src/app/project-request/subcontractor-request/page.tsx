@@ -148,5 +148,5 @@ export default function SubcontractorRequestPage() {
     );
   }
 
-  return <RequestDashboard config={config} />;
+  return <RequestDashboard config={config} backUrl="/project-request/make-request" />;
 }
