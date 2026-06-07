@@ -1,7 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "@/lib/store/store";
 
-// Company interface
 export interface Company {
   id: string;
   logo?: string;
@@ -19,7 +18,6 @@ export interface Company {
   roles?: { id: number; name: string }[];
 }
 
-// Helper to get tenant-specific base URL
 const getTenantBaseUrl = (state: RootState) => {
   const tenantSchemaName = state.auth.tenant_schema_name;
   const apiDomain =
@@ -27,8 +25,11 @@ const getTenantBaseUrl = (state: RootState) => {
   return `https://${tenantSchemaName}.${apiDomain}`;
 };
 
+export const COMPANY_TAG = 'Company' as const;
+ 
 export const companyApi = createApi({
   reducerPath: "companyApi",
+  tagTypes: [COMPANY_TAG],
   baseQuery: async (args, api) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -41,14 +42,12 @@ export const companyApi = createApi({
     let method = "GET";
     let body: any = undefined;
 
-    // Handle args
     if (typeof args === "string") {
       url = `${baseUrl}${args}`;
     } else {
       url = `${baseUrl}${args.url}`;
       method = args.method || "GET";
 
-      // ⬇ Detect FormData automatically
       if (args.body instanceof FormData) {
         body = args.body;
       } else if (args.body) {
@@ -84,14 +83,16 @@ export const companyApi = createApi({
   endpoints: (builder) => ({
     getCompany: builder.query<Company, void>({
       query: () => "/company/update-company-profile/",
+      providesTags: [COMPANY_TAG],
     }),
 
     updateCompany: builder.mutation<any, FormData>({
       query: (formData) => ({
         url: "/company/update-company-profile/",
         method: "PUT",
-        body: formData, // ← MUST be FormData
+        body: formData,
       }),
+      invalidatesTags: [COMPANY_TAG],
     }),
 
     changeAdminPassword: builder.mutation<{ detail: string }, { old_password: string; new_password: string; confirm_password: string; user_id: number }>({

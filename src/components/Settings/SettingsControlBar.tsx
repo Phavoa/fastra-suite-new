@@ -44,7 +44,7 @@ export const SettingsControlBar = ({
   const getButtonLabel = () => {
     switch (activeSection) {
       case "company":
-        return "New Company";
+        return "Update Company";
       case "user":
         return "Create User";
       case "accessgroup":
@@ -77,7 +77,11 @@ export const SettingsControlBar = ({
       {/* Right Controls */}
       <div className="flex gap-3 items-center">
         {/* Primary Button */}
-        <PermissionGuard application="settings" module={activeSection} action="create">
+        <PermissionGuard
+          application="settings"
+          module={activeSection}
+          action="create"
+        >
           <GrayButton
             size="md"
             className="bg-[#3B7CED] text-white"
@@ -105,6 +109,8 @@ export const SettingsControlBar = ({
         {/* Grid/List Toggle */}
         <div className="flex items-center border border-[#E2E6E9] rounded-sm px-2 h-11">
           <button
+            type="button"
+            aria-label="Grid view"
             className="p-1 hover:bg-gray-100"
             onClick={() => handleToggleView("grid")}
           >
@@ -117,6 +123,8 @@ export const SettingsControlBar = ({
           <div className="w-px self-stretch bg-[#E2E6E9] mx-1" />
 
           <button
+            type="button"
+            aria-label="List view"
             className="p-1 hover:bg-gray-100"
             onClick={() => handleToggleView("list")}
           >

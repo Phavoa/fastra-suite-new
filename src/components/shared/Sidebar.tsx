@@ -52,7 +52,12 @@ const middleItems = [
 ];
 
 const bottomItems = [
-  { id: "settings", icon: SettingsIcon, label: "Settings", route: "/settings" },
+  {
+    id: "settings",
+    icon: SettingsIcon,
+    label: "Settings",
+    route: "/settings/company/1",
+  },
   { id: "app", icon: AppIcon, label: "App", route: "/app" },
 ];
 
