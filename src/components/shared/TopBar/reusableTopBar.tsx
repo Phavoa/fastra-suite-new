@@ -63,12 +63,12 @@ export function NavBar({
 
   const isActive = (href?: string) => {
     if (!href) return false;
-    
+
     // If activeHref is explicitly provided (e.g., from parent), use it for comparison
     if (activeHref !== undefined) {
       return href === activeHref;
     }
-    
+
     if (href === "/" || href.endsWith("/")) {
       return pathname === href || pathname === href.slice(0, -1);
     }
@@ -96,7 +96,8 @@ export function NavBar({
     router.push("/auth/login");
   };
 
-  const isHome = title.toLowerCase() === "home" || title.toLowerCase() === "dashboard";
+  const isHome =
+    title.toLowerCase() === "home" || title.toLowerCase() === "dashboard";
   const showBackButton = !!backUrl || !isHome;
 
   const handleBack = () => {
@@ -130,7 +131,9 @@ export function NavBar({
               <Menu size={24} className="text-gray-600" />
             </button>
           )}
-          <h1 className="text-xl md:text-2xl truncate font-bold text-gray-900">{title}</h1>
+          <h1 className="text-xl md:text-2xl truncate font-bold text-gray-900">
+            {title}
+          </h1>
         </div>
 
         <nav
@@ -279,7 +282,7 @@ export function NavBar({
 
                 {permissions.isAdmin && (
                   <Link
-                    href="/settings"
+                    href="/settings/company/1"
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >

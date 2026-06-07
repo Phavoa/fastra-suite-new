@@ -234,7 +234,7 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
       purchase: "/purchase",
       inventory: "/inventory/operation",
       contacts: "/contact",
-      settings: "/settings",
+      settings: "/settings/company/1",
       "project-request": "/project-request",
     };
     return routeMap[id] || null;

@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { SettingsGrid } from "@/components/Settings/settingsGrid";
@@ -50,6 +51,8 @@ export default function AccessGroup() {
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const archive = useSelector((state: RootState) => state.viewMode.archive);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("search") ?? "";
 
   // Fetch access group rights data
   const {
@@ -59,11 +62,19 @@ export default function AccessGroup() {
   } = useGetAccessGroupRightsQuery();
   console.log(accessGroupRights);
 
-  const filteredData: AccessGroupData[] = React.useMemo(() => {
-    return getUniqueAccessGroups(accessGroupRights ?? []);
-  }, [accessGroupRights]);
+  const baseData = getUniqueAccessGroups(accessGroupRights ?? []);
 
-  console.log(filteredData);
+  const searchLower = searchQuery.toLowerCase();
+  const searchedData = useMemo(() => {
+    if (!searchLower) return baseData;
+    return baseData.filter((item) =>
+      Object.values(item).some((val) =>
+        String(val).toLowerCase().includes(searchLower),
+      ),
+    );
+  }, [baseData, searchLower]);
+
+  console.log(searchedData);
 
   // Handle loading state
   if (isLoading) {
@@ -90,10 +101,7 @@ export default function AccessGroup() {
     );
   }
 
-  // Filter data based on archive state
-  // Note: Since the API doesn't include a status/hidden field in the basic response,
-  // we'll show all data when archive is false, and handle filtering based on available data
-  //const filteredData: AccessGroupData[] = accessGroupRights || [];
+  const filteredData: AccessGroupData[] = searchedData;
 
   function normaliseString(str: string): string {
     return str
