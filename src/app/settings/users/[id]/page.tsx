@@ -32,6 +32,16 @@ import { useGetAccessGroupRightsQuery } from "@/api/settings/accessGroupRightApi
 import { AccessGroupData } from "../../accessgroup/page";
 import { getUniqueAccessGroups } from "@/lib/utils/filterAccessGroup";
 
+import PermissionsGrid from "@/components/Settings/PermissionsGrid";
+import {
+  getUserPermissions,
+  saveUserPermissions,
+  getPermissionTemplates,
+  UserPermissions,
+  createEmptyPermissions,
+} from "@/utils/modulePermissionsStore";
+import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
+
 interface CompanyRoleDetails {
   id: number;
   name: string;
@@ -64,9 +74,10 @@ export default function UsersDetails() {
   const [updateUser] = useUpdateUserByIdMutation();
 
   const [editMode, setEditMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"basic" | "access">("basic");
+  const [activeTab, setActiveTab] = useState<"basic" | "access" | "permissions">("basic");
   const [resetLoading, setResetLoading] = useState(false);
   const statusModal = useStatusModal();
+  const [directPermissions, setDirectPermissions] = useState<UserPermissions>(createEmptyPermissions());
 
   const [form, setForm] = useState<UserData>({
     first_name: "",
@@ -146,6 +157,13 @@ export default function UsersDetails() {
 
     return codes;
   };
+
+  // Load direct permissions on userId change
+  useEffect(() => {
+    if (userId) {
+      setDirectPermissions(getUserPermissions(userId));
+    }
+  }, [userId]);
 
   // ----------------- Load user data into state -----------------
   useEffect(() => {
@@ -291,6 +309,10 @@ export default function UsersDetails() {
         console.log("Access rights to update:", accessRights);
       }
 
+      // Save direct permissions to localStorage and trigger updates
+      saveUserPermissions(userId, directPermissions);
+      window.dispatchEvent(new Event(PERMISSIONS_UPDATE_EVENT));
+
       statusModal.showSuccess("Success", "User updated successfully!");
       setEditMode(false);
     } catch (err: any) {
@@ -393,6 +415,16 @@ export default function UsersDetails() {
           onClick={() => setActiveTab("access")}
         >
           Access Rights
+        </button>
+        <button
+          className={`px-4 py-2 -mb-px font-medium ${
+            activeTab === "permissions"
+              ? "border-b-2 border-blue-600 text-[#3B7CED]"
+              : "text-gray-500"
+          }`}
+          onClick={() => setActiveTab("permissions")}
+        >
+          Module Permissions
         </button>
         <PermissionGuard application="settings" module="user" action="edit">
           <button
@@ -718,6 +750,67 @@ export default function UsersDetails() {
                   )}
                 </div>
               ))}
+            </div>
+          </FormSection>
+
+          {editMode && (
+            <div className="mt-6 flex justify-end gap-4 px-6">
+              <button
+                type="button"
+                onClick={() => setEditMode(false)}
+                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+        </Form>
+      )}
+
+      {/* Module Permissions Tab */}
+      {activeTab === "permissions" && (
+        <Form onSubmit={handleSave}>
+          <FormSection title="Module Permissions Grid">
+            {editMode && (
+              <div className="mb-6 max-w-md mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Apply Permission Template (Optional)
+                </label>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const selected = getPermissionTemplates().find(t => t.id === e.target.value);
+                      if (selected) {
+                        setDirectPermissions(selected.permissions);
+                      }
+                    }
+                  }}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  defaultValue=""
+                >
+                  <option value="" disabled>-- Select a Template --</option>
+                  {getPermissionTemplates()
+                    .filter((t) => !t.isArchived)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+            <div className="mt-4">
+              <PermissionsGrid
+                permissions={directPermissions}
+                onChange={setDirectPermissions}
+                readOnly={!editMode}
+              />
             </div>
           </FormSection>
 

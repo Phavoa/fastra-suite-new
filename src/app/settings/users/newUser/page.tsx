@@ -25,6 +25,16 @@ import { useCreateUserMutation } from "@/api/settings/usersApi";
 import { useGetAccessGroupsByApplicationQuery } from "@/api/settings/accessGroupRightApi";
 import { RootState } from "@/lib/store/store";
 
+import PermissionsGrid from "@/components/Settings/PermissionsGrid";
+import {
+  getUserPermissions,
+  saveUserPermissions,
+  getPermissionTemplates,
+  UserPermissions,
+  createEmptyPermissions,
+} from "@/utils/modulePermissionsStore";
+import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
+
 const userCreateSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
@@ -42,8 +52,9 @@ const userCreateSchema = z.object({
 type UserCreateInput = z.infer<typeof userCreateSchema>;
 
 export default function NewUser() {
-  const [activeTab, setActiveTab] = useState<"basic" | "access">("basic");
+  const [activeTab, setActiveTab] = useState<"basic" | "access" | "permissions">("basic");
   const router = useRouter();
+  const [directPermissions, setDirectPermissions] = useState<UserPermissions>(createEmptyPermissions());
   
   const tenant_company_name = useSelector(
     (state: RootState) => state.auth.tenant_company_name
@@ -148,7 +159,11 @@ export default function NewUser() {
     }
 
     try {
-      await createUser(formData).unwrap();
+      const res = await createUser(formData).unwrap();
+      if (res?.id) {
+        saveUserPermissions(res.id, directPermissions);
+        window.dispatchEvent(new Event(PERMISSIONS_UPDATE_EVENT));
+      }
       setNotification({
         message: `User ${data.name} created successfully!`,
         type: "success",
@@ -271,6 +286,17 @@ export default function NewUser() {
             onClick={() => setActiveTab("access")}
           >
             Access Rights
+          </button>
+          <button
+            type="button"
+            className={`px-4 py-2 -mb-px font-medium ${
+              activeTab === "permissions"
+                ? "border-b-2 border-blue-600 text-[#3B7CED]"
+                : "text-gray-500"
+            }`}
+            onClick={() => setActiveTab("permissions")}
+          >
+            Module Permissions
           </button>
         </div>
 
@@ -522,6 +548,65 @@ export default function NewUser() {
                 <button
                   type="button"
                   onClick={() => setActiveTab("basic")}
+                  className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
+                >
+                  Back
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("permissions")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Module Permissions Tab */}
+          {activeTab === "permissions" && (
+            <div className="w-full bg-white px-6">
+              <FormSection title="Module Permissions Grid">
+                <div className="mb-6 max-w-md mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Apply Permission Template (Optional)
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const selected = getPermissionTemplates().find(t => t.id === e.target.value);
+                        if (selected) {
+                          setDirectPermissions(selected.permissions);
+                        }
+                      }
+                    }}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>-- Select a Template --</option>
+                    {getPermissionTemplates()
+                      .filter((t) => !t.isArchived)
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="mt-4">
+                  <PermissionsGrid
+                    permissions={directPermissions}
+                    onChange={setDirectPermissions}
+                    readOnly={false}
+                  />
+                </div>
+              </FormSection>
+
+              <div className="mt-12 flex justify-end gap-4 pb-6">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("access")}
                   className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
                 >
                   Back

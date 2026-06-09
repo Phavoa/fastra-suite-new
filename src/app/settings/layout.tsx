@@ -12,7 +12,7 @@ import { setArchive } from "@/components/Settings/viewModeSlice";
 import { RootState } from "@/lib/store/store";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-type SettingsSection = "company" | "user" | "accessgroup" | "application";
+type SettingsSection = "company" | "user" | "accessgroup" | "application" | "permissiontemplates";
 
 export default function SettingsLayout({
   children,
@@ -36,6 +36,11 @@ export default function SettingsLayout({
       label: "Access Groups",
       href: "/settings/accessgroup",
     },
+    {
+      key: "permissiontemplates",
+      label: "Permission Templates",
+      href: "/settings/permission-templates",
+    },
     //{ label: "Application", href: "/settings/application" },
   ];
 
@@ -44,6 +49,7 @@ export default function SettingsLayout({
     if (path.startsWith("/settings/users")) return "user";
     if (path.startsWith("/settings/accessgroup")) return "accessgroup";
     if (path.startsWith("/settings/application")) return "application";
+    if (path.startsWith("/settings/permission-templates")) return "permissiontemplates";
     return "company";
   };
 
@@ -82,6 +88,9 @@ export default function SettingsLayout({
       case "application":
         basePath += "/application";
         break;
+      case "permissiontemplates":
+        basePath += "/permission-templates";
+        break;
     }
     router.push(`${basePath}?search=${encodeURIComponent(query)}`);
   };
@@ -102,6 +111,9 @@ export default function SettingsLayout({
       case "application":
         newPath += "/application/newApplication";
         break;
+      case "permissiontemplates":
+        newPath += "/permission-templates/new";
+        break;
       default:
         newPath += "/new";
         break;
@@ -119,6 +131,8 @@ export default function SettingsLayout({
       pathname !== "/settings/users") ||
     (/^\/settings\/accessgroup\/[^/]+$/.test(pathname) &&
       pathname !== "/settings/accessgroup") ||
+    (/^\/settings\/permission-templates\/[^/]+$/.test(pathname) &&
+      pathname !== "/settings/permission-templates") ||
     pathname === "/settings" ||
     pathname === "/settings/company/1" ||
     /^\/settings\/company\/updatecompany\/?$/.test(pathname);
