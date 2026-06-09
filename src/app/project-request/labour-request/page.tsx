@@ -74,7 +74,10 @@ export default function LabourRequestPage() {
   // Combine API and local data
   useEffect(() => {
     const combineData = () => {
-      const apiRequests = apiData || [];
+      const rawApiData = apiData || [];
+      const apiRequests: LabourRequest[] = Array.isArray(rawApiData)
+        ? rawApiData
+        : (rawApiData as any).results || [];
       const localRequests = localData;
       console.log("API requests:", apiRequests);
       console.log("Local requests:", localRequests);
@@ -85,9 +88,9 @@ export default function LabourRequestPage() {
           id: req.id,
           referenceId: req.reference_id,
           // project: `${req?.project || "Name here"}`, // to be added later
-          workers: req.detail.number_of_workers,
-          role: req.detail.role_type,
-          requester: req.detail.created_by_name || "Requester",
+          workers: req.detail?.number_of_workers || 0,
+          role: req.detail?.role_type || "Unknown",
+          requester: req.detail?.created_by_name || "Requester",
           status: req.status || "draft",
           isOffline: false,
         }),
@@ -99,9 +102,9 @@ export default function LabourRequestPage() {
         .map((req) => ({
           id: req.id || 0,
           referenceId: req.reference_id,
-          project: `${req.project_request.project || "Project name"}`,
-          workers: req.detail.number_of_workers,
-          role: req.detail.role_type,
+          project: `${req.project_request?.project || "Project name"}`,
+          workers: req.detail?.number_of_workers || 0,
+          role: req.detail?.role_type || "Unknown",
           requester: "You (Offline)",
           status: req.project_request?.status || "draft",
           isOffline: true,
