@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { SettingsGrid } from "@/components/Settings/settingsGrid";
@@ -26,7 +27,7 @@ type User = {
   status: string;
   companyRole?: string;
   phone?: string;
-  address?: string;
+  timezone?: string;
 };
 
 export default function Users() {
@@ -34,28 +35,38 @@ export default function Users() {
   const archive = useSelector((state: RootState) => state.viewMode.archive);
   const archiveFlag = !!archive;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("search") ?? "";
 
   const { data: users } = useGetUsersQuery();
-  console.log(users)
+  console.log(users);
 
   const formattedUsers: User[] =
-  users?.map((u: any) => ({
-    id: u.id,
-    name: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim(),  
-    email: u.email,
-    companyRole: u.company_role_details?.name ?? "—",               // ROLE NAME
-    phone: u.phone_number ?? "—",
-    address: u.address ?? "—",                                    // optional
-    status: u.status ?? "active",
-  })) ?? [];
+    users?.map((u: any) => ({
+      id: u.id,
+      name: `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim(),
+      email: u.email,
+      companyRole: u.company_role_details?.name ?? "—", // ROLE NAME
+      phone: u.phone_number ?? "—",
+      timezone: u.timezone ?? "—", // optional
+      status: u.status ?? "active",
+    })) ?? [];
 
-
-  const finalDataset = archiveFlag
-    ? formattedUsers.filter(u => u.status?.toLowerCase() === "archived")
+  const baseDataset = archiveFlag
+    ? formattedUsers.filter((u) => u.status?.toLowerCase() === "archived")
     : formattedUsers;
 
+  const searchLower = searchQuery.toLowerCase();
+  const searchedDataset = searchLower
+    ? baseDataset.filter((u) =>
+        Object.values(u).some((val) =>
+          String(val).toLowerCase().includes(searchLower),
+        ),
+      )
+    : baseDataset;
+
   // 👉 Empty state
-  if (finalDataset.length === 0) {
+  if (searchedDataset.length === 0) {
     return (
       <div className="py-20 w-full flex flex-col items-center justify-center text-center">
         <img
@@ -71,9 +82,9 @@ export default function Users() {
   const headers = [
     { key: "name", label: "Name" },
     { key: "email", label: "Email" },
-    { key: "company_role", label: "Company Role" },
+    { key: "companyRole", label: "Company Role" },
     { key: "phone", label: "Phone" },
-    { key: "address", label: "Address" },
+    { key: "timezone", label: "Timezone" },
     ...(archiveFlag ? [{ key: "status", label: "Status" }] : []),
   ];
 
@@ -87,7 +98,7 @@ export default function Users() {
       {viewMode === "grid" ? (
         <SettingsGrid
           icon={<GridCardIcon />}
-          dataList={finalDataset}
+          dataList={searchedDataset}
           type="user"
           fieldsToShow={["companyRole", "email", "phone"]}
           onItemClick={handleUserClick}
@@ -95,7 +106,7 @@ export default function Users() {
       ) : (
         <ReusableTable
           headers={headers}
-          data={finalDataset}
+          data={searchedDataset}
           className="bg-white p-4"
           headerClassName="bg-[#F1F2F4]"
           headerTextColor="text-[#7A8A98]"

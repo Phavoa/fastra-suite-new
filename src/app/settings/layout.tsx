@@ -2,7 +2,7 @@
 
 import { BreadcrumbItem } from "@/components/shared/BreadScrumbs";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { GrayButton } from "@/components/ui/grayButton";
 import { CloudUploadFilled } from "@/components/icons/CloudUploadFilled";
@@ -29,7 +29,7 @@ export default function SettingsLayout({
     href: string;
     key: SettingsSection;
   }[] = [
-    { key: "company", label: "Company", href: "/settings" },
+    { key: "company", label: "Company", href: "/settings/company/1" },
     { key: "user", label: "User", href: "/settings/users" },
     {
       key: "accessgroup",
@@ -50,6 +50,9 @@ export default function SettingsLayout({
   const activeSection = getActiveSection(pathname);
   const activeNav = navItems.find((item) => item.key === activeSection);
 
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("search") ?? "";
+
   /*const activeSection =
      activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||
      "company";
@@ -57,7 +60,7 @@ export default function SettingsLayout({
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
-    { label: "Settings", href: "/settings" },
+    { label: "Settings", href: "/settings/company/1" },
   ];
 
   if (activeNav) {
@@ -65,7 +68,22 @@ export default function SettingsLayout({
   }
 
   const handleSearch = (query: string) => {
-    console.log("Search query:", query);
+    let basePath = "/settings";
+    switch (activeSection) {
+      case "company":
+        basePath += "/company/1";
+        break;
+      case "user":
+        basePath += "/users";
+        break;
+      case "accessgroup":
+        basePath += "/accessgroup";
+        break;
+      case "application":
+        basePath += "/application";
+        break;
+    }
+    router.push(`${basePath}?search=${encodeURIComponent(query)}`);
   };
 
   const handleNew = () => {
@@ -73,7 +91,7 @@ export default function SettingsLayout({
 
     switch (activeSection) {
       case "company":
-        newPath += "/company/newcompany";
+        newPath += "/company/updatecompany";
         break;
       case "user":
         newPath += "/users/newUser";
@@ -100,7 +118,10 @@ export default function SettingsLayout({
     (/^\/settings\/users\/[^/]+$/.test(pathname) &&
       pathname !== "/settings/users") ||
     (/^\/settings\/accessgroup\/[^/]+$/.test(pathname) &&
-      pathname !== "/settings/accessgroup");
+      pathname !== "/settings/accessgroup") ||
+    pathname === "/settings" ||
+    pathname === "/settings/company/1" ||
+    /^\/settings\/company\/updatecompany\/?$/.test(pathname);
   return (
     <PageGuard application="settings" module={activeSection}>
       <NavBar title="Settings" items={navItems} activeHref={activeNav?.href} />
@@ -111,9 +132,9 @@ export default function SettingsLayout({
           <Breadcrumbs items={breadcrumbItems} />
         </div>
 
-        <GrayButton size="sm" icon={CloudUploadFilled}>
+        {/* <GrayButton size="sm" icon={CloudUploadFilled}>
           Autosaved
-        </GrayButton>
+        </GrayButton> */}
       </div>
 
       {/* Settings control bar */}

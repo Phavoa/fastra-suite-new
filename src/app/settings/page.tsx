@@ -6,29 +6,31 @@ import { RootState } from "@/lib/store/store";
 import { ReusableTable } from "@/components/Settings/settingsReusableTable";
 import { useGetCompanyQuery } from "@/api/settings/companyApi";
 import { SettingsCard } from "@/components/Settings/settingsCard";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { useEffect } from "react";
 
 export default function Settings() {
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const router = useRouter();
   const tenant_company_name = useSelector(
-    (state: any) => state.auth.tenant_company_name
+    (state: any) => state.auth.tenant_company_name,
   );
-  const userEmail = useSelector(
-    (state: any) => state.auth.user.email
-  );
+  const userEmail = useSelector((state: any) => state.auth.user.email);
 
   const { data: company, isLoading, isError } = useGetCompanyQuery();
+  console.log("industry", company?.industry);
 
-  if (isLoading) return (
-    <div className="p-6 flex justify-center items-center">
-      <LoadingDots count={3} />
-    </div>
-  );
+  if (isLoading)
+    return (
+      <div className="p-6 flex justify-center items-center">
+        <LoadingDots count={3} />
+      </div>
+    );
 
-  if (isError) return <p className="p-6 text-red-500">Failed to load company</p>;
+  if (isError)
+    return <p className="p-6 text-red-500">Failed to load company</p>;
   if (!company) return <p className="p-6">No company has been created yet</p>;
 
   const roleName =
@@ -41,11 +43,7 @@ export default function Settings() {
       id: company.id,
       title: company.industry || "Company",
       icon: <GridCardIcon />,
-      data: [
-        roleName,
-         userEmail,
-        company.phone,
-      ].filter(Boolean),
+      data: [roleName, userEmail, company.phone].filter(Boolean),
     },
   ];
 
@@ -68,6 +66,7 @@ export default function Settings() {
     { key: "email", label: "Email" },
   ];
 
+  console.log("company", company);
   return (
     <PageGuard application="settings" module="company" action="view">
       <div className="py-4 w-full">
