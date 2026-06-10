@@ -57,6 +57,8 @@ export interface ProjectCostingProject {
   total_budget: string;
   wbs: string;
   financials: string;
+  pending_requests_count?: number;
+  pending_requests_value?: number;
 }
 
 export interface UpdateProjectCostingProjectRequest {
