@@ -6,10 +6,17 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WbsTable } from "@/components/project-costing/WbsTable";
 import { useParams } from "next/navigation";
+import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
 
 export default function WBSPage() {
   const params = useParams();
   const id = params?.id || "1";
+  
+  const { data: project } = useGetProjectCostingProjectQuery(Number(id), {
+    skip: !id,
+  });
+
+  const budgetNum = project?.total_budget ? Number(project.total_budget) : 9000000;
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative min-h-screen">
@@ -32,7 +39,7 @@ export default function WBSPage() {
             <span className="text-sm font-medium text-green-500">Project Budget</span>
           </div>
           <div className="text-3xl font-semibold text-green-500 mt-2">
-            N9,000,000
+            N{budgetNum.toLocaleString()}
           </div>
         </div>
 

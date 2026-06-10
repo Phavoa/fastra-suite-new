@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,64 +16,34 @@ import {
 import { Search, LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 
-const dummyProjects = [
-  {
-    id: "1",
-    code: "PC-10293",
-    name: "Building Project",
-    manager: "John Doe",
-    type: "Fixed Price",
-    startDate: "4 Apr 2024",
-    status: "Active",
-    statusVariant: "validated",
-  },
-  {
-    id: "2",
-    code: "PC-10293",
-    name: "Building Project",
-    manager: "John Doe",
-    type: "Time & Material",
-    startDate: "4 Apr 2024",
-    status: "Awaiting Approval",
-    statusVariant: "pending",
-  },
-  {
-    id: "3",
-    code: "PC-10293",
-    name: "Building Project",
-    manager: "John Doe",
-    type: "Cost Plus",
-    startDate: "4 Apr 2024",
-    status: "Rejected",
-    statusVariant: "rejected",
-  },
-  {
-    id: "4",
-    code: "PC-10293",
-    name: "Building Project",
-    manager: "John Doe",
-    type: "Milestone-based",
-    startDate: "4 Apr 2024",
-    status: "Draft",
-    statusVariant: "draft",
-  },
-  {
-    id: "5",
-    code: "PC-10293",
-    name: "Building Project",
-    manager: "John Doe",
-    type: "Fixed Price",
-    startDate: "4 Apr 2024",
-    status: "Awaiting Approval",
-    statusVariant: "pending",
-  },
-];
+const getStatusVariant = (status: string) => {
+  switch (status?.toUpperCase()) {
+    case "ACTIVE":
+    case "APPROVED":
+      return "validated";
+    case "AWAITING APPROVAL":
+    case "PENDING":
+      return "pending";
+    case "REJECTED":
+      return "rejected";
+    default:
+      return "draft";
+  }
+};
 
 export default function ProjectCostingListPage() {
   const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [ordering, setOrdering] = useState("");
 
-  const handleRowClick = (id: string) => {
+  const { data: projects = [], isLoading } = useGetProjectCostingProjectsQuery({
+    search,
+    ordering,
+  });
+
+  const handleRowClick = (id: number) => {
     router.push(`/project-costing/${id}`);
   };
 
@@ -89,6 +59,8 @@ export default function ProjectCostingListPage() {
               type="text"
               placeholder="Search"
               className="pl-9 bg-gray-50 border-gray-200"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
@@ -120,34 +92,48 @@ export default function ProjectCostingListPage() {
               </TableHead>
               <TableHead className="font-medium text-gray-500">Project Code</TableHead>
               <TableHead className="font-medium text-gray-500">Project Name</TableHead>
-              <TableHead className="font-medium text-gray-500">Project Manager</TableHead>
+              <TableHead className="font-medium text-gray-500">Client Name</TableHead>
               <TableHead className="font-medium text-gray-500">Project Type</TableHead>
               <TableHead className="font-medium text-gray-500">Start Date</TableHead>
               <TableHead className="font-medium text-gray-500">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dummyProjects.map((project, index) => (
-              <TableRow 
-                key={index} 
-                className="cursor-pointer hover:bg-gray-50 border-b-gray-100"
-                onClick={() => handleRowClick(project.code)}
-              >
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Checkbox className="border-gray-300" />
-                </TableCell>
-                <TableCell className="text-gray-600">{project.code}</TableCell>
-                <TableCell className="text-gray-600">{project.name}</TableCell>
-                <TableCell className="text-gray-600">{project.manager}</TableCell>
-                <TableCell className="text-gray-600">{project.type}</TableCell>
-                <TableCell className="text-gray-600">{project.startDate}</TableCell>
-                <TableCell>
-                  <Badge variant={project.statusVariant as any} className="px-3 py-1 font-normal">
-                    {project.status}
-                  </Badge>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  Loading projects...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : projects.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  No projects found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              projects.map((project, index) => (
+                <TableRow 
+                  key={index} 
+                  className="cursor-pointer hover:bg-gray-50 border-b-gray-100"
+                  onClick={() => handleRowClick(project.id)}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox className="border-gray-300" />
+                  </TableCell>
+                  <TableCell className="text-gray-600">{project.project_code || "N/A"}</TableCell>
+                  <TableCell className="text-gray-600">{project.name}</TableCell>
+                  <TableCell className="text-gray-600">{project.client_name || "N/A"}</TableCell>
+                  <TableCell className="text-gray-600">{project.project_type || "N/A"}</TableCell>
+                  <TableCell className="text-gray-600">{project.start_date || "N/A"}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(project.status) as any} className="px-3 py-1 font-normal">
+                      {project.status || "DRAFT"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

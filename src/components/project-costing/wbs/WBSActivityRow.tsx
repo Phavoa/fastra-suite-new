@@ -2,7 +2,7 @@ import React from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Trash2 } from "lucide-react";
-import { Activity } from "./types";
+import { Activity } from "../types";
 
 interface WBSActivityRowProps {
   activity: Activity;
@@ -30,7 +30,7 @@ export function WBSActivityRow({
         <Input
           value={activity.name}
           onChange={(e) => onUpdate({ name: e.target.value })}
-          className="h-8 w-full bg-transparent border-transparent hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+          className="h-8 w-full bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
         />
       </TableCell>
       <TableCell className="py-2 flex items-center gap-2">
@@ -38,7 +38,7 @@ export function WBSActivityRow({
           type="number"
           value={activity.budget || ""}
           onChange={(e) => onUpdate({ budget: Number(e.target.value) })}
-          className="h-8 w-full max-w-[120px] bg-transparent border-transparent hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+          className="h-8 w-full max-w-[120px] bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
         />
         <button
           onClick={onRemove}

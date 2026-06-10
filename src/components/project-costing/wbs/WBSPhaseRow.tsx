@@ -1,7 +1,7 @@
 import React from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Activity, Phase, Subphase } from "../types";
 import { WBSActivityRow } from "./WBSActivityRow";
 import { WBSSubphaseRow } from "./WBSSubphaseRow";
@@ -17,6 +17,8 @@ interface WBSPhaseRowProps {
   onAddSubphaseActivity: (subphaseId: string) => void;
   onUpdateActivity: (activityId: string, updates: Partial<Activity>, subphaseId?: string) => void;
   onRemoveActivity: (activityId: string, subphaseId?: string) => void;
+  onRemovePhase: () => void;
+  onRemoveSubphase: (subphaseId: string) => void;
 }
 
 export function WBSPhaseRow({
@@ -30,6 +32,8 @@ export function WBSPhaseRow({
   onAddSubphaseActivity,
   onUpdateActivity,
   onRemoveActivity,
+  onRemovePhase,
+  onRemoveSubphase,
 }: WBSPhaseRowProps) {
   return (
     <React.Fragment>
@@ -39,7 +43,7 @@ export function WBSPhaseRow({
           <Input
             value={phase.name}
             onChange={(e) => onUpdatePhaseName(e.target.value)}
-            className="h-8 w-40 bg-transparent border-transparent hover:border-gray-300 focus:bg-white transition-all font-medium p-1 mr-4 shadow-none"
+            className="h-8 w-40 bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white transition-all font-medium p-1 mr-4 shadow-none"
           />
           <button
             onClick={onAddSubphase}
@@ -52,6 +56,13 @@ export function WBSPhaseRow({
             className="ml-4 text-[#3B7CED] text-xs font-normal hover:underline flex items-center"
           >
             <Plus className="w-3 h-3 mr-1" /> Activity
+          </button>
+          <button
+            onClick={onRemovePhase}
+            className="ml-4 text-gray-400 hover:text-red-500 flex items-center"
+            title="Delete Phase"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </TableCell>
         <TableCell></TableCell>
@@ -85,6 +96,7 @@ export function WBSPhaseRow({
           onRemoveActivity={(activityId) =>
             onRemoveActivity(activityId, subphase.id)
           }
+          onRemoveSubphase={() => onRemoveSubphase(subphase.id)}
         />
       ))}
     </React.Fragment>

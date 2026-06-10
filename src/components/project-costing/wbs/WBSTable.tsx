@@ -7,31 +7,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Phase, Subphase, Activity } from "./types";
+import { Phase, Subphase, Activity } from "../types";
 import { WBSPhaseRow } from "./WBSPhaseRow";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-export function WBSTable() {
-  const [phases, setPhases] = useState<Phase[]>([
-    {
-      id: "p1",
-      name: "Phase 1",
-      activities: [
-        { id: "p1-a1", name: "Activities 1", budget: 1000000 },
-        { id: "p1-a2", name: "Activities 2", budget: 1000000 },
-      ],
-      subphases: [
-        {
-          id: "p1-s1",
-          name: "Sub Phase 1",
-          activities: [
-            { id: "p1-s1-a1", name: "Activities 2", budget: 1000000 },
-          ],
-        },
-      ],
-    },
-  ]);
+interface WBSTableProps {
+  phases: Phase[];
+  setPhases: React.Dispatch<React.SetStateAction<Phase[]>>;
+}
+
+export function WBSTable({ phases, setPhases }: WBSTableProps) {
 
   // Compute total budget
   const totalBudget = useMemo(() => {
@@ -239,6 +225,24 @@ export function WBSTable() {
     );
   };
 
+  const removePhase = (phaseId: string) => {
+    setPhases((prev) => prev.filter((p) => p.id !== phaseId));
+  };
+
+  const removeSubphase = (phaseId: string, subphaseId: string) => {
+    setPhases((prev) =>
+      prev.map((p) => {
+        if (p.id === phaseId) {
+          return {
+            ...p,
+            subphases: p.subphases.filter((s) => s.id !== subphaseId),
+          };
+        }
+        return p;
+      }),
+    );
+  };
+
   return (
     <section>
       <h2 className="text-[#3B7CED] text-base font-medium mb-4">
@@ -281,6 +285,8 @@ export function WBSTable() {
                 onRemoveActivity={(activityId, subphaseId) =>
                   removeActivity(phase.id, activityId, subphaseId)
                 }
+                onRemovePhase={() => removePhase(phase.id)}
+                onRemoveSubphase={(subphaseId) => removeSubphase(phase.id, subphaseId)}
               />
             ))}
           </TableBody>

@@ -20,10 +20,25 @@ import { Plus } from "lucide-react";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  project?: any;
 }
 
-export function AddBudgetAdjustmentModal({ isOpen, onClose }: Props) {
+export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
+
+  const budgetNum = project?.total_budget ? Number(project.total_budget) : 0;
+  
+  let activities: any[] = [];
+  if (project?.financials) {
+    try {
+      const fin = typeof project.financials === "string" ? JSON.parse(project.financials) : project.financials;
+      if (fin?.by_activity && Array.isArray(fin.by_activity)) {
+        activities = fin.by_activity;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -43,13 +58,13 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose }: Props) {
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Original Approved Budget</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-2xl font-bold text-gray-900">N450,000</p>
+                  <p className="text-2xl font-bold text-gray-900">{budgetNum > 0 ? `N${budgetNum.toLocaleString()}` : "N/A"}</p>
                   <Badge variant="outline" className="text-gray-400 border-gray-300 font-normal py-0">Locked</Badge>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Current Approved Budget</p>
-                <p className="text-2xl font-bold text-gray-900">N550,000</p>
+                <p className="text-2xl font-bold text-gray-900">{budgetNum > 0 ? `N${budgetNum.toLocaleString()}` : "N/A"}</p>
               </div>
             </div>
           </div>
@@ -90,11 +105,18 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose }: Props) {
                     <label className="text-sm font-semibold text-gray-900">WBS Activity</label>
                     <Select>
                       <SelectTrigger className="w-full text-gray-500">
-                        <SelectValue placeholder="All" />
+                        <SelectValue placeholder="Select Activity" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="activity-1">Activity 1</SelectItem>
+                        {activities.length > 0 ? (
+                          activities.map((act) => (
+                            <SelectItem key={act.activity_id} value={act.activity_id}>
+                              {act.activity_name} ({act.wbs_code})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>No activities available</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -103,54 +125,60 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose }: Props) {
                     <label className="text-sm font-semibold text-gray-900">Cost Category</label>
                     <Select>
                       <SelectTrigger className="w-full text-gray-500">
-                        <SelectValue placeholder="All" />
+                        <SelectValue placeholder="Select Category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="lab-001">LAB-001</SelectItem>
+                        <SelectItem value="LABOUR">Labour</SelectItem>
+                        <SelectItem value="MATERIAL_CONSUMPTION">Material Consumption</SelectItem>
+                        <SelectItem value="PLANT_EQUIPMENT">Plant Equipment</SelectItem>
+                        <SelectItem value="SUB_CONTRACTOR">Sub Contractor</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold text-gray-900">Adjustment Amount</label>
-                    <Input placeholder="All" />
+                    <Input placeholder="Enter amount" type="number" />
                   </div>
 
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold text-gray-900">Reason for Adjustment</label>
-                    <Input placeholder="All" />
+                    <Input placeholder="Enter reason" />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold text-gray-900">Activity Name</label>
-                    <Input placeholder="All" />
+                    <Input placeholder="Enter activity name" />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-gray-900">Budget Amount</label>
+                    <Input placeholder="Enter budget amount" type="number" />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-gray-900">Reason for Adjustment</label>
+                    <Input placeholder="Enter reason" />
                   </div>
 
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold text-gray-900">Cost Category</label>
                     <Select>
                       <SelectTrigger className="w-full text-gray-500">
-                        <SelectValue placeholder="All" />
+                        <SelectValue placeholder="Select Category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="lab-001">LAB-001</SelectItem>
+                        <SelectItem value="LABOUR">Labour</SelectItem>
+                        <SelectItem value="MATERIAL_CONSUMPTION">Material Consumption</SelectItem>
+                        <SelectItem value="PLANT_EQUIPMENT">Plant Equipment</SelectItem>
+                        <SelectItem value="SUB_CONTRACTOR">Sub Contractor</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-900">Budget Amount</label>
-                    <Input placeholder="All" />
-                  </div>
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-900">Reason for Adjustment</label>
-                    <Input placeholder="All" />
-                  </div>
                 </>
               )}
 
