@@ -49,6 +49,7 @@ import { labourRequestApi } from "@/api/requests/labourRequestApi";
 import { projectPurchaseRequestApi } from "@/api/requests/projectPurchaseRequestApi";
 import { plantEquipmentRequestApi } from "@/api/requests/plantEquipmentRequestApi";
 import { projectRequestApi } from "@/api/requests/projectRequestApi";
+import { pettyCashRequestApi } from "@/api/requests/pettyCashRequestApi";
 
 const authPersistConfig = {
   key: "auth",
@@ -102,6 +103,7 @@ const rootReducer = combineReducers({
   [projectPurchaseRequestApi.reducerPath]: projectPurchaseRequestApi.reducer,
   [plantEquipmentRequestApi.reducerPath]: plantEquipmentRequestApi.reducer,
   [projectRequestApi.reducerPath]: projectRequestApi.reducer,
+  [pettyCashRequestApi.reducerPath]: pettyCashRequestApi.reducer,
 
   [invoiceApi.reducerPath]: invoiceApi.reducer,
 
@@ -154,6 +156,7 @@ export const store = configureStore({
       projectPurchaseRequestApi.middleware,
       plantEquipmentRequestApi.middleware,
       projectRequestApi.middleware,
+      pettyCashRequestApi.middleware,
 
       invoiceApi.middleware,
       companyApi.middleware,

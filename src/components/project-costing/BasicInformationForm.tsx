@@ -1,13 +1,6 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface BasicInformationFormProps {
   name: string;
@@ -63,15 +56,12 @@ export function BasicInformationForm({
 
         <div className="flex flex-col gap-2">
           <Label className="text-gray-700 font-medium">Project Type</Label>
-          <Select value={projectType} onValueChange={setProjectType}>
-            <SelectTrigger className="bg-white border-gray-300 rounded w-full">
-              <SelectValue placeholder="Select Project Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fixed">Fixed Price</SelectItem>
-              <SelectItem value="time">Time & Material</SelectItem>
-            </SelectContent>
-          </Select>
+          <Input
+            placeholder="Enter Project Type"
+            className="bg-white border-gray-300 rounded"
+            value={projectType}
+            onChange={(e) => setProjectType(e.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label className="text-gray-700 font-medium">Start date</Label>

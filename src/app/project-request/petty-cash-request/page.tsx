@@ -1,51 +1,28 @@
 "use client";
 
 import React from "react";
-import { FileText, CheckCircle, Clock, XCircle } from "lucide-react";
+import { FileText, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RequestDashboard } from "@/components/requests/RequestDashboard";
 import { RequestDashboardConfig, RequestStatus } from "@/components/requests/types";
+import { useGetProjectRequestsQuery } from "@/api/requests/projectRequestApi";
+import { useRouter } from "next/navigation";
 
-interface PettyCashRequest {
+interface PettyCashRequestItem {
   id: string;
   project: string;
   amountRequested: number;
   requester: string;
   status: RequestStatus;
+  realId: number;
 }
 
-const mockRequests: PettyCashRequest[] = [
-  {
-    id: "PC00001",
-    project: "Project #1",
-    amountRequested: 50000,
-    requester: "Firstname Lastname",
-    status: "approved",
-  },
-  {
-    id: "PC00002",
-    project: "Project #1",
-    amountRequested: 50000,
-    requester: "Firstname Lastname",
-    status: "pending",
-  },
-  {
-    id: "PC00003",
-    project: "Project #1",
-    amountRequested: 50000,
-    requester: "Firstname Lastname",
-    status: "draft",
-  },
-];
-
-const statusCounts: Record<RequestStatus, number> = {
-  draft: 12,
-  approved: 12,
-  pending: 12,
-  rejected: 12,
-};
-
 export default function PettyCashRequestPage() {
+  const router = useRouter();
+  const { data: apiRequests = [], isLoading } = useGetProjectRequestsQuery({
+    request_type: "petty_cash",
+  });
+
   const getStatusBadgeVariant = (status: RequestStatus) => {
     switch (status) {
       case "approved":
@@ -59,11 +36,53 @@ export default function PettyCashRequestPage() {
     }
   };
 
-  const config: RequestDashboardConfig<PettyCashRequest> = {
+  const requests = React.useMemo(() => {
+    return apiRequests.map((req) => {
+      let detail: any = {};
+      if (req.detail) {
+        if (typeof req.detail === "string") {
+          try {
+            detail = JSON.parse(req.detail);
+          } catch (e) {
+            detail = {};
+          }
+        } else {
+          detail = req.detail;
+        }
+      }
+      return {
+        id: req.reference_id || `PC-${req.id}`,
+        project: req.project_details?.name || "General Project",
+        amountRequested: parseFloat(detail.amount_requested) || detail.amountRequested || detail.amount || 0,
+        requester: req.created_by_details 
+          ? `${req.created_by_details.first_name} ${req.created_by_details.last_name}` 
+          : `User #${req.created_by}`,
+        status: (req.status === "cancelled" ? "rejected" : req.status) as RequestStatus,
+        realId: req.id,
+      };
+    });
+  }, [apiRequests]);
+
+  const counts = React.useMemo(() => {
+    const defaultCounts: Record<RequestStatus, number> = {
+      draft: 0,
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+    };
+    requests.forEach((r) => {
+      if (r.status in defaultCounts) {
+        defaultCounts[r.status]++;
+      }
+    });
+    return defaultCounts;
+  }, [requests]);
+
+  const config: RequestDashboardConfig<PettyCashRequestItem> = {
     title: "Petty Cash Request",
     idPrefix: "PC",
     newRequestPath: "/project-request/petty-cash-request/new",
-    statusCounts,
+    statusCounts: counts,
     summaryConfigs: [
       {
         status: "draft",
@@ -99,7 +118,10 @@ export default function PettyCashRequestPage() {
       },
     ],
     renderItem: (request) => (
-      <div className="p-4 border border-gray-200 rounded-md bg-white">
+      <div 
+        onClick={() => router.push(`/project-request/petty-cash-request/${request.realId}`)}
+        className="p-4 border border-gray-200 rounded-md bg-white hover:shadow-md transition-shadow duration-200 cursor-pointer"
+      >
         <div className="flex justify-between items-start">
           <span className="text-sm font-bold text-[#3B7CED]">{request.id}</span>
           <Badge variant={getStatusBadgeVariant(request.status)}>
@@ -112,7 +134,7 @@ export default function PettyCashRequestPage() {
           <div>
             <p className="text-xs text-gray-400 font-medium">Amount Requested</p>
             <p className="text-sm font-bold text-gray-900 mt-0.5">
-              {request.amountRequested.toLocaleString()}
+              ₦{request.amountRequested.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
           <div className="text-right">
@@ -122,8 +144,17 @@ export default function PettyCashRequestPage() {
         </div>
       </div>
     ),
-    mockData: mockRequests,
+    mockData: requests,
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F1F5F9] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-10 h-10 text-[#3B7CED] animate-spin" />
+        <p className="text-gray-500 font-medium">Loading Petty Cash dashboard...</p>
+      </div>
+    );
+  }
 
   return <RequestDashboard config={config} backUrl="/project-request/make-request" />;
 }

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AddBudgetAdjustmentModal } from "@/components/project-costing/modals/AddBudgetAdjustmentModal";
@@ -20,10 +21,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, RefreshCw, Plus } from "lucide-react";
+import { ArrowLeft, RefreshCw, Plus, ChevronDown, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
+import { 
+  useGetProjectCostingProjectQuery,
+  useApproveProjectMutation,
+  useRejectProjectMutation,
+  useSubmitProjectMutation
+} from "@/api/projectCostingApi";
 import {
   LineChart,
   Line,
@@ -58,11 +64,41 @@ export default function ProjectDashboardPage() {
   const [showActual, setShowActual] = useState(true);
   const [showPlanned, setShowPlanned] = useState(true);
   const [isBudgetAdjustmentModalOpen, setIsBudgetAdjustmentModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("adjustments");
+  const [isAdjExpanded, setIsAdjExpanded] = useState(true);
 
-  const { data: project, isLoading, error } = useGetProjectCostingProjectQuery(
+  // Filter States
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [costCategoryFilter, setCostCategoryFilter] = useState("all");
+
+  const { data: project, isLoading, error, refetch } = useGetProjectCostingProjectQuery(
     Number(id),
     { skip: !id }
   );
+
+  const statusModal = useStatusModal();
+
+  const [approveProject, { isLoading: isApproving }] = useApproveProjectMutation();
+  const [rejectProject, { isLoading: isRejecting }] = useRejectProjectMutation();
+  const [submitProject, { isLoading: isSubmitting }] = useSubmitProjectMutation();
+
+  const handleAction = async (actionFn: any, actionName: string) => {
+    try {
+      await actionFn({ id: Number(id), body: { project_code: project?.project_code } }).unwrap();
+      statusModal.showSuccess(
+        "Action Successful",
+        `Project ${actionName} successfully.`
+      );
+      refetch();
+    } catch (err) {
+      console.error(`Failed to ${actionName} project`, err);
+      statusModal.showError(
+        "Action Failed",
+        `Failed to ${actionName} project.`
+      );
+    }
+  };
   
   if (isLoading) {
     return (
@@ -88,34 +124,9 @@ export default function ProjectDashboardPage() {
   let remaining = 0;
   let variance = "0%";
   let fin: any = null;
-  
-  if (project?.financials) {
-    try {
-      fin = typeof project.financials === "string" ? JSON.parse(project.financials) : project.financials;
-      if (fin?.summary) {
-        actualSpend = fin.summary.actual || fin.summary.spent || 0;
-        committed = fin.summary.committed || 0;
-        remaining = fin.summary.remaining_budget || 0;
-        variance = `${(fin.summary.consumed_percent || 0).toFixed(1)}%`;
-      }
-    } catch (e) {
-      console.error("Failed to parse financials", e);
-    }
-  }
-
-  const budgetNum = project?.total_budget ? Number(project.total_budget) : 0;
-  // If API gives us remaining budget, we can use it, otherwise calculate it as a fallback
-  if (!fin || !fin.summary) {
-    remaining = budgetNum - actualSpend - committed;
-    variance = budgetNum > 0 ? `${((actualSpend / budgetNum) * 100).toFixed(1)}%` : "0%";
-  }
-
-  const finPercent = budgetNum > 0 ? actualSpend / budgetNum : 0;
-  const actualPercent = budgetNum > 0 ? actualSpend / budgetNum : 0;
-  const committedPercent = budgetNum > 0 ? committed / budgetNum : 0;
-  const availablePercent = budgetNum > 0 ? remaining / budgetNum : 1;
-
+  let budgetNum = project?.total_budget ? Number(project.total_budget) : 0;
   let parsedWbs: any[] = [];
+
   if (project?.wbs) {
     try {
       parsedWbs = typeof project.wbs === "string" ? JSON.parse(project.wbs) : project.wbs;
@@ -123,6 +134,59 @@ export default function ProjectDashboardPage() {
       console.error("Failed to parse WBS", e);
     }
   }
+
+  if (project?.financials) {
+    try {
+      fin = typeof project.financials === "string" ? JSON.parse(project.financials) : project.financials;
+      
+      if (costCategoryFilter !== "all") {
+         // Filter Actual Spend by Category
+         if (fin?.summary?.category_breakdown) {
+            const cat = fin.summary.category_breakdown.find((c: any) => 
+               c.request_type.toLowerCase() === costCategoryFilter.toLowerCase() || 
+               c.request_type.toLowerCase().replace("_", "") === costCategoryFilter.toLowerCase().replace("_", "")
+            );
+            actualSpend = cat ? cat.amount : 0;
+            committed = 0; // Committed is generally an aggregate right now
+         }
+
+         // Filter Budget by Category (traverse WBS)
+         let filteredBudget = 0;
+         const sumCategoryBudget = (items: any[]) => {
+           for (const item of items) {
+              if (item.element_type === "ACTIVITY" && item.budget_lines) {
+                 for (const line of item.budget_lines) {
+                    if (line.cost_category && line.cost_category.toLowerCase() === costCategoryFilter.toLowerCase()) {
+                       filteredBudget += Number(line.original_budget || line.amount || 0);
+                    }
+                 }
+              }
+              if (item.children) {
+                 sumCategoryBudget(item.children);
+              }
+           }
+         };
+         sumCategoryBudget(parsedWbs);
+         budgetNum = filteredBudget;
+      } else {
+        // All Categories
+        if (fin?.summary) {
+          actualSpend = fin.summary.actual || fin.summary.spent || 0;
+          committed = fin.summary.committed || 0;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse financials", e);
+    }
+  }
+
+  remaining = budgetNum - actualSpend - committed;
+  variance = budgetNum > 0 ? `${((actualSpend / budgetNum) * 100).toFixed(1)}%` : "0%";
+
+  const finPercent = budgetNum > 0 ? actualSpend / budgetNum : 0;
+  const actualPercent = budgetNum > 0 ? actualSpend / budgetNum : 0;
+  const committedPercent = budgetNum > 0 ? committed / budgetNum : 0;
+  const availablePercent = budgetNum > 0 ? remaining / budgetNum : 1;
 
   let dynamicLineChartData: any[] = [];
   if (project?.start_date && project?.expected_end_date && budgetNum > 0) {
@@ -218,64 +282,94 @@ export default function ProjectDashboardPage() {
   return (
     <div className="flex flex-col h-full bg-gray-50 relative pb-20">
       {/* Top Navigation Row */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-sm">
-        <div className="flex items-center">
-          <Link href="/project-costing">
-            <Button variant="ghost" size="icon" className="mr-2">
-              <ArrowLeft className="h-5 w-5 text-gray-500" />
-            </Button>
-          </Link>
-          <h1 className="text-lg font-medium text-gray-800">{project.name}</h1>
-        </div>
+      <div className="flex items-center px-6 py-4">
+        <Link href="/project-costing" className="flex items-center text-sm text-gray-500 hover:text-gray-900 font-medium">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          {project.name}
+        </Link>
       </div>
 
-      <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6 overflow-y-auto">
+      <div className="px-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6 overflow-y-auto">
         
         {/* Project Header Info */}
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">{project.name}</h2>
-            <div className="text-sm text-gray-500 mt-1">{project.project_code || "N/A"}</div>
-            <div className="text-sm text-gray-800 mt-2">
-              <span className="font-semibold text-gray-600">Client Name:</span> {project.client_name || "N/A"} <span className="mx-2">|</span> <span className="font-semibold text-gray-600">Date:</span> {project.start_date || "N/A"} - {project.expected_end_date || "N/A"}
+            <div className="flex items-center gap-4">
+              <h2 className="text-2xl font-bold text-gray-800">{project.name}</h2>
+              {project.status === "ACTIVE" ? (
+                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 px-3 py-0.5 border-0 font-medium text-xs">Active</Badge>
+              ) : (
+                <Badge variant={getStatusVariant(project.status) as any} className="px-3 py-0.5 font-medium border-0 text-xs">{project.status || "DRAFT"}</Badge>
+              )}
+            </div>
+            <div className="text-sm text-gray-500 mt-2">{project.project_code || "N/A"}</div>
+            <div className="text-sm text-gray-800 mt-1">
+              <span className="font-semibold text-gray-600">Project Manager:</span> John Doe <span className="mx-2"> </span> <span className="font-semibold text-gray-600">Date:</span> {project.start_date || "N/A"} - {project.expected_end_date || "N/A"}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-3">
-            <Badge variant={getStatusVariant(project.status) as any} className="px-4 py-1 text-sm">
-              {project.status || "DRAFT"}
-            </Badge>
-            <Button onClick={() => setIsBudgetAdjustmentModalOpen(true)} className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-8 text-xs">
-              <Plus className="h-4 w-4 mr-1" /> Add Budget Adjustment
-            </Button>
+          
+          <div className="flex items-center gap-3">
+            {(!project.status || project.status === "DRAFT") && (
+              <Button 
+                onClick={() => handleAction(submitProject, "submitted")}
+                disabled={isSubmitting}
+                className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Project"}
+              </Button>
+            )}
+            
+            {(project.status === "PENDING" || project.status === "PENDING_APPROVAL") && (
+              <>
+                <Button 
+                  onClick={() => handleAction(rejectProject, "rejected")}
+                  disabled={isRejecting || isApproving}
+                  variant="outline"
+                  className="border-red-500 text-red-500 hover:bg-red-50"
+                >
+                  {isRejecting ? "Rejecting..." : "Reject"}
+                </Button>
+                <Button 
+                  onClick={() => handleAction(approveProject, "approved")}
+                  disabled={isApproving || isRejecting}
+                  className="bg-[#2BA24D] hover:bg-[#22853d] text-white"
+                >
+                  {isApproving ? "Approving..." : "Approve"}
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-end gap-6 bg-white p-4 rounded shadow-sm">
-          <div className="flex gap-4 items-center">
+        {/* Filters and Actions */}
+        <div className="flex items-end justify-between py-2 border-b border-gray-100 pb-6">
+          <div className="flex gap-8 items-center">
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-600">Date Range</label>
+              <label className="text-sm font-semibold text-gray-700">Date Range</label>
               <div className="flex gap-2">
-                <Input placeholder="From" className="w-32" />
-                <Input placeholder="To" className="w-32" />
+                <Input type="date" placeholder="From" className="w-36 h-9" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                <Input type="date" placeholder="To" className="w-36 h-9" value={toDate} onChange={(e) => setToDate(e.target.value)} />
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-600">WBS Elements</label>
-              <Select>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All" />
+              <label className="text-sm font-semibold text-gray-700">Cost Category</label>
+              <Select value={costCategoryFilter} onValueChange={setCostCategoryFilter}>
+                <SelectTrigger className="w-56 h-9 text-gray-600">
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="phase1">Phase 1</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="labour">Labour</SelectItem>
+                  <SelectItem value="material_consumption">Material Consumption</SelectItem>
+                  <SelectItem value="plant_equipment">Plant Equipment</SelectItem>
+                  <SelectItem value="sub_contractor">Sub Contractor</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <div className="ml-auto">
-            <Button variant="ghost" className="text-gray-500 hover:text-gray-800 flex items-center gap-2">
-              Refresh <RefreshCw className="h-4 w-4" />
+          <div>
+            <Button onClick={() => setIsBudgetAdjustmentModalOpen(true)} variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 hover:text-[#3B7CED] h-9 font-medium px-6">
+              Create Budget Adjustment
             </Button>
           </div>
         </div>
@@ -311,7 +405,7 @@ export default function ProjectDashboardPage() {
             </div>
 
             {/* Line Chart */}
-            <div className="bg-white p-6 rounded shadow-sm border border-gray-100">
+            <div className="bg-white p-6 rounded shadow-sm border border-gray-100 flex-1 flex flex-col">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-medium text-[#3B7CED]">Spend Over Time vs Budget Curve</h3>
                 <div className="flex gap-4">
@@ -325,7 +419,7 @@ export default function ProjectDashboardPage() {
                   </label>
                 </div>
               </div>
-              <div className="h-[300px] w-full">
+              <div className="flex-1 w-full min-h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dynamicLineChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -343,70 +437,6 @@ export default function ProjectDashboardPage() {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* WBS Table */}
-            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
-              <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                <h3 className="text-lg font-medium text-[#3B7CED]">Work Breakdown Structure (WBS)</h3>
-                <Link href={`/project-costing/${project.id}/wbs`}>
-                  <Button variant="outline" size="sm" className="text-xs">View Full WBS</Button>
-                </Link>
-              </div>
-              <Table>
-                <TableHeader className="bg-gray-50 border-b border-gray-200">
-                  <TableRow className="hover:bg-gray-50 border-0">
-                    <TableHead className="w-[50%] font-medium text-gray-500 py-3">WBS Elements</TableHead>
-                    <TableHead className="w-[30%] font-medium text-gray-500 py-3">Activities</TableHead>
-                    <TableHead className="w-[20%] font-medium text-gray-500 py-3">Budget</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parsedWbs && parsedWbs.length > 0 ? (
-                    renderWbsRows(parsedWbs)
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-6 text-gray-500">
-                        No WBS data available for this project.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              <div className="flex items-center justify-end p-4 bg-gray-50 border-t border-gray-200">
-                <div className="text-gray-600 text-sm">
-                  Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">{budgetNum.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Transactions */}
-            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
-              <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                <h3 className="text-lg font-medium text-[#3B7CED]">Recent transactions</h3>
-                <Link href={`/project-costing/${project.id}/transactions`}>
-                  <Button variant="outline" size="sm" className="text-xs">View All</Button>
-                </Link>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 border-b-gray-100">
-                    <TableHead className="font-medium text-gray-500">Date</TableHead>
-                    <TableHead className="font-medium text-gray-500">Description</TableHead>
-                    <TableHead className="font-medium text-gray-500">Category</TableHead>
-                    <TableHead className="font-medium text-gray-500">Cost Category</TableHead>
-                    <TableHead className="font-medium text-gray-500">Amount</TableHead>
-                    <TableHead className="font-medium text-gray-500">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-gray-500">
-                      No transactions available for this project.
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
             </div>
 
           </div>
@@ -502,6 +532,95 @@ export default function ProjectDashboardPage() {
 
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-6 border-b border-gray-200 mt-4">
+          <button 
+            className={`pb-3 text-sm font-medium ${activeTab === 'wbs' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('wbs')}
+          >
+            WBS Budget
+          </button>
+          <button 
+            className={`pb-3 text-sm font-medium ${activeTab === 'adjustments' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('adjustments')}
+          >
+            Budget Adjustments
+          </button>
+        </div>
+
+        {/* Tabs Content */}
+        {activeTab === 'wbs' && (
+          <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
+            <div className="flex justify-between items-center p-4 border-b border-gray-100">
+              <h3 className="text-lg font-medium text-[#3B7CED]">Work Breakdown Structure (WBS)</h3>
+              <Link href={`/project-costing/${project.id}/wbs`}>
+                <Button variant="outline" size="sm" className="text-xs">View Full WBS</Button>
+              </Link>
+            </div>
+            <Table>
+              <TableHeader className="bg-gray-50 border-b border-gray-200">
+                <TableRow className="hover:bg-gray-50 border-0">
+                  <TableHead className="w-[50%] font-medium text-gray-500 py-3">WBS Elements</TableHead>
+                  <TableHead className="w-[30%] font-medium text-gray-500 py-3">Activities</TableHead>
+                  <TableHead className="w-[20%] font-medium text-gray-500 py-3">Budget</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {parsedWbs && parsedWbs.length > 0 ? (
+                  renderWbsRows(parsedWbs)
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-6 text-gray-500">
+                      No WBS data available for this project.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            <div className="flex items-center justify-end p-4 bg-gray-50 border-t border-gray-200">
+              <div className="text-gray-600 text-sm">
+                Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">{budgetNum.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'adjustments' && (
+          <div className="flex flex-col gap-6 mb-12">
+            
+            {/* Original Budget Box */}
+            <div className="border border-gray-200 rounded p-6 bg-white shadow-sm">
+              <div className="text-sm font-semibold text-gray-800 mb-2">Original Approved Budget</div>
+              <div className="text-3xl font-medium text-[#3B7CED]">N{budgetNum.toLocaleString()}</div>
+            </div>
+
+            {/* Pending Approval Section */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[#3B7CED] font-medium">Pending Approval</h3>
+                <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
+              </div>
+
+              <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                <p>No pending adjustments available.</p>
+              </div>
+            </div>
+
+            {/* Completed Adjustment Section */}
+            <div className="mt-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[#3B7CED] font-medium">Completed Adjustment</h3>
+                <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
+              </div>
+
+              <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                <p>No completed adjustments available.</p>
+              </div>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Footer sticky bar */}
@@ -514,10 +633,19 @@ export default function ProjectDashboardPage() {
         </Button>
       </div>
 
-      <AddBudgetAdjustmentModal 
+      <AddBudgetAdjustmentModal
         isOpen={isBudgetAdjustmentModalOpen}
         onClose={() => setIsBudgetAdjustmentModalOpen(false)}
         project={project}
+      />
+      
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        actionText={statusModal.type === "success" ? "Done" : "Try again"}
       />
     </div>
   );
