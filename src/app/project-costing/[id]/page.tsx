@@ -28,7 +28,8 @@ import {
   useGetProjectCostingProjectQuery,
   useApproveProjectMutation,
   useRejectProjectMutation,
-  useSubmitProjectMutation
+  useSubmitProjectMutation,
+  useGetBudgetAdjustmentsQuery
 } from "@/api/projectCostingApi";
 import {
   LineChart,
@@ -64,7 +65,7 @@ export default function ProjectDashboardPage() {
   const [showActual, setShowActual] = useState(true);
   const [showPlanned, setShowPlanned] = useState(true);
   const [isBudgetAdjustmentModalOpen, setIsBudgetAdjustmentModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("adjustments");
+  const [activeTab, setActiveTab] = useState("phases");
   const [isAdjExpanded, setIsAdjExpanded] = useState(true);
 
   // Filter States
@@ -73,6 +74,11 @@ export default function ProjectDashboardPage() {
   const [costCategoryFilter, setCostCategoryFilter] = useState("all");
 
   const { data: project, isLoading, error, refetch } = useGetProjectCostingProjectQuery(
+    Number(id),
+    { skip: !id }
+  );
+
+  const { data: budgetAdjustments, isLoading: isLoadingAdjustments } = useGetBudgetAdjustmentsQuery(
     Number(id),
     { skip: !id }
   );
@@ -124,14 +130,14 @@ export default function ProjectDashboardPage() {
   let remaining = 0;
   let variance = "0%";
   let fin: any = null;
-  let budgetNum = project?.total_budget ? Number(project.total_budget) : 0;
-  let parsedWbs: any[] = [];
+  let budgetNum = 0;
+  let parsedPhases: any[] = [];
 
-  if (project?.wbs) {
+  if (project?.phases) {
     try {
-      parsedWbs = typeof project.wbs === "string" ? JSON.parse(project.wbs) : project.wbs;
+      parsedPhases = typeof project.phases === "string" ? JSON.parse(project.phases) : project.phases;
     } catch (e) {
-      console.error("Failed to parse WBS", e);
+      console.error("Failed to parse phases", e);
     }
   }
 
@@ -141,42 +147,44 @@ export default function ProjectDashboardPage() {
       
       if (costCategoryFilter !== "all") {
          // Filter Actual Spend by Category
-         if (fin?.summary?.category_breakdown) {
-            const cat = fin.summary.category_breakdown.find((c: any) => 
+         if (fin?.category_breakdown) {
+            const cat = fin.category_breakdown.find((c: any) => 
                c.request_type.toLowerCase() === costCategoryFilter.toLowerCase() || 
                c.request_type.toLowerCase().replace("_", "") === costCategoryFilter.toLowerCase().replace("_", "")
             );
-            actualSpend = cat ? cat.amount : 0;
+            actualSpend = cat ? Number(cat.amount) : 0;
             committed = 0; // Committed is generally an aggregate right now
          }
 
-         // Filter Budget by Category (traverse WBS)
+         // Filter Budget by Category (traverse phases)
          let filteredBudget = 0;
-         const sumCategoryBudget = (items: any[]) => {
-           for (const item of items) {
-              if (item.element_type === "ACTIVITY" && item.budget_lines) {
-                 for (const line of item.budget_lines) {
-                    if (line.cost_category && line.cost_category.toLowerCase() === costCategoryFilter.toLowerCase()) {
-                       filteredBudget += Number(line.original_budget || line.amount || 0);
+         const sumCategoryBudget = (phases: any[]) => {
+           for (const phase of phases) {
+              if (phase.activities) {
+                 for (const act of phase.activities) {
+                    if (act.cost_category && act.cost_category.toLowerCase() === costCategoryFilter.toLowerCase()) {
+                       filteredBudget += Number(act.amount || 0);
                     }
                  }
               }
-              if (item.children) {
-                 sumCategoryBudget(item.children);
-              }
            }
          };
-         sumCategoryBudget(parsedWbs);
+         sumCategoryBudget(parsedPhases);
          budgetNum = filteredBudget;
       } else {
         // All Categories
-        if (fin?.summary) {
-          actualSpend = fin.summary.actual || fin.summary.spent || 0;
-          committed = fin.summary.committed || 0;
-        }
+        actualSpend = Number(fin.actual || fin.spent || 0);
+        committed = Number(fin.committed || 0);
+        budgetNum = Number(fin.budget || 0);
       }
     } catch (e) {
       console.error("Failed to parse financials", e);
+    }
+  } else {
+    if (parsedPhases.length > 0) {
+      budgetNum = parsedPhases.reduce((acc, phase) => {
+        return acc + (phase.activities || []).reduce((sum: number, act: any) => sum + Number(act.amount || 0), 0);
+      }, 0);
     }
   }
 
@@ -224,60 +232,64 @@ export default function ProjectDashboardPage() {
     }
   }
 
-  const renderWbsRows = (items: any[], level = 0): React.ReactNode => {
-    if (!items || !Array.isArray(items)) return null;
-    return items.map((item, index) => {
-      const isPhase = item.element_type === "PHASE";
-      const isSubPhase = item.element_type === "SUB_PHASE";
-      const isActivity = item.element_type === "ACTIVITY";
-
-      const name = item.name || (isPhase ? `Phase ${index + 1}` : "Unnamed Element");
+  const renderPhaseRows = (phases: any[]): React.ReactNode => {
+    if (!phases || !Array.isArray(phases)) return null;
+    return phases.flatMap((phase, pIndex) => {
+      const phaseName = phase.name || `Phase ${pIndex + 1}`;
+      let phaseBudget = 0;
       
-      let budget = 0;
-      if (isActivity && item.budget_lines) {
-        budget = item.budget_lines.reduce((sum: number, line: any) => sum + Number(line.original_budget || line.amount || 0), 0);
-      } else if (item.total_budget) {
-        budget = Number(item.total_budget);
-      } else if (item.children) {
-        const sumChildren = (childItems: any[]): number => {
-           let sum = 0;
-           for (const child of childItems) {
-             if (child.element_type === "ACTIVITY" && child.budget_lines) {
-               sum += child.budget_lines.reduce((s: number, l: any) => s + Number(l.original_budget || l.amount || 0), 0);
-             }
-             if (child.children) {
-               sum += sumChildren(child.children);
-             }
-           }
-           return sum;
-        };
-        budget = sumChildren(item.children);
+      if (phase.activities && Array.isArray(phase.activities)) {
+        phaseBudget = phase.activities.reduce((sum: number, act: any) => sum + Number(act.amount || 0), 0);
       }
 
-      let rowClass = "border-b border-gray-100 hover:bg-transparent";
-      if (isPhase) rowClass = "bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white";
-      else if (isSubPhase) rowClass = "bg-[#F4F7FC] hover:bg-[#F4F7FC] border-b border-white";
+      const rows = [
+        <TableRow key={`phase-${phase.id || pIndex}`} className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white">
+          <TableCell className="py-3 text-sm font-medium pl-4">{phaseName}</TableCell>
+          <TableCell className="py-3 text-sm text-gray-600"></TableCell>
+          <TableCell className="py-3 text-sm text-gray-600"></TableCell>
+          <TableCell className="py-3 text-sm text-gray-600"></TableCell>
+          <TableCell className="font-medium text-sm text-gray-600">{phaseBudget > 0 ? phaseBudget.toLocaleString() : ""}</TableCell>
+        </TableRow>
+      ];
 
-      return (
-        <React.Fragment key={item.id || `${level}-${index}`}>
-          <TableRow className={rowClass}>
-            <TableCell className="py-3 text-sm font-medium relative" style={{ paddingLeft: level === 0 ? '1rem' : `${level * 1.5 + 1}rem` }}>
-              {level > 0 && (
-                <>
-                  <div className="absolute left-6 top-0 bottom-1/2 w-px bg-gray-300"></div>
-                  <div className="absolute left-6 top-1/2 w-4 h-px bg-gray-300"></div>
-                </>
-              )}
-              {isActivity ? "" : name}
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">{isActivity ? name : ""}</TableCell>
-            <TableCell className="font-medium text-sm text-gray-600">{budget > 0 ? budget.toLocaleString() : ""}</TableCell>
-          </TableRow>
-          {renderWbsRows(item.children || [], level + 1)}
-        </React.Fragment>
-      );
+      if (phase.activities && Array.isArray(phase.activities)) {
+        phase.activities.forEach((act: any, aIndex: number) => {
+          const actName = act.name || `Activity ${aIndex + 1}`;
+          const actBudget = Number(act.amount || 0);
+          const quantity = Number(act.quantity || 1);
+          const rate = Number(act.rate || (actBudget / quantity) || 0);
+
+          rows.push(
+            <TableRow key={`act-${phase.id || pIndex}-${act.id || aIndex}`} className="border-b border-gray-100 hover:bg-transparent">
+              <TableCell className="py-3 text-sm font-medium relative pl-10">
+                <div className="absolute left-6 top-0 bottom-1/2 w-px bg-gray-300"></div>
+                <div className="absolute left-6 top-1/2 w-4 h-px bg-gray-300"></div>
+              </TableCell>
+              <TableCell className="py-3 text-sm text-gray-600">{actName}</TableCell>
+              <TableCell className="py-3 text-sm text-gray-600">{quantity}</TableCell>
+              <TableCell className="py-3 text-sm text-gray-600">{rate.toLocaleString()}</TableCell>
+              <TableCell className="font-medium text-sm text-gray-600">{actBudget > 0 ? actBudget.toLocaleString() : ""}</TableCell>
+            </TableRow>
+          );
+        });
+      }
+
+      return rows;
     });
   };
+
+  // Set up PieChart data
+  let pieChartData: any[] = [];
+  if (fin?.category_breakdown && Array.isArray(fin.category_breakdown)) {
+    const COLORS = ["#3B7CED", "#2BA24D", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
+    pieChartData = fin.category_breakdown
+      .filter((cat: any) => Number(cat.amount || 0) > 0)
+      .map((cat: any, index: number) => ({
+        name: cat.request_type.replace(/_/g, ' '),
+        value: Number(cat.amount),
+        color: COLORS[index % COLORS.length]
+      }));
+  }
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative pb-20">
@@ -490,11 +502,11 @@ export default function ProjectDashboardPage() {
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Awaiting Approval</div>
-                  <div className="text-2xl font-bold text-gray-800">{project?.pending_requests_count || 0}</div>
+                  <div className="text-2xl font-bold text-gray-800">0</div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Total Value</div>
-                  <div className="text-2xl font-bold text-gray-800">N{(project?.pending_requests_value || 0).toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-800">N0</div>
                 </div>
               </div>
             </div>
@@ -507,7 +519,7 @@ export default function ProjectDashboardPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={[]}
+                        data={pieChartData}
                         cx="50%"
                         cy="50%"
                         innerRadius={0}
@@ -516,17 +528,29 @@ export default function ProjectDashboardPage() {
                         dataKey="value"
                         stroke="none"
                       >
+                        {pieChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
                   {/* Fallback for empty data */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <p className="text-gray-400 text-sm">No data</p>
+                  {pieChartData.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <p className="text-gray-400 text-sm">No data</p>
+                    </div>
+                  )}
+                </div>
+                {pieChartData.length > 0 && (
+                  <div className="flex flex-col gap-3 ml-4">
+                    {pieChartData.map((entry, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm text-gray-600 capitalize">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: entry.color }}></div>
+                        {entry.name} ({actualSpend > 0 ? ((entry.value / actualSpend) * 100).toFixed(1) : 0}%)
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="flex flex-col gap-3 ml-4">
-                  {/* Legends removed as there is no data */}
-                </div>
+                )}
               </div>
             </div>
 
@@ -536,10 +560,10 @@ export default function ProjectDashboardPage() {
         {/* Tabs */}
         <div className="flex items-center gap-6 border-b border-gray-200 mt-4">
           <button 
-            className={`pb-3 text-sm font-medium ${activeTab === 'wbs' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('wbs')}
+            className={`pb-3 text-sm font-medium ${activeTab === 'phases' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('phases')}
           >
-            WBS Budget
+            Phases & Activities
           </button>
           <button 
             className={`pb-3 text-sm font-medium ${activeTab === 'adjustments' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
@@ -550,29 +574,31 @@ export default function ProjectDashboardPage() {
         </div>
 
         {/* Tabs Content */}
-        {activeTab === 'wbs' && (
+        {activeTab === 'phases' && (
           <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
             <div className="flex justify-between items-center p-4 border-b border-gray-100">
-              <h3 className="text-lg font-medium text-[#3B7CED]">Work Breakdown Structure (WBS)</h3>
-              <Link href={`/project-costing/${project.id}/wbs`}>
-                <Button variant="outline" size="sm" className="text-xs">View Full WBS</Button>
+              <h3 className="text-lg font-medium text-[#3B7CED]">Project Phases & Activities</h3>
+              <Link href={`/project-costing/${project.id}/phases`}>
+                <Button variant="outline" size="sm" className="text-xs">See more</Button>
               </Link>
             </div>
             <Table>
               <TableHeader className="bg-gray-50 border-b border-gray-200">
                 <TableRow className="hover:bg-gray-50 border-0">
-                  <TableHead className="w-[50%] font-medium text-gray-500 py-3">WBS Elements</TableHead>
-                  <TableHead className="w-[30%] font-medium text-gray-500 py-3">Activities</TableHead>
-                  <TableHead className="w-[20%] font-medium text-gray-500 py-3">Budget</TableHead>
+                  <TableHead className="w-[40%] font-medium text-gray-500 py-3">Phase</TableHead>
+                  <TableHead className="w-[20%] font-medium text-gray-500 py-3">Activities</TableHead>
+                  <TableHead className="w-[10%] font-medium text-gray-500 py-3">Qty</TableHead>
+                  <TableHead className="w-[15%] font-medium text-gray-500 py-3">Rate</TableHead>
+                  <TableHead className="w-[15%] font-medium text-gray-500 py-3">Budget</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {parsedWbs && parsedWbs.length > 0 ? (
-                  renderWbsRows(parsedWbs)
+                {parsedPhases && parsedPhases.length > 0 ? (
+                  renderPhaseRows(parsedPhases)
                 ) : (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-6 text-gray-500">
-                      No WBS data available for this project.
+                      No phases data available for this project.
                     </TableCell>
                   </TableRow>
                 )}
@@ -602,9 +628,30 @@ export default function ProjectDashboardPage() {
                 <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
               </div>
 
-              <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
-                <p>No pending adjustments available.</p>
-              </div>
+              {isLoadingAdjustments ? (
+                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                  <p>Loading adjustments...</p>
+                </div>
+              ) : budgetAdjustments && budgetAdjustments.filter((a: any) => a.status === "PENDING" || a.status === "PENDING_APPROVAL").length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {budgetAdjustments.filter((a: any) => a.status === "PENDING" || a.status === "PENDING_APPROVAL").map((adj: any, i: number) => (
+                    <div key={i} className="border border-gray-200 rounded bg-white shadow-sm p-4 flex justify-between items-center">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800 mb-1">{adj.reason || "Budget Adjustment"}</div>
+                        <div className="text-xs text-gray-500 capitalize">{adj.cost_category ? adj.cost_category.replace(/_/g, " ") : "Category N/A"}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-[#3B7CED] mb-1">N{Number(adj.amount || 0).toLocaleString()}</div>
+                        <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full inline-block">Pending</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                  <p>No pending adjustments available.</p>
+                </div>
+              )}
             </div>
 
             {/* Completed Adjustment Section */}
@@ -614,9 +661,30 @@ export default function ProjectDashboardPage() {
                 <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
               </div>
 
-              <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
-                <p>No completed adjustments available.</p>
-              </div>
+              {isLoadingAdjustments ? (
+                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                  <p>Loading adjustments...</p>
+                </div>
+              ) : budgetAdjustments && budgetAdjustments.filter((a: any) => a.status === "APPROVED" || a.status === "COMPLETED").length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {budgetAdjustments.filter((a: any) => a.status === "APPROVED" || a.status === "COMPLETED").map((adj: any, i: number) => (
+                    <div key={i} className="border border-gray-200 rounded bg-white shadow-sm p-4 flex justify-between items-center">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800 mb-1">{adj.reason || "Budget Adjustment"}</div>
+                        <div className="text-xs text-gray-500 capitalize">{adj.cost_category ? adj.cost_category.replace(/_/g, " ") : "Category N/A"}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-green-600 mb-1">N{Number(adj.amount || 0).toLocaleString()}</div>
+                        <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full inline-block">Approved</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                  <p>No completed adjustments available.</p>
+                </div>
+              )}
             </div>
 
           </div>

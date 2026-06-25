@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BasicInformationForm } from "@/components/project-costing/BasicInformationForm";
 import { WBSTable } from "@/components/project-costing/wbs/WBSTable";
-import { Phase } from "@/components/project-costing/types";
+import { Phase, Subphase, Activity } from "@/components/project-costing/types";
 import { useCreateProjectCostingProjectMutation } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { extractErrorMessage } from "@/lib/utils";
@@ -29,6 +30,84 @@ export default function NewProjectPage() {
   const [createProject, { isLoading }] = useCreateProjectCostingProjectMutation();
   const statusModal = useStatusModal();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importedFileName, setImportedFileName] = useState("");
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportedFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json<any>(ws);
+
+        if (!data || data.length === 0) {
+          statusModal.showError("Invalid File", "The uploaded Excel file is empty.");
+          return;
+        }
+
+        const firstRow = data[0];
+        const hasPhase = "Phase" in firstRow;
+        const hasActivity = "Activity" in firstRow;
+        
+        if (!hasPhase || !hasActivity) {
+          statusModal.showError("Invalid Format", "The Excel file must contain 'Phase' and 'Activity' columns.");
+          return;
+        }
+
+        const newPhases: Phase[] = [];
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
+        data.forEach((row) => {
+          const phaseName = String(row.Phase || "").trim();
+          const subphaseName = String(row.Subphase || "").trim();
+          const activityName = String(row.Activity || "").trim();
+          const quantity = Number(row.Quantity) || 1;
+          const rate = Number(row.Rate) || 0;
+          const budget = quantity * rate;
+
+          if (!phaseName || !activityName) return; 
+
+          let phase = newPhases.find((p) => p.name === phaseName);
+          if (!phase) {
+            phase = { id: generateId(), name: phaseName, subphases: [], activities: [] };
+            newPhases.push(phase);
+          }
+
+          const activityObj: Activity = { id: generateId(), name: activityName, quantity, rate, budget };
+
+          if (subphaseName) {
+            let subphase = phase.subphases.find((s) => s.name === subphaseName);
+            if (!subphase) {
+              subphase = { id: generateId(), name: subphaseName, activities: [] };
+              phase.subphases.push(subphase);
+            }
+            subphase.activities.push(activityObj);
+          } else {
+            phase.activities.push(activityObj);
+          }
+        });
+
+        setPhases(newPhases);
+        statusModal.showSuccess("Import Successful", "The WBS has been populated from the Excel file.");
+      } catch (err) {
+        statusModal.showError("Parsing Error", "There was an error reading the Excel file. Please ensure it is a valid format.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async () => {
     if (!name || !clientName) {
       statusModal.showError(
@@ -38,39 +117,26 @@ export default function NewProjectPage() {
       return;
     }
 
-    // Map Phase structure to WBS nested tree items (backend schema)
-    // - PHASE: no name (auto-generated), children = [SUB_PHASE | ACTIVITY]
-    // - SUB_PHASE: name required, children = [ACTIVITY]
-    // - ACTIVITY: name required, budget_lines = [{ cost_category, amount }]
-    const wbsPayload: import("@/types/projectCosting").WBSCreateItem[] = phases.map((phase) => ({
-      element_type: "PHASE" as const,
-      children: [
-        // 1. Direct activities under the phase
+    // Map Phase structure to backend schema
+    const phasesPayload = phases.map((phase) => ({
+      name: phase.name,
+      activities: [
+        // Direct activities
         ...phase.activities.map((a) => ({
-          element_type: "ACTIVITY" as const,
           name: a.name,
-          budget_lines: [
-            {
-              cost_category: "LABOUR",
-              amount: String(a.budget || 0),
-            },
-          ],
+          amount: a.budget || 0,
+          quantity: a.quantity || 1,
+          rate: a.rate || a.budget || 0,
         })),
-        // 2. Subphases (each containing their own activities)
-        ...phase.subphases.map((sub) => ({
-          element_type: "SUB_PHASE" as const,
-          name: sub.name,
-          children: sub.activities.map((a) => ({
-            element_type: "ACTIVITY" as const,
-            name: a.name,
-            budget_lines: [
-              {
-                cost_category: "LABOUR",
-                amount: String(a.budget || 0),
-              },
-            ],
-          })),
-        })),
+        // Flatten subphase activities into the phase
+        ...phase.subphases.flatMap((sub) => 
+          sub.activities.map((a) => ({
+            name: `${sub.name} - ${a.name}`,
+            amount: a.budget || 0,
+            quantity: a.quantity || 1,
+            rate: a.rate || a.budget || 0,
+          }))
+        ),
       ],
     }));
 
@@ -82,7 +148,7 @@ export default function NewProjectPage() {
         start_date: startDate || new Date().toISOString().split("T")[0],
         expected_end_date: expectedEndDate || new Date().toISOString().split("T")[0],
         description,
-        wbs: wbsPayload,
+        phases: phasesPayload,
       }).unwrap();
 
       statusModal.showSuccess(
@@ -102,7 +168,7 @@ export default function NewProjectPage() {
 
   const handleModalAction = () => {
     statusModal.close();
-    if (statusModal.type === "success") {
+    if (statusModal.type === "success" && statusModal.title === "Project Created Successfully") {
       router.push("/project-costing");
     }
   };
@@ -134,6 +200,35 @@ export default function NewProjectPage() {
           description={description}
           setDescription={setDescription}
         />
+
+        {/* Documents Section */}
+        <section>
+          <h2 className="text-[#3B7CED] text-base font-medium mb-4">
+            Documents
+          </h2>
+          <div className="flex items-center">
+            <input 
+              type="file" 
+              accept=".xlsx, .xls, .csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 px-6 py-6 border-2 border-dashed border-[#3B7CED] opacity-80 rounded text-[#3B7CED] hover:bg-blue-50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">Add a document</span>
+            </button>
+            {importedFileName && (
+              <div className="ml-4 flex items-center text-sm text-gray-600">
+                <span className="font-medium text-gray-800 mr-2">File loaded:</span> {importedFileName}
+              </div>
+            )}
+          </div>
+        </section>
+
         <WBSTable phases={phases} setPhases={setPhases} />
       </div>
 

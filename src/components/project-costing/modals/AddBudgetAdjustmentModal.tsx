@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, X } from "lucide-react";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
-import { useCreateActivityBudgetLineMutation } from "@/api/projectCostingApi";
+import { useCreateBudgetAdjustmentMutation } from "@/api/projectCostingApi";
 
 interface Props {
   isOpen: boolean;
@@ -40,7 +40,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   
   // Modals & API
   const statusModal = useStatusModal();
-  const [createBudgetLine, { isLoading: isSubmitting }] = useCreateActivityBudgetLineMutation();
+  const [createBudgetAdjustment, { isLoading: isSubmitting }] = useCreateBudgetAdjustmentMutation();
 
   // State for lines
   const [adjustmentLines, setAdjustmentLines] = useState<AdjustmentLine[]>([]);
@@ -52,17 +52,35 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   const [reason, setReason] = useState("");
   const [newActivityName, setNewActivityName] = useState("");
 
-  const budgetNum = project?.total_budget ? Number(project.total_budget) : 0;
+  let budgetNum = 0;
+  if (project?.financials) {
+    try {
+      const fin = typeof project.financials === 'string' ? JSON.parse(project.financials) : project.financials;
+      budgetNum = Number(fin?.budget || 0);
+    } catch (e) {
+      console.error(e);
+    }
+  }
   
   // Calculate current approved budget including adjustments
   const currentBudgetNum = budgetNum + adjustmentLines.reduce((acc, line) => acc + line.amount, 0);
   
   let activities: any[] = [];
-  if (project?.financials) {
+  if (project?.phases) {
     try {
-      const fin = typeof project.financials === "string" ? JSON.parse(project.financials) : project.financials;
-      if (fin?.by_activity && Array.isArray(fin.by_activity)) {
-        activities = fin.by_activity;
+      const phasesArr = typeof project.phases === 'string' ? JSON.parse(project.phases) : project.phases;
+      if (Array.isArray(phasesArr)) {
+         phasesArr.forEach((phase: any) => {
+            if (phase.activities && Array.isArray(phase.activities)) {
+               phase.activities.forEach((act: any) => {
+                  activities.push({
+                     activity_id: act.id,
+                     activity_name: act.name,
+                     wbs_code: phase.code ? `${phase.code}-${act.serial_number || '00'}` : act.name
+                  });
+               });
+            }
+         });
       }
     } catch (e) {
       console.error(e);
@@ -122,22 +140,22 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
     }
     
     try {
-      await Promise.all(
-        adjustmentLines.map(line => 
-          createBudgetLine({
+      await createBudgetAdjustment({
+        id: project.id,
+        body: {
+          lines: adjustmentLines.map(line => ({
             cost_category: line.costCategory,
             amount: line.amount.toString(),
-            // The API doesn't fully document activity mapping in CreateActivityBudgetLineRequest, 
-            // but we pass it through so the backend can use it if configured to accept it
-            // @ts-ignore
-            activity: line.activityId || undefined,
-          }).unwrap()
-        )
-      );
+            reason: line.reason,
+            activity_id: line.activityId || undefined,
+            activity_name: line.type === "new" ? line.activityName : undefined,
+          }))
+        }
+      }).unwrap();
 
       statusModal.showSuccess(
         "Action Successful",
-        `Successfully submitted ${adjustmentLines.length} budget adjustment line(s).`
+        `Successfully submitted budget adjustment request with ${adjustmentLines.length} line(s).`
       );
       
       setAdjustmentLines([]);

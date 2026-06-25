@@ -51,6 +51,8 @@ export function WBSSubphaseRow({
           </button>
         </TableCell>
         <TableCell></TableCell>
+        <TableCell></TableCell>
+        <TableCell></TableCell>
         <TableCell className="font-medium text-sm">
           {subphaseBudget.toLocaleString()}
         </TableCell>

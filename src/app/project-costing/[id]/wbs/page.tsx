@@ -16,7 +16,7 @@ export default function WBSPage() {
     skip: !id,
   });
 
-  const budgetNum = project?.total_budget ? Number(project.total_budget) : 9000000;
+  const budgetNum = 0;
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative min-h-screen">

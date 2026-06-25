@@ -66,6 +66,8 @@ export function WBSPhaseRow({
           </button>
         </TableCell>
         <TableCell></TableCell>
+        <TableCell></TableCell>
+        <TableCell></TableCell>
         <TableCell className="font-medium text-sm">
           {phaseBudget.toLocaleString()}
         </TableCell>

@@ -33,12 +33,28 @@ export function WBSActivityRow({
           className="h-8 w-full bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
         />
       </TableCell>
+      <TableCell className="py-2">
+        <Input
+          type="number"
+          value={activity.quantity || ""}
+          onChange={(e) => onUpdate({ quantity: Number(e.target.value), budget: Number(e.target.value) * (activity.rate || 0) })}
+          className="h-8 w-full max-w-[80px] bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+        />
+      </TableCell>
+      <TableCell className="py-2">
+        <Input
+          type="number"
+          value={activity.rate || ""}
+          onChange={(e) => onUpdate({ rate: Number(e.target.value), budget: (activity.quantity || 0) * Number(e.target.value) })}
+          className="h-8 w-full max-w-[120px] bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+        />
+      </TableCell>
       <TableCell className="py-2 flex items-center gap-2">
         <Input
           type="number"
           value={activity.budget || ""}
-          onChange={(e) => onUpdate({ budget: Number(e.target.value) })}
-          className="h-8 w-full max-w-[120px] bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+          disabled
+          className="h-8 w-full max-w-[120px] bg-gray-50 border-gray-200 text-sm p-1 shadow-none cursor-not-allowed"
         />
         <button
           onClick={onRemove}

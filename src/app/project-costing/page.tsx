@@ -188,7 +188,7 @@ export default function ProjectCostingListPage() {
                   <TableCell className="text-gray-600">{project.project_type || "N/A"}</TableCell>
                   <TableCell className="text-gray-600">{project.start_date || "N/A"}</TableCell>
                   <TableCell className="text-gray-600 font-semibold">
-                    N{Number(project.total_budget || 0).toLocaleString("en-US", {
+                    N{Number(0).toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                     })}
                   </TableCell>

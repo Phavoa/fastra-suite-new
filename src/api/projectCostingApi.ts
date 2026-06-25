@@ -1,18 +1,21 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "@/lib/store/store";
 import type {
-  ActivityBudgetLine,
-  CreateActivityBudgetLineRequest,
-  UpdateActivityBudgetLineRequest,
-  CreateProjectCostingProjectRequest,
-  CreateProjectCostingProjectResponse,
-  ProjectCostingProject,
-  UpdateProjectCostingProjectRequest,
   ProjectCostingFilterParams,
-  WBSElement,
-  CreateWBSElementRequest,
+  ProjectCostingProject,
+  CreateProjectCostingProjectRequest,
+  UpdateProjectCostingProjectRequest,
+  CreateAddPhaseActivityRequest,
+  UpdatePhaseBundleRequest,
+  DeletePhaseRequest,
+  CreateActualCostRequest,
+  CreateBudgetAdjustmentRequest,
+  CreateCommitmentRequest,
   ProjectActionRequest,
-  ProjectSettings,
+  BudgetAdjustment,
+  ProjectTransaction,
+  Activity,
+  Phase,
 } from "@/types/projectCosting";
 
 // Helper function to get tenant-specific base URL
@@ -33,7 +36,13 @@ export const projectCostingApi = createApi({
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
-    headers.set("content-type", "application/json");
+    
+    // Do not set content-type if the body is FormData (for file uploads)
+    if (args && (args as any).body && (args as any).body instanceof FormData) {
+      // Browser will set the correct multipart/form-data boundary
+    } else {
+      headers.set("content-type", "application/json");
+    }
     headers.set("accept", "application/json");
 
     let url: string;
@@ -53,10 +62,15 @@ export const projectCostingApi = createApi({
     }
 
     try {
+      const isStringArgs = typeof args === "string";
+      const body = !isStringArgs && args.body 
+        ? (args.body instanceof FormData ? args.body : JSON.stringify(args.body)) 
+        : undefined;
+
       const response = await fetch(url, {
-        method: typeof args === "string" ? "GET" : args.method || "GET",
+        method: isStringArgs ? "GET" : args.method || "GET",
         headers,
-        body: typeof args === "string" ? undefined : args.body ? JSON.stringify(args.body) : undefined,
+        body,
       });
 
       if (!response.ok) {
@@ -84,45 +98,7 @@ export const projectCostingApi = createApi({
     }
   },
   endpoints: (builder) => ({
-    // Activity Budget Lines Endpoints
-    getActivityBudgetLines: builder.query<ActivityBudgetLine[], ProjectCostingFilterParams>({
-      query: (params) => ({
-        url: "/project-costing/activity-budget-lines/",
-        params,
-      }),
-    }),
-    getActivityBudgetLine: builder.query<ActivityBudgetLine, string>({
-      query: (id) => `/project-costing/activity-budget-lines/${id}/`,
-    }),
-    createActivityBudgetLine: builder.mutation<ActivityBudgetLine, CreateActivityBudgetLineRequest>({
-      query: (body) => ({
-        url: "/project-costing/activity-budget-lines/",
-        method: "POST",
-        body,
-      }),
-    }),
-    updateActivityBudgetLine: builder.mutation<ActivityBudgetLine, { id: string; body: UpdateActivityBudgetLineRequest }>({
-      query: ({ id, body }) => ({
-        url: `/project-costing/activity-budget-lines/${id}/`,
-        method: "PUT",
-        body,
-      }),
-    }),
-    patchActivityBudgetLine: builder.mutation<ActivityBudgetLine, { id: string; body: Partial<UpdateActivityBudgetLineRequest> }>({
-      query: ({ id, body }) => ({
-        url: `/project-costing/activity-budget-lines/${id}/`,
-        method: "PATCH",
-        body,
-      }),
-    }),
-    deleteActivityBudgetLine: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/project-costing/activity-budget-lines/${id}/`,
-        method: "DELETE",
-      }),
-    }),
-
-    // Projects Costing Endpoints
+    // Projects Core Endpoints
     getProjectCostingProjects: builder.query<ProjectCostingProject[], ProjectCostingFilterParams>({
       query: (params) => ({
         url: "/project-costing/projects/",
@@ -132,7 +108,7 @@ export const projectCostingApi = createApi({
     getProjectCostingProject: builder.query<ProjectCostingProject, number>({
       query: (id) => `/project-costing/projects/${id}/`,
     }),
-    createProjectCostingProject: builder.mutation<CreateProjectCostingProjectResponse, CreateProjectCostingProjectRequest>({
+    createProjectCostingProject: builder.mutation<ProjectCostingProject, CreateProjectCostingProjectRequest>({
       query: (body) => ({
         url: "/project-costing/projects/",
         method: "POST",
@@ -146,7 +122,7 @@ export const projectCostingApi = createApi({
         body,
       }),
     }),
-    patchProjectCostingProject: builder.mutation<ProjectCostingProject, { id: number; body: UpdateProjectCostingProjectRequest }>({
+    patchProjectCostingProject: builder.mutation<ProjectCostingProject, { id: number; body: Partial<UpdateProjectCostingProjectRequest> }>({
       query: ({ id, body }) => ({
         url: `/project-costing/projects/${id}/`,
         method: "PATCH",
@@ -161,28 +137,28 @@ export const projectCostingApi = createApi({
     }),
 
     // Project Actions
-    approveProject: builder.mutation<ProjectCostingProject, { id: number; body: ProjectActionRequest }>({
+    approveProject: builder.mutation<ProjectCostingProject, { id: number; body?: ProjectActionRequest }>({
       query: ({ id, body }) => ({
         url: `/project-costing/projects/${id}/approve/`,
         method: "POST",
         body,
       }),
     }),
-    closeProject: builder.mutation<ProjectCostingProject, { id: number; body: ProjectActionRequest }>({
+    closeProject: builder.mutation<ProjectCostingProject, { id: number; body?: ProjectActionRequest }>({
       query: ({ id, body }) => ({
         url: `/project-costing/projects/${id}/close/`,
         method: "POST",
         body,
       }),
     }),
-    rejectProject: builder.mutation<ProjectCostingProject, { id: number; body: ProjectActionRequest }>({
+    rejectProject: builder.mutation<ProjectCostingProject, { id: number; body?: ProjectActionRequest }>({
       query: ({ id, body }) => ({
         url: `/project-costing/projects/${id}/reject/`,
         method: "POST",
         body,
       }),
     }),
-    submitProject: builder.mutation<ProjectCostingProject, { id: number; body: ProjectActionRequest }>({
+    submitProject: builder.mutation<ProjectCostingProject, { id: number; body?: ProjectActionRequest }>({
       query: ({ id, body }) => ({
         url: `/project-costing/projects/${id}/submit/`,
         method: "POST",
@@ -190,86 +166,102 @@ export const projectCostingApi = createApi({
       }),
     }),
 
-    // Project Sub-resources
-    getProjectDashboard: builder.query<ProjectCostingProject, number>({
-      query: (id) => `/project-costing/projects/${id}/dashboard/`,
-    }),
-    getProjectFinancials: builder.query<ProjectCostingProject, number>({
-      query: (id) => `/project-costing/projects/${id}/financials/`,
-    }),
-    getProjectContext: builder.query<ProjectCostingProject, number>({
-      query: (id) => `/project-costing/projects/${id}/project_context/`,
-    }),
-    getProjectWbs: builder.query<ProjectCostingProject, number>({
-      query: (id) => `/project-costing/projects/${id}/wbs/`,
-    }),
-
-    // Project Settings
-    getProjectSettings: builder.query<void, string>({
-      query: (id) => `/project-costing/projects/${id}/settings/`,
-    }),
-    updateProjectSettings: builder.mutation<void, { id: string; body: ProjectSettings }>({
+    // Phase & Activity Management
+    createAddPhaseActivity: builder.mutation<{ phase_id: number; activities: Activity[] }, { id: number; body: CreateAddPhaseActivityRequest }>({
       query: ({ id, body }) => ({
-        url: `/project-costing/projects/${id}/settings/`,
-        method: "PUT",
-        body,
-      }),
-    }),
-    patchProjectSettings: builder.mutation<void, { id: string; body: Partial<ProjectSettings> }>({
-      query: ({ id, body }) => ({
-        url: `/project-costing/projects/${id}/settings/`,
-        method: "PATCH",
-        body,
-      }),
-    }),
-
-    // WBS Elements Endpoints
-    getWbsElements: builder.query<WBSElement[], ProjectCostingFilterParams>({
-      query: (params) => ({
-        url: "/project-costing/wbs-elements/",
-        params,
-      }),
-    }),
-    getWbsElement: builder.query<WBSElement, string>({
-      query: (id) => `/project-costing/wbs-elements/${id}/`,
-    }),
-    createWbsElement: builder.mutation<WBSElement, CreateWBSElementRequest>({
-      query: (body) => ({
-        url: "/project-costing/wbs-elements/",
+        url: `/project-costing/projects/${id}/createAdd_phase_activity/`,
         method: "POST",
         body,
       }),
     }),
-    updateWbsElement: builder.mutation<WBSElement, { id: string; body: CreateWBSElementRequest }>({
+    deletePhase: builder.mutation<void, { id: number; body: DeletePhaseRequest }>({
       query: ({ id, body }) => ({
-        url: `/project-costing/wbs-elements/${id}/`,
-        method: "PUT",
+        url: `/project-costing/projects/${id}/delete_phase/`,
+        method: "DELETE",
         body,
       }),
     }),
-    patchWbsElement: builder.mutation<WBSElement, { id: string; body: Partial<CreateWBSElementRequest> }>({
+    updatePhaseBundle: builder.mutation<{ updated: Activity[]; created: Activity[] }, { id: number; body: UpdatePhaseBundleRequest }>({
       query: ({ id, body }) => ({
-        url: `/project-costing/wbs-elements/${id}/`,
+        url: `/project-costing/projects/${id}/update_phase_bundle/`,
         method: "PATCH",
         body,
       }),
     }),
-    deleteWbsElement: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/project-costing/wbs-elements/${id}/`,
-        method: "DELETE",
+
+    // Budget Adjustments
+    approveBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body?: any }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/approve_budget_adjustment/`,
+        method: "POST",
+        body,
+      }),
+    }),
+    createBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body: CreateBudgetAdjustmentRequest }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/create_budget_adjustment/`,
+        method: "POST",
+        body,
+      }),
+    }),
+    rejectBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body?: any }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/reject_budget_adjustment/`,
+        method: "POST",
+        body,
+      }),
+    }),
+    submitBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body?: any }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/submit_budget_adjustment/`,
+        method: "POST",
+        body,
+      }),
+    }),
+    getBudgetAdjustments: builder.query<BudgetAdjustment[], number>({
+      query: (id) => `/project-costing/projects/${id}/budget_adjustments/`,
+    }),
+    getBudgetAdjustmentDetail: builder.query<BudgetAdjustment, number>({
+      query: (id) => `/project-costing/projects/${id}/budget_adjustment_detail/`,
+    }),
+
+    // Financials & Costs
+    createActualCost: builder.mutation<ProjectCostingProject, { id: number; body: CreateActualCostRequest }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/create_actual_cost/`,
+        method: "POST",
+        body,
+      }),
+    }),
+    createCommitment: builder.mutation<ProjectCostingProject, { id: number; body: CreateCommitmentRequest }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/create_commitment/`,
+        method: "POST",
+        body,
+      }),
+    }),
+    getProjectTransactions: builder.query<ProjectTransaction[], number>({
+      query: (id) => `/project-costing/projects/${id}/transactions/`,
+    }),
+    getProjectFinancials: builder.query<ProjectCostingProject, number>({
+      query: (id) => `/project-costing/projects/${id}/financials/`,
+    }),
+
+    // Dashboards & Imports
+    getProjectDashboard: builder.query<ProjectCostingProject, number>({
+      query: (id) => `/project-costing/projects/${id}/dashboard/`,
+    }),
+    importProjectXlsx: builder.mutation<ProjectCostingProject, { id: number; body: FormData }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/import_xlsx/`,
+        method: "POST",
+        body,
       }),
     }),
   }),
 });
 
 export const {
-  useGetActivityBudgetLinesQuery,
-  useGetActivityBudgetLineQuery,
-  useCreateActivityBudgetLineMutation,
-  useUpdateActivityBudgetLineMutation,
-  usePatchActivityBudgetLineMutation,
-  useDeleteActivityBudgetLineMutation,
   useGetProjectCostingProjectsQuery,
   useGetProjectCostingProjectQuery,
   useCreateProjectCostingProjectMutation,
@@ -280,17 +272,19 @@ export const {
   useCloseProjectMutation,
   useRejectProjectMutation,
   useSubmitProjectMutation,
-  useGetProjectDashboardQuery,
+  useCreateAddPhaseActivityMutation,
+  useDeletePhaseMutation,
+  useUpdatePhaseBundleMutation,
+  useApproveBudgetAdjustmentMutation,
+  useCreateBudgetAdjustmentMutation,
+  useRejectBudgetAdjustmentMutation,
+  useSubmitBudgetAdjustmentMutation,
+  useGetBudgetAdjustmentsQuery,
+  useGetBudgetAdjustmentDetailQuery,
+  useCreateActualCostMutation,
+  useCreateCommitmentMutation,
+  useGetProjectTransactionsQuery,
   useGetProjectFinancialsQuery,
-  useGetProjectContextQuery,
-  useGetProjectWbsQuery,
-  useGetProjectSettingsQuery,
-  useUpdateProjectSettingsMutation,
-  usePatchProjectSettingsMutation,
-  useGetWbsElementsQuery,
-  useGetWbsElementQuery,
-  useCreateWbsElementMutation,
-  useUpdateWbsElementMutation,
-  usePatchWbsElementMutation,
-  useDeleteWbsElementMutation,
+  useGetProjectDashboardQuery,
+  useImportProjectXlsxMutation,
 } = projectCostingApi;

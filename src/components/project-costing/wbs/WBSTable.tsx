@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Maximize2, Minimize2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -18,6 +19,7 @@ interface WBSTableProps {
 }
 
 export function WBSTable({ phases, setPhases }: WBSTableProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Compute total budget
   const totalBudget = useMemo(() => {
@@ -90,6 +92,8 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
                 id: generateId(),
                 name: `Activities ${p.activities.length + 1}`,
                 budget: 0,
+                quantity: 1,
+                rate: 0,
               },
             ],
           };
@@ -115,6 +119,8 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
                       id: generateId(),
                       name: `Activities ${s.activities.length + 1}`,
                       budget: 0,
+                      quantity: 1,
+                      rate: 0,
                     },
                   ],
                 };
@@ -243,23 +249,25 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
     );
   };
 
-  return (
-    <section>
-      <h2 className="text-[#3B7CED] text-base font-medium mb-4">
-        Work Breakdown Structure (WBS)
-      </h2>
-      <div className="border border-gray-200 rounded overflow-hidden">
+  const tableContent = (
+      <div className="border border-gray-200 rounded overflow-hidden bg-white">
         <Table>
           <TableHeader className="bg-gray-50 border-b border-gray-200">
             <TableRow className="hover:bg-gray-50 border-0">
-              <TableHead className="w-[50%] font-medium text-gray-500 py-3">
+              <TableHead className="w-[40%] font-medium text-gray-500 py-3">
                 Name
               </TableHead>
-              <TableHead className="w-[30%] font-medium text-gray-500 py-3">
+              <TableHead className="w-[20%] font-medium text-gray-500 py-3">
                 Activities
               </TableHead>
-              <TableHead className="w-[20%] font-medium text-gray-500 py-3">
-                Budget
+              <TableHead className="w-[10%] font-medium text-gray-500 py-3">
+                Qty
+              </TableHead>
+              <TableHead className="w-[15%] font-medium text-gray-500 py-3">
+                Rate
+              </TableHead>
+              <TableHead className="w-[15%] font-medium text-gray-500 py-3">
+                Amount
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -308,6 +316,43 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
           </div>
         </div>
       </div>
-    </section>
+  );
+
+  return (
+    <>
+      {isExpanded && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h2 className="text-[#3B7CED] text-lg font-medium">Work Breakdown Structure (WBS)</h2>
+              <button 
+                onClick={() => setIsExpanded(false)}
+                className="text-gray-500 hover:text-gray-700 p-1 flex items-center gap-1 hover:underline"
+              >
+                <Minimize2 className="w-5 h-5" /> Collapse
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              {tableContent}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className={isExpanded ? "opacity-0 h-0 overflow-hidden" : ""}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-[#3B7CED] text-base font-medium">
+            Work Breakdown Structure (WBS)
+          </h2>
+          <button 
+            onClick={() => setIsExpanded(true)}
+            className="text-[#3B7CED] text-sm font-medium flex items-center gap-1 hover:underline"
+          >
+            <Maximize2 className="w-4 h-4" /> Expand
+          </button>
+        </div>
+        {tableContent}
+      </section>
+    </>
   );
 }
