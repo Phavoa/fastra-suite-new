@@ -8,6 +8,7 @@ import { ArrowLeft, Plus, Trash2, AlertCircle } from "lucide-react";
 import {
   useGetProjectQuery,
   useGetAvailableBudgetQuery,
+  useGetProjectsQuery,
 } from "@/api/projectApi";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -377,6 +378,53 @@ export function RequestForm<T extends Record<string, any>>({
                         render={({ field: controllerField }) => {
                           if (field.type === "select") {
                             let options = field.options || [];
+
+                            // Handle dynamic project listing
+                            if (field.name === "project" && options.length === 0) {
+                              // eslint-disable-next-line react-hooks/rules-of-hooks
+                              const { data: projects = [] } = useGetProjectsQuery();
+                              options = projects.map((p) => ({
+                                label: p.name,
+                                value: String(p.id),
+                              }));
+                            }
+
+                            // Handle dynamic Phase filtering (dependsOn project)
+                            if (field.name === "phase" && field.dependsOn) {
+                              const projectVal = currentValues[field.dependsOn];
+                              // eslint-disable-next-line react-hooks/rules-of-hooks
+                              const { data: project } = useGetProjectQuery(
+                                Number(projectVal),
+                                { skip: !projectVal }
+                              );
+                              if (project) {
+                                options = project.wbs
+                                  .filter((w) => !w.is_activity)
+                                  .map((w) => ({
+                                    label: w.name,
+                                    value: String(w.id),
+                                  }));
+                              }
+                            }
+
+                            // Handle dynamic Task filtering (dependsOn phase)
+                            if (field.name === "task" && field.dependsOn) {
+                              const phaseVal = currentValues[field.dependsOn];
+                              const projectVal = currentValues["project"];
+                              // eslint-disable-next-line react-hooks/rules-of-hooks
+                              const { data: project } = useGetProjectQuery(
+                                Number(projectVal),
+                                { skip: !projectVal }
+                              );
+                              if (project && phaseVal) {
+                                options = project.wbs
+                                  .filter((w) => w.is_activity && w.parent === Number(phaseVal))
+                                  .map((w) => ({
+                                    label: w.name,
+                                    value: String(w.id),
+                                  }));
+                              }
+                            }
 
                             // Handle dynamic WBS filtering (dependsOn project)
                             if (

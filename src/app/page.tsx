@@ -95,6 +95,15 @@ const MODULES: Module[] = [
     Icon: SettingsIcon,
     isFunctional: true,
   },
+  {
+    id: "project",
+    title: "Project Costing",
+    description:
+      "Track project expenses, monitor budget allocations, and analyze project profitability to ensure projects are delivered on time and within budget.",
+    color: "yellow",
+    Icon: Briefcase,
+    isFunctional: true,
+  },
   // --- Non-Functional Modules (Coming Soon) ---
   {
     id: "sales",
@@ -123,15 +132,7 @@ const MODULES: Module[] = [
     Icon: HRIcon,
     isFunctional: false,
   },
-  {
-    id: "project",
-    title: "Project Costing",
-    description:
-      "Track project expenses, monitor budget allocations, and analyze project profitability to ensure projects are delivered on time and within budget.",
-    color: "yellow",
-    Icon: Briefcase,
-    isFunctional: false,
-  },
+
   {
     id: "crm",
     title: "CRM",
@@ -237,6 +238,7 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
       contacts: "/contact",
       settings: "/settings/company/1",
       "project-request": "/project-request",
+      project: "/project-costing",
     };
     return routeMap[id] || null;
   };

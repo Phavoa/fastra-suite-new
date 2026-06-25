@@ -8,34 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useCreateSubcontractorRequestMutation } from "@/api/subcontractorRequestApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
+import { useGetAvailableBudgetQuery } from "@/api/projectApi";
 import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
-  isNewVendor: z.boolean().default(false),
-  vendor: z.string().optional(),
-  vendor_name: z.string().optional(),
-  vendor_email: z.string().email("Invalid email").optional().or(z.literal("")),
-  vendor_phone: z.string().optional(),
+  project: z.string().min(1, "Please select a project"),
+  vendor: z.string().min(1, "Please select a subcontractor"),
   scope_of_work: z.string().min(2, "Scope of work is required"),
   start_date: z.string().min(2, "Start date is required"),
   end_date: z.string().min(2, "End date is required"),
   contract_value: z.string().min(1, "Contract value is required"),
   payment_terms: z.string().min(2, "Payment terms are required"),
+  phase: z.string().min(1, "Please select a phase"),
+  task: z.string().min(1, "Please select a task"),
   justification_notes: z.string().optional(),
-  payment_type: z.string().min(1, "Please select a payment type"),
-  milestones: z.array(z.object({
-    name: z.string().min(1, "Name is required"),
-    percentage: z.string().min(1, "Percentage is required"),
-    completion_criteria: z.string().min(1, "Criteria is required"),
-  })).optional(),
-}).refine((data) => {
-  if (data.isNewVendor) {
-    return !!data.vendor_name;
-  }
-  return !!data.vendor;
-}, {
-  message: "Please provide subcontractor details",
-  path: ["vendor_name"],
 }).refine((data) => {
   if (data.start_date && data.end_date) {
     return new Date(data.end_date) >= new Date(data.start_date);
@@ -53,6 +39,11 @@ export default function NewSubcontractorRequestPage() {
   const [createRequest, { isLoading: isSubmitting }] = useCreateSubcontractorRequestMutation();
   const { data: vendors = [], isLoading: isLoadingVendors } = useGetVendorsQuery({});
 
+  const [requestId] = React.useState(() => {
+    const num = Math.floor(Math.random() * 90000) + 10000;
+    return `SC${num}`;
+  });
+
   const vendorOptions = useMemo(() => {
     return vendors.map((vendor) => ({
       label: vendor.company_name,
@@ -62,8 +53,8 @@ export default function NewSubcontractorRequestPage() {
 
   const config: RequestFormConfig<FormValues> = {
     title: "Subcontractor Request",
-    requestId: "Auto-generated",
-    requesterName: "Current User", // This should ideally come from auth state
+    requestId: requestId,
+    requesterName: "Current User",
     date: new Date().toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
@@ -75,16 +66,7 @@ export default function NewSubcontractorRequestPage() {
         <div className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="requestId" className="text-sm font-semibold text-gray-900">Request ID</Label>
-            <Input id="requestId" value="Auto-generated" readOnly className="bg-white text-gray-900" />
-            <p className="text-[10px] text-gray-500 italic">This ID will be automatically assigned after submission.</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="date" className="text-sm font-semibold text-gray-900">Date</Label>
-            <Input id="date" value={new Date().toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })} readOnly className="bg-white text-gray-900" />
+            <Input id="requestId" value={requestId} readOnly className="bg-white text-gray-900" />
           </div>
         </div>
       </div>
@@ -94,41 +76,18 @@ export default function NewSubcontractorRequestPage() {
         title: "Subcontractor Details",
         fields: [
           {
-            name: "isNewVendor",
-            label: "New Subcontractor?",
-            type: "checkbox",
-            placeholder: "Check if the subcontractor is not in the system",
+            name: "project",
+            label: "Project",
+            type: "select",
+            placeholder: "Select a project",
+            options: [],
           },
           {
             name: "vendor",
-            label: "Select Subcontractor",
-            type: "select",
-            placeholder: isLoadingVendors ? "Loading subcontractors..." : "Select a subcontractor",
-            options: vendorOptions,
-            visibleIf: { field: "isNewVendor", value: false },
-          },
-          {
-            name: "vendor_name",
             label: "Subcontractor Name",
-            type: "text",
-            placeholder: "Enter name",
-            visibleIf: { field: "isNewVendor", value: true },
-          },
-          {
-            name: "vendor_email",
-            label: "Subcontractor Email",
-            type: "text",
-            placeholder: "Enter email",
-            visibleIf: { field: "isNewVendor", value: true },
-            halfWidth: true,
-          },
-          {
-            name: "vendor_phone",
-            label: "Subcontractor Phone",
-            type: "text",
-            placeholder: "Enter phone",
-            visibleIf: { field: "isNewVendor", value: true },
-            halfWidth: true,
+            type: "select",
+            placeholder: isLoadingVendors ? "Loading subcontractors..." : "Enter name",
+            options: vendorOptions,
           },
           {
             name: "scope_of_work",
@@ -137,27 +96,24 @@ export default function NewSubcontractorRequestPage() {
             placeholder: "Enter scope of work",
           },
           {
-            name: "payment_type",
-            label: "Payment Type",
-            type: "select",
-            placeholder: "Select payment type",
-            options: [
-              { label: "Lump Sum", value: "lump_sum" },
-              { label: "Milestone", value: "milestone" },
-            ],
-          },
-          {
             name: "start_date",
             label: "Start Date",
             type: "date",
+            placeholder: "Enter date",
             halfWidth: true,
           },
           {
             name: "end_date",
             label: "End Date",
             type: "date",
+            placeholder: "Enter date",
             halfWidth: true,
           },
+        ],
+      },
+      {
+        title: "Cost Details",
+        fields: [
           {
             name: "contract_value",
             label: "Contract Value (Estimated)",
@@ -170,83 +126,129 @@ export default function NewSubcontractorRequestPage() {
             type: "text",
             placeholder: "Enter payment terms",
           },
+        ],
+      },
+      {
+        title: "WBS",
+        fields: [
+          {
+            name: "phase",
+            label: "Phase",
+            type: "select",
+            placeholder: "Select a phase",
+            dependsOn: "project",
+            options: [],
+          },
+          {
+            name: "task",
+            label: "Task",
+            type: "select",
+            placeholder: "Select a task",
+            dependsOn: "phase",
+            options: [],
+          },
+        ],
+        renderBottom: (data: FormValues) => {
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          const { data: budgetData } = useGetAvailableBudgetQuery(
+            {
+              project_id: Number(data.project),
+              wbs_id: Number(data.task),
+              cost_code: data.project === "2" ? "CC-05" : "CC-04",
+            },
+            { skip: !data.project || !data.task }
+          );
+          const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
+          return (
+            <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-semibold text-gray-500">Cost Code</span>
+                <span className="text-sm font-semibold text-gray-500">
+                  {data.project === "2" ? "CC-05" : data.project ? "CC-04" : "-"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-900">Available Budget</span>
+                <span className="text-sm font-semibold text-[#3B7CED]">
+                  N{available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        fields: [
           {
             name: "justification_notes",
-            label: "Justification Notes",
+            label: "Notes / Justification",
             type: "text",
             placeholder: "Enter note",
           },
         ],
-      },
-      {
-        title: "Project Milestones",
-        fields: [
-          {
-            name: "milestones",
-            label: "Milestones",
-            type: "milestones",
-          },
-        ],
+        renderTop: (data: FormValues) => {
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          const { data: budgetData } = useGetAvailableBudgetQuery(
+            {
+              project_id: Number(data.project),
+              wbs_id: Number(data.task),
+              cost_code: data.project === "2" ? "CC-05" : "CC-04",
+            },
+            { skip: !data.project || !data.task }
+          );
+          const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
+          return (
+            <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-semibold text-gray-900">Available Budget</span>
+                <span className="text-sm font-semibold text-[#3B7CED]">
+                  N{available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-900">Total Cost</span>
+                <span className="text-sm font-semibold text-[#3B7CED]">
+                  N{Number(data.contract_value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          );
+        },
       },
     ],
     schema: formSchema,
     defaultValues: {
-      isNewVendor: false,
+      project: "",
       vendor: "",
-      vendor_name: "",
-      vendor_email: "",
-      vendor_phone: "",
       scope_of_work: "",
       start_date: "",
       end_date: "",
       contract_value: "",
       payment_terms: "",
+      phase: "",
+      task: "",
       justification_notes: "",
-      payment_type: "lump_sum",
-      milestones: [],
     },
     onSubmit: async (data) => {
-      // PRD Section 4.7: Validate milestone percentages total 100%
-      if (data.payment_type === "milestone") {
-        const totalPercent = (data.milestones || []).reduce((sum, m) => sum + Number(m.percentage), 0);
-        if (totalPercent !== 100) {
-          throw new Error("Total milestone percentage must equal 100%");
-        }
-      }
-
       try {
         const payload: any = {
+          project: Number(data.project),
+          project_request: Number(data.project),
           scope_of_work: data.scope_of_work,
-          payment_type: data.payment_type,
+          payment_type: "lump_sum",
           contract_value: data.contract_value,
           payment_terms: data.payment_terms,
           start_date: data.start_date,
           end_date: data.end_date,
           justification_notes: data.justification_notes || "",
-          milestones: data.payment_type === "milestone" 
-            ? (data.milestones || []).map(m => ({
-                name: m.name,
-                percentage: m.percentage,
-                completion_criteria: m.completion_criteria,
-                is_completed: false,
-              }))
-            : [], 
+          milestones: [],
+          vendor: Number(data.vendor),
         };
 
-        if (data.isNewVendor) {
-          payload.vendor_name = data.vendor_name;
-          payload.vendor_email = data.vendor_email;
-          payload.vendor_phone = data.vendor_phone;
-        } else {
-          payload.vendor = Number(data.vendor);
-        }
-
         await createRequest(payload).unwrap();
-        
-        // Success handled by RequestForm's successMessage config
       } catch (error) {
-        console.error("Failed to submit request:", error);
-        throw error; 
+        console.error("Failed to submit subcontractor request:", error);
+        throw error;
       }
     },
     successMessage: {
