@@ -11,7 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { PermissionGuard } from "../ProtectedComponent";
 
 type SettingsControlBarProps = {
-  activeSection: "company" | "user" | "accessgroup" | "application";
+  activeSection: "company" | "user" | "accessgroup" | "application" | "permissiontemplates";
   onSearch?: (query: string) => void;
   onNew?: () => void;
   onShowArchivedUsers?: () => void; // NEW HANDLER
@@ -51,6 +51,8 @@ export const SettingsControlBar = ({
         return "New Access Group";
       case "application":
         return "New Application";
+      case "permissiontemplates":
+        return "New Template";
       default:
         return "New Item";
     }

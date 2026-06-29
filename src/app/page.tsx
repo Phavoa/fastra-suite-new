@@ -28,6 +28,7 @@ import {
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
 
 type Module = {
   id: string;
@@ -288,9 +289,16 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
 }
 
 export default function DashboardPage(): ReactElement {
-  const loggedInUser = useSelector(
-    (state: RootState) => state.auth.user_accesses,
-  );
+  const { hasAccess } = useModulePermissions();
+
+  const filteredModules = MODULES.filter((m) => {
+    if (m.id === "invoice" || m.id === "purchase") return hasAccess("invoice");
+    if (m.id === "inventory") return hasAccess("inventory");
+    if (m.id === "project-request") return hasAccess("projectRequest");
+    if (m.id === "settings") return hasAccess("settings");
+    if (m.id === "project") return hasAccess("projectCosting");
+    return true; // default access for non-applicable modules
+  });
 
   return (
     <div className="min-h-screen flex flex-col text-slate-900">
@@ -305,7 +313,7 @@ export default function DashboardPage(): ReactElement {
               role="list"
               aria-label="Dashboard modules"
             >
-              {MODULES.map((m) => (
+              {filteredModules.map((m) => (
                 <div key={m.id} role="listitem">
                   <ModuleCard module={m} />
                 </div>
