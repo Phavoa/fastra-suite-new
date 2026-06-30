@@ -49,8 +49,8 @@ export function StockMoveTable({
   return (
     <section className="w-full">
       <div className="bg-white overflow-x-auto">
-        <div className="min-w-[1050px]">
-          <div className="grid grid-cols-[48px_1.2fr_1fr_1.2fr_1.5fr_0.8fr_1fr_1fr_1.5fr] items-center bg-[#F8F9FA] rounded-t-md px-4 py-3 text-xs font-semibold text-gray-500 border-b border-gray-200">
+        <div className="min-w-[1300px]">
+          <div className="grid grid-cols-[40px_1.1fr_1.1fr_0.8fr_1fr_1.3fr_0.6fr_0.7fr_0.9fr_1fr_1.5fr] items-center bg-[#F8F9FA] rounded-t-md px-4 py-3 text-xs font-semibold text-gray-500 border-b border-gray-200">
             <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 id="select-all"
@@ -61,13 +61,15 @@ export function StockMoveTable({
               />
             </div>
             <div>Date / Time</div>
+            <div>User</div>
             <div>Type</div>
             <div>Ref Doc</div>
             <div>Item Name</div>
             <div className="text-center">QTY</div>
-            <div className="text-right pr-4">Unit Cost</div>
-            <div className="text-right pr-4">Total Value</div>
-            <div className="pl-2">WBS Phase & Activity</div>
+            <div className="text-center">Run. Bal</div>
+            <div className="text-right pr-2">Unit Cost</div>
+            <div className="text-right pr-2">Total Value</div>
+            <div className="pl-2">WBS / Cost Code</div>
           </div>
 
           <div className="divide-y divide-gray-100">

@@ -39,10 +39,20 @@ export function StockMoveCards({ moves }: StockMoveCardsProps) {
 
                   <CardContent className="pt-3 text-xs space-y-2">
                     <div className="flex justify-between">
+                      <span className="text-gray-500">User:</span>
+                      <span className="text-gray-700 font-medium truncate max-w-[150px]">{move.user || "System Admin"}</span>
+                    </div>
+
+                    <div className="flex justify-between">
                       <span className="text-gray-500">Quantity:</span>
                       <span className={`font-bold ${isPositive ? "text-green-600" : "text-red-600"}`}>
                         {isPositive ? `+${move.quantity}` : move.quantity}
                       </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Running Bal:</span>
+                      <span className="font-mono font-medium text-gray-800">{move.running_balance !== undefined ? move.running_balance.toLocaleString() : "—"}</span>
                     </div>
 
                     <div className="flex justify-between">
@@ -61,10 +71,11 @@ export function StockMoveCards({ moves }: StockMoveCardsProps) {
                     </div>
 
                     <div className="pt-2 border-t border-gray-100 mt-2">
-                      <span className="text-gray-400 block text-[10px] mb-0.5">WBS Phase & Activity</span>
+                      <span className="text-gray-400 block text-[10px] mb-0.5">WBS Phase & Cost Code</span>
                       <span className="text-gray-700 font-medium line-clamp-1">
                         {move.wbs_phase && move.wbs_activity ? `${move.wbs_phase} / ${move.wbs_activity}` : "General Stock"}
                       </span>
+                      {move.cost_code && <span className="text-gray-400 block text-[10px] font-mono mt-0.5">{move.cost_code}</span>}
                     </div>
                   </CardContent>
                 </Card>

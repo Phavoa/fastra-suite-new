@@ -9,7 +9,9 @@ interface UnauthorizedMessageProps {
   fullScreen?: boolean;
 }
 
-export const UnauthorizedMessage = ({ fullScreen = false }: UnauthorizedMessageProps) => {
+export const UnauthorizedMessage = ({
+  fullScreen = false,
+}: UnauthorizedMessageProps) => {
   const containerVariants: any = {
     hidden: { opacity: 0, y: 10 },
     visible: {
@@ -29,7 +31,9 @@ export const UnauthorizedMessage = ({ fullScreen = false }: UnauthorizedMessageP
   };
 
   return (
-    <div className={`flex items-center justify-center p-6 ${fullScreen ? "min-h-screen bg-white" : "h-full py-20"}`}>
+    <div
+      className={`flex items-center justify-center p-6 ${fullScreen ? "min-h-screen bg-white" : "h-full py-20"}`}
+    >
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -37,7 +41,7 @@ export const UnauthorizedMessage = ({ fullScreen = false }: UnauthorizedMessageP
         className="max-w-md w-full text-center"
       >
         {/* Icon */}
-        <motion.div 
+        <motion.div
           variants={itemVariants}
           className="flex justify-center mb-6"
         >
@@ -52,8 +56,8 @@ export const UnauthorizedMessage = ({ fullScreen = false }: UnauthorizedMessageP
             Access Denied
           </h1>
           <p className="text-[#7A8A98] text-base leading-relaxed">
-            You don't have the required permissions to access this page. 
-            If you believe this is an error, please contact your administrator.
+            You don't have the required permissions to access this page. If you
+            believe this is an error, please contact your administrator.
           </p>
         </motion.div>
 
@@ -68,7 +72,7 @@ export const UnauthorizedMessage = ({ fullScreen = false }: UnauthorizedMessageP
         </motion.div>
 
         {/* Status Code (Subtle) */}
-        <motion.p 
+        <motion.p
           variants={itemVariants}
           className="mt-12 text-[10px] text-[#A9B3BC] uppercase tracking-widest font-medium"
         >

@@ -21,7 +21,7 @@ export function StockAdjustmentRow({
   const router = useRouter();
 
   const handleRowClick = () => {
-    router.push(`/inventory/stocks/scrap/${request.id}`);
+    router.push(`/inventory/operation/scrap/${request.id}`);
   };
 
   const handleCheckboxChange = (checked: boolean) => {

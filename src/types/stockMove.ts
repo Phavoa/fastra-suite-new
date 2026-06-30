@@ -16,6 +16,9 @@ export interface StockMove {
   total_value?: number;
   wbs_phase?: string;
   wbs_activity?: string;
+  user?: string;
+  running_balance?: number;
+  cost_code?: string;
 }
 
 export interface GetStockMovesParams {

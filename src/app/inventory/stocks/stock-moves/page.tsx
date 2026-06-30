@@ -21,6 +21,9 @@ const DUMMY_LEDGER_MOVES: StockMove[] = [
     transaction_type: "Receipt",
     reference_document: "PO-2026-0089",
     source_document_id: "PO-2026-0089",
+    user: "Mr. Abubakar (Storekeeper)",
+    running_balance: 1200,
+    cost_code: "CC-1020 (Concrete Materials)",
     product: {
       id: "1",
       product_name: "Cement (50kg Bag)",
@@ -43,6 +46,9 @@ const DUMMY_LEDGER_MOVES: StockMove[] = [
     transaction_type: "Consumption",
     reference_document: "REQ-2026-0142",
     source_document_id: "REQ-2026-0142",
+    user: "Eng. John Doe (Site Engineer)",
+    running_balance: 148,
+    cost_code: "CC-2040 (Structural Reinforcement)",
     product: {
       id: "2",
       product_name: "Reinforcement Steel 16mm",
@@ -65,6 +71,9 @@ const DUMMY_LEDGER_MOVES: StockMove[] = [
     transaction_type: "Scrap",
     reference_document: "SCRAP-0012",
     source_document_id: "SCRAP-0012",
+    user: "Mrs. Ngozi (Controller)",
+    running_balance: 700,
+    cost_code: "CC-9010 (Overhead Spoilage)",
     product: {
       id: "1",
       product_name: "Cement (50kg Bag)",
@@ -87,6 +96,9 @@ const DUMMY_LEDGER_MOVES: StockMove[] = [
     transaction_type: "Adjustment",
     reference_document: "WH-MAIN-ADJ-0001",
     source_document_id: "WH-MAIN-ADJ-0001",
+    user: "Admin (Inventory Control)",
+    running_balance: 118,
+    cost_code: "CC-3005 (Safety Equipment)",
     product: {
       id: "4",
       product_name: "Safety Helmets (Yellow)",
@@ -109,6 +121,9 @@ const DUMMY_LEDGER_MOVES: StockMove[] = [
     transaction_type: "Return",
     reference_document: "RET-2026-0003",
     source_document_id: "RET-2026-0003",
+    user: "Mr. Abubakar (Storekeeper)",
+    running_balance: 35,
+    cost_code: "CC-1010 (Excavation & Sand)",
     product: {
       id: "3",
       product_name: "Sharp Sand",

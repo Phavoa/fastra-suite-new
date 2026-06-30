@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowLeft, Eye, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Eye, CheckCircle2, AlertCircle, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -14,6 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageGuard } from "@/components/auth/PageGuard";
 
 const pendingRequests = [
@@ -22,84 +28,92 @@ const pendingRequests = [
     project: "Project #1 - Site A Construction",
     wbsPhase: "Superstructure",
     wbsActivity: "First Floor Slab Reinforcement",
+    costCode: "CC-2040 (Structural Reinforcement)",
+    availableBudget: 15000000,
     equipmentId: "Tower Crane TC-01 (EQ-102)",
     requester: "Eng. John Doe (Site Engineer)",
-    gateReceiver: "Mr. Abubakar (Site Foreman - 08031234567)",
+    gateReceiver: "Mr. Abubakar (Site Foreman)",
     requisitionDate: "2026-06-27",
-    issueDate: "2026-06-28",
+    itemsCount: 2,
     totalCost: 10200000,
-    itemsList: [
-      { id: "1", name: "Reinforcement Steel 16mm", unit: "Tonnes", requestedQty: 12, availableStock: 150, unitCost: 850000 },
-      { id: "2", name: "Binding Wire", unit: "Rolls", requestedQty: 5, availableStock: 40, unitCost: 15000 }
-    ],
     status: "pending",
+    isOverrun: false,
   },
   {
     id: "REQ-2026-0143",
     project: "Project #2 - Site B Infrastructure",
     wbsPhase: "Substructure / Foundation",
     wbsActivity: "Drainage Trench Concrete",
+    costCode: "CC-1020 (Concrete Materials)",
+    availableBudget: 3500000,
     equipmentId: "Concrete Mixer CM-04 (EQ-088)",
     requester: "Eng. Jane Smith (Site Supervisor)",
-    gateReceiver: "Engr. Kenneth (Project Supervisor - 08029876543)",
+    gateReceiver: "Engr. Kenneth (Project Supervisor)",
     requisitionDate: "2026-06-28",
-    issueDate: "2026-06-29",
+    itemsCount: 1,
     totalCost: 1375000,
-    itemsList: [
-      { id: "3", name: "Cement (50kg Bag)", unit: "Bags", requestedQty: 250, availableStock: 500, unitCost: 5500 }
-    ],
     status: "pending",
+    isOverrun: false,
+  },
+];
+
+const overrunRequests = [
+  {
+    id: "REQ-2026-0189",
+    project: "Project #1 - Site A Construction",
+    wbsPhase: "Substructure / Foundation",
+    wbsActivity: "Retaining Wall Concrete Pour",
+    costCode: "CC-1020 (Concrete Materials)",
+    availableBudget: 2000000,
+    equipmentId: "Batching Plant BP-01",
+    requester: "Eng. Samuel (Site Supervisor)",
+    gateReceiver: "Mr. Abubakar (Site Foreman)",
+    requisitionDate: "2026-06-29",
+    itemsCount: 4,
+    totalCost: 4850000,
+    status: "held_overrun",
+    isOverrun: true,
   },
 ];
 
 export default function MaterialConsumptionApprovalsPage() {
-  const [requests, setRequests] = useState(pendingRequests);
-  const [expandedReqId, setExpandedReqId] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<any>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [actionType, setActionType] = useState<"approve" | "reject" | "clarify" | null>(null);
-  
+  const router = useRouter();
+  const [activeQueue, setActiveQueue] = useState<"normal" | "overrun">("normal");
+  const [normalList, setNormalList] = useState(pendingRequests);
+  const [overrunList, setOverrunList] = useState(overrunRequests);
   const statusModal = useStatusModal();
 
-  const toggleExpand = (id: string) => {
-    setExpandedReqId(expandedReqId === id ? null : id);
-  };
+  const currentList = activeQueue === "normal" ? normalList : overrunList;
 
-  const handleActionClick = (req: any, type: "approve" | "reject" | "clarify") => {
-    setSelectedRequest(req);
-    setActionType(type);
-    setRejectionReason("");
-  };
-
-  const confirmAction = () => {
-    if ((actionType === "reject" || actionType === "clarify") && !rejectionReason.trim()) {
-      statusModal.showError("Reason Required", "You must provide a reason for rejection or clarification.");
-      return;
-    }
-
-    setRequests(requests.filter(r => r.id !== selectedRequest.id));
-    
-    let title = "";
-    let msg = "";
-    if (actionType === "approve") {
-      title = "Request Approved";
-      msg = `Material Consumption ${selectedRequest.id} has been approved. Actual project costing and warehouse stock deduction have been posted to the Inventory Ledger.`;
-    } else if (actionType === "reject") {
-      title = "Request Rejected";
-      msg = `Material Consumption ${selectedRequest.id} has been rejected. The submitter has been notified.`;
+  const handleAction = (id: string, action: "approve" | "reject" | "clarify") => {
+    if (activeQueue === "normal") {
+      setNormalList(normalList.filter((r) => r.id !== id));
     } else {
-      title = "Clarification Requested";
-      msg = `Request sent back to submitter for clarification.`;
+      setOverrunList(overrunList.filter((r) => r.id !== id));
     }
 
-    setSelectedRequest(null);
-    setActionType(null);
-    statusModal.showSuccess(title, msg);
+    if (action === "approve") {
+      statusModal.showSuccess(
+        "Requisition Approved",
+        `Material Consumption ${id} approved successfully. Actual project costing and warehouse stock deduction have been posted.`
+      );
+    } else if (action === "reject") {
+      statusModal.showSuccess(
+        "Requisition Rejected",
+        `Material Consumption ${id} has been rejected. The submitter has been notified.`
+      );
+    } else {
+      statusModal.showSuccess(
+        "Clarification Requested",
+        `Material Consumption ${id} sent back to the submitter for clarification.`
+      );
+    }
   };
 
   return (
     <PageGuard application="inventory" module="materialconsumption">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
           <div className="flex items-center">
             <Link href="/inventory/operation">
@@ -108,137 +122,176 @@ export default function MaterialConsumptionApprovalsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-lg font-medium text-gray-800">Material Consumption Approvals (Storekeeper & Project Gate)</h1>
-              <p className="text-xs text-gray-500 mt-0.5">Review site requisitions against WBS job allocations and real-time available stock.</p>
+              <h1 className="text-lg font-medium text-gray-800">
+                Material Consumption Approvals
+              </h1>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Review site requisitions against WBS job allocations and authorize warehouse stock deductions.
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto w-full flex flex-col gap-8">
+        <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6">
+          
+          {/* PRD 10.2 Queue Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActiveQueue("normal")}
+                className={`px-4 py-2 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-2 ${
+                  activeQueue === "normal"
+                    ? "bg-[#3B7CED] text-white shadow-xs"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" /> Within Budget Queue ({normalList.length})
+              </button>
+              <button
+                onClick={() => setActiveQueue("overrun")}
+                className={`px-4 py-2 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-2 ${
+                  activeQueue === "overrun"
+                    ? "bg-red-600 text-white shadow-xs animate-pulse"
+                    : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                }`}
+              >
+                <AlertCircle className="w-4 h-4" /> Overrun Queue - Budget Exceeded ({overrunList.length})
+              </button>
+            </div>
+            <span className="text-xs text-gray-500">
+              {activeQueue === "normal"
+                ? "Items within WBS budget proceed to stock deduction upon supervisor approval."
+                : "PRD 10.2: Items held by Budget Validation Gate. Stock is NOT deducted until PM resolves."}
+            </span>
+          </div>
+
           <section>
-            <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Pending Site Requisitions</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-xl font-medium ${activeQueue === "normal" ? "text-[#3B7CED]" : "text-red-600"}`}>
+                {activeQueue === "normal" ? "Pending Site Requisitions (Within Budget)" : "Overrun Queue — PM Review Required"}
+              </h2>
+              <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded">
+                {currentList.length} Request{currentList.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
             <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto w-full">
                 <Table className="min-w-[900px] w-full">
                   <TableHeader>
-                    <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-200">
-                      <TableHead className="w-10 pl-4"></TableHead>
-                      <TableHead className="py-3 font-medium text-gray-600 text-xs uppercase">Requisition ID</TableHead>
-                      <TableHead className="py-3 font-medium text-gray-600 text-xs uppercase">Project & WBS Allocation</TableHead>
-                      <TableHead className="py-3 font-medium text-gray-600 text-xs uppercase">Requester & Equipment</TableHead>
-                      <TableHead className="py-3 font-medium text-gray-600 text-xs uppercase">Dates & Receiver</TableHead>
-                      <TableHead className="py-3 font-medium text-gray-600 text-xs uppercase">Total Cost</TableHead>
-                      <TableHead className="pr-6 py-3 font-medium text-gray-600 text-xs uppercase text-right">Actions</TableHead>
+                    <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
+                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Requisition ID</TableHead>
+                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Project & WBS Allocation</TableHead>
+                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Budget Gate Validation</TableHead>
+                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Requester & Equipment</TableHead>
+                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase text-right">Total Valuation</TableHead>
+                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase text-center">Status</TableHead>
+                      <TableHead className="py-3 pr-6 font-medium text-gray-500 text-xs uppercase text-right">Options</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {requests.length === 0 ? (
+                    {currentList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="px-6 py-10 text-center text-gray-400 italic">
-                          No pending material consumption requests to review.
+                        <TableCell colSpan={7} className="px-6 py-12 text-center text-gray-400 italic">
+                          No pending requisitions in this queue.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      requests.map((req) => (
-                        <React.Fragment key={req.id}>
-                          <TableRow className="hover:bg-gray-50/50 transition-colors border-b-gray-100 cursor-pointer" onClick={() => toggleExpand(req.id)}>
-                            <TableCell className="pl-4 py-4 text-gray-400">
-                              {expandedReqId === req.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </TableCell>
-                            <TableCell className="py-4 font-mono font-semibold text-[#3B7CED]">{req.id}</TableCell>
-                            <TableCell className="py-4">
-                              <div className="font-medium text-gray-900">{req.project}</div>
-                              <div className="text-gray-600 text-xs mt-0.5 font-medium">
-                                <span className="text-blue-600">{req.wbsPhase}</span> → <span className="text-gray-700">{req.wbsActivity}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-4">
-                              <div className="text-gray-800 text-sm font-medium">{req.requester}</div>
-                              <div className="text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded w-fit mt-1 font-semibold">
-                                🚜 {(req as any).equipmentId || "N/A"}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-4">
-                              <div className="text-xs text-gray-600">Req: <span className="font-semibold text-gray-800">{(req as any).requisitionDate || (req as any).date}</span></div>
-                              <div className="text-xs text-gray-600 mt-0.5">Issue: <span className="font-semibold text-blue-600">{(req as any).issueDate || "Pending"}</span></div>
-                              <div className="text-[11px] text-gray-500 truncate max-w-48 mt-1" title={(req as any).gateReceiver}>
-                                📦 {(req as any).gateReceiver || "Not Specified"}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-4 font-medium text-gray-900 text-sm">
-                              ₦{req.totalCost.toLocaleString()} <span className="text-xs text-gray-500 font-normal">({req.itemsList.length} items)</span>
-                            </TableCell>
-                            <TableCell className="pr-6 py-4 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
-                              <Button variant="outline" size="sm" className="text-[#3B7CED] border-blue-200 hover:bg-blue-50 text-xs font-medium" onClick={() => handleActionClick(req, "clarify")}>
-                                Clarify
-                              </Button>
-                              <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 text-xs font-medium" onClick={() => handleActionClick(req, "reject")}>
-                                Reject
-                              </Button>
-                              <Button size="sm" className="bg-[#2BA24D] hover:bg-[#238A40] text-white text-xs font-medium shadow-sm" onClick={() => handleActionClick(req, "approve")}>
-                                Approve & Deduct Stock
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-
-                          {/* Expanded Items & Stock Visibility Row */}
-                          {expandedReqId === req.id && (
-                            <TableRow className="bg-blue-50/30 border-b border-gray-200">
-                              <TableCell colSpan={7} className="px-10 py-4">
-                                <div className="bg-white rounded border border-gray-200 p-4 shadow-sm">
-                                  <div className="flex flex-wrap items-center justify-between bg-gray-50 p-3 rounded border border-gray-100 mb-4 text-xs gap-4">
-                                    <div>
-                                      <span className="text-gray-500 font-medium">Gate Receiver / Signatory:</span>
-                                      <p className="font-semibold text-gray-900 mt-0.5">{(req as any).gateReceiver}</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-500 font-medium">Target Asset / Equipment:</span>
-                                      <p className="font-semibold text-amber-700 mt-0.5">{(req as any).equipmentId}</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-500 font-medium">Requisition vs Issue Date:</span>
-                                      <p className="font-semibold text-gray-900 mt-0.5">{(req as any).requisitionDate} → {(req as any).issueDate}</p>
-                                    </div>
-                                  </div>
-                                  <h4 className="text-xs font-semibold text-gray-700 uppercase mb-3">Requisition Line Items & Stock Visibility</h4>
-                                  <Table className="w-full text-xs">
-                                    <TableHeader>
-                                      <TableRow className="bg-gray-50">
-                                        <TableHead>Item Name</TableHead>
-                                        <TableHead className="text-center">Unit</TableHead>
-                                        <TableHead className="text-center">Requested QTY</TableHead>
-                                        <TableHead className="text-center">Available Warehouse Stock</TableHead>
-                                        <TableHead className="text-right">Unit Cost</TableHead>
-                                        <TableHead className="text-right">Total Line Cost</TableHead>
-                                        <TableHead className="text-center">Stock Status</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {req.itemsList.map((item) => {
-                                        const hasSufficient = item.availableStock >= item.requestedQty;
-                                        return (
-                                          <TableRow key={item.id}>
-                                            <TableCell className="font-medium text-gray-800">{item.name}</TableCell>
-                                            <TableCell className="text-center">{item.unit}</TableCell>
-                                            <TableCell className="text-center font-bold text-blue-600">{item.requestedQty}</TableCell>
-                                            <TableCell className="text-center font-medium text-gray-700">{item.availableStock}</TableCell>
-                                            <TableCell className="text-right">₦{item.unitCost.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right font-semibold">₦{(item.requestedQty * item.unitCost).toLocaleString()}</TableCell>
-                                            <TableCell className="text-center">
-                                              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${hasSufficient ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                                                {hasSufficient ? "Sufficient Stock" : "Shortage Warning"}
-                                              </span>
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </React.Fragment>
+                      currentList.map((req) => (
+                        <TableRow
+                          key={req.id}
+                          className="hover:bg-gray-50 border-b-gray-100 transition-colors"
+                        >
+                          <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold text-gray-900">
+                            <Link
+                              href={`/inventory/operation/material-consumption/${req.id}`}
+                              className="text-[#3B7CED] hover:underline"
+                            >
+                              {req.id}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5">
+                            <div className="font-medium text-gray-800 text-sm">{req.project}</div>
+                            <div className="text-gray-500 text-xs mt-0.5">
+                              <span className="text-[#3B7CED] font-medium">{req.wbsPhase}</span> → {req.wbsActivity}
+                            </div>
+                            <div className="text-[11px] text-gray-400 font-mono mt-0.5">{req.costCode}</div>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5">
+                            <div className="text-xs">
+                              <span className="text-gray-500">Avail. WBS Budget:</span>{" "}
+                              <strong className="text-gray-800 font-mono">₦{req.availableBudget.toLocaleString()}</strong>
+                            </div>
+                            <div className="mt-1">
+                              {req.isOverrun ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
+                                  OVERRUN (+₦{(req.totalCost - req.availableBudget).toLocaleString()})
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                                  Within Budget Gate
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5">
+                            <div className="text-gray-800 text-sm font-medium">{req.requester}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              Asset: <span className="font-medium text-gray-700">{req.equipmentId}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5 text-right font-semibold text-gray-800 text-sm">
+                            ₦{req.totalCost.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5 text-center">
+                            <span className={`inline-block px-2 py-0.5 text-[11px] rounded font-medium uppercase ${req.isOverrun ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
+                              {req.isOverrun ? "HELD: OVERRUN" : "PENDING"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="pr-6 py-3.5 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-gray-500 hover:text-gray-900"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem
+                                  className="text-xs cursor-pointer text-gray-700 flex items-center py-2"
+                                  onClick={() => router.push(`/inventory/operation/material-consumption/${req.id}`)}
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-2 text-[#3B7CED]" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs cursor-pointer text-green-700 font-medium flex items-center py-2"
+                                  onClick={() => handleAction(req.id, "approve")}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-green-600" />
+                                  Approve & Deduct Stock
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs cursor-pointer text-amber-700 flex items-center py-2"
+                                  onClick={() => handleAction(req.id, "clarify")}
+                                >
+                                  <AlertCircle className="w-3.5 h-3.5 mr-2 text-amber-600" />
+                                  Request Clarification
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs cursor-pointer text-red-600 flex items-center py-2"
+                                  onClick={() => handleAction(req.id, "reject")}
+                                >
+                                  <XCircle className="w-3.5 h-3.5 mr-2 text-red-600" />
+                                  Reject Requisition
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
                       ))
                     )}
                   </TableBody>
@@ -248,61 +301,12 @@ export default function MaterialConsumptionApprovalsPage() {
           </section>
         </div>
 
-        {/* Action Modal */}
-        {selectedRequest && actionType && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl border border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                {actionType === "approve" ? "Approve Requisition" : actionType === "reject" ? "Reject Requisition" : "Request Clarification"}
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to {actionType} requisition <span className="font-mono font-semibold">{selectedRequest.id}</span>?
-              </p>
-
-              {(actionType === "reject" || actionType === "clarify") && (
-                <div className="mb-4 space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Reason <span className="text-red-500">*</span>
-                  </label>
-                  <Textarea 
-                    placeholder={`Please provide a reason for ${actionType === "reject" ? "rejection" : "clarification"}...`}
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    className="resize-none border-gray-300"
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="ghost" onClick={() => setSelectedRequest(null)} className="text-gray-600 hover:bg-gray-100 text-sm font-medium">
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={confirmAction}
-                  className={
-                    actionType === "approve" ? "bg-[#2BA24D] hover:bg-[#238A40] text-white text-sm font-medium shadow-sm" :
-                    actionType === "reject" ? "bg-[#E43D2B] hover:bg-[#C93020] text-white text-sm font-medium shadow-sm" :
-                    "bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-sm font-medium shadow-sm"
-                  }
-                >
-                  Confirm {actionType.charAt(0).toUpperCase() + actionType.slice(1)}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Status Modal */}
         <StatusModal
           isOpen={statusModal.isOpen}
           onClose={statusModal.close}
-          type={statusModal.type}
           title={statusModal.title}
           message={statusModal.message}
-          actionText="Close"
-          onAction={statusModal.close}
-          showCloseButton={false}
+          type={statusModal.type}
         />
       </div>
     </PageGuard>

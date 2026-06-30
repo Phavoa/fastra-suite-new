@@ -30,6 +30,8 @@ export default function IncomingProductDetailPage() {
     notes: "Batch delivery verified against delivery note DN-89201.",
     has_backorder: true,
     backorder_id: "WH-IN-0001-BO",
+    three_way_match_status: "FLAGGED_DISCREPANCY",
+    discrepancy_details: "Quantity shortage (100 Bags short) and Unit Invoice Price variance (+₦150/bag vs PO).",
     items: [
       {
         id: "1",
@@ -37,10 +39,13 @@ export default function IncomingProductDetailPage() {
         product_description: "Portland Cement Grade 42.5",
         unit_symbol: "Bags",
         po_quantity: 600,
+        po_unit_price: 5500,
         received_quantity: 500,
+        invoice_unit_price: 5650,
         accepted_quantity: 500,
         rejected_quantity: 0,
         reject_reason: "",
+        match_status: "Variance Detected",
       },
     ],
   };
@@ -91,6 +96,29 @@ export default function IncomingProductDetailPage() {
 
         {/* Details Content */}
         <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
+          
+          {/* PRD 3-Way Match Audit Banner */}
+          {dummyData.three_way_match_status && (
+            <div className="p-4 rounded border bg-amber-50/80 border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 text-amber-800 rounded-full font-bold text-xs">
+                  3-WAY MATCH
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-amber-950">
+                    Discrepancy Flagged: {dummyData.discrepancy_details}
+                  </h4>
+                  <p className="text-xs text-amber-800 mt-0.5">
+                    Automated comparison between Purchase Order ({dummyData.related_po}), Supplier Delivery Note, and Physical Received Stock.
+                  </p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-red-100 text-red-800 font-bold text-xs rounded border border-red-300 uppercase self-start sm:self-auto">
+                {dummyData.three_way_match_status.replace("_", " ")}
+              </span>
+            </div>
+          )}
+
           <section>
             <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Receipt Summary</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-gray-50 p-6 rounded border border-gray-200">
@@ -118,36 +146,49 @@ export default function IncomingProductDetailPage() {
           </section>
 
           <section>
-            <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Received Product Lines & Quality Inspection</h2>
+            <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Received Product Lines & 3-Way Match Verification</h2>
             <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#F8F9FA] border-b-gray-100">
-                    <TableHead className="pl-4">Product Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-center">Unit</TableHead>
-                    <TableHead className="text-center">PO QTY</TableHead>
-                    <TableHead className="text-center">Received QTY</TableHead>
-                    <TableHead className="text-center">Accepted QTY</TableHead>
-                    <TableHead className="text-center">Rejected QTY</TableHead>
-                    <TableHead className="pr-4">Reject Reason</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dummyData.items.map((item) => (
-                    <TableRow key={item.id} className="border-b-gray-100 hover:bg-gray-50">
-                      <TableCell className="pl-4 font-medium text-gray-800">{item.product_name}</TableCell>
-                      <TableCell className="text-gray-600 text-xs">{item.product_description}</TableCell>
-                      <TableCell className="text-center text-xs">{item.unit_symbol}</TableCell>
-                      <TableCell className="text-center font-medium text-gray-500">{item.po_quantity}</TableCell>
-                      <TableCell className="text-center font-bold text-gray-900">{item.received_quantity}</TableCell>
-                      <TableCell className="text-center font-bold text-green-600">{item.accepted_quantity}</TableCell>
-                      <TableCell className="text-center font-bold text-red-600">{item.rejected_quantity}</TableCell>
-                      <TableCell className="pr-4 text-xs text-gray-500">{item.reject_reason || "None"}</TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1000px]">
+                  <TableHeader>
+                    <TableRow className="bg-[#F8F9FA] border-b-gray-100">
+                      <TableHead className="pl-4">Product Name</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead className="text-center">PO QTY</TableHead>
+                      <TableHead className="text-center">Received QTY</TableHead>
+                      <TableHead className="text-right">PO Unit Price</TableHead>
+                      <TableHead className="text-right">Invoice Unit Price</TableHead>
+                      <TableHead className="text-center">Accepted QTY</TableHead>
+                      <TableHead className="text-center pr-4">3-Way Match Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {dummyData.items.map((item: any) => (
+                      <TableRow key={item.id} className="border-b-gray-100 hover:bg-gray-50">
+                        <TableCell className="pl-4 font-medium text-gray-800">
+                          <div>{item.product_name}</div>
+                          <div className="text-[11px] text-gray-500 font-normal">{item.product_description}</div>
+                        </TableCell>
+                        <TableCell className="text-xs">{item.unit_symbol}</TableCell>
+                        <TableCell className="text-center font-medium text-gray-500">{item.po_quantity}</TableCell>
+                        <TableCell className="text-center font-bold text-gray-900">{item.received_quantity}</TableCell>
+                        <TableCell className="text-right font-mono text-gray-600">
+                          {item.po_unit_price ? `₦${item.po_unit_price.toLocaleString()}` : "—"}
+                        </TableCell>
+                        <TableCell className={`text-right font-mono font-bold ${item.invoice_unit_price !== item.po_unit_price ? "text-red-600" : "text-gray-900"}`}>
+                          {item.invoice_unit_price ? `₦${item.invoice_unit_price.toLocaleString()}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-green-600">{item.accepted_quantity}</TableCell>
+                        <TableCell className="text-center pr-4">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
+                            {item.match_status || "Verified"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </section>
         </div>

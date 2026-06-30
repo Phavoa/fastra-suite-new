@@ -26,7 +26,7 @@ export function StockMoveRow({
   return (
     <motion.div
       className={cn(
-        "grid grid-cols-[48px_1.2fr_1fr_1.2fr_1.5fr_0.8fr_1fr_1fr_1.5fr] items-center px-4 py-3.5 text-xs text-slate-700 border-b border-gray-100 hover:bg-gray-50 transition-colors",
+        "grid grid-cols-[40px_1.1fr_1.1fr_0.8fr_1fr_1.3fr_0.6fr_0.7fr_0.9fr_1fr_1.5fr] items-center px-4 py-3.5 text-xs text-slate-700 border-b border-gray-100 hover:bg-gray-50 transition-colors",
       )}
       role="row"
     >
@@ -40,6 +40,10 @@ export function StockMoveRow({
       </div>
 
       <div className="text-slate-600 truncate">{move.date_moved || "N/A"}</div>
+
+      <div className="text-slate-700 font-medium truncate" title={move.user || "System"}>
+        {move.user || "System Admin"}
+      </div>
 
       <div>
         <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium text-[11px]">
@@ -55,16 +59,21 @@ export function StockMoveRow({
         {isPositive ? `+${move.quantity}` : move.quantity}
       </div>
 
-      <div className="text-right pr-4 text-slate-600">
+      <div className="font-mono text-center font-medium text-slate-700">
+        {move.running_balance !== undefined ? move.running_balance.toLocaleString() : "—"}
+      </div>
+
+      <div className="text-right pr-2 text-slate-600">
         {move.unit_cost !== undefined ? `₦${move.unit_cost.toLocaleString()}` : "—"}
       </div>
 
-      <div className="text-right pr-4 font-medium text-slate-800">
+      <div className="text-right pr-2 font-medium text-slate-800">
         {move.total_value !== undefined ? `₦${move.total_value.toLocaleString()}` : "—"}
       </div>
 
       <div className="text-slate-600 truncate pl-2">
-        {move.wbs_phase && move.wbs_activity ? `${move.wbs_phase} / ${move.wbs_activity}` : "General Stock"}
+        <div className="font-medium text-slate-800">{move.wbs_phase && move.wbs_activity ? `${move.wbs_phase} / ${move.wbs_activity}` : "General Stock"}</div>
+        {move.cost_code && <div className="text-[10px] text-gray-400 font-mono">{move.cost_code}</div>}
       </div>
     </motion.div>
   );

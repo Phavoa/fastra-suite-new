@@ -140,8 +140,8 @@ export default function ProductDetailsPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Reorder Point</Label>
-                  <Input type="number" defaultValue="50" className="bg-white border-gray-300 rounded font-mono" />
+                  <Label className="text-gray-700 font-medium">Default Reorder Unit</Label>
+                  <Input defaultValue="50 Bags" disabled className="bg-gray-100 border-gray-300 rounded text-gray-600 font-mono" />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -159,9 +159,91 @@ export default function ProductDetailsPage() {
 
                 <div className="flex flex-col gap-2 md:col-span-3">
                   <Label className="text-gray-700 font-medium">Description</Label>
-                  <Textarea defaultValue="High quality grade 42.5R Portland cement suitable for all structural reinforced concrete works." className="bg-white border-gray-300 rounded min-h-[100px]" />
+                  <Textarea defaultValue="High quality grade 42.5R Portland cement suitable for all structural reinforced concrete works." className="bg-white border-gray-300 rounded min-h-[80px]" />
+                </div>
+              </div>
+
+              {/* PRD 10.5 Per-Site Low Stock Thresholds */}
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-[#3B7CED]">Multi-Site Low Stock Thresholds (PRD 10.5)</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Configure reorder points per physical site. Alerts trigger automatically when stock falls below the threshold with direct Purchase Request links.
+                    </p>
+                  </div>
                 </div>
 
+                <div className="border border-gray-200 rounded overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA]">
+                        <TableHead className="font-semibold text-gray-600 text-xs pl-4">Site Location</TableHead>
+                        <TableHead className="font-semibold text-gray-600 text-xs text-center">Current Stock</TableHead>
+                        <TableHead className="font-semibold text-gray-600 text-xs text-center">Low Stock Threshold</TableHead>
+                        <TableHead className="font-semibold text-gray-600 text-xs">Alert Recipients</TableHead>
+                        <TableHead className="font-semibold text-gray-600 text-xs text-center">Alert Status</TableHead>
+                        <TableHead className="font-semibold text-gray-600 text-xs text-right pr-4">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow className="border-b border-gray-100">
+                        <TableCell className="font-medium text-gray-800 text-xs pl-4">Main Warehouse - Site A</TableCell>
+                        <TableCell className="text-center font-mono font-semibold text-xs text-green-600">850 Bags</TableCell>
+                        <TableCell className="text-center">
+                          <Input type="number" defaultValue="200" className="w-24 h-8 text-center mx-auto text-xs font-mono" />
+                        </TableCell>
+                        <TableCell className="text-xs text-gray-600">Site Mgr & Project Director</TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                            Normal
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-400">Up to date</Button>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow className="border-b border-gray-100 bg-red-50/30">
+                        <TableCell className="font-medium text-gray-800 text-xs pl-4">Secondary Store - Site B</TableCell>
+                        <TableCell className="text-center font-mono font-bold text-xs text-red-600">18 Bags</TableCell>
+                        <TableCell className="text-center">
+                          <Input type="number" defaultValue="50" className="w-24 h-8 text-center mx-auto text-xs font-mono border-red-300 bg-white" />
+                        </TableCell>
+                        <TableCell className="text-xs text-gray-600">Site Mgr & Procurement</TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-800 border border-red-300 animate-pulse">
+                            Low Stock Alert
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white shadow-xs"
+                            onClick={() => alert("Redirecting to create Purchase Request for Site B...")}
+                          >
+                            + Create Purchase Request
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium text-gray-800 text-xs pl-4">Port Storage Facility - Site C</TableCell>
+                        <TableCell className="text-center font-mono font-semibold text-xs text-gray-700">332 Bags</TableCell>
+                        <TableCell className="text-center">
+                          <Input type="number" defaultValue="100" className="w-24 h-8 text-center mx-auto text-xs font-mono" />
+                        </TableCell>
+                        <TableCell className="text-xs text-gray-600">Warehouse Admin</TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                            Normal
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-400">Up to date</Button>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
           )}
