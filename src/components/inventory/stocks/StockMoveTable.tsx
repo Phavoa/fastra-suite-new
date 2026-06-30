@@ -21,13 +21,11 @@ export function StockMoveTable({
     return moves.filter(
       (m) =>
         String(m.id).toLowerCase().includes(lowerQuery) ||
-        m.product.product_name.toLowerCase().includes(lowerQuery) ||
-        (m.source_location &&
-          m.source_location.toLowerCase().includes(lowerQuery)) ||
-        (m.destination_location &&
-          m.destination_location.toLowerCase().includes(lowerQuery)) ||
-        (m.source_document_id &&
-          m.source_document_id.toLowerCase().includes(lowerQuery)),
+        (m.product && m.product.product_name.toLowerCase().includes(lowerQuery)) ||
+        (m.transaction_type && m.transaction_type.toLowerCase().includes(lowerQuery)) ||
+        (m.reference_document && m.reference_document.toLowerCase().includes(lowerQuery)) ||
+        (m.wbs_phase && m.wbs_phase.toLowerCase().includes(lowerQuery)) ||
+        (m.wbs_activity && m.wbs_activity.toLowerCase().includes(lowerQuery))
     );
   }, [moves, query]);
 
@@ -49,91 +47,59 @@ export function StockMoveTable({
   }
 
   return (
-    <section className="mx-auto mt-6 mr-4">
-      <motion.div
-        className="px-6 bg-white h-full"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <div className="mt-2 pt-4 bg-white rounded-lg overflow-hidden">
-          <motion.div
-            className="hidden md:grid grid-cols-[48px_1fr_1.5fr_1fr_1fr_1fr_1fr] items-center bg-gray-100 rounded-md px-4 py-3 text-sm font-medium text-gray-500 border-b border-gray-100"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-          >
-            <div
-              className="flex items-center"
-              onClick={(e) => e.stopPropagation()}
-            >
+    <section className="w-full">
+      <div className="bg-white overflow-x-auto">
+        <div className="min-w-[1050px]">
+          <div className="grid grid-cols-[48px_1.2fr_1fr_1.2fr_1.5fr_0.8fr_1fr_1fr_1.5fr] items-center bg-[#F8F9FA] rounded-t-md px-4 py-3 text-xs font-semibold text-gray-500 border-b border-gray-200">
+            <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 id="select-all"
                 aria-label="Select all stock moves"
                 checked={allSelected}
                 onCheckedChange={() => toggleAll()}
-                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700 transition-all duration-200"
+                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white transition-all duration-200"
               />
             </div>
-            <div>Move ID</div>
-            <div>Product</div>
-            <div>Quantity</div>
-            <div>Source</div>
-            <div>Destination</div>
-            <div>Date Moved</div>
-          </motion.div>
+            <div>Date / Time</div>
+            <div>Type</div>
+            <div>Ref Doc</div>
+            <div>Item Name</div>
+            <div className="text-center">QTY</div>
+            <div className="text-right pr-4">Unit Cost</div>
+            <div className="text-right pr-4">Total Value</div>
+            <div className="pl-2">WBS Phase & Activity</div>
+          </div>
 
-          <div className="">
-            {filtered.map((move, index) => (
-              <motion.div
+          <div className="divide-y divide-gray-100">
+            {filtered.map((move) => (
+              <StockMoveRow
                 key={move.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.4,
-                  ease: "easeOut",
-                  delay: index * 0.05,
-                }}
-              >
-                <StockMoveRow
-                  move={move}
-                  isSelected={!!selected[String(move.id)]}
-                  onToggleSelect={toggleOne}
-                />
-              </motion.div>
+                move={move}
+                isSelected={!!selected[String(move.id)]}
+                onToggleSelect={toggleOne}
+              />
             ))}
           </div>
         </div>
 
         {filtered.length === 0 && (
-          <motion.div
-            className="p-8 text-center text-gray-400"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
-          >
-            No stock moves found
-          </motion.div>
+          <div className="p-8 text-center text-gray-400 text-sm">
+            No inventory ledger records found matching your query.
+          </div>
         )}
 
-        <div className="px-6 py-4 flex items-center justify-between text-sm text-gray-500">
-          <div>{filtered.length} results</div>
-          <nav aria-label="Pagination">
-            <ul className="inline-flex items-center gap-2">
-              <li>
-                <button className="px-3 py-1 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
-                  Prev
-                </button>
-              </li>
-              <li>
-                <button className="px-3 py-1 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
-                  Next
-                </button>
-              </li>
-            </ul>
-          </nav>
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 bg-[#F8F9FA]">
+          <div>Showing {filtered.length} entries</div>
+          <div className="flex gap-2">
+            <button disabled className="px-2.5 py-1 rounded border border-gray-200 bg-white text-gray-400 cursor-not-allowed">
+              Prev
+            </button>
+            <button disabled className="px-2.5 py-1 rounded border border-gray-200 bg-white text-gray-400 cursor-not-allowed">
+              Next
+            </button>
+          </div>
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

@@ -131,9 +131,80 @@ export function NavBar({
               <Menu size={24} className="text-gray-600" />
             </button>
           )}
-          <h1 className="text-xl md:text-2xl truncate font-bold text-gray-900">
-            {title}
-          </h1>
+          <div className="flex items-center">
+            <h1 className="text-xl md:text-2xl truncate font-bold text-gray-900">
+              {title}
+            </h1>
+            {items && items.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="md:hidden ml-1.5 p-1 rounded hover:bg-gray-100 text-gray-600 flex items-center focus:outline-none" aria-label="Module navigation">
+                  <ChevronDown size={20} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64 bg-white border border-gray-200 shadow-xl rounded-lg p-2 mt-2 max-h-[75vh] overflow-y-auto z-50">
+                  {items.map((item, idx) => (
+                    <div key={`mob-nav-${idx}`} className="py-1.5 border-b border-gray-100 last:border-none">
+                      {item.children && item.children.length > 0 ? (
+                        <>
+                          <div className="px-3 py-1 text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
+                            {item.label}
+                          </div>
+                          <div className="mt-1 space-y-0.5">
+                            {item.children.map((child) => {
+                              const Wrapper =
+                                child.module && child.application
+                                  ? ({ children }: { children: React.ReactNode }) => (
+                                      <ProtectedComponent
+                                        key={child.href}
+                                        application={child.application! as any}
+                                        module={child.module!}
+                                        action={(child.action as any) || "view"}
+                                      >
+                                        {children}
+                                      </ProtectedComponent>
+                                    )
+                                  : ({ children }: { children: React.ReactNode }) => (
+                                      <>{children}</>
+                                    );
+
+                              return (
+                                <Wrapper key={child.href}>
+                                  <DropdownMenuItem asChild>
+                                    <Link
+                                      href={child.href!}
+                                      className={`w-full px-3 py-2 text-sm rounded block cursor-pointer ${
+                                        isActive(child.href)
+                                          ? "bg-blue-50 text-[#3B7CED] font-semibold"
+                                          : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                      }`}
+                                    >
+                                      {child.label}
+                                    </Link>
+                                  </DropdownMenuItem>
+                                </Wrapper>
+                              );
+                            })}
+                          </div>
+                        </>
+                      ) : (
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href={item.href!}
+                            className={`w-full px-3 py-2 text-sm font-medium rounded block cursor-pointer ${
+                              isActive(item.href)
+                                ? "bg-blue-50 text-[#3B7CED] font-semibold"
+                                : "text-gray-800 hover:bg-gray-50"
+                            }`}
+                          >
+                            {item.label}
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                    </div>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
 
         <nav

@@ -122,6 +122,7 @@ export interface CreateIncomingProductRequest {
   is_validated: boolean;
   can_edit: boolean;
   is_hidden: boolean;
+  notes?: string | null;
 }
 
 export interface UpdateIncomingProductRequest {
@@ -141,6 +142,7 @@ export interface UpdateIncomingProductRequest {
   is_validated: boolean;
   can_edit: boolean;
   is_hidden: boolean;
+  notes?: string | null;
 }
 
 export interface PatchIncomingProductRequest {
@@ -160,4 +162,5 @@ export interface PatchIncomingProductRequest {
   is_validated?: boolean;
   can_edit?: boolean;
   is_hidden?: boolean;
+  notes?: string | null;
 }

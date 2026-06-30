@@ -60,7 +60,7 @@ export interface UnitOfMeasureDetails {
 
 export interface ProductDetails {
   url: string;
-  id: number;
+  id: number | string;
   product_name: string;
   product_description: string;
   product_category: string;

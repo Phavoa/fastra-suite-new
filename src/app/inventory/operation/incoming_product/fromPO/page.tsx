@@ -1,30 +1,16 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PageHeader } from "@/components/purchase/products/PageHeader";
-import { BreadcrumbItem } from "@/types/purchase";
-import { useCreateIncomingProductMutation, useCreateIncomingProductBackorderMutation } from "@/api/inventory/incomingProductApi";
-import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
-import { useGetProductsQuery } from "@/api/purchase/productsApi";
-import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
-import { useGetPurchaseOrderQuery } from "@/api/purchase/purchaseOrderApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
-import {
-  FadeIn,
-  SlideUp,
-  StaggerContainer,
-} from "@/components/shared/AnimatedWrapper";
-import { useSelector } from "react-redux";
-import { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash } from "lucide-react";
+import { Plus, Trash, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -42,94 +28,81 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { z } from "zod";
-import type { Resolver } from "react-hook-form";
-import type { CreateIncomingProductRequest } from "@/types/incomingProduct";
 import { PageGuard } from "@/components/auth/PageGuard";
-import { extractErrorMessage } from "@/lib/utils";
 
 type Option = { value: string; label: string };
 
-// Incoming product item type
-interface IncomingProductLineItem {
+interface GRNLineItem {
   id: string;
   product: string;
-  product_details: {
-    product_name: string;
-    product_description: string;
-    unit_of_measure_details: {
-      unit_symbol: string;
-    };
-  };
-  expected_quantity: string;
-  quantity_received: string;
+  product_name: string;
+  product_description: string;
+  unit_symbol: string;
+  po_quantity: string;
+  received_quantity: string;
+  accepted_quantity: string;
+  rejected_quantity: string;
+  reject_reason: string;
 }
 
-// Form schema for incoming product creation
-const receiptTypes = [
-  "vendor_receipt",
-  "manufacturing_receipt",
-  "internal_transfer",
-  "returns",
-  "scrap",
-] as const;
-
-const incomingProductSchema = z.object({
-  receipt_type: z.enum(receiptTypes),
+const grnSchema = z.object({
   supplier: z.string().min(1, "Supplier is required"),
-  source_location: z.string().min(1, "Source location is required"),
   destination_location: z.string().min(1, "Destination location is required"),
-  related_po: z.string().optional(),
+  delivery_note: z.string().min(1, "Delivery note / reference is required"),
   notes: z.string().optional(),
 });
 
-type IncomingProductFormData = z.infer<typeof incomingProductSchema>;
+type GRNFormData = z.infer<typeof grnSchema>;
 
-const initialItems: IncomingProductLineItem[] = [
-  {
-    id: "1",
-    product: "",
-    product_details: {
-      product_name: "",
-      product_description: "",
-      unit_of_measure_details: {
-        unit_symbol: "",
-      },
-    },
-    expected_quantity: "",
-    quantity_received: "",
-  },
+const DUMMY_LOCATIONS: Option[] = [
+  { value: "WH-MAIN", label: "Main Warehouse - Site A (WH-MAIN)" },
+  { value: "WH-SEC", label: "Secondary Store - Site B (WH-SEC)" },
+];
+
+const DUMMY_SUPPLIERS: Option[] = [
+  { value: "SUP-1", label: "Dangote Cement Plc" },
+  { value: "SUP-2", label: "Julius Berger Steel Co." },
+];
+
+const DUMMY_PRODUCTS = [
+  { id: "1", product_name: "Cement (50kg Bag)", product_description: "Portland Cement Grade 42.5", unit_symbol: "Bags" },
+  { id: "2", product_name: "Reinforcement Steel 16mm", product_description: "High Yield Deformed Steel Bars", unit_symbol: "Tonnes" },
+  { id: "3", product_name: "Sharp Sand", product_description: "Clean river sharp sand for plastering", unit_symbol: "m³" },
 ];
 
 export default function CreateIncomingProductFromPOPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const poId = searchParams.get("poId");
-  const formRef = useRef<HTMLFormElement>(null);
+  const poId = searchParams.get("poId") || "PO-2026-0089";
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // API mutations and queries
-  const [createIncomingProduct, { isLoading: isCreating }] =
-    useCreateIncomingProductMutation();
-  const [createBackorder, { isLoading: isCreatingBackorder }] =
-    useCreateIncomingProductBackorderMutation();
-  const { data: purchaseOrder, isLoading: isLoadingPO, error: poError } =
-    useGetPurchaseOrderQuery(poId || "", { skip: !poId });
-  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
-    useGetActiveLocationsQuery();
-  const {
-    data: vendors,
-    isLoading: isLoadingVendors,
-    error: vendorsError,
-  } = useGetVendorsQuery({});
-  const {
-    data: products,
-    isLoading: isLoadingProducts,
-    error: productsError,
-  } = useGetProductsQuery({});
+  const [items, setItems] = useState<GRNLineItem[]>([
+    {
+      id: "1",
+      product: "1",
+      product_name: "Cement (50kg Bag)",
+      product_description: "Portland Cement Grade 42.5",
+      unit_symbol: "Bags",
+      po_quantity: "500",
+      received_quantity: "500",
+      accepted_quantity: "500",
+      rejected_quantity: "0",
+      reject_reason: "",
+    },
+    {
+      id: "2",
+      product: "2",
+      product_name: "Reinforcement Steel 16mm",
+      product_description: "High Yield Deformed Steel Bars",
+      unit_symbol: "Tonnes",
+      po_quantity: "20",
+      received_quantity: "18",
+      accepted_quantity: "18",
+      rejected_quantity: "0",
+      reject_reason: "",
+    },
+  ]);
 
-  // Form state
-  const [items, setItems] = useState<IncomingProductLineItem[]>(initialItems);
-
-  // Discrepancy Dialog State
   const [discrepancyState, setDiscrepancyState] = useState<{
     isOpen: boolean;
     type: DiscrepancyType | null;
@@ -140,99 +113,6 @@ export default function CreateIncomingProductFromPOPage() {
     ipId: null,
   });
 
-  // Load PO data and pre-populate form
-  useEffect(() => {
-    if (purchaseOrder) {
-      // Pre-populate form with PO data
-      setValue("receipt_type", "vendor_receipt");
-      setValue("supplier", purchaseOrder.vendor_details?.id.toString() || "");
-      setValue(
-        "source_location",
-        purchaseOrder.vendor_details?.id.toString() || ""
-      ); // Assuming vendor location as source
-      setValue(
-        "destination_location",
-        purchaseOrder.destination_location_details?.id.toString() || ""
-      );
-      setValue("related_po", purchaseOrder.id);
-      setValue("notes", "");
-
-      // Pre-populate items from PO
-      if (purchaseOrder.items && purchaseOrder.items.length > 0) {
-        const poItems: IncomingProductLineItem[] = purchaseOrder.items.map(
-          (item, index) => ({
-            id: (index + 1).toString(),
-            product: item.product_details?.id.toString() || "",
-            product_details: {
-              product_name: item.product_details?.product_name || "",
-              product_description:
-                item.product_details?.product_description || "",
-              unit_of_measure_details: {
-                unit_symbol:
-                  item.product_details?.unit_of_measure_details?.unit_symbol ||
-                  "",
-              },
-            },
-            expected_quantity: item.qty.toString(),
-            quantity_received: "",
-          })
-        );
-        setItems(poItems);
-      }
-    }
-  }, [purchaseOrder]);
-
-  const addRow = () =>
-    setItems((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        product: "",
-        product_details: {
-          product_name: "",
-          product_description: "",
-          unit_of_measure_details: {
-            unit_symbol: "",
-          },
-        },
-        expected_quantity: "",
-        quantity_received: "",
-      },
-    ]);
-
-  const removeRow = (id: string) =>
-    setItems((prev) => prev.filter((p) => p.id !== id));
-
-  const updateItem = (id: string, patch: Partial<IncomingProductLineItem>) =>
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
-    );
-
-  // React Hook Form setup
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm<IncomingProductFormData>({
-    resolver: zodResolver(
-      incomingProductSchema
-    ) as Resolver<IncomingProductFormData>,
-    defaultValues: {
-      receipt_type: "vendor_receipt",
-      supplier: "",
-      source_location: "",
-      destination_location: "",
-      related_po: poId || "",
-      notes: "",
-    },
-  });
-
-  const loggedInUser = useSelector((state: RootState) => state.auth.user);
-
-  // Notification state
   const [notification, setNotification] = React.useState<{
     message: string;
     type: "success" | "error";
@@ -243,869 +123,357 @@ export default function CreateIncomingProductFromPOPage() {
     show: false,
   });
 
-  // Convert API data to option format
-  const locationOptions: Option[] =
-    locations?.map((location) => ({
-      value: location.id.toString(),
-      label: `${location.location_name} (${location.location_code})`,
-    })) || [];
-
-  const vendorOptions: Option[] =
-    vendors?.map((vendor) => ({
-      value: vendor.id.toString(),
-      label: vendor.company_name,
-    })) || [];
-
-  const productOptions: Option[] =
-    products?.map((product) => ({
-      value: product.id.toString(),
-      label: product.product_name,
-    })) || [];
-
-  // Show notification if products or vendors fail to load
-  React.useEffect(() => {
-    if (productsError) {
-      setNotification({
-        message: extractErrorMessage(productsError, "Failed to load products. Please check your connection and try again."),
-        type: "error",
-        show: true,
-      });
-    }
-  }, [productsError]);
-
-  React.useEffect(() => {
-    if (vendorsError) {
-      setNotification({
-        message: extractErrorMessage(vendorsError, "Failed to load vendors. Please check your connection and try again."),
-        type: "error",
-        show: true,
-      });
-    }
-  }, [vendorsError]);
-
-  React.useEffect(() => {
-    if (locationsError) {
-      setNotification({
-        message: extractErrorMessage(locationsError, "Failed to load locations. Please check your connection and try again."),
-        type: "error",
-        show: true,
-      });
-    }
-  }, [locationsError]);
-
-  React.useEffect(() => {
-    if (poError) {
-      setNotification({
-        message: extractErrorMessage(poError, "Failed to load purchase order details."),
-        type: "error",
-        show: true,
-      });
-    }
-  }, [poError]);
-
-  const breadcrumsItem: BreadcrumbItem[] = [
-    { label: "Home", href: "/" },
-    { label: "Inventory", href: "/inventory" },
-    {
-      label: "Operation",
-      href: "/inventory/operation",
-    },
-    {
-      label: "Incoming Product",
-      href: "/inventory/operation/incoming_product",
-    },
-    {
-      label: "New from PO",
-      href: `/inventory/operation/incoming_product/fromPO?poId=${poId}`,
-      current: true,
-    },
-  ];
-
-  // Helper function to validate and prepare data
-  const prepareSubmissionData = (
-    data: IncomingProductFormData,
-    status: "draft" | "validated"
-  ): CreateIncomingProductRequest | null => {
-    const validItems = items.filter(
-      (item) => item.product && item.expected_quantity && item.quantity_received
-    );
-
-    if (validItems.length === 0) {
-      return null;
-    }
-
-    return {
-      receipt_type: data.receipt_type,
-      related_po: data.related_po || null,
-      supplier: parseInt(data.supplier),
-      source_location: data.source_location,
-      destination_location: data.destination_location,
-      incoming_product_items: validItems.map((item) => ({
-        product: parseInt(item.product),
-        expected_quantity: item.expected_quantity,
-        quantity_received: item.quantity_received,
-      })),
-      status,
-      is_validated: status === "validated",
-      can_edit: status === "draft",
-      is_hidden: false,
-    };
-  };
-
-  // Save as draft
-  async function onSave(data: IncomingProductFormData): Promise<void> {
-    const incomingProductData = prepareSubmissionData(data, "draft");
-
-    if (!incomingProductData) {
-      setNotification({
-        message:
-          "Please add at least one valid item with product, expected quantity, and quantity received",
-        type: "error",
-        show: true,
-      });
-      return;
-    }
-
-    try {
-      await createIncomingProduct(incomingProductData).unwrap();
-
-      setNotification({
-        message: "Incoming product saved as draft!",
-        type: "success",
-        show: true,
-      });
-
-      setTimeout(() => {
-        reset();
-        setItems(initialItems);
-        router.push("/inventory/operation");
-      }, 1500);
-    } catch (error: unknown) {
-      const errorMessage = extractErrorMessage(error, "Failed to save incoming product. Please try again.");
-
-      setNotification({
-        message: errorMessage,
-        type: "error",
-        show: true,
-      });
-    }
-  }
-
-  // Validate and mark as done
-  async function onValidate(data: IncomingProductFormData): Promise<void> {
-    const incomingProductData = prepareSubmissionData(data, "validated");
-
-    if (!incomingProductData) {
-      setNotification({
-        message:
-          "Please add at least one valid item with product, expected quantity, and quantity received",
-        type: "error",
-        show: true,
-      });
-      return;
-    }
-
-    try {
-      await createIncomingProduct(incomingProductData).unwrap();
-
-      setNotification({
-        message: "Incoming product validated and completed!",
-        type: "success",
-        show: true,
-      });
-
-      setTimeout(() => {
-        reset();
-        setItems(initialItems);
-        router.push("/inventory/operation");
-      }, 1500);
-    } catch (error: unknown) {
-      // Check for specific backorder/return error codes from backend
-      const err = error as any;
-      const detailRaw = err?.data?.detail?.toString?.() || "";
-      const codeMatch = detailRaw.match(/code='(.*?)'/);
-      const backorderCode = codeMatch?.[1];
-
-      // Extract IP_ID from string like "... string='{\"IP_ID\": \"INCP-0001\"}' ..."
-      let IP_ID = null;
-      const jsonMatch = detailRaw.match(/string='(.*?)'/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          IP_ID = parsed?.IP_ID;
-        } catch (e) {
-          console.warn("Failed to parse IP_ID from error detail", e);
-        }
-      }
-
-      if (backorderCode === "backorder_required" && IP_ID) {
-        setDiscrepancyState({
-          isOpen: true,
-          type: "backorder",
-          ipId: IP_ID,
-        });
-        return;
-      }
-
-      if (backorderCode === "return_required" && IP_ID) {
-        setDiscrepancyState({
-          isOpen: true,
-          type: "return",
-          ipId: IP_ID,
-        });
-        return;
-      }
-
-      const errorMessage = extractErrorMessage(error, "Failed to validate incoming product. Please try again.");
-
-      setNotification({
-        message: errorMessage,
-        type: "error",
-        show: true,
-      });
-    }
-  }
-
-  // Handlers for Discrepancy Dialog
-  const handleBackorderConfirm = async () => {
-    if (!discrepancyState.ipId) return;
-    try {
-      await createBackorder({
-        response: true,
-        incoming_product: discrepancyState.ipId,
-      }).unwrap();
-
-      setNotification({
-        message: "Backorder created successfully!",
-        type: "success",
-        show: true,
-      });
-
-      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-      router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
-    } catch (error) {
-      setNotification({
-        message: extractErrorMessage(error, "Failed to create backorder"),
-        type: "error",
-        show: true,
-      });
-    }
-  };
-
-  const handleBackorderDecline = async () => {
-    if (!discrepancyState.ipId) return;
-    try {
-      await createBackorder({
-        response: false,
-        incoming_product: discrepancyState.ipId,
-      }).unwrap();
-
-      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-      router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
-    } catch (error) {
-      setNotification({
-        message: extractErrorMessage(error, "Failed to acknowledge discrepancy"),
-        type: "error",
-        show: true,
-      });
-    }
-  };
-
-  const handleReturnConfirm = () => {
-    if (!discrepancyState.ipId) return;
-    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-    router.push(`/inventory/operation/incoming_product/return/${discrepancyState.ipId}`);
-  };
-
-  const handleReturnDecline = () => {
-    if (!discrepancyState.ipId) return;
-    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-    router.push(`/inventory/operation/incoming_product/${discrepancyState.ipId}`);
-  };
-
-  // Close notification
-  function closeNotification() {
-    setNotification((prev) => ({ ...prev, show: false }));
-  }
-
-  // Function to get product details when a product is selected
-  const getProductDetails = (productId: string) => {
-    const product = products?.find((p) => p.id.toString() === productId);
-    return {
-      product_name: product?.product_name || "",
-      product_description:
-        product?.product_description || "No description available",
-      unit_of_measure_details: {
-        unit_symbol: product?.unit_of_measure_details?.unit_symbol || "N/A",
+  const addRow = () =>
+    setItems((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        product: "",
+        product_name: "",
+        product_description: "",
+        unit_symbol: "",
+        po_quantity: "0",
+        received_quantity: "0",
+        accepted_quantity: "0",
+        rejected_quantity: "0",
+        reject_reason: "",
       },
-    };
+    ]);
+
+  const removeRow = (itemId: string) =>
+    setItems((prev) => prev.filter((p) => p.id !== itemId));
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<GRNFormData>({
+    resolver: zodResolver(grnSchema) as Resolver<GRNFormData>,
+    defaultValues: {
+      supplier: "SUP-1",
+      destination_location: "WH-MAIN",
+      delivery_note: `DN-${Math.floor(10000 + Math.random() * 90000)}`,
+      notes: `Received against Purchase Order ${poId}`,
+    },
+  });
+
+  const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
+    value: p.id,
+    label: p.product_name,
+  }));
+
+  const updateItemProduct = (itemId: string, productId: string) => {
+    const p = DUMMY_PRODUCTS.find((item) => item.id === productId);
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              product: productId,
+              product_name: p?.product_name || "",
+              product_description: p?.product_description || "",
+              unit_symbol: p?.unit_symbol || "",
+            }
+          : it
+      )
+    );
   };
 
-  // Enhanced updateItem function that also populates product details
-  const updateItemWithProductDetails = (
-    id: string,
-    patch: Partial<IncomingProductLineItem>
+  const updateItemQty = (
+    itemId: string,
+    field: "received_quantity" | "accepted_quantity" | "rejected_quantity",
+    val: string
   ) => {
     setItems((prev) =>
       prev.map((it) => {
-        if (it.id === id) {
-          const updatedItem = { ...it, ...patch };
-
-          // If product is being updated, populate product details
-          if (patch.product && patch.product !== it.product) {
-            const productDetails = getProductDetails(patch.product);
-            updatedItem.product_details = productDetails;
-          }
-
-          return updatedItem;
+        if (it.id !== itemId) return it;
+        const updated = { ...it, [field]: val };
+        const rec = Number(updated.received_quantity) || 0;
+        if (field === "received_quantity" || field === "accepted_quantity") {
+          const acc = Number(updated.accepted_quantity) || 0;
+          updated.rejected_quantity = Math.max(0, rec - acc).toString();
         }
-        return it;
+        return updated;
       })
     );
   };
 
-  // Show error state if PO failed to load
-  if (poError || (poId && !purchaseOrder && !isLoadingPO)) {
-    return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center text-red-600 px-4">
-          <p className="font-semibold text-lg">Error loading purchase order</p>
-          <p className="text-sm mt-2">
-            {extractErrorMessage(poError, "The requested purchase order could not be found.")}
-          </p>
-          <Button
-            onClick={() =>
-              router.push("/inventory/operation")
-            }
-            className="mt-6 pointer-cursor"
-          >
-            Back to Operations
-          </Button>
-        </div>
-      </main>
-    );
+  const updateReason = (itemId: string, val: string) => {
+    setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, reject_reason: val } : it)));
+  };
+
+  async function onSaveDraft(data: GRNFormData) {
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setNotification({
+        message: "Goods Receipt Note (GRN) draft saved successfully!",
+        type: "success",
+        show: true,
+      });
+      setTimeout(() => {
+        router.push("/inventory/operation");
+      }, 1000);
+    }, 500);
   }
 
-  // Show loading state while fetching PO data
-  if (isLoadingPO) {
-    return (
-      <main className="min-h-screen text-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading purchase order data...</p>
-        </div>
-      </main>
-    );
+  async function onValidateGRN(data: GRNFormData) {
+    // Check if any accepted quantity < po quantity
+    const hasBackorder = items.some((it) => Number(it.accepted_quantity) < Number(it.po_quantity));
+    
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      if (hasBackorder) {
+        setDiscrepancyState({
+          isOpen: true,
+          type: "backorder",
+          ipId: "WH-IN-0003",
+        });
+      } else {
+        setNotification({
+          message: "GRN Validated! Warehouse inventory stock and project costing ledger updated.",
+          type: "success",
+          show: true,
+        });
+        setTimeout(() => {
+          router.push("/inventory/operation");
+        }, 1200);
+      }
+    }, 500);
   }
+
+  const handleCreateBackorder = () => {
+    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+    setNotification({
+      message: "GRN Validated & Backorder created for remaining balance!",
+      type: "success",
+      show: true,
+    });
+    setTimeout(() => {
+      router.push("/inventory/operation");
+    }, 1200);
+  };
+
+  const handleCloseWithoutBackorder = () => {
+    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+    setNotification({
+      message: "GRN Validated! PO closed without backorder.",
+      type: "success",
+      show: true,
+    });
+    setTimeout(() => {
+      router.push("/inventory/operation");
+    }, 1200);
+  };
 
   return (
     <PageGuard application="inventory" module="incomingproduct">
-      <motion.div
-      className="h-full text-gray-900 font-sans antialiased"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-    >
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <PageHeader
-          items={breadcrumsItem}
-          title="New Incoming Product from PO"
-        />
-      </motion.div>
-
-      {/* Main form area */}
-      <motion.main
-        className="h-full mx-auto px-6 py-8 bg-white"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
-      >
-        <form ref={formRef} className="bg-white">
-          <motion.h2
-            className="text-lg font-medium text-blue-500 mb-6"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
-          >
-            Basic Information
-          </motion.h2>
-
-          {/* Content: rows with separators */}
-          <div className="flex-1">
-            {/* Row 1 (first 3 fields) */}
-            <SlideUp delay={0.4}>
-              <div className="py-2 mb-6 border-b border-gray-200">
-                <StaggerContainer
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-4"
-                  staggerDelay={0.15}
-                >
-                  {/* Receipt Type */}
-                  <FadeIn>
-                    <div className="p-4 transition-colors border-r border-gray-300">
-                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Receipt Type
-                      </h3>
-                      <p className="text-gray-700">
-                        {watch("receipt_type") === "vendor_receipt"
-                          ? "Vendor Receipt"
-                          : watch("receipt_type") === "manufacturing_receipt"
-                          ? "Manufacturing Receipt"
-                          : watch("receipt_type") === "internal_transfer"
-                          ? "Internal Transfer"
-                          : watch("receipt_type") === "returns"
-                          ? "Returns"
-                          : watch("receipt_type") === "scrap"
-                          ? "Scrap"
-                          : "Select type"}
-                      </p>
-                    </div>
-                  </FadeIn>
-
-                  {/* Date */}
-                  <FadeIn>
-                    <div className="p-4 transition-colors border-r border-gray-300">
-                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Date
-                      </h3>
-                      <p className="text-gray-700">
-                        {new Date().toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}{" "}
-                        -{" "}
-                        {new Date().toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </FadeIn>
-                </StaggerContainer>
-              </div>
-            </SlideUp>
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+        <div className="flex items-center px-6 py-4 border-b border-gray-100">
+          <Link href="/inventory/operation">
+            <Button variant="ghost" size="icon" className="mr-2">
+              <ArrowLeft className="h-5 w-5 text-gray-500" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-lg font-medium text-gray-800">Record Goods Receipt Note (GRN) from PO: {poId}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">Inspect arriving deliveries against PO quantities and record accepted stock.</p>
           </div>
+        </div>
 
-          {/* Incoming product form fields */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.5 }}
-            className="mb-8"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Receipt Type */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Receipt Type <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={watch("receipt_type")}
-                  onValueChange={(value) =>
-                    setValue(
-                      "receipt_type",
-                      value as
-                        | "vendor_receipt"
-                        | "manufacturing_receipt"
-                        | "internal_transfer"
-                        | "returns"
-                        | "scrap"
-                    )
-                  }
-                >
-                  <SelectTrigger size="md" className="h-11 w-full">
-                    <SelectValue placeholder="Select receipt type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vendor_receipt">
-                      Vendor Receipt
-                    </SelectItem>
-                    <SelectItem value="manufacturing_receipt">
-                      Manufacturing Receipt
-                    </SelectItem>
-                    <SelectItem value="internal_transfer">
-                      Internal Transfer
-                    </SelectItem>
-                    <SelectItem value="returns">Returns</SelectItem>
-                    <SelectItem value="scrap">Scrap</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.receipt_type && (
-                  <p className="text-sm text-red-500">
-                    {errors.receipt_type.message}
-                  </p>
-                )}
+        <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
+          <form className="flex flex-col gap-10">
+            <section>
+              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Delivery Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Supplier / Vendor <span className="text-red-500">*</span></Label>
+                  <Select value={watch("supplier")} onValueChange={(v) => setValue("supplier", v)}>
+                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                      <SelectValue placeholder="Select supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DUMMY_SUPPLIERS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.supplier && <p className="text-xs text-red-500">{errors.supplier.message}</p>}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Destination Store <span className="text-red-500">*</span></Label>
+                  <Select value={watch("destination_location")} onValueChange={(v) => setValue("destination_location", v)}>
+                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                      <SelectValue placeholder="Select warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DUMMY_LOCATIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.destination_location && <p className="text-xs text-red-500">{errors.destination_location.message}</p>}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Delivery Note / Ref <span className="text-red-500">*</span></Label>
+                  <Input {...register("delivery_note")} placeholder="e.g. DN-89201" className="bg-white border-gray-300 rounded" />
+                  {errors.delivery_note && <p className="text-xs text-red-500">{errors.delivery_note.message}</p>}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Inspection Notes</Label>
+                  <Input {...register("notes")} placeholder="Condition of goods, driver info..." className="bg-white border-gray-300 rounded" />
+                </div>
               </div>
+            </section>
 
-              {/* Supplier */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Supplier <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={watch("supplier")}
-                  onValueChange={(value) => setValue("supplier", value)}
-                  disabled={isLoadingVendors}
-                >
-                  <SelectTrigger size="md" className="h-11 w-full">
-                    <SelectValue
-                      placeholder={
-                        isLoadingVendors
-                          ? "Loading suppliers..."
-                          : "Select supplier"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingVendors ? (
-                      <SelectItem value="__loading__" disabled>
-                        Loading suppliers...
-                      </SelectItem>
-                    ) : vendorOptions.length === 0 ? (
-                      <SelectItem value="__no_vendors__" disabled>
-                        No suppliers available
-                      </SelectItem>
-                    ) : (
-                      vendorOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {errors.supplier && (
-                  <p className="text-sm text-red-500">
-                    {errors.supplier.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Source Location */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Source Location <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={watch("source_location")}
-                  onValueChange={(value) => setValue("source_location", value)}
-                  disabled={isLoadingLocations}
-                >
-                  <SelectTrigger size="md" className="h-11 w-full">
-                    <SelectValue
-                      placeholder={
-                        isLoadingLocations
-                          ? "Loading locations..."
-                          : "Select source location"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingLocations ? (
-                      <SelectItem value="__loading__" disabled>
-                        Loading locations...
-                      </SelectItem>
-                    ) : locationOptions.length === 0 ? (
-                      <SelectItem value="__no_locations__" disabled>
-                        No locations available
-                      </SelectItem>
-                    ) : (
-                      locationOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {errors.source_location && (
-                  <p className="text-sm text-red-500">
-                    {errors.source_location.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Destination Location */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Destination Location <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={watch("destination_location")}
-                  onValueChange={(value) =>
-                    setValue("destination_location", value)
-                  }
-                  disabled={isLoadingLocations}
-                >
-                  <SelectTrigger size="md" className="h-11 w-full">
-                    <SelectValue
-                      placeholder={
-                        isLoadingLocations
-                          ? "Loading locations..."
-                          : "Select destination location"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingLocations ? (
-                      <SelectItem value="__loading__" disabled>
-                        Loading locations...
-                      </SelectItem>
-                    ) : locationOptions.length === 0 ? (
-                      <SelectItem value="__no_locations__" disabled>
-                        No locations available
-                      </SelectItem>
-                    ) : (
-                      locationOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {errors.destination_location && (
-                  <p className="text-sm text-red-500">
-                    {errors.destination_location.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Related PO */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Related PO
-                </label>
-                <Input
-                  {...register("related_po")}
-                  placeholder="Enter related purchase order..."
-                  className="h-11"
-                  readOnly
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Notes
-                </label>
-                <Textarea
-                  {...register("notes")}
-                  placeholder="Enter any notes for this incoming product..."
-                  className="min-h-11"
-                />
-              </div>
-            </div>
-          </motion.div>
-
-          <section className="bg-white mt-8 border-none">
-            <div className="mx-auto">
-              <div className="overflow-x-auto">
-                <Table className="min-w-[1000px] table-fixed">
-                  <TableHeader className="bg-[#F6F7F8]">
-                    <TableRow>
-                      <TableHead className="w-48 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Product
-                      </TableHead>
-                      <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Description
-                      </TableHead>
-                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Unit
-                      </TableHead>
-                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Expected QTY
-                      </TableHead>
-                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Received QTY
-                      </TableHead>
-                      <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Action
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody className="bg-white">
-                    {items.map((it) => (
-                      <TableRow
-                        key={it.id}
-                        className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150"
-                      >
-                        <TableCell className="border border-gray-200 align-middle">
-                          <Select
-                            value={it.product}
-                            onValueChange={(value) =>
-                              updateItemWithProductDetails(it.id, {
-                                product: value,
-                              })
-                            }
-                            disabled={isLoadingProducts}
-                          >
-                            <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0">
-                              <SelectValue
-                                placeholder={
-                                  isLoadingProducts
-                                    ? "Loading products..."
-                                    : "Select product"
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {isLoadingProducts ? (
-                                <SelectItem value="__loading__" disabled>
-                                  Loading products...
-                                </SelectItem>
-                              ) : productOptions.length === 0 ? (
-                                <SelectItem value="__no_products__" disabled>
-                                  No products available
-                                </SelectItem>
-                              ) : (
-                                productOptions.map((option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-
-                        <TableCell className="border border-gray-200 px-4 align-middle">
-                          <div className="text-sm text-gray-600 line-clamp-2">
-                            {it.product_details.product_description ||
-                              "Select a product"}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                          <div className="text-sm text-gray-700">
-                            {it.product_details.unit_of_measure_details
-                              .unit_symbol || "N/A"}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="border border-gray-200 align-middle text-center">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            aria-label="Expected quantity"
-                            value={it.expected_quantity}
-                            onChange={(e) =>
-                              updateItemWithProductDetails(it.id, {
-                                expected_quantity: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
-                          />
-                        </TableCell>
-
-                        <TableCell className="border border-gray-200 align-middle text-center">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            aria-label="Quantity received"
-                            value={it.quantity_received}
-                            onChange={(e) =>
-                              updateItemWithProductDetails(it.id, {
-                                quantity_received: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
-                          />
-                        </TableCell>
-
-                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                          <button
+            <section>
+              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Quality Inspection & Quantity Tracking</h2>
+              <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto w-full">
+                  <Table className="min-w-[950px] w-full">
+                    <TableHeader>
+                      <TableRow className="bg-[#F8F9FA] border-b-gray-100">
+                        <TableHead className="w-56 pl-4">Product</TableHead>
+                        <TableHead className="w-48">Description</TableHead>
+                        <TableHead className="w-20 text-center">Unit</TableHead>
+                        <TableHead className="w-24 text-center">PO QTY</TableHead>
+                        <TableHead className="w-28 text-center">Received QTY</TableHead>
+                        <TableHead className="w-28 text-center">Accepted QTY</TableHead>
+                        <TableHead className="w-28 text-center">Rejected QTY</TableHead>
+                        <TableHead className="w-44 pr-2">Reject Reason</TableHead>
+                        <TableHead className="w-12 text-center pr-4"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((it) => (
+                        <TableRow key={it.id} className="border-b-gray-100 hover:bg-gray-50 transition-colors">
+                          <TableCell className="pl-4 py-2 align-middle">
+                            <Select value={it.product} onValueChange={(v) => updateItemProduct(it.id, v)}>
+                              <SelectTrigger className="bg-white border-gray-300 rounded h-9 text-xs">
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {productOptions.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="py-2 text-xs text-gray-600 line-clamp-1">{it.product_description || "—"}</TableCell>
+                          <TableCell className="py-2 text-center text-xs font-medium">{it.unit_symbol || "—"}</TableCell>
+                          <TableCell className="py-2 text-center font-semibold text-gray-700">{it.po_quantity}</TableCell>
+                          <TableCell className="py-2 text-center">
+                            <Input
+                              type="number"
+                              value={it.received_quantity}
+                              onChange={(e) => updateItemQty(it.id, "received_quantity", e.target.value)}
+                              className="w-20 mx-auto text-center h-8 text-xs font-bold"
+                            />
+                          </TableCell>
+                          <TableCell className="py-2 text-center">
+                            <Input
+                              type="number"
+                              value={it.accepted_quantity}
+                              onChange={(e) => updateItemQty(it.id, "accepted_quantity", e.target.value)}
+                              className="w-20 mx-auto text-center h-8 text-xs font-bold text-green-600"
+                            />
+                          </TableCell>
+                          <TableCell className="py-2 text-center font-bold text-red-600">
+                            {it.rejected_quantity}
+                          </TableCell>
+                          <TableCell className="py-2 pr-2">
+                            <Input
+                              value={it.reject_reason}
+                              onChange={(e) => updateReason(it.id, e.target.value)}
+                              placeholder={Number(it.rejected_quantity) > 0 ? "Reason required..." : "None"}
+                              disabled={Number(it.rejected_quantity) <= 0}
+                              className={`h-8 text-xs ${Number(it.rejected_quantity) > 0 && !it.reject_reason ? "border-red-400 bg-red-50/30" : ""}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-2 text-center pr-4">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeRow(it.id)}
+                              disabled={items.length === 1}
+                              className="h-8 w-8 text-red-500 hover:bg-red-50"
+                              title="Remove line"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter className="bg-[#F8F9FA] border-t border-gray-200">
+                      <TableRow>
+                        <TableCell colSpan={9} className="py-2 pl-4">
+                          <Button
                             type="button"
-                            onClick={() => removeRow(it.id)}
-                            aria-label="Remove row"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
-                            disabled={items.length === 1}
+                            variant="ghost"
+                            onClick={addRow}
+                            className="text-[#3B7CED] hover:bg-blue-50 text-xs font-medium h-8 px-3"
                           >
-                            <Trash className="w-4 h-4 text-red-500" />
-                          </button>
+                            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Product Line
+                          </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-
-                  <TableFooter className="bg-[#FBFCFD] border border-gray-200">
-                    <TableRow>
-                      <TableCell className="bg-white">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={addRow}
-                          className="flex items-center gap-2 px-3 py-0 text-sm m-auto rounded-md hover:bg-gray-50"
-                          aria-label="Add row"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                    </TableFooter>
+                  </Table>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </form>
+        </div>
 
-          {/* Form actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
-            className="flex justify-end gap-4 mt-8"
+        {/* Sticky Footer Bar */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+          <Link href="/inventory/operation">
+            <Button variant="outline" type="button" className="border-blue-400 text-blue-500 hover:bg-blue-50">
+              Cancel
+            </Button>
+          </Link>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit(onSaveDraft)}
+            variant="outline"
+            className="border-blue-400 text-blue-500 hover:bg-blue-50"
           >
-            <Button
-              type="button"
-              disabled={isCreating}
-              onClick={handleSubmit(onSave)}
-            >
-              {isCreating ? "Saving..." : "Save"}
-            </Button>
-            <Button
-              type="button"
-              disabled={isCreating}
-              onClick={handleSubmit(onValidate)}
-              variant={"contained"}
-            >
-              {isCreating ? "Validating..." : "Validate"}
-            </Button>
-          </motion.div>
-        </form>
-      </motion.main>
+            {isSubmitting ? "Saving..." : "Save Draft"}
+          </Button>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit(onValidateGRN)}
+            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+          >
+            {isSubmitting ? "Validating..." : "Validate GRN & Post Stock"}
+          </Button>
+        </div>
 
-      {/* Notification */}
-      <ToastNotification
-        message={notification.message}
-        type={notification.type}
-        show={notification.show}
-        onClose={closeNotification}
-      />
+        <DiscrepancyDialog
+          isOpen={discrepancyState.isOpen}
+          onClose={() => setDiscrepancyState({ isOpen: false, type: null, ipId: null })}
+          type={discrepancyState.type || "backorder"}
+          onConfirm={handleCreateBackorder}
+          onDecline={handleCloseWithoutBackorder}
+        />
 
-      <DiscrepancyDialog
-        isOpen={discrepancyState.isOpen}
-        type={discrepancyState.type}
-        onClose={() => setDiscrepancyState({ ...discrepancyState, isOpen: false })}
-        onConfirm={discrepancyState.type === "backorder" ? handleBackorderConfirm : handleReturnConfirm}
-        onDecline={discrepancyState.type === "backorder" ? handleBackorderDecline : handleReturnDecline}
-        isLoading={isCreatingBackorder}
-      />
-    </motion.div>
-  </PageGuard>
+        <ToastNotification
+          message={notification.message}
+          type={notification.type}
+          show={notification.show}
+          onClose={() => setNotification((p) => ({ ...p, show: false }))}
+        />
+      </div>
+    </PageGuard>
   );
 }
