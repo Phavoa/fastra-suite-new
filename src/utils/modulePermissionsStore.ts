@@ -255,6 +255,43 @@ export const getUserPermissions = (userId: number | string): UserPermissions => 
   }
 };
 
+// Mapping from frontend module keys to backend module keys
+export const MODULE_KEY_MAP: Record<keyof UserPermissions, string> = {
+  projectRequest: "project-request",
+  projectCosting: "project-costing",
+  invoice: "invoice",
+  inventory: "inventory",
+  settings: "settings",
+};
+
+/**
+ * Convert frontend UserPermissions (boolean flags) to backend format
+ * Option A: { "project-request": ["create", "view"], ... }
+ */
+export function convertPermissionsToApiFormat(
+  permissions: UserPermissions,
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+
+  for (const [moduleKey, modulePerms] of Object.entries(permissions)) {
+    const backendKey = MODULE_KEY_MAP[moduleKey as keyof UserPermissions];
+    if (!backendKey) continue;
+
+    const actions: string[] = [];
+    for (const [permKey, value] of Object.entries(modulePerms)) {
+      if (value) {
+        actions.push(permKey);
+      }
+    }
+
+    if (actions.length > 0) {
+      result[backendKey] = actions;
+    }
+  }
+
+  return result;
+}
+
 export const saveUserPermissions = (userId: number | string, permissions: UserPermissions): void => {
   if (typeof window === "undefined") return;
   try {

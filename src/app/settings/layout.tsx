@@ -12,7 +12,12 @@ import { setArchive } from "@/components/Settings/viewModeSlice";
 import { RootState } from "@/lib/store/store";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-type SettingsSection = "company" | "user" | "accessgroup" | "application" | "permissiontemplates";
+type SettingsSection =
+  | "company"
+  | "user"
+  | "accessgroup"
+  | "application"
+  | "permissiontemplates";
 
 export default function SettingsLayout({
   children,
@@ -31,11 +36,11 @@ export default function SettingsLayout({
   }[] = [
     { key: "company", label: "Company", href: "/settings/company/1" },
     { key: "user", label: "User", href: "/settings/users" },
-    {
-      key: "accessgroup",
-      label: "Access Groups",
-      href: "/settings/accessgroup",
-    },
+    // {
+    //   key: "accessgroup",
+    //   label: "Access Groups",
+    //   href: "/settings/accessgroup",
+    // },
     {
       key: "permissiontemplates",
       label: "Permission Templates",
@@ -47,9 +52,10 @@ export default function SettingsLayout({
   // Determine active section automatically, handling sub-paths
   const getActiveSection = (path: string): SettingsSection => {
     if (path.startsWith("/settings/users")) return "user";
-    if (path.startsWith("/settings/accessgroup")) return "accessgroup";
+    // if (path.startsWith("/settings/accessgroup")) return "accessgroup";
     if (path.startsWith("/settings/application")) return "application";
-    if (path.startsWith("/settings/permission-templates")) return "permissiontemplates";
+    if (path.startsWith("/settings/permission-templates"))
+      return "permissiontemplates";
     return "company";
   };
 
@@ -82,9 +88,9 @@ export default function SettingsLayout({
       case "user":
         basePath += "/users";
         break;
-      case "accessgroup":
-        basePath += "/accessgroup";
-        break;
+      // case "accessgroup":
+      //   basePath += "/accessgroup";
+      //   break;
       case "application":
         basePath += "/application";
         break;
@@ -105,9 +111,9 @@ export default function SettingsLayout({
       case "user":
         newPath += "/users/newUser";
         break;
-      case "accessgroup":
-        newPath += "/accessgroup/new";
-        break;
+      // case "accessgroup":
+      //   newPath += "/accessgroup/new";
+      //   break;
       case "application":
         newPath += "/application/newApplication";
         break;
@@ -145,10 +151,6 @@ export default function SettingsLayout({
         <div className="flex-1">
           <Breadcrumbs items={breadcrumbItems} />
         </div>
-
-        {/* <GrayButton size="sm" icon={CloudUploadFilled}>
-          Autosaved
-        </GrayButton> */}
       </div>
 
       {/* Settings control bar */}

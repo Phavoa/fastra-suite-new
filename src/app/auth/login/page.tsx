@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLoginMutation } from "@/api/authApi";
 import { useDispatch } from "react-redux";
-import { setAuthData } from "@/lib/store/authSlice";
+import { setAuthData, setIsAdmin } from "@/lib/store/authSlice";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, LockKeyhole } from "lucide-react";
@@ -108,18 +108,52 @@ const LoginPage: NextPage = () => {
       localStorage.removeItem(`auth_failures_${data.email}`);
       localStorage.removeItem(`auth_lockout_${data.email}`);
 
+      // Store core auth data including new user_permissions field
       dispatch(
         setAuthData({
           user: result.user,
           access_token: result.access_token,
           refresh_token: result.refresh_token,
+          tenant_user_id: result.tenant_user_id,
           tenant_id: result.tenant_id,
           tenant_schema_name: result.tenant_schema_name,
           tenant_company_name: result.tenant_company_name,
           isOnboarded: result.isOnboarded,
-          user_accesses: result.user_accesses,
+          user_permissions: result.user_permissions ?? [],
+          // Temporarily set isAdmin = false; will be confirmed below
+          isAdmin: false,
         }),
       );
+
+      // --- Determine admin status from tenant-user profile ---
+      // The backend returns user_permissions: [] for admin/superusers,
+      // but also for users with literally no permissions assigned.
+      // We resolve this by fetching the tenant-user profile and
+      // checking company_role (role 1 = owner/admin).
+      try {
+        const tenantUserId = result.tenant_user_id;
+        const tenantSchema = result.tenant_schema_name;
+        if (tenantUserId && tenantSchema) {
+          const profileRes = await fetch(
+            `https://${tenantSchema}.${process.env.NEXT_PUBLIC_API_DOMAIN}/users/tenant-users/${tenantUserId}/`,
+            {
+              headers: {
+                Authorization: `Bearer ${result.access_token}`,
+              },
+            }
+          );
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            // company_role 1 = primary owner/admin; or if backend explicitly sets a role name
+            const roleId: number = profile?.company_role ?? 0;
+            const roleName: string = (profile?.company_role_details?.name ?? "").toLowerCase();
+            const adminByRole = roleId === 1 || roleName === "admin" || roleName === "owner" || roleName === "super admin" || roleName === "superadmin";
+            dispatch(setIsAdmin(adminByRole));
+          }
+        }
+      } catch {
+        // Profile fetch failed — leave isAdmin as false; non-critical
+      }
 
       // Set httpOnly cookie via API route for security
       await fetch("/api/auth/set-token", {

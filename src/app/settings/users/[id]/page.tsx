@@ -22,15 +22,11 @@ import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
 import ReadOnlyField from "@/components/Settings/ReadOnlyField";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
 import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
-import { useGetApplicationsAndAccessRightsQuery } from "@/api/settings/applicationsApi";
 
 import {
   useGetUserByIdQuery,
   useUpdateUserByIdMutation,
 } from "@/api/settings/usersApi";
-import { useGetAccessGroupRightsQuery } from "@/api/settings/accessGroupRightApi";
-import { AccessGroupData } from "../../accessgroup/page";
-import { getUniqueAccessGroups } from "@/lib/utils/filterAccessGroup";
 
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
@@ -39,6 +35,7 @@ import {
   getPermissionTemplates,
   UserPermissions,
   createEmptyPermissions,
+  convertPermissionsToApiFormat,
 } from "@/utils/modulePermissionsStore";
 import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
 
@@ -70,6 +67,9 @@ export default function UsersDetails() {
   const tenant_company_name = useSelector(
     (state: any) => state.auth.tenant_company_name,
   );
+  const tenant_schema_name = useSelector(
+    (state: any) => state.auth.tenant_schema_name,
+  );
   const access_token = useSelector((state: any) => state.auth.access_token);
   const [updateUser] = useUpdateUserByIdMutation();
 
@@ -94,69 +94,10 @@ export default function UsersDetails() {
     user_image_image: null,
   });
 
-  const [accessRights, setAccessRights] = useState<Record<string, string[]>>({
-    purchase: [],
-    inventory: [],
-    sales: [],
-    human_resources: [],
-    accounting: [],
-  });
-
   const { data: userData, isLoading } = useGetUserByIdQuery(userId, {
     skip: !userId,
   });
   console.log(userData);
-  const { data: accessGroupRights, error } = useGetAccessGroupRightsQuery();
-  console.log(accessGroupRights);
-  const {
-    data: applicationsData,
-    isLoading: isLoadingApps,
-    error: appsError,
-  } = useGetApplicationsAndAccessRightsQuery();
-  const filteredData: AccessGroupData[] = React.useMemo(() => {
-    return getUniqueAccessGroups(accessGroupRights ?? []);
-  }, [accessGroupRights]);
-
-  // Build options directly from filteredData
-  const accessGroupOptionsByApp = React.useMemo(() => {
-    const result: Record<string, { label: string; value: string }[]> = {};
-
-    if (!filteredData?.length) return result;
-
-    filteredData.forEach((item) => {
-      const app = item.application; // e.g., "purchase"
-      if (!result[app]) result[app] = [];
-
-      result[app].push({
-        label: item.group_name, // show the group name
-        value: item.group_name, // use group name as value
-      });
-    });
-
-    return result;
-  }, [filteredData]);
-
-  const appLabelsByAccessKey: Record<string, string> = {
-    purchase: "PURCHASE",
-    inventory: "INVENTORY",
-    sales: "SALES",
-    human_resources: "HUMAN RESOURCES",
-    accounting: "ACCOUNTING",
-  };
-
-  // Utility to map group name to access_code
-  const getAccessCodesFromSelectedGroups = () => {
-    const codes: string[] = [];
-
-    Object.values(accessRights).forEach((groupNames) => {
-      groupNames.forEach((groupName) => {
-        const group = filteredData?.find((g) => g.group_name === groupName);
-        if (group?.access_code) codes.push(group.access_code);
-      });
-    });
-
-    return codes;
-  };
 
   // Load direct permissions on userId change
   useEffect(() => {
@@ -182,22 +123,6 @@ export default function UsersDetails() {
         signature_image: userData.signature || null,
         user_image_image: userData.user_image || null,
       });
-
-      const appAccesses: Record<string, string[]> = {
-        purchase: [],
-        inventory: [],
-        sales: [],
-        human_resources: [],
-        accounting: [],
-      };
-
-      userData.application_accesses?.forEach((access) => {
-        const appKey = access.application as keyof typeof appAccesses;
-        if (!appAccesses[appKey]) appAccesses[appKey] = [];
-        appAccesses[appKey].push(access.group_name);
-      });
-
-      setAccessRights(appAccesses);
     }
   }, [userData]);
 
@@ -235,15 +160,6 @@ export default function UsersDetails() {
     });
   };
 
-  const handleAccessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value, options } = e.target;
-    const selectedValues = Array.from(options)
-      .filter((option) => option.selected)
-      .map((option) => option.value);
-
-    setAccessRights((prev) => ({ ...prev, [name]: selectedValues }));
-  };
-
   const base64ToFile = (base64: string, fileName: string) => {
     if (!base64.startsWith("data:")) {
       console.warn("Invalid base64 string provided:", base64);
@@ -275,6 +191,7 @@ export default function UsersDetails() {
       formData.append("first_name", form.first_name);
       formData.append("last_name", form.last_name);
       formData.append("email", form.email);
+      formData.append("tenant_schema_name", tenant_schema_name || "");
       if (form.company_role !== null)
         formData.append("company_role", String(form.company_role));
       formData.append("phone_number", form.phone_number);
@@ -294,20 +211,14 @@ export default function UsersDetails() {
         formData.append("user_image_image", form.user_image_image);
       }
 
-      // Append access_codes
-      const accessCodes = getAccessCodesFromSelectedGroups();
-      accessCodes.forEach((code) => formData.append("access_codes", code));
+      const userPermissionsPayload = convertPermissionsToApiFormat(directPermissions);
+      formData.append("user_permissions", JSON.stringify(userPermissionsPayload));
 
       for (const [key, value] of formData.entries()) {
         console.log(key, value);
       }
 
       await updateUser({ id: userId, data: formData }).unwrap();
-
-      if (Object.values(accessRights).some(Boolean)) {
-        // TODO: replace this console.log with actual API call
-        console.log("Access rights to update:", accessRights);
-      }
 
       // Save direct permissions to localStorage and trigger updates
       saveUserPermissions(userId, directPermissions);
@@ -405,16 +316,6 @@ export default function UsersDetails() {
           onClick={() => setActiveTab("basic")}
         >
           Basic Settings
-        </button>
-        <button
-          className={`px-4 py-2 -mb-px font-medium ${
-            activeTab === "access"
-              ? "border-b-2 border-blue-600 text-[#3B7CED]"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("access")}
-        >
-          Access Rights
         </button>
         <button
           className={`px-4 py-2 -mb-px font-medium ${
@@ -701,72 +602,10 @@ export default function UsersDetails() {
             <div className="mt-6 flex justify-end gap-4 px-6">
               <button
                 type="button"
-                onClick={() => setActiveTab("access")}
+                onClick={() => setActiveTab("permissions")}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Next
-              </button>
-            </div>
-          )}
-        </Form>
-      )}
-
-      {/* Access Rights Tab */}
-      {activeTab === "access" && (
-        <Form onSubmit={handleSave}>
-          <FormSection title="Applications">
-            {/* GRID WRAPPER — outside the map */}
-            <div
-              className={
-                editMode
-                  ? "grid grid-cols-3 gap-5 pt-6"
-                  : "grid grid-cols-4 gap-5 pt-6"
-              }
-            >
-              {Object.entries(accessRights).map(([appKey, value]) => (
-                <div key={appKey}>
-                  {editMode ? (
-                    <FormMultiSelect
-                      label={appLabelsByAccessKey[appKey] || appKey}
-                      name={appKey}
-                      value={value} // string[]
-                      onChange={(selectedValues) =>
-                        setAccessRights((prev) => ({
-                          ...prev,
-                          [appKey]: selectedValues,
-                        }))
-                      }
-                      options={
-                        accessGroupOptionsByApp[appKey] || [
-                          { label: "No groups", value: "" },
-                        ]
-                      }
-                    />
-                  ) : (
-                    <ReadOnlyField
-                      label={appLabelsByAccessKey[appKey] || appKey}
-                      value={value?.length ? value.join(", ") : "—"}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </FormSection>
-
-          {editMode && (
-            <div className="mt-6 flex justify-end gap-4 px-6">
-              <button
-                type="button"
-                onClick={() => setEditMode(false)}
-                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
-              >
-                Back
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Save Changes
               </button>
             </div>
           )}

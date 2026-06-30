@@ -7,45 +7,59 @@ export interface User {
   user_image: string | null;
 }
 
-export interface UserAccess {
-  application: string;
-  access_groups: string;
-}
-
 export interface AuthState {
   user: User | null;
   access_token: string | null;
   refresh_token: string | null;
+  /** The TenantUser profile ID — used to fetch the user's role/company_role. */
+  tenant_user_id: number | null;
   tenant_id: number | null;
   tenant_schema_name: string | null;
   tenant_company_name: string | null;
   isOnboarded: boolean | null;
-  user_accesses: UserAccess[];
+  /**
+   * New backend permission format (Django codenames).
+   * Empty array [] signals that the user is an admin (bypasses all checks).
+   * Non-empty array contains explicit permission codenames for regular users.
+   */
+  user_permissions: string[];
+  /**
+   * Whether this user is an admin/owner of the tenant.
+   * Derived after login by checking company_role from the tenant-user profile endpoint.
+   * true = full access to all modules.
+   */
+  isAdmin: boolean;
 }
 
 const initialState: AuthState = {
   user: null,
   access_token: null,
   refresh_token: null,
+  tenant_user_id: null,
   tenant_id: null,
   tenant_schema_name: null,
   tenant_company_name: null,
   isOnboarded: null,
-  user_accesses: [],
+  user_permissions: [],
+  isAdmin: false,
 };
 
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    setAuthData: (state, action: PayloadAction<AuthState>) => {
+    setAuthData: (state, action: PayloadAction<Partial<AuthState>>) => {
       return { ...state, ...action.payload };
     },
-    clearAuthData: (state) => {
+    clearAuthData: () => {
       return initialState;
+    },
+    /** Called after fetching the tenant-user profile to confirm admin status. */
+    setIsAdmin: (state, action: PayloadAction<boolean>) => {
+      state.isAdmin = action.payload;
     },
   },
 });
 
-export const { setAuthData, clearAuthData } = authSlice.actions;
+export const { setAuthData, clearAuthData, setIsAdmin } = authSlice.actions;
 export default authSlice.reducer;

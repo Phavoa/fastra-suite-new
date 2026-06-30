@@ -29,14 +29,19 @@ export interface LoginResponse {
     email: string;
     user_image: string | null;
   };
+  /** The TenantUser profile ID for this user within their tenant. */
+  tenant_user_id: number;
   tenant_id: number;
   tenant_schema_name: string;
   tenant_company_name: string;
   isOnboarded: boolean;
-  user_accesses: Array<{
-    application: string;
-    access_groups: string;
-  }>;
+  /**
+   * New backend permission format.
+   * - Empty array [] for admin/superusers (they bypass all permission checks)
+   * - Array of Django permission codenames for regular users
+   *   e.g. ["inventory.view_deliveryorder", "purchase.add_purchaserequest"]
+   */
+  user_permissions: string[];
 }
 
 export interface ForgetPasswordRequest {

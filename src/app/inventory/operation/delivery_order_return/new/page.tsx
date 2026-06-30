@@ -11,8 +11,7 @@ import { useCreateDeliveryOrderReturnMutation } from "@/api/inventory/deliveryOr
 import { useGetDeliveryOrdersQuery } from "@/api/inventory/deliveryOrderApi";
 import { useGetDeliveryOrderQuery } from "@/api/inventory/deliveryOrderApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
-import { useSelector } from "react-redux";
-import { RootState } from "@/lib/store/store";
+
 import { Button } from "@/components/ui/button";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
@@ -56,9 +55,7 @@ export default function Page() {
   const { isAdmin, permissions } = usePermissionContext();
   const { can } = usePermission();
 
-  const user_accesses = useSelector(
-    (state: RootState) => state.auth.user_accesses,
-  );
+
 
   const hasCreatePermission = React.useMemo(() => {
     return (
