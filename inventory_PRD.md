@@ -98,3 +98,65 @@ System monitors stock on hand continuously. Sends in-system and email notificati
 
 ## 10.9 & 10.10 & 10.11 Settings, Integration, Access Matrix
 Configurable settings: Optional Waybill Photo on Receipt, Low Stock Alert Recipients, Default Location, Units of Measure, Product Categories.
+
+---
+
+# Comprehensive Review: Inventory Module PRD
+*This section identifies critical gaps, missing data fields, absent approval workflows, and recommended architectural improvements for enterprise scalability.*
+
+## 1. Major Logical Disconnects
+
+### The Cost & Financial Disconnect (Costing Link)
+* **The Gap:** The PRD states that inventory connects to the "Project Costing Module". However, the Product Record (Section 10.2) has no field for **Cost** or **Price**.
+* **Fix:** Define an inventory valuation method (e.g., Weighted Average Cost). Incoming receipts must capture the unit cost from the Purchase Order and continuously update the product's average cost.
+
+### Supplier Returns vs. Invoicing (Accounts Payable Link)
+* **The Gap:** Returning goods to a supplier (Section 10.3.2) simply "reduces stock on hand." 
+* **Fix:** Confirming a return must explicitly trigger a **Vendor Credit / Debit Note** in the Invoice Module to adjust payable balances automatically.
+
+### The Backorder Cancellation Black Hole
+* **The Gap:** If a user receives a partial shipment and selects "No" to creating a backorder, the remaining quantity is "discarded" (Section 10.3.1).
+* **Fix:** Canceling a backorder in the Inventory Module must send a signal to the Invoice Module to force-close the associated PO.
+
+## 2. Missing Fields and Data Sources
+
+### Missing Data in Manual Operations (Scrap & Adjustments)
+* **Missing Fields:**
+  * **Warehouse Location:** Even in a single-location tier, the system must record where the stock was deducted from for ledger accuracy.
+  * **Authorized By:** The PRD assumes only admins do this, but there is no explicit "Requested By" and "Approved By" fields to satisfy financial audits.
+
+### The Material Consumption Form (Section 10.4)
+* **Missing Fields:** The PRD completely forgot to include the **Products** and **Quantities** grid in the data model definition for consumption requests.
+
+### Product Management: Opening Stock (Section 10.2)
+* **Missing Flow:** There is no workflow defined for **Opening Stock**. When a new company adopts FastraSuite, they need a way to input the inventory they already own into the database on Day 1.
+
+### Deactivation Loopholes (Section 10.2)
+* **Missing Validation:** The system must also check that **Physical Stock == 0**. You cannot deactivate a product if there are still units sitting on a shelf. 
+
+## 3. Automation and Logic Oversights
+
+### Low Stock Alerts: Spam Prevention (Section 10.8)
+* **Fix:** Define logic stating: "Alert is sent once. A new alert will not trigger until stock is replenished above the threshold and falls below it again."
+
+### Missing Stock Reservation (Soft Allocation)
+* **The Reality:** If a request sits pending approval for 3 days, another worker might physically take the items.
+* **Fix:** Introduce "Soft Allocation" (Reserved Stock vs. Available Stock) the moment a request is submitted.
+
+### The "In-Transit" Status (Future-Proofing)
+* **Fix:** Never instantly deduct from Location A and add to Location B. Transfers require an **In-Transit** state to cover the physical time goods spend in moving vehicles.
+
+## 4. Reporting & Access 
+
+### Inventory Ledger Filtering (Section 10.7)
+* **The Reality:** Without explicitly defining search parameters (Date Range, Product, User, Transaction Type), the ledger will become a massive, unreadable table.
+
+### Access Matrix Clarity (Section 10.11)
+* **Fix:** Explicitly define the roles (e.g., General Worker, Stockkeeper, Warehouse Manager, Finance Admin) and map their CRUD (Create, Read, Update, Delete) permissions for every operation.
+
+## 5. Recommended UI / UX Enhancements
+
+| Enhancement | Business Value | Recommended UI Improvement |
+| :--- | :--- | :--- |
+| **1. Photographic Evidence for Rejected Materials** | When materials such as rusted steel bars or damaged cement bags are rejected, a rejection reason alone is often insufficient for vendor disputes and payment reconciliation. | Allow users to attach photos or delivery slips whenever Rejected Quantity > 0, creating a visual audit trail for procurement and finance teams. |
+| **2. Purchase Order Fulfillment Progress** | Large purchase orders are frequently delivered in multiple shipments over several days or weeks, making it difficult to understand overall fulfillment status. | Display a Fulfillment Progress Indicator (e.g., 65% Delivered • Shipment 4 of 6) prominently within the receiving workflow. |
