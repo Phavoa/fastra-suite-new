@@ -8,6 +8,7 @@ import { TransactionHistoryTable } from "@/components/project-costing/Transactio
 import { FilterModal } from "@/components/project-costing/modals/FilterModal";
 import { TransactionDetailsModal } from "@/components/project-costing/modals/TransactionDetailsModal";
 import { useParams } from "next/navigation";
+import { useGetProjectTransactionsQuery } from "@/api/projectCostingApi";
 
 export default function TransactionsPage() {
   const params = useParams();
@@ -16,6 +17,14 @@ export default function TransactionsPage() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+
+  const { data: transactions = [], isLoading } = useGetProjectTransactionsQuery(Number(id), {
+    skip: !id,
+  });
+
+  const approvedCount = transactions.filter((t: any) => (t.status || "approved").toLowerCase().includes("approv") || (t.status || "").toLowerCase() === "paid" || (t.status || "").toLowerCase() === "done").length;
+  const pendingCount = transactions.filter((t: any) => (t.status || "").toLowerCase().includes("pend")).length;
+  const totalCount = transactions.length;
 
   const handleRowClick = (tx: any) => {
     setSelectedTransaction(tx);
@@ -49,7 +58,7 @@ export default function TransactionsPage() {
               <span className="text-sm font-medium">Approved transactions</span>
             </div>
             <div className="text-3xl font-semibold text-green-500 mt-2">
-              32
+              {isLoading ? "-" : approvedCount}
             </div>
           </div>
           
@@ -59,7 +68,7 @@ export default function TransactionsPage() {
               <span className="text-sm font-medium">Pending transactions</span>
             </div>
             <div className="text-3xl font-semibold text-yellow-500 mt-2">
-              19
+              {isLoading ? "-" : pendingCount}
             </div>
           </div>
 
@@ -69,13 +78,13 @@ export default function TransactionsPage() {
               <span className="text-sm font-medium">Total Transactions</span>
             </div>
             <div className="text-3xl font-semibold text-blue-500 mt-2">
-              50
+              {isLoading ? "-" : totalCount}
             </div>
           </div>
         </div>
 
         {/* Transaction Table */}
-        <TransactionHistoryTable onRowClick={handleRowClick} />
+        <TransactionHistoryTable transactions={transactions} isLoading={isLoading} onRowClick={handleRowClick} />
 
       </div>
 
