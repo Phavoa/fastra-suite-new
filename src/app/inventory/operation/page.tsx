@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
 import { Input } from "@/components/ui/input";
-import { SearchIcon } from "lucide-react";
+import { Search, Package, Hammer, Trash2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,98 +20,109 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useGetIncomingProductsQuery } from "@/api/inventory/incomingProductApi";
-import { useGetActiveDeliveryOrdersQuery } from "@/api/inventory/deliveryOrderApi";
-import { useGetActiveDeliveryOrderReturnsQuery } from "@/api/inventory/deliveryOrderReturnApi";
-import { useGetActiveInternalTransfersQuery } from "@/api/inventory/internalTransferApi";
-import type { RootState } from "@/lib/store/store";
-import { Card } from "@/components/ui/card";
-import {
-  PackageIcon,
-  TruckIcon,
-  ArrowRightLeftIcon,
-  RotateCcwIcon,
-} from "lucide-react";
-import type { IncomingProduct } from "@/types/incomingProduct";
 import { PageGuard } from "@/components/auth/PageGuard";
-import { extractErrorMessage } from "@/lib/utils";
 
-// StatusCards component for operation overview
-function StatusCards() {
-  // Get counts from all APIs
-  const { data: incomingProducts = [] } = useGetIncomingProductsQuery({});
-  const { data: deliveryOrders = [] } = useGetActiveDeliveryOrdersQuery();
-  const { data: deliveryOrderReturns = [] } =
-    useGetActiveDeliveryOrderReturnsQuery();
-  const { data: internalTransfers = [] } = useGetActiveInternalTransfersQuery();
+const DUMMY_INCOMING_PRODUCTS: any[] = [
+  {
+    incoming_product_id: "WH-IN-0001",
+    receipt_type: "vendor_receipt",
+    status: "validated",
+    related_po: "PO-2026-0089",
+    created_at: "2026-06-25T10:00:00Z",
+    supplier_details: { company_name: "Dangote Cement Plc" },
+    source_location_details: { location_name: "Supplier Location" },
+    destination_location_details: { location_name: "Main Warehouse - Site A" },
+    accepted_qty: "500 Bags",
+    rejected_qty: 0,
+    has_backorder: false,
+  },
+  {
+    incoming_product_id: "WH-IN-0002",
+    receipt_type: "vendor_receipt",
+    status: "draft",
+    related_po: "PO-2026-0094",
+    created_at: "2026-06-28T14:30:00Z",
+    supplier_details: { company_name: "Julius Berger Steel" },
+    source_location_details: { location_name: "Supplier Location" },
+    destination_location_details: { location_name: "Main Warehouse - Site A" },
+    accepted_qty: "18 Tonnes",
+    rejected_qty: 2,
+    has_backorder: true,
+  },
+  {
+    incoming_product_id: "WH-IN-0003",
+    receipt_type: "returns",
+    status: "validated",
+    related_po: "PO-2026-0042",
+    created_at: "2026-06-27T09:15:00Z",
+    supplier_details: { company_name: "Lafarge Africa Plc" },
+    source_location_details: { location_name: "Main Warehouse - Site A" },
+    destination_location_details: { location_name: "Supplier Location" },
+    accepted_qty: "50 Bags",
+    rejected_qty: 0,
+    has_backorder: false,
+  },
+];
 
-  const counts = useMemo(() => {
-    return {
-      incomingProducts: incomingProducts.length,
-      deliveryOrders: deliveryOrders.length,
-      internalTransfers: internalTransfers.length,
-      deliveryOrderReturns: deliveryOrderReturns.length,
-    };
-  }, [
-    incomingProducts,
-    deliveryOrders,
-    internalTransfers,
-    deliveryOrderReturns,
-  ]);
-
-  const card = (
-    label: string,
-    value: number,
-    icon: React.ReactNode,
-    colorClass = "text-gray-700",
-    linkHref?: string,
-  ) => (
-    <Link href={linkHref || "#"}>
-      <Card className="p-4 rounded-none shadow-none cursor-pointer hover:bg-gray-50 transition-colors border border-b-0 border-t-0 border-l-0 border-r">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="text-lg">{icon}</div>
-            <div className={`text-sm font-medium ${colorClass}`}>{label}</div>
-          </div>
-          <div className={`text-[2rem] font-bold ${colorClass}`}>{value}</div>
-        </div>
-      </Card>
-    </Link>
-  );
+function OperationsNavigationTiles({ incomingCount }: { incomingCount: number }) {
+  const operationModules = [
+    {
+      title: "Incoming Products",
+      description: "Confirm goods received on-site against approved Purchase Orders.",
+      href: "/inventory/operation",
+      count: incomingCount,
+      icon: Package,
+      color: "text-blue-500",
+      bg: "bg-blue-50",
+    },
+    {
+      title: "Material Consumption",
+      description: "Record materials consumed from stock against specific project WBS.",
+      href: "/inventory/operation/material-consumption",
+      count: 2,
+      icon: Hammer,
+      color: "text-amber-500",
+      bg: "bg-amber-50",
+    },
+    {
+      title: "Scrap Recording",
+      description: "Record deliberate removal of damaged or lost items from inventory.",
+      href: "/inventory/operation/scrap",
+      count: 1,
+      icon: Trash2,
+      color: "text-red-500",
+      bg: "bg-red-50",
+    },
+  ];
 
   return (
-    <section className="max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {card(
-          "Incoming Products",
-          counts.incomingProducts,
-          <PackageIcon color="#3B7CED" />,
-          "text-[#3B7CED]",
-          "/inventory/operation",
-        )}
-        {card(
-          "Delivery Orders",
-          counts.deliveryOrders,
-          <TruckIcon color="#2BA24D" />,
-          "text-[#2BA24D]",
-          "/inventory/operation/delivery_order",
-        )}
-        {card(
-          "Internal Transfers",
-          counts.internalTransfers,
-          <ArrowRightLeftIcon color="#F0B401" />,
-          "text-[#F0B401]",
-          "/inventory/operation/internal_transfer",
-        )}
-        {card(
-          "Delivery Order Returns",
-          counts.deliveryOrderReturns,
-          <RotateCcwIcon color="#E43D2B" />,
-          "text-[#E43D2B]",
-          "/inventory/operation/delivery_order_return",
-        )}
-      </div>
-    </section>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {operationModules.map((mod) => (
+        <Link
+          key={mod.title}
+          href={mod.href}
+          className="bg-white p-6 rounded border border-gray-200 shadow-sm hover:border-[#3B7CED] transition-all flex flex-col justify-between group"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className={`w-10 h-10 rounded-full ${mod.bg} flex items-center justify-center`}>
+                <mod.icon className={`w-5 h-5 ${mod.color}`} />
+              </div>
+              <span className="text-2xl font-bold text-gray-900 font-mono">{mod.count}</span>
+            </div>
+            <h3 className="text-base font-semibold text-gray-900 mb-1 group-hover:text-[#3B7CED] transition-colors">
+              {mod.title}
+            </h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {mod.description}
+            </p>
+          </div>
+          <div className="mt-6 flex items-center text-xs font-medium text-[#3B7CED]">
+            Open <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -121,18 +131,8 @@ export default function OperationPage() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>("list");
 
-  // Get logged-in user from Redux store
-  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const allIncomingProducts = DUMMY_INCOMING_PRODUCTS;
 
-  // Use the API query hook for incoming products
-  const {
-    data: allIncomingProducts = [],
-    isLoading,
-    isError,
-    error,
-  } = useGetIncomingProductsQuery({});
-
-  // Filter incoming products based on search query
   const incomingProducts = useMemo(() => {
     if (!query) return allIncomingProducts;
 
@@ -156,7 +156,6 @@ export default function OperationPage() {
     });
   }, [allIncomingProducts, query]);
 
-  // Function to highlight search matches
   const highlightText = (text: string, query: string) => {
     if (!query) return text;
 
@@ -187,7 +186,7 @@ export default function OperationPage() {
     }
   };
 
-  const breadcrumsItem: BreadcrumbItem[] = [
+  const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
     {
@@ -209,191 +208,187 @@ export default function OperationPage() {
     setCurrentView(view);
   };
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <PageGuard application="inventory" module="incomingproduct">
-        <main className="min-h-screen text-gray-800 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p>Loading incoming products...</p>
-          </div>
-        </main>
-      </PageGuard>
-    );
-  }
-
-  // Show error state
-  if (isError) {
-    return (
-      <PageGuard application="inventory" module="incomingproduct">
-        <main className="min-h-screen text-gray-800 flex items-center justify-center">
-          <div className="text-center text-red-600 px-4">
-            <p className="text-lg font-semibold">Error loading incoming products</p>
-            <p className="text-sm mt-2">{extractErrorMessage(error, "An unknown error occurred")}</p>
-            <Button
-              onClick={() => window.location.reload()}
-              variant="outline"
-              className="mt-6"
-            >
-              Try Again
-            </Button>
-          </div>
-        </main>
-      </PageGuard>
-    );
-  }
-
   return (
     <PageGuard application="inventory" module="incomingproduct">
-      <main className="min-h-screen text-gray-800 mr-4">
-      <Breadcrumbs
-        items={breadcrumsItem}
-        action={
-          <Button
-            variant="ghost"
-            className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
-          >
-            Autosaved <AutoSaveIcon />
-          </Button>
-        }
-      />
-
-      <div className="bg-white rounded-md shadow hover:shadow-lg transition-shadow duration-300 p-6 pb-4 mt-4">
-        <StatusCards />
-      </div>
-
-      <div className="bg-white p-6 rounded-md flex flex-col lg:flex-row items-start md:items-start justify-between gap-4 mt-6">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-lg text-nowrap font-medium">Incoming Products</h2>
-
-          <div className="relative w-xs">
-            <Input
-              type="text"
-              className="w-full pl-10 pr-4 border border-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search incoming products"
-            />
-            <SearchIcon
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-              size={16}
-            />
-          </div>
-        </div>
-        <div className="flex space-x-4">
-          <Link href="/inventory/operation/incoming_product/new">
-            <Button variant="contained" className="px-4 py-2 cursor-pointer">
-              New Incoming Product
-            </Button>
-          </Link>
-          <ViewToggle
-            currentView={currentView}
-            onViewChange={handleViewChange}
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
+          <Breadcrumbs
+            items={breadcrumbsItem}
+            action={
+              <Button
+                variant="ghost"
+                className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
+              >
+                Autosaved <AutoSaveIcon />
+              </Button>
+            }
           />
-        </div>
-      </div>
 
-      {/* Conditional rendering based on current view */}
-      {currentView === "list" ? (
-        <div className="bg-white rounded-md shadow mt-6 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-[#F6F7F8]">
-              <TableRow>
-                <TableHead className="w-12 px-4 py-3">
-                  <Checkbox
-                    checked={
-                      selectedItems.length === incomingProducts.length &&
-                      incomingProducts.length > 0
-                    }
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                  Request ID
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                  Receipt Type
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                  Source Location
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                  Destination Location
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                  Status
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {incomingProducts.map((item: IncomingProduct) => (
-                <TableRow
-                  key={item.incoming_product_id}
-                  className="hover:bg-gray-50"
-                >
-                  <TableCell className="px-4 py-3">
-                    <Checkbox
-                      checked={selectedItems.includes(item.incoming_product_id)}
-                      onCheckedChange={(checked) =>
-                        handleSelectItem(
-                          item.incoming_product_id,
-                          checked as boolean,
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-gray-900">
-                    <Link
-                      href={`/inventory/operation/incoming_product/${item.incoming_product_id}`}
-                      className="text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {highlightText(item.incoming_product_id, query)}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-gray-900 capitalize">
-                    {highlightText(item.receipt_type.replace("_", " "), query)}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-gray-900">
-                    {highlightText(
-                      item.source_location_details?.location_name || "N/A",
-                      query,
+          <div className="flex items-center justify-between py-4 mb-2">
+            <h1 className="text-2xl font-semibold text-gray-900">Inventory Operations</h1>
+          </div>
+
+          <OperationsNavigationTiles incomingCount={allIncomingProducts.length} />
+
+          {/* Top Bar Controls for Incoming Products List */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-4 rounded border border-gray-200 shadow-sm gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+              <h2 className="text-lg font-semibold text-gray-800 shrink-0">Incoming Products</h2>
+
+              <div className="relative w-full max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  type="text"
+                  className="w-full pl-9 pr-4 bg-gray-50 border-gray-200 rounded h-9 text-sm focus:bg-white focus:ring-1 focus:ring-[#3B7CED]"
+                  placeholder="Search receipt ID, type, status, or vendor..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Search incoming products"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+              <Link href="/inventory/operation/incoming_product/new" className="w-full sm:w-auto">
+                <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 text-sm w-full sm:w-auto">
+                  New Incoming Product
+                </Button>
+              </Link>
+              <ViewToggle
+                currentView={currentView}
+                onViewChange={handleViewChange}
+              />
+            </div>
+          </div>
+
+          {/* Conditional rendering based on current view */}
+          {currentView === "list" ? (
+            <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto w-full">
+                <Table className="min-w-[800px] w-full">
+                  <TableHeader>
+                    <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
+                      <TableHead className="w-12 pl-4 py-3">
+                        <Checkbox
+                          checked={
+                            selectedItems.length === incomingProducts.length &&
+                            incomingProducts.length > 0
+                          }
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Request ID
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Receipt Type
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Source Location
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Destination Location
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Inspection Summary
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Status
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {incomingProducts.map((item: any) => (
+                      <TableRow
+                        key={item.incoming_product_id}
+                        className="hover:bg-gray-50 border-b-gray-100 transition-colors"
+                      >
+                        <TableCell className="pl-4 py-3.5">
+                          <Checkbox
+                            checked={selectedItems.includes(item.incoming_product_id)}
+                            onCheckedChange={(checked) =>
+                              handleSelectItem(
+                                item.incoming_product_id,
+                                checked as boolean,
+                              )
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-xs font-mono font-semibold text-gray-900">
+                          <Link
+                            href={`/inventory/operation/incoming_product/${item.incoming_product_id}`}
+                            className="text-[#3B7CED] hover:underline"
+                          >
+                            {highlightText(item.incoming_product_id, query)}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-sm text-gray-700 capitalize">
+                          {highlightText(item.receipt_type.replace(/_/g, " "), query)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-sm text-gray-600">
+                          {highlightText(
+                            item.source_location_details?.location_name || "N/A",
+                            query,
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-sm text-gray-600">
+                          {highlightText(
+                            item.destination_location_details?.location_name || "N/A",
+                            query,
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-xs">
+                          {item.accepted_qty !== undefined ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-semibold text-green-600">✓ {item.accepted_qty} Accepted</span>
+                              {item.rejected_qty > 0 && (
+                                <span className="font-semibold text-red-600">✕ {item.rejected_qty} Rejected</span>
+                              )}
+                              {item.has_backorder && (
+                                <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded w-fit">Backorder Created</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-sm">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize inline-block ${
+                              item.status === "validated"
+                                ? "bg-green-50 text-green-700 border border-green-200"
+                                : item.status === "draft"
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : item.status === "canceled"
+                                    ? "bg-red-50 text-red-700 border border-red-200"
+                                    : "bg-gray-100 text-gray-600 border border-gray-200"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {incomingProducts.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-gray-500 text-sm">
+                          No incoming products found matching your search.
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-gray-900">
-                    {highlightText(
-                      item.destination_location_details?.location_name || "N/A",
-                      query,
-                    )}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-sm">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                        item.status === "validated"
-                          ? "bg-green-100 text-green-500"
-                          : item.status === "draft"
-                            ? "bg-blue-100 text-blue-500"
-                            : item.status === "canceled"
-                              ? "bg-red-100 text-red-500"
-                              : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <IncomingProductCards
-          incomingProducts={incomingProducts}
-          query={query}
-        />
-      )}
-    </main>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <IncomingProductCards
+              incomingProducts={incomingProducts}
+              query={query}
+            />
+          )}
+        </main>
+      </div>
     </PageGuard>
   );
 }
+

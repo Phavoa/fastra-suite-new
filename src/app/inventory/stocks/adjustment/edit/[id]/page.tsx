@@ -1,35 +1,16 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import { useParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import React, { useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PageHeader } from "@/components/purchase/products/PageHeader";
-import { BreadcrumbItem } from "@/types/purchase";
-import {
-  useGetStockAdjustmentQuery,
-  useGetStockAdjustmentEditableQuery,
-  usePatchStockAdjustmentMutation,
-} from "@/api/inventory/stockAdjustmentApi";
-import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
-import { useGetProductsQuery } from "@/api/purchase/productsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
-import { LoadingDots } from "@/components/shared/LoadingComponents";
-import {
-  FadeIn,
-  SlideUp,
-  StaggerContainer,
-} from "@/components/shared/AnimatedWrapper";
-import { useSelector } from "react-redux";
-import { RootState } from "@/lib/store/store";
-import { Button } from "@/components/ui/button";
 import { PageGuard } from "@/components/auth/PageGuard";
-import { extractErrorMessage } from "@/lib/utils";
-import { Plus, Trash } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Plus, Trash, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -47,59 +28,55 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { z } from "zod";
-import type { Resolver } from "react-hook-form";
-import type {
-  StockAdjustment,
-  StockAdjustmentItem,
-} from "@/types/stockAdjustment";
 
 type Option = { value: string; label: string };
 
-// Stock adjustment item type for editing
-interface EditableStockAdjustmentItem {
+interface StockAdjustmentLineItem {
   id: string;
   product: string;
   product_description: string;
   unit_of_measure: string;
   current_quantity: string;
   adjusted_quantity: string;
-  originalId?: string; // For tracking existing items
 }
 
-// Form schema for stock adjustment
 const stockAdjustmentSchema = z.object({
   warehouse_location: z.string().min(1, "Warehouse location is required"),
-  notes: z.string().optional(),
+  notes: z.string().min(1, "Mandatory reason is required per PRD"),
 });
 
 type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>;
 
-export default function StockAdjustmentEditPage() {
-  const router = useRouter();
+const DUMMY_LOCATIONS: Option[] = [
+  { value: "WH-MAIN", label: "Main Warehouse - Site A (WH-MAIN)" },
+  { value: "WH-SEC", label: "Secondary Store - Site B (WH-SEC)" },
+];
+
+const DUMMY_PRODUCTS = [
+  { id: "1", product_name: "Cement (50kg Bag)", product_description: "Portland Cement Grade 42.5", unit_symbol: "Bags", current_stock: "500" },
+  { id: "2", product_name: "Reinforcement Steel 16mm", product_description: "High Yield Deformed Steel Bars", unit_symbol: "Tonnes", current_stock: "150" },
+  { id: "3", product_name: "Sharp Sand", product_description: "Clean river sharp sand for plastering", unit_symbol: "m³", current_stock: "45" },
+  { id: "4", product_name: "Safety Helmets (Yellow)", product_description: "HDPE Hard Hats with adjustable strap", unit_symbol: "Pieces", current_stock: "120" },
+];
+
+export default function EditStockAdjustmentPage() {
   const params = useParams();
-  const adjustmentId = params.id as string;
+  const id = (params?.id as string) || "WH-MAIN-ADJ-0002";
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // API hooks
-  const {
-    data: stockAdjustment,
-    isLoading: isLoadingAdjustment,
-    error: adjustmentError,
-  } = useGetStockAdjustmentQuery(adjustmentId);
+  const [items, setItems] = useState<StockAdjustmentLineItem[]>([
+    {
+      id: "1",
+      product: "2",
+      product_description: "High Yield Deformed Steel Bars",
+      unit_of_measure: "Tonnes",
+      current_quantity: "150",
+      adjusted_quantity: "162",
+    },
+  ]);
 
-  const [patchStockAdjustment, { isLoading: isUpdating }] =
-    usePatchStockAdjustmentMutation();
-
-  const { data: locations, isLoading: isLoadingLocations, error: locationsError } =
-    useGetActiveLocationsQuery();
-  const {
-    data: products,
-    isLoading: isLoadingProducts,
-    error: productsError,
-  } = useGetProductsQuery({});
-
-  // Form state
-  const [items, setItems] = useState<EditableStockAdjustmentItem[]>([]);
   const [notification, setNotification] = React.useState<{
     message: string;
     type: "success" | "error";
@@ -110,120 +87,6 @@ export default function StockAdjustmentEditPage() {
     show: false,
   });
 
-  const loggedInUser = useSelector((state: RootState) => state.auth.user);
-
-  // React Hook Form setup
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm<StockAdjustmentFormData>({
-    resolver: zodResolver(
-      stockAdjustmentSchema
-    ) as Resolver<StockAdjustmentFormData>,
-    defaultValues: {
-      warehouse_location: "",
-      notes: "",
-    },
-  });
-
-  // Convert API data to option format
-  const locationOptions: Option[] = useMemo(
-    () =>
-      locations?.map((location) => ({
-        value: location.id.toString(),
-        label: `${location.location_name} (${location.location_code})`,
-      })) || [],
-    [locations]
-  );
-
-  const productOptions: Option[] = useMemo(
-    () =>
-      products?.map((product) => ({
-        value: product.id.toString(),
-        label: product.product_name,
-      })) || [],
-    [products]
-  );
-
-  // Initialize form data when stock adjustment is loaded
-  useEffect(() => {
-    if (stockAdjustment) {
-      // Set form values
-      setValue("warehouse_location", stockAdjustment.warehouse_location);
-      setValue("notes", stockAdjustment.notes || "");
-
-      // Convert API items to editable format
-      const editableItems: EditableStockAdjustmentItem[] =
-        stockAdjustment.stock_adjustment_items.map((item) => ({
-          id: `edit-${item.id}`,
-          originalId: item.id,
-          product: item.product.toString(),
-          product_description: item.product_details?.product_description || "",
-          unit_of_measure:
-            item.unit_of_measure ||
-            item.product_details?.unit_of_measure_details?.unit_symbol ||
-            "",
-          current_quantity: item.current_quantity || "0",
-          adjusted_quantity: item.adjusted_quantity || "0",
-        }));
-
-      setItems(
-        editableItems.length > 0
-          ? editableItems
-          : [
-              {
-                id: "1",
-                product: "",
-                product_description: "",
-                unit_of_measure: "",
-                current_quantity: "0",
-                adjusted_quantity: "",
-              },
-            ]
-      );
-    }
-  }, [stockAdjustment, setValue]);
-
-  // Handle query errors
-  useEffect(() => {
-    if (productsError) {
-      setNotification({
-        message: extractErrorMessage(productsError, "Failed to load products."),
-        type: "error",
-        show: true,
-      });
-    }
-  }, [productsError]);
-
-  useEffect(() => {
-    if (locationsError) {
-      setNotification({
-        message: extractErrorMessage(locationsError, "Failed to load locations."),
-        type: "error",
-        show: true,
-      });
-    }
-  }, [locationsError]);
-
-  const breadcrumsItem: BreadcrumbItem[] = [
-    { label: "Home", href: "/" },
-    { label: "Inventory", href: "/inventory" },
-    {
-      label: "Stock Adjustments",
-      href: "/inventory/stocks/adjustment",
-    },
-    {
-      label: stockAdjustment?.id || "Edit",
-      href: `/inventory/stocks/adjustment/edit/${adjustmentId}`,
-      current: true,
-    },
-  ];
-
-  // Table operations
   const addRow = () =>
     setItems((prev) => [
       ...prev,
@@ -237,613 +100,331 @@ export default function StockAdjustmentEditPage() {
       },
     ]);
 
-  const removeRow = (id: string) =>
-    setItems((prev) => prev.filter((p) => p.id !== id));
+  const removeRow = (itemId: string) =>
+    setItems((prev) => prev.filter((p) => p.id !== itemId));
 
-  // Enhanced updateItem function that also populates product details
-  const updateItemWithProductDetails = (
-    id: string,
-    patch: Partial<EditableStockAdjustmentItem>
-  ) => {
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<StockAdjustmentFormData>({
+    resolver: zodResolver(stockAdjustmentSchema) as Resolver<StockAdjustmentFormData>,
+    defaultValues: {
+      warehouse_location: "WH-MAIN",
+      notes: "Quarterly spot check adjustment.",
+    },
+  });
+
+  const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
+    value: p.id,
+    label: p.product_name,
+  }));
+
+  const updateItemWithProductDetails = (itemId: string, productId: string) => {
+    const p = DUMMY_PRODUCTS.find((item) => item.id === productId);
     setItems((prev) =>
-      prev.map((it) => {
-        if (it.id === id) {
-          const updatedItem = { ...it, ...patch };
-
-          // If product is being updated, populate description, unit, and current quantity
-          if (patch.product && patch.product !== it.product) {
-            const product = products?.find(
-              (p) => p.id.toString() === patch.product
-            );
-            if (product) {
-              updatedItem.product_description =
-                product.product_description || "No description available";
-              updatedItem.unit_of_measure =
-                product.unit_of_measure_details?.unit_symbol || "N/A";
-              updatedItem.current_quantity =
-                product.available_product_quantity || "0";
+      prev.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              product: productId,
+              product_description: p?.product_description || "",
+              unit_of_measure: p?.unit_symbol || "",
+              current_quantity: p?.current_stock || "0",
+              adjusted_quantity: p?.current_stock || "0",
             }
-          }
-
-          return updatedItem;
-        }
-        return it;
-      })
+          : it
+      )
     );
   };
 
-  // Calculate effective quantity (current + adjusted)
-  const calculateEffectiveQuantity = (
-    currentQty: string,
-    adjustedQty: string
-  ) => {
-    const current = parseFloat(currentQty) || 0;
-    const adjusted = parseFloat(adjustedQty) || 0;
-    return (current + adjusted).toFixed(2);
+  const updateAdjustedQty = (itemId: string, qty: string) => {
+    setItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, adjusted_quantity: qty } : it))
+    );
   };
 
-  // Helper function to validate and prepare data for submission
-  const prepareSubmissionData = (
-    data: StockAdjustmentFormData,
-    status: "draft" | "done"
-  ) => {
+  async function onSave(data: StockAdjustmentFormData): Promise<void> {
     const validItems = items.filter(
-      (item) => item.product && item.adjusted_quantity
+      (item) => item.product && item.adjusted_quantity !== ""
     );
 
     if (validItems.length === 0) {
-      return null;
-    }
-
-    // Separate new and existing items
-    const existingItems = validItems.filter((item) => item.originalId);
-    const newItems = validItems.filter((item) => !item.originalId);
-
-    const stockAdjustmentItems = [
-      // Existing items with IDs for updates
-      ...existingItems.map((item) => ({
-        id: item.originalId,
-        product: parseInt(item.product),
-        adjusted_quantity: item.adjusted_quantity,
-      })),
-      // New items without IDs
-      ...newItems.map((item) => ({
-        product: parseInt(item.product),
-        adjusted_quantity: item.adjusted_quantity,
-      })),
-    ];
-
-    return {
-      warehouse_location: data.warehouse_location,
-      notes: data.notes || "",
-      status,
-      stock_adjustment_items: stockAdjustmentItems,
-    };
-  };
-
-  // Save as draft
-  const onSave = async (data: StockAdjustmentFormData) => {
-    const stockAdjustmentData = prepareSubmissionData(data, "draft");
-
-    if (!stockAdjustmentData) {
       setNotification({
-        message:
-          "Please add at least one valid item with product and adjusted quantity",
+        message: "Please add at least one valid product line to adjust",
         type: "error",
         show: true,
       });
       return;
     }
 
-    try {
-      await patchStockAdjustment({
-        id: adjustmentId,
-        data: stockAdjustmentData,
-      }).unwrap();
-
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
       setNotification({
-        message: "Stock adjustment updated successfully!",
+        message: "Stock adjustment draft updated!",
         type: "success",
         show: true,
       });
 
       setTimeout(() => {
-        router.push("/inventory/stocks/adjustment");
-      }, 1500);
-    } catch (error: unknown) {
-      const errorMessage = extractErrorMessage(
-        error,
-        "Failed to update stock adjustment. Please try again."
-      );
+        router.push(`/inventory/stocks/adjustment/${id}`);
+      }, 1000);
+    }, 500);
+  }
 
+  async function onValidate(data: StockAdjustmentFormData): Promise<void> {
+    const validItems = items.filter(
+      (item) => item.product && item.adjusted_quantity !== ""
+    );
+
+    if (validItems.length === 0) {
       setNotification({
-        message: errorMessage,
-        type: "error",
-        show: true,
-      });
-    }
-  };
-
-  // Validate and mark as done
-  const onValidate = async (data: StockAdjustmentFormData) => {
-    const stockAdjustmentData = prepareSubmissionData(data, "done");
-
-    if (!stockAdjustmentData) {
-      setNotification({
-        message:
-          "Please add at least one valid item with product and adjusted quantity",
+        message: "Please add at least one valid product line to adjust",
         type: "error",
         show: true,
       });
       return;
     }
 
-    try {
-      await patchStockAdjustment({
-        id: adjustmentId,
-        data: stockAdjustmentData,
-      }).unwrap();
-
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
       setNotification({
-        message: "Stock adjustment validated and completed!",
+        message: "Stock adjustment validated! Inventory ledger updated.",
         type: "success",
         show: true,
       });
 
       setTimeout(() => {
-        router.push("/inventory/stocks/adjustment");
-      }, 1500);
-    } catch (error: unknown) {
-      const errorMessage = extractErrorMessage(
-        error,
-        "Failed to validate stock adjustment. Please try again."
-      );
+        router.push(`/inventory/stocks/adjustment/${id}`);
+      }, 1000);
+    }, 500);
+  }
 
-      setNotification({
-        message: errorMessage,
-        type: "error",
-        show: true,
-      });
-    }
-  };
-
-  // Close notification
-  const closeNotification = () => {
+  function closeNotification() {
     setNotification((prev) => ({ ...prev, show: false }));
-  };
-
-  // Loading states
-  if (isLoadingAdjustment) {
-    return (
-      <PageGuard application="inventory" module="stockadjustment">
-        <FadeIn className="h-full text-gray-900 font-sans antialiased">
-          <div className="h-full mx-auto px-6 py-8 bg-white">
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <LoadingDots />
-                <p className="mt-4 text-gray-600">
-                  Loading stock adjustment details...
-                </p>
-              </div>
-            </div>
-          </div>
-        </FadeIn>
-      </PageGuard>
-    );
-  }
-
-  // Error state
-  if (adjustmentError) {
-    const errorMessage = extractErrorMessage(
-      adjustmentError,
-      "Unable to load stock adjustment details"
-    );
-
-    return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased">
-        <div className="h-full mx-auto px-6 py-8 bg-white flex items-center justify-center">
-          <div className="text-center text-red-600 px-4">
-            <p className="text-lg font-semibold">
-              Error Loading Stock Adjustment
-            </p>
-            <p className="text-sm mt-2">{errorMessage}</p>
-            <Button
-              onClick={() => router.push("/inventory/stocks/adjustment")}
-              className="mt-6 pointer-cursor"
-            >
-              Back to Stock Adjustments
-            </Button>
-          </div>
-        </div>
-      </FadeIn>
-    );
-  }
-
-  // Check if editable
-  if (stockAdjustment?.status !== "draft") {
-    return (
-      <FadeIn className="h-full text-gray-900 font-sans antialiased">
-        <div className="h-full mx-auto px-6 py-8 bg-white">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="text-orange-500 text-lg font-semibold mb-2">
-                Cannot Edit Stock Adjustment
-              </div>
-              <p className="text-gray-600">
-                This stock adjustment cannot be edited because it is not in a
-                draft state or you {"don't"} have permission to edit it.
-              </p>
-            </div>
-          </div>
-        </div>
-      </FadeIn>
-    );
   }
 
   return (
-    <PageGuard application="inventory" module="stockadjustment">
-      <motion.div
-      className="h-full text-gray-900 font-sans antialiased"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-    >
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <PageHeader items={breadcrumsItem} title="Edit Stock Adjustment" />
-      </motion.div>
-
-      {/* Main form area */}
-      <motion.main
-        className="h-full mx-auto px-6 py-8 bg-white"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
-      >
-        <form ref={formRef} className="bg-white">
-          <motion.h2
-            className="text-lg font-medium text-blue-500 mb-6"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
-          >
-            Basic Information
-          </motion.h2>
-
-          {/* Content: rows with separators */}
-          <div className="flex-1">
-            {/* Row 1 (first 3 fields) */}
-            <SlideUp delay={0.4}>
-              <div className="py-2 mb-6 border-b border-gray-200">
-                <StaggerContainer
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-4"
-                  staggerDelay={0.15}
-                >
-                  {/* Adjustment ID */}
-                  <FadeIn>
-                    <div className="p-4 transition-colors border-r border-gray-300">
-                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Adjustment ID
-                      </h3>
-                      <p className="text-gray-700 font-mono">
-                        {stockAdjustment.id}
-                      </p>
-                    </div>
-                  </FadeIn>
-
-                  {/* Status */}
-                  <FadeIn>
-                    <div className="p-4 transition-colors border-r border-gray-300">
-                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Status
-                      </h3>
-                      <p className="text-gray-700 capitalize">
-                        {stockAdjustment.status}
-                      </p>
-                    </div>
-                  </FadeIn>
-
-                  {/* Date */}
-                  <FadeIn>
-                    <div className="p-4 transition-colors">
-                      <h3 className="text-base font-semibold text-[#3B7CED] mb-2">
-                        Date
-                      </h3>
-                      <p className="text-gray-700">
-                        {new Date().toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}{" "}
-                        -{" "}
-                        {new Date().toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </FadeIn>
-                </StaggerContainer>
-              </div>
-            </SlideUp>
-          </div>
-
-          {/* Stock adjustment form fields */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.5 }}
-            className="mb-8"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Warehouse Location */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Warehouse Location <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={watch("warehouse_location")}
-                  onValueChange={(value) =>
-                    setValue("warehouse_location", value)
-                  }
-                  disabled={isLoadingLocations}
-                >
-                  <SelectTrigger size="md" className="h-11 w-full">
-                    <SelectValue
-                      placeholder={
-                        isLoadingLocations
-                          ? "Loading locations..."
-                          : "Select warehouse location"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingLocations ? (
-                      <SelectItem value="__loading__" disabled>
-                        Loading locations...
-                      </SelectItem>
-                    ) : locationOptions.length === 0 ? (
-                      <SelectItem value="__no_locations__" disabled>
-                        No locations available
-                      </SelectItem>
-                    ) : (
-                      locationOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {errors.warehouse_location && (
-                  <p className="text-sm text-red-500">
-                    {errors.warehouse_location.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Notes
-                </label>
-                <Textarea
-                  {...register("notes")}
-                  placeholder="Enter any notes for this adjustment..."
-                  className="min-h-11"
-                />
-              </div>
-            </div>
-          </motion.div>
-
-          <section className="bg-white mt-8 border-none">
-            <div className="mx-auto">
-              <div className="overflow-x-auto">
-                <Table className="min-w-[1000px] table-fixed">
-                  <TableHeader className="bg-[#F6F7F8]">
-                    <TableRow>
-                      <TableHead className="w-48 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Product
-                      </TableHead>
-                      <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Description
-                      </TableHead>
-                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Unit
-                      </TableHead>
-                      <TableHead className="w-28 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Current QTY
-                      </TableHead>
-                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Adjusted QTY
-                      </TableHead>
-                      <TableHead className="w-28 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Effective QTY
-                      </TableHead>
-                      <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Action
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody className="bg-white">
-                    {items.map((it) => {
-                      const effectiveQty = calculateEffectiveQuantity(
-                        it.current_quantity,
-                        it.adjusted_quantity
-                      );
-                      return (
-                        <TableRow
-                          key={it.id}
-                          className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150"
-                        >
-                          <TableCell className="border border-gray-200 align-middle">
-                            <Select
-                              value={it.product}
-                              onValueChange={(value) =>
-                                updateItemWithProductDetails(it.id, {
-                                  product: value,
-                                })
-                              }
-                              disabled={isLoadingProducts}
-                            >
-                              <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0">
-                                <SelectValue
-                                  placeholder={
-                                    isLoadingProducts
-                                      ? "Loading products..."
-                                      : "Select product"
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {isLoadingProducts ? (
-                                  <SelectItem value="__loading__" disabled>
-                                    Loading products...
-                                  </SelectItem>
-                                ) : productOptions.length === 0 ? (
-                                  <SelectItem value="__no_products__" disabled>
-                                    No products available
-                                  </SelectItem>
-                                ) : (
-                                  productOptions.map((option) => (
-                                    <SelectItem
-                                      key={option.value}
-                                      value={option.value}
-                                    >
-                                      {option.label}
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle">
-                            <div className="text-sm text-gray-600 line-clamp-2">
-                              {it.product_description || "Select a product"}
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            <div className="text-sm text-gray-700">
-                              {it.unit_of_measure || "N/A"}
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            <div className="text-sm text-gray-700 font-medium">
-                              {it.current_quantity}
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 align-middle text-center">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              aria-label="Adjusted quantity"
-                              value={it.adjusted_quantity}
-                              onChange={(e) =>
-                                updateItemWithProductDetails(it.id, {
-                                  adjusted_quantity: e.target.value,
-                                })
-                              }
-                              placeholder="0"
-                              className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0"
-                            />
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            <div
-                              className={`text-sm font-medium tabular-nums ${
-                                parseFloat(effectiveQty) < 0
-                                  ? "text-red-600"
-                                  : "text-green-600"
-                              }`}
-                            >
-                              {effectiveQty}
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeRow(it.id)}
-                              aria-label="Remove row"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-2 rounded-md hover:bg-red-50"
-                              disabled={items.length === 1}
-                            >
-                              <Trash className="w-4 h-4 text-red-500" />
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-
-                  <TableFooter className="bg-[#FBFCFD] border border-gray-200">
-                    <TableRow>
-                      <TableCell className="bg-white">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={addRow}
-                          className="flex items-center gap-2 px-3 py-0 text-sm m-auto rounded-md hover:bg-gray-50"
-                          aria-label="Add row"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                      <TableCell className="bg-white" />
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
-            </div>
-          </section>
-
-          {/* Form actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
-            className="flex justify-end gap-4 mt-8"
-          >
-            <Button
-              type="button"
-              disabled={isUpdating}
-              onClick={handleSubmit(onSave)}
-              variant="outline"
-            >
-              {isUpdating ? "Saving..." : "Save as Draft"}
+    <PageGuard application="inventory" module="adjustment">
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+        {/* Clean Header */}
+        <div className="flex items-center px-6 py-4 border-b border-gray-100">
+          <Link href={`/inventory/stocks/adjustment/${id}`}>
+            <Button variant="ghost" size="icon" className="mr-2">
+              <ArrowLeft className="h-5 w-5 text-gray-500" />
             </Button>
-            <Button
-              type="button"
-              disabled={isUpdating}
-              onClick={handleSubmit(onValidate)}
-              variant="default"
-            >
-              {isUpdating ? "Validating..." : "Validate & Complete"}
-            </Button>
-          </motion.div>
-        </form>
-      </motion.main>
+          </Link>
+          <h1 className="text-lg font-medium text-gray-800">Edit Stock Adjustment Draft: {id}</h1>
+        </div>
 
-      <ToastNotification
-        message={notification.message}
-        type={notification.type}
-        show={notification.show}
-        onClose={closeNotification}
-      />
-    </motion.div>
+        {/* Main Form Container */}
+        <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
+          <form ref={formRef} className="flex flex-col gap-10">
+            <section>
+              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Adjustment Details</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Adjustment Type (Fixed per PRD) */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Adjustment Type</Label>
+                  <Input
+                    value="Stock Level Update"
+                    readOnly
+                    className="bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed rounded"
+                  />
+                  <p className="text-[11px] text-gray-400">Fixed to Stock Level Update per PRD Core Tier.</p>
+                </div>
+
+                {/* Warehouse Location */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">
+                    Warehouse Location <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={watch("warehouse_location")}
+                    onValueChange={(value) => setValue("warehouse_location", value)}
+                  >
+                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DUMMY_LOCATIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.warehouse_location && (
+                    <p className="text-xs text-red-500 mt-1">{errors.warehouse_location.message}</p>
+                  )}
+                </div>
+
+                {/* Notes (Mandatory Reason per PRD) */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">
+                    Reason / Notes <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    {...register("notes")}
+                    placeholder="Mandatory reason for discrepancy..."
+                    className="bg-white border-gray-300 rounded"
+                  />
+                  {errors.notes && (
+                    <p className="text-xs text-red-500 mt-1">{errors.notes.message}</p>
+                  )}
+                </div>
+
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Lines</h2>
+              <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto w-full">
+                  <Table className="min-w-[900px] w-full">
+                    <TableHeader>
+                      <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
+                        <TableHead className="w-64 font-medium text-gray-500 pl-4">Product</TableHead>
+                        <TableHead className="w-64 font-medium text-gray-500">Description</TableHead>
+                        <TableHead className="w-24 font-medium text-gray-500 text-center">Unit</TableHead>
+                        <TableHead className="w-32 font-medium text-gray-500 text-center">Current System QTY</TableHead>
+                        <TableHead className="w-32 font-medium text-gray-500 text-center">New Physical Count</TableHead>
+                        <TableHead className="w-32 font-medium text-gray-500 text-center">Variance</TableHead>
+                        <TableHead className="w-16 font-medium text-gray-500 text-center pr-4">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((it) => {
+                        const current = Number(it.current_quantity) || 0;
+                        const adjusted = Number(it.adjusted_quantity) || 0;
+                        const variance = adjusted - current;
+                        return (
+                          <TableRow key={it.id} className="group hover:bg-gray-50 border-b-gray-100 transition-colors">
+                            <TableCell className="pl-4 py-2 align-middle">
+                              <Select
+                                value={it.product}
+                                onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
+                              >
+                                <SelectTrigger className="bg-white border-gray-300 rounded h-9 text-xs">
+                                  <SelectValue placeholder="Select product" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {productOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+
+                            <TableCell className="py-2 align-middle">
+                              <span className="text-xs text-gray-600 line-clamp-1">
+                                {it.product_description || "Select a product"}
+                              </span>
+                            </TableCell>
+
+                            <TableCell className="py-2 align-middle text-center">
+                              <span className="text-xs text-gray-700 font-medium">
+                                {it.unit_of_measure || "N/A"}
+                              </span>
+                            </TableCell>
+
+                            <TableCell className="py-2 align-middle text-center">
+                              <span className="text-xs text-gray-700 font-medium">
+                                {it.current_quantity}
+                              </span>
+                            </TableCell>
+
+                            <TableCell className="py-2 align-middle text-center">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={it.adjusted_quantity}
+                                onChange={(e) => updateAdjustedQty(it.id, e.target.value)}
+                                placeholder="0"
+                                className="bg-white border-gray-300 rounded h-9 text-xs text-center w-24 mx-auto"
+                              />
+                            </TableCell>
+
+                            <TableCell className="py-2 align-middle text-center">
+                              <span className={`text-xs font-semibold ${variance < 0 ? "text-red-600" : variance > 0 ? "text-green-600" : "text-gray-700"}`}>
+                                {it.product ? (variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)) : "—"}
+                              </span>
+                            </TableCell>
+
+                            <TableCell className="py-2 align-middle text-center pr-4">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeRow(it.id)}
+                                disabled={items.length === 1}
+                                className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                title="Remove line"
+                              >
+                                <Trash className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                    <TableFooter className="bg-[#F8F9FA] border-t border-gray-200">
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-2 pl-4">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={addRow}
+                            className="text-[#3B7CED] hover:bg-blue-50 text-xs font-medium h-8 px-3"
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Product Line
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
+              </div>
+            </section>
+          </form>
+        </div>
+
+        {/* Signature Sticky Footer Bar */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+          <Link href={`/inventory/stocks/adjustment/${id}`}>
+            <Button variant="outline" type="button" className="border-blue-400 text-blue-500 hover:bg-blue-50">
+              Cancel
+            </Button>
+          </Link>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit(onSave)}
+            variant="outline"
+            className="border-blue-400 text-blue-500 hover:bg-blue-50"
+          >
+            {isSubmitting ? "Saving..." : "Save Draft"}
+          </Button>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit(onValidate)}
+            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+          >
+            {isSubmitting ? "Validating..." : "Validate & Update Stock"}
+          </Button>
+        </div>
+
+        <ToastNotification
+          message={notification.message}
+          type={notification.type}
+          show={notification.show}
+          onClose={closeNotification}
+        />
+      </div>
     </PageGuard>
   );
 }

@@ -29,7 +29,9 @@ import {
   useApproveProjectMutation,
   useRejectProjectMutation,
   useSubmitProjectMutation,
-  useGetBudgetAdjustmentsQuery
+  useGetBudgetAdjustmentsQuery,
+  useApproveBudgetAdjustmentMutation,
+  useGetProjectTransactionsQuery
 } from "@/api/projectCostingApi";
 import {
   LineChart,
@@ -83,11 +85,17 @@ export default function ProjectDashboardPage() {
     { skip: !id }
   );
 
+  const { data: transactions, isLoading: isLoadingTransactions } = useGetProjectTransactionsQuery(
+    Number(id),
+    { skip: !id }
+  );
+
   const statusModal = useStatusModal();
 
   const [approveProject, { isLoading: isApproving }] = useApproveProjectMutation();
   const [rejectProject, { isLoading: isRejecting }] = useRejectProjectMutation();
   const [submitProject, { isLoading: isSubmitting }] = useSubmitProjectMutation();
+  const [approveBudgetAdjustment, { isLoading: isApprovingAdjustment }] = useApproveBudgetAdjustmentMutation();
 
   const handleAction = async (actionFn: any, actionName: string) => {
     try {
@@ -105,6 +113,37 @@ export default function ProjectDashboardPage() {
       );
     }
   };
+
+  const handleApproveAdjustment = async (adj: any) => {
+    try {
+      await approveBudgetAdjustment({ 
+        id: Number(id), 
+        adjustment_id: adj.uuid,
+        body: { 
+          id: adj.id || adj.uuid,
+          uuid: adj.uuid,
+          adjustment_id: adj.id || adj.uuid,
+          budget_adjustment_id: adj.id || adj.uuid,
+          budget_adjustment: adj.id || adj.uuid,
+          reference_no: adj.reference_no 
+        } 
+      }).unwrap();
+      statusModal.showSuccess(
+        "Action Successful",
+        `Budget adjustment ${adj.reference_no || ''} approved successfully.`
+      );
+      refetch();
+    } catch (err) {
+      console.error("Failed to approve budget adjustment", err);
+      statusModal.showError(
+        "Action Failed",
+        "Failed to approve budget adjustment."
+      );
+    }
+  };
+
+  const pendingAdjsList = budgetAdjustments?.filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase())) || [];
+  const pendingAdjsTotal = pendingAdjsList.reduce((acc: number, a: any) => acc + Number(a.total_adjustment || a.amount || 0), 0);
   
   if (isLoading) {
     return (
@@ -502,11 +541,11 @@ export default function ProjectDashboardPage() {
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Awaiting Approval</div>
-                  <div className="text-2xl font-bold text-gray-800">0</div>
+                  <div className="text-2xl font-bold text-gray-800">{pendingAdjsList.length}</div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Total Value</div>
-                  <div className="text-2xl font-bold text-gray-800">N0</div>
+                  <div className="text-2xl font-bold text-gray-800">N{pendingAdjsTotal.toLocaleString()}</div>
                 </div>
               </div>
             </div>
@@ -616,72 +655,259 @@ export default function ProjectDashboardPage() {
           <div className="flex flex-col gap-6 mb-12">
             
             {/* Original Budget Box */}
-            <div className="border border-gray-200 rounded p-6 bg-white shadow-sm">
-              <div className="text-sm font-semibold text-gray-800 mb-2">Original Approved Budget</div>
-              <div className="text-3xl font-medium text-[#3B7CED]">N{budgetNum.toLocaleString()}</div>
+            <div className="border border-gray-200 rounded-lg p-6 bg-white shadow-sm mb-2">
+              <div className="text-sm font-medium text-gray-800 mb-2">Original Approved Budget</div>
+              <div className="text-3xl font-normal text-[#3B7CED]">N{budgetNum.toLocaleString()}</div>
             </div>
 
             {/* Pending Approval Section */}
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[#3B7CED] font-medium">Pending Approval</h3>
+                <h3 className="text-[#3B7CED] font-medium text-base">Pending Approval</h3>
                 <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
               </div>
 
               {isLoadingAdjustments ? (
-                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 text-center text-gray-500">
                   <p>Loading adjustments...</p>
                 </div>
-              ) : budgetAdjustments && budgetAdjustments.filter((a: any) => a.status === "PENDING" || a.status === "PENDING_APPROVAL").length > 0 ? (
-                <div className="flex flex-col gap-4">
-                  {budgetAdjustments.filter((a: any) => a.status === "PENDING" || a.status === "PENDING_APPROVAL").map((adj: any, i: number) => (
-                    <div key={i} className="border border-gray-200 rounded bg-white shadow-sm p-4 flex justify-between items-center">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-800 mb-1">{adj.reason || "Budget Adjustment"}</div>
-                        <div className="text-xs text-gray-500 capitalize">{adj.cost_category ? adj.cost_category.replace(/_/g, " ") : "Category N/A"}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-[#3B7CED] mb-1">N{Number(adj.amount || 0).toLocaleString()}</div>
-                        <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full inline-block">Pending</div>
-                      </div>
-                    </div>
-                  ))}
+              ) : budgetAdjustments && budgetAdjustments.filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase())).length > 0 ? (
+                <div className="flex flex-col gap-6">
+                  {budgetAdjustments
+                    .filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase()))
+                    .map((adj: any, i: number) => {
+                      const totalAdj = Number(adj.total_adjustment || adj.amount || 0);
+                      const lines = adj.lines && adj.lines.length > 0 ? adj.lines : [
+                        {
+                          adjustment_type: "NEW",
+                          activity_name: adj.reason || "Planning Phase Activity",
+                          reason: "Budget line adjustment",
+                          adjustment_amount: totalAdj
+                        }
+                      ];
+                      
+                      return (
+                        <div key={i} className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
+                          {/* Top Header */}
+                          <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+                            <div>
+                              <div className="text-base font-semibold text-gray-800">
+                                Adjustment {adj.reference_no || `ADJ-00${i + 1}`}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                Submitted by {adj.requested_by_name || "John Doe"} on {adj.created_at ? new Date(adj.created_at).toLocaleDateString() : "5/20/2026"}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500 mb-0.5">Total Adjustment</div>
+                              <div className={`text-xl font-bold ${totalAdj >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                {totalAdj >= 0 ? "+" : ""}N{totalAdj.toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Line Items Section */}
+                          <div className="p-6 border-b border-gray-100">
+                            <div 
+                              className="flex justify-between items-center cursor-pointer mb-4"
+                              onClick={() => setIsAdjExpanded(!isAdjExpanded)}
+                            >
+                              <span className="text-sm font-medium text-gray-700">{lines.length} Adjustment Line Item{lines.length > 1 ? "s" : ""}</span>
+                              <ChevronDown className={`w-4 h-4 text-gray-400 transform transition-transform ${isAdjExpanded ? "rotate-180" : ""}`} />
+                            </div>
+                            
+                            {isAdjExpanded && (
+                              <div className="flex flex-col gap-3">
+                                {lines.map((line: any, idx: number) => {
+                                  const lineAmt = Number(line.adjustment_amount || line.amount || totalAdj);
+                                  return (
+                                    <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white">
+                                      <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2.5">
+                                          <span className="text-sm font-semibold text-gray-800">Planning Phase</span>
+                                          <Badge variant="outline" className="text-[11px] font-normal text-gray-500 border-gray-200 px-2.5 py-0.5 rounded-full">
+                                            {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      <div className="flex justify-between items-end mt-2">
+                                        <span className="text-xs text-gray-500">
+                                          {line.activity_name || "LAB-001"} {line.reason ? `• ${line.reason}` : ""}
+                                        </span>
+                                        <span className={`text-sm font-bold ${lineAmt >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                          {lineAmt >= 0 ? "+" : ""}N{lineAmt.toLocaleString()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Summary Calculation Section */}
+                          <div className="p-6 border-b border-gray-100 bg-gray-50/40 text-xs text-gray-600 flex flex-col gap-3">
+                            <div className="flex justify-between items-center">
+                              <span>Original Budget:</span>
+                              <span className="font-semibold text-gray-800">N{budgetNum.toLocaleString()}.00</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span>Proposed Budget Change:</span>
+                              <span className="font-semibold text-gray-800">N{totalAdj.toLocaleString()}.00</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-sm font-bold text-[#3B7CED]">
+                              <span>Proposed Total Budget:</span>
+                              <span>N{(budgetNum + totalAdj).toLocaleString()}.00</span>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons Section */}
+                          <div className="p-4 bg-white flex gap-4">
+                            <Button
+                              variant="destructive"
+                              className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white font-medium h-11 rounded-md"
+                              disabled={isRejecting}
+                            >
+                              Reject
+                            </Button>
+                            <Button
+                              className="flex-1 bg-[#10B981] hover:bg-emerald-600 text-white font-medium h-11 rounded-md"
+                              onClick={() => handleApproveAdjustment(adj)}
+                              disabled={isApprovingAdjustment}
+                            >
+                              Approve
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 text-center text-gray-500">
                   <p>No pending adjustments available.</p>
                 </div>
               )}
             </div>
 
             {/* Completed Adjustment Section */}
-            <div className="mt-4">
+            <div className="mt-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[#3B7CED] font-medium">Completed Adjustment</h3>
+                <h3 className="text-[#3B7CED] font-medium text-base">Completed Adjustment</h3>
                 <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
               </div>
 
               {isLoadingAdjustments ? (
-                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 text-center text-gray-500">
                   <p>Loading adjustments...</p>
                 </div>
-              ) : budgetAdjustments && budgetAdjustments.filter((a: any) => a.status === "APPROVED" || a.status === "COMPLETED").length > 0 ? (
-                <div className="flex flex-col gap-4">
-                  {budgetAdjustments.filter((a: any) => a.status === "APPROVED" || a.status === "COMPLETED").map((adj: any, i: number) => (
-                    <div key={i} className="border border-gray-200 rounded bg-white shadow-sm p-4 flex justify-between items-center">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-800 mb-1">{adj.reason || "Budget Adjustment"}</div>
-                        <div className="text-xs text-gray-500 capitalize">{adj.cost_category ? adj.cost_category.replace(/_/g, " ") : "Category N/A"}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-green-600 mb-1">N{Number(adj.amount || 0).toLocaleString()}</div>
-                        <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full inline-block">Approved</div>
-                      </div>
-                    </div>
-                  ))}
+              ) : budgetAdjustments && budgetAdjustments.filter((a: any) => ["APPROVED", "COMPLETED"].includes(a.status?.toUpperCase())).length > 0 ? (
+                <div className="flex flex-col gap-6">
+                  {budgetAdjustments
+                    .filter((a: any) => ["APPROVED", "COMPLETED"].includes(a.status?.toUpperCase()))
+                    .map((adj: any, i: number) => {
+                      const totalAdj = Number(adj.total_adjustment || adj.amount || 0);
+                      const lines = adj.lines && adj.lines.length > 0 ? adj.lines : [
+                        {
+                          adjustment_type: "NEW",
+                          activity_name: adj.reason || "Planning Phase Activity",
+                          reason: "Budget line adjustment",
+                          adjustment_amount: totalAdj
+                        }
+                      ];
+
+                      return (
+                        <div key={i} className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
+                          {/* Top Header */}
+                          <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base font-semibold text-gray-800">
+                                    Adjustment {adj.reference_no || `ADJ-00${i + 1}`}
+                                  </span>
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 font-medium text-xs px-2.5 py-0.5 rounded-full border-0">
+                                    Approved
+                                  </Badge>
+                                </div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  Submitted by {adj.requested_by_name || "John Doe"} on {adj.created_at ? new Date(adj.created_at).toLocaleDateString() : "5/20/2026"}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500 mb-0.5">Total Adjustment</div>
+                              <div className={`text-xl font-bold ${totalAdj >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                {totalAdj >= 0 ? "+" : ""}N{totalAdj.toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Line Items Section */}
+                          <div className="p-6 border-b border-gray-100">
+                            <div 
+                              className="flex justify-between items-center cursor-pointer mb-4"
+                              onClick={() => setIsAdjExpanded(!isAdjExpanded)}
+                            >
+                              <span className="text-sm font-medium text-gray-700">{lines.length} Adjustment Line Item{lines.length > 1 ? "s" : ""}</span>
+                              <ChevronDown className={`w-4 h-4 text-gray-400 transform transition-transform ${isAdjExpanded ? "rotate-180" : ""}`} />
+                            </div>
+                            
+                            {isAdjExpanded && (
+                              <div className="flex flex-col gap-3">
+                                {lines.map((line: any, idx: number) => {
+                                  const lineAmt = Number(line.adjustment_amount || line.amount || totalAdj);
+                                  return (
+                                    <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white">
+                                      <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2.5">
+                                          <span className="text-sm font-semibold text-gray-800">Planning Phase</span>
+                                          <Badge variant="outline" className="text-[11px] font-normal text-gray-500 border-gray-200 px-2.5 py-0.5 rounded-full">
+                                            {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      <div className="flex justify-between items-end mt-2">
+                                        <span className="text-xs text-gray-500">
+                                          {line.activity_name || "LAB-001"} {line.reason ? `• ${line.reason}` : ""}
+                                        </span>
+                                        <span className={`text-sm font-bold ${lineAmt >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                          {lineAmt >= 0 ? "+" : ""}N{lineAmt.toLocaleString()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Summary Calculation Section */}
+                          <div className="p-6 border-b border-gray-100 bg-gray-50/40 text-xs text-gray-600 flex flex-col gap-3">
+                            <div className="flex justify-between items-center">
+                              <span>Original Budget:</span>
+                              <span className="font-semibold text-gray-800">N{budgetNum.toLocaleString()}.00</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span>Current Budget:</span>
+                              <span className="font-semibold text-gray-800">N{(budgetNum + totalAdj).toLocaleString()}.00</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-sm font-bold text-[#3B7CED]">
+                              <span>New Calculated Budget:</span>
+                              <span>N{(budgetNum + totalAdj).toLocaleString()}.00</span>
+                            </div>
+                          </div>
+
+                          {/* Bottom Status Section */}
+                          <div className="p-4 bg-white flex justify-center items-center gap-2 text-sm font-medium text-green-600">
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            <span>Approved</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded bg-white shadow-sm p-6 text-center text-gray-500">
+                <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 text-center text-gray-500">
                   <p>No completed adjustments available.</p>
                 </div>
               )}
@@ -689,6 +915,66 @@ export default function ProjectDashboardPage() {
 
           </div>
         )}
+
+        {/* Recent transactions */}
+        <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
+          <div className="flex justify-between items-center p-4 border-b border-gray-100">
+            <h3 className="text-lg font-medium text-[#3B7CED]">Recent transactions</h3>
+            <Link href={`/project-costing/${project?.id || id}/transactions`}>
+              <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
+            </Link>
+          </div>
+          <Table>
+            <TableHeader className="bg-gray-50 border-b border-gray-200">
+              <TableRow className="hover:bg-gray-50 border-0">
+                <TableHead className="font-medium text-gray-500 py-3">Date</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3">Description</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3">Category</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3">Cost Category</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3">Amount</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingTransactions ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    Loading recent transactions...
+                  </TableCell>
+                </TableRow>
+              ) : transactions && transactions.length > 0 ? (
+                transactions.slice(0, 6).map((tx: any, idx: number) => (
+                  <TableRow key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                    <TableCell className="py-3 text-sm text-gray-600">
+                      {tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString() : "N/A"}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-gray-800 font-medium">{tx.description || tx.name || tx.desc || "Transaction"}</TableCell>
+                    <TableCell className="py-3 text-sm text-gray-600 capitalize">{tx.category || tx.type || "-"}</TableCell>
+                    <TableCell className="py-3 text-sm text-gray-600 font-mono uppercase">{tx.cost_category || tx.cost_code || tx.costCat || "-"}</TableCell>
+                    <TableCell className="py-3 text-sm text-gray-800 font-semibold">₦{Number(tx.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell className="py-3 text-sm">
+                      <Badge className={`px-2 py-0.5 text-xs font-medium border-0 ${
+                        (tx.status || 'approved').toLowerCase() === 'approved' || (tx.status || '').toLowerCase() === 'paid'
+                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                          : (tx.status || '').toLowerCase() === 'cancelled'
+                          ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                      }`}>
+                        {tx.status || "Approved"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    No recent transactions recorded for this project yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Footer sticky bar */}
@@ -703,7 +989,10 @@ export default function ProjectDashboardPage() {
 
       <AddBudgetAdjustmentModal
         isOpen={isBudgetAdjustmentModalOpen}
-        onClose={() => setIsBudgetAdjustmentModalOpen(false)}
+        onClose={() => {
+          setIsBudgetAdjustmentModalOpen(false);
+          refetch();
+        }}
         project={project}
       />
       

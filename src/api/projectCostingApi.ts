@@ -97,6 +97,7 @@ export const projectCostingApi = createApi({
       };
     }
   },
+  tagTypes: ["ProjectCosting", "BudgetAdjustments"],
   endpoints: (builder) => ({
     // Projects Core Endpoints
     getProjectCostingProjects: builder.query<ProjectCostingProject[], ProjectCostingFilterParams>({
@@ -104,9 +105,11 @@ export const projectCostingApi = createApi({
         url: "/project-costing/projects/",
         params,
       }),
+      providesTags: ["ProjectCosting"],
     }),
     getProjectCostingProject: builder.query<ProjectCostingProject, number>({
       query: (id) => `/project-costing/projects/${id}/`,
+      providesTags: (result, error, id) => [{ type: "ProjectCosting", id }],
     }),
     createProjectCostingProject: builder.mutation<ProjectCostingProject, CreateProjectCostingProjectRequest>({
       query: (body) => ({
@@ -190,12 +193,17 @@ export const projectCostingApi = createApi({
     }),
 
     // Budget Adjustments
-    approveBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body?: any }>({
-      query: ({ id, body }) => ({
+    approveBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; adjustment_id?: string; body?: any }>({
+      query: ({ id, adjustment_id, body }) => ({
         url: `/project-costing/projects/${id}/approve_budget_adjustment/`,
         method: "POST",
+        params: { adjustment_id: adjustment_id || body?.adjustment_id || body?.uuid || body?.id },
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectCosting", id },
+        { type: "BudgetAdjustments", id },
+      ],
     }),
     createBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body: CreateBudgetAdjustmentRequest }>({
       query: ({ id, body }) => ({
@@ -203,23 +211,38 @@ export const projectCostingApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectCosting", id },
+        { type: "BudgetAdjustments", id },
+      ],
     }),
-    rejectBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body?: any }>({
-      query: ({ id, body }) => ({
+    rejectBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; adjustment_id?: string; body?: any }>({
+      query: ({ id, adjustment_id, body }) => ({
         url: `/project-costing/projects/${id}/reject_budget_adjustment/`,
         method: "POST",
+        params: { adjustment_id: adjustment_id || body?.adjustment_id || body?.uuid || body?.id },
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectCosting", id },
+        { type: "BudgetAdjustments", id },
+      ],
     }),
-    submitBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; body?: any }>({
-      query: ({ id, body }) => ({
+    submitBudgetAdjustment: builder.mutation<ProjectCostingProject, { id: number; adjustment_id?: string; body?: any }>({
+      query: ({ id, adjustment_id, body }) => ({
         url: `/project-costing/projects/${id}/submit_budget_adjustment/`,
         method: "POST",
+        params: { adjustment_id: adjustment_id || body?.adjustment_id || body?.uuid || body?.id },
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectCosting", id },
+        { type: "BudgetAdjustments", id },
+      ],
     }),
     getBudgetAdjustments: builder.query<BudgetAdjustment[], number>({
       query: (id) => `/project-costing/projects/${id}/budget_adjustments/`,
+      providesTags: (result, error, id) => [{ type: "BudgetAdjustments", id }],
     }),
     getBudgetAdjustmentDetail: builder.query<BudgetAdjustment, number>({
       query: (id) => `/project-costing/projects/${id}/budget_adjustment_detail/`,
@@ -232,6 +255,7 @@ export const projectCostingApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "ProjectCosting", id }],
     }),
     createCommitment: builder.mutation<ProjectCostingProject, { id: number; body: CreateCommitmentRequest }>({
       query: ({ id, body }) => ({
@@ -239,17 +263,21 @@ export const projectCostingApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "ProjectCosting", id }],
     }),
     getProjectTransactions: builder.query<ProjectTransaction[], number>({
       query: (id) => `/project-costing/projects/${id}/transactions/`,
+      providesTags: (result, error, id) => [{ type: "ProjectCosting", id }],
     }),
     getProjectFinancials: builder.query<ProjectCostingProject, number>({
       query: (id) => `/project-costing/projects/${id}/financials/`,
+      providesTags: (result, error, id) => [{ type: "ProjectCosting", id }],
     }),
 
     // Dashboards & Imports
     getProjectDashboard: builder.query<ProjectCostingProject, number>({
       query: (id) => `/project-costing/projects/${id}/dashboard/`,
+      providesTags: (result, error, id) => [{ type: "ProjectCosting", id }],
     }),
     importProjectXlsx: builder.mutation<ProjectCostingProject, { id: number; body: FormData }>({
       query: ({ id, body }) => ({

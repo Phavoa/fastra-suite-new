@@ -16,41 +16,17 @@ export default function InventoryLayout({
           application: "inventory",
           module: "incomingproduct",
         },
-        {
-          label: "Incoming Product Return",
-          href: "/inventory/operation/incoming_product_return",
-          application: "inventory",
-          module: "incomingproductreturn",
-        },
-        { 
-          label: "Delivery Order", 
-          href: "/inventory/operation/delivery_order",
-          application: "inventory",
-          module: "deliveryorder",
-        },
-        {
-          label: "Delivery Order Return",
-          href: "/inventory/operation/delivery_order_return",
-          application: "inventory",
-          module: "deliveryorderreturn",
-        },
-        {
-          label: "Internal Transfer",
-          href: "/inventory/operation/internal_transfer",
-          application: "inventory",
-          module: "internaltransfer",
-        },
-        { 
-          label: "Back Order", 
-          href: "/inventory/operation/back_order",
-          application: "inventory",
-          module: "backorder",
-        },
         { 
           label: "Material Consumption", 
           href: "/inventory/operation/material-consumption",
           application: "inventory",
           module: "materialconsumption",
+        },
+        { 
+          label: "Scrap", 
+          href: "/inventory/operation/scrap",
+          application: "inventory",
+          module: "scrap",
         },
       ],
     },
@@ -69,25 +45,36 @@ export default function InventoryLayout({
           application: "inventory",
           module: "stockmove",
         },
-        { 
-          label: "Scrap", 
-          href: "/inventory/stocks/scrap",
-          application: "inventory",
-          module: "scrap",
-        },
       ],
     },
-    { 
-      label: "Location", 
-      href: "/inventory/locations",
-      application: "inventory",
-      module: "location",
-    },
-    { 
-      label: "Configuration", 
-      href: "/inventory/configuration",
-      application: "inventory",
-      module: "configuration",
+    {
+      label: "Configuration",
+      children: [
+        {
+          label: "Products",
+          href: "/inventory/configuration/products",
+          application: "inventory",
+          module: "products",
+        },
+        {
+          label: "Units of Measure",
+          href: "/inventory/configuration/units-of-measure",
+          application: "inventory",
+          module: "unitsofmeasure",
+        },
+        {
+          label: "Product Categories",
+          href: "/inventory/configuration/categories",
+          application: "inventory",
+          module: "productcategories",
+        },
+        {
+          label: "Settings",
+          href: "/inventory/configuration/settings",
+          application: "inventory",
+          module: "settings",
+        },
+      ],
     },
   ];
 

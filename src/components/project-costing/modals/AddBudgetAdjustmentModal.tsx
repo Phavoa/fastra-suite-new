@@ -31,6 +31,8 @@ interface AdjustmentLine {
   activityId?: string;
   activityName: string;
   costCategory: string;
+  quantity: number;
+  rate: number;
   amount: number;
   reason: string;
 }
@@ -48,9 +50,13 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   // Form State
   const [selectedActivity, setSelectedActivity] = useState("");
   const [costCategory, setCostCategory] = useState("");
-  const [amount, setAmount] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [rate, setRate] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+  const [direction, setDirection] = useState<"increase" | "decrease">("increase");
   const [reason, setReason] = useState("");
   const [newActivityName, setNewActivityName] = useState("");
+  const [overallReason, setOverallReason] = useState("");
 
   let budgetNum = 0;
   if (project?.financials) {
@@ -76,7 +82,8 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                   activities.push({
                      activity_id: act.id,
                      activity_name: act.name,
-                     wbs_code: phase.code ? `${phase.code}-${act.serial_number || '00'}` : act.name
+                     wbs_code: act.serial_number ? `ACT-${act.serial_number}` : "ACT",
+                     phase_name: phase.name
                   });
                });
             }
@@ -88,11 +95,6 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   }
 
   const handleAddLine = () => {
-    if (!amount || !costCategory || !reason) {
-      alert("Please fill all required fields");
-      return;
-    }
-
     if (activeTab === "existing" && !selectedActivity) {
       alert("Please select an activity");
       return;
@@ -103,9 +105,25 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       return;
     }
 
+    let amtNum = Number(amountInput);
+    let qNum = Number(quantity);
+    let rNum = Number(rate);
+
+    if (amountInput && !isNaN(amtNum) && amtNum > 0) {
+      qNum = 1;
+      rNum = amtNum;
+    } else if (isNaN(qNum) || isNaN(rNum) || qNum <= 0 || rNum <= 0) {
+      alert("Please enter a valid adjustment amount");
+      return;
+    } else {
+      amtNum = qNum * rNum;
+    }
+
+    const finalAmount = direction === "decrease" ? -Math.abs(amtNum) : Math.abs(amtNum);
+
     let actName = newActivityName;
     if (activeTab === "existing") {
-      const act = activities.find(a => a.activity_id === selectedActivity);
+      const act = activities.find(a => String(a.activity_id) === String(selectedActivity));
       actName = act ? act.activity_name : "Unknown Activity";
     }
 
@@ -114,15 +132,19 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       type: activeTab,
       activityId: activeTab === "existing" ? selectedActivity : undefined,
       activityName: actName,
-      costCategory,
-      amount: Number(amount),
+      costCategory: costCategory || "LABOUR",
+      quantity: qNum,
+      rate: rNum,
+      amount: finalAmount,
       reason,
     };
 
     setAdjustmentLines([...adjustmentLines, newLine]);
     
     // Reset form
-    setAmount("");
+    setQuantity("");
+    setRate("");
+    setAmountInput("");
     setReason("");
     setNewActivityName("");
     setSelectedActivity("");
@@ -139,16 +161,21 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       return;
     }
     
+    const topReason = overallReason.trim() || adjustmentLines.map(l => l.reason).filter(Boolean)[0] || "Budget adjustment request";
+    
     try {
       await createBudgetAdjustment({
         id: project.id,
         body: {
+          reason: topReason,
           lines: adjustmentLines.map(line => ({
-            cost_category: line.costCategory,
-            amount: line.amount.toString(),
-            reason: line.reason,
-            activity_id: line.activityId || undefined,
+            adjustment_type: line.type === "new" ? "NEW" : "EXISTING",
+            activity: line.type === "existing" ? (!isNaN(Number(line.activityId)) ? Number(line.activityId) : line.activityId) : undefined,
             activity_name: line.type === "new" ? line.activityName : undefined,
+            quantity: line.quantity,
+            rate: line.rate,
+            cost_category: line.costCategory || undefined,
+            reason: line.reason || undefined,
           }))
         }
       }).unwrap();
@@ -159,6 +186,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       );
       
       setAdjustmentLines([]);
+      setOverallReason("");
       // Let the user click 'Done' on the status modal to close everything, 
       // or we could close it automatically. We'll leave it up to them.
     } catch (error) {
@@ -175,7 +203,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden bg-white">
         <DialogHeader className="p-6 pb-4">
-          <DialogTitle className="text-xl font-bold text-gray-900">Add Budget Adjustment</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-gray-900">Create Budget Adjustment</DialogTitle>
           <p className="text-sm text-gray-500 mt-1">
             Create a structured budget adjustment request. All changes require approval before becoming active.
           </p>
@@ -195,8 +223,16 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
               </div>
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Current Approved Budget</p>
-                <p className="text-2xl font-bold text-[#3B7CED]">{currentBudgetNum > 0 ? `N${currentBudgetNum.toLocaleString()}` : "N/A"}</p>
+                <p className="text-2xl font-bold text-gray-900">{currentBudgetNum > 0 ? `N${currentBudgetNum.toLocaleString()}` : "N/A"}</p>
               </div>
+            </div>
+            <div className="mt-4">
+              <label className="text-sm font-semibold text-gray-900 block mb-1.5">Reason for Adjustment</label>
+              <Input
+                placeholder="Enter reason"
+                value={overallReason}
+                onChange={(e) => setOverallReason(e.target.value)}
+              />
             </div>
           </div>
 
@@ -233,59 +269,63 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
             {/* Form Fields */}
             <div className="flex flex-col gap-4">
               {activeTab === "existing" ? (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-900">WBS Activity</label>
-                    <Select value={selectedActivity} onValueChange={setSelectedActivity}>
-                      <SelectTrigger className="w-full text-gray-500">
-                        <SelectValue placeholder="Select Activity" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activities.length > 0 ? (
-                          activities.map((act) => (
-                            <SelectItem key={act.activity_id} value={act.activity_id}>
-                              {act.activity_name} ({act.wbs_code})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="none" disabled>No activities available</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-gray-900">WBS Activity</label>
+                  <Select value={selectedActivity} onValueChange={setSelectedActivity}>
+                    <SelectTrigger className="w-full text-gray-500">
+                      <SelectValue placeholder="Enter name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activities.length > 0 ? (
+                        activities.map((act) => (
+                          <SelectItem key={act.activity_id} value={act.activity_id}>
+                            {act.activity_name} ({act.wbs_code})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="none" disabled>No activities available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               ) : (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-900">Activity Name</label>
-                    <Input placeholder="Enter activity name" value={newActivityName} onChange={(e) => setNewActivityName(e.target.value)} />
-                  </div>
-                </>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-gray-900">Activity Name</label>
+                  <Input placeholder="Enter activity name" value={newActivityName} onChange={(e) => setNewActivityName(e.target.value)} />
+                </div>
               )}
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-gray-900">Cost Category</label>
-                <Select value={costCategory} onValueChange={setCostCategory}>
-                  <SelectTrigger className="w-full text-gray-500">
-                    <SelectValue placeholder="Select Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="LABOUR">Labour</SelectItem>
-                    <SelectItem value="MATERIAL_CONSUMPTION">Material Consumption</SelectItem>
-                    <SelectItem value="PLANT_EQUIPMENT">Plant Equipment</SelectItem>
-                    <SelectItem value="SUB_CONTRACTOR">Sub Contractor</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-semibold text-gray-900">Budget Change Direction</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDirection("increase")}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded border text-sm font-medium transition-colors ${
+                      direction === "increase"
+                        ? "border-green-600 bg-green-50 text-green-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    ↗ Increase Budget
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDirection("decrease")}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded border text-sm font-medium transition-colors ${
+                      direction === "decrease"
+                        ? "border-red-600 bg-red-50 text-red-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    ↘ Decrease Budget
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-gray-900">{activeTab === "new" ? "Budget Amount" : "Adjustment Amount"}</label>
-                <Input placeholder="Enter amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-gray-900">Reason for Adjustment</label>
-                <Input placeholder="Enter reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+                <label className="text-sm font-semibold text-gray-900">Adjustment Amount</label>
+                <Input placeholder="Enter Amount" type="number" value={amountInput} onChange={(e) => setAmountInput(e.target.value)} />
               </div>
 
               <Button type="button" onClick={handleAddLine} className="w-full mt-2 bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center justify-center gap-2">
@@ -296,34 +336,35 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
           
           {/* Added Lines Summary */}
           {adjustmentLines.length > 0 && (
-            <div className="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
-              <h3 className="font-semibold text-gray-900 mb-4">{adjustmentLines.length} Adjustment Line{adjustmentLines.length > 1 ? 's' : ''} Added</h3>
+            <div className="flex flex-col gap-3 mt-2">
+              <h3 className="font-semibold text-gray-900">Adjustment Lines</h3>
               <div className="flex flex-col gap-3">
                 {adjustmentLines.map((line) => (
-                  <div key={line.id} className="flex justify-between items-center bg-white p-3 rounded border border-gray-100 shadow-sm">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-bold text-gray-800">{line.activityName}</span>
-                        <Badge variant="outline" className="text-[10px] py-0 border-gray-200 text-gray-400">
-                          {line.type === "new" ? "New Activity" : "Existing"}
+                  <div key={line.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-800">Planning Phase</span>
+                        <Badge variant="outline" className="text-xs py-0.5 px-2 rounded-full border-gray-200 text-gray-500 font-normal">
+                          {line.type === "new" ? "New Activity" : "Existing Activity"}
                         </Badge>
                       </div>
-                      <div className="text-xs text-gray-500">{line.costCategory} • {line.reason}</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm font-medium ${line.amount >= 0 ? "text-green-600" : "text-red-500"}`}>
-                        {line.amount >= 0 ? "+" : ""}N{line.amount.toLocaleString()}
-                      </span>
-                      <button onClick={() => removeLine(line.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                      <button type="button" onClick={() => removeLine(line.id)} className="text-gray-500 hover:text-red-500 transition-colors">
                         <X className="w-4 h-4" />
                       </button>
+                    </div>
+                    <div className="flex justify-between items-end mt-1">
+                      <span className="text-xs text-gray-500">
+                        {line.activityName} {line.reason ? `• ${line.reason}` : ""}
+                      </span>
+                      <span className={`text-sm font-bold ${line.amount >= 0 ? "text-green-600" : "text-red-500"}`}>
+                        {line.amount >= 0 ? "+" : ""}N{line.amount.toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          
         </div>
 
         <div className="p-6 pt-0 flex justify-end">

@@ -101,6 +101,19 @@ function IncomingProductCard({
 
         <CardContent>
           <div className="space-y-3">
+            {/* Inspection & Backorder Status */}
+            {(incomingProduct as any).accepted_qty !== undefined && (
+              <div className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded border border-gray-100 text-xs">
+                <span className="font-semibold text-green-600">✓ {(incomingProduct as any).accepted_qty} Accepted</span>
+                {(incomingProduct as any).rejected_qty > 0 && (
+                  <span className="font-semibold text-red-600">✕ {(incomingProduct as any).rejected_qty} Rejected</span>
+                )}
+                {(incomingProduct as any).has_backorder && (
+                  <span className="bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.5 rounded text-[10px]">Backorder Created</span>
+                )}
+              </div>
+            )}
+
             {/* Receipt Type */}
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Receipt Type:</span>

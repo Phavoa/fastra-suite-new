@@ -14,19 +14,29 @@ interface Props {
 }
 
 export function TransactionDetailsModal({ isOpen, onClose, transaction }: Props) {
+  const amountVal = transaction?.amount !== undefined ? transaction?.amount : (transaction?.total_amount || 0);
+  const amountStr = typeof amountVal === "number" ? `₦${amountVal.toLocaleString()}` : (amountVal || "₦0");
+  const dateStr = transaction?.date || transaction?.created_at ? new Date(transaction?.date || transaction?.created_at).toLocaleDateString() : "-";
+  const refStr = transaction?.reference_no || transaction?.transaction_number || transaction?.id ? `#${transaction?.reference_no || transaction?.transaction_number || `TXN-${transaction?.id}`}` : "-";
+  const catStr = transaction?.category || transaction?.type || transaction?.project_type || "-";
+  const statusStr = transaction?.status || "Approved";
+  const descStr = transaction?.description || transaction?.desc || transaction?.name || "-";
+  const wbsStr = transaction?.wbs || transaction?.phase_name || transaction?.phase || "-";
+  const costCatStr = transaction?.cost_category || transaction?.costCat || transaction?.cost_code || "-";
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-white">
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="text-xl font-bold text-gray-900">Transaction Details</DialogTitle>
-          <p className="text-sm text-gray-500 mt-1">Transaction number #TXN-00123</p>
+          <p className="text-sm text-gray-500 mt-1">Transaction number {refStr}</p>
         </DialogHeader>
 
         <div className="px-6 py-4 flex flex-col gap-6">
           {/* Amount */}
           <div>
             <p className="text-sm text-gray-400 font-medium mb-1">Transaction Amount</p>
-            <p className="text-3xl font-bold text-gray-900">N50,000</p>
+            <p className="text-3xl font-bold text-gray-900">{amountStr}</p>
           </div>
 
           <hr className="border-gray-100" />
@@ -37,23 +47,23 @@ export function TransactionDetailsModal({ isOpen, onClose, transaction }: Props)
             <div className="grid grid-cols-2 gap-y-4 gap-x-8">
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Transaction Date</p>
-                <p className="text-sm font-semibold text-gray-800">May 15,2026</p>
+                <p className="text-sm font-semibold text-gray-800">{dateStr}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Transaction Number</p>
-                <p className="text-sm font-semibold text-gray-800">May 15,2026</p>
+                <p className="text-sm font-semibold text-gray-800">{refStr}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Category</p>
-                <p className="text-sm font-semibold text-gray-800">Labor</p>
+                <p className="text-sm font-semibold text-gray-800 capitalize">{catStr}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Status</p>
-                <p className="text-sm font-semibold text-gray-800">May 15,2026</p>
+                <p className="text-sm font-semibold text-gray-800 capitalize">{statusStr}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-sm text-gray-400 font-medium mb-1">Description</p>
-                <p className="text-sm font-semibold text-gray-800">Building Project</p>
+                <p className="text-sm font-semibold text-gray-800">{descStr}</p>
               </div>
             </div>
           </div>
@@ -66,11 +76,11 @@ export function TransactionDetailsModal({ isOpen, onClose, transaction }: Props)
             <div className="grid grid-cols-2 gap-y-4 gap-x-8">
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">WBS</p>
-                <p className="text-sm font-semibold text-gray-800">Phase 1</p>
+                <p className="text-sm font-semibold text-gray-800">{wbsStr}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">Cost Category</p>
-                <p className="text-sm font-semibold text-gray-800">LAB-001</p>
+                <p className="text-sm font-semibold text-gray-800 font-mono uppercase">{costCatStr}</p>
               </div>
             </div>
           </div>
