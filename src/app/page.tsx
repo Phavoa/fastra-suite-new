@@ -232,7 +232,7 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
 
   const getRoute = (id: string): string | null => {
     const routeMap: Record<string, string> = {
-      invoice: "/invoice",
+      invoice: "/invoice/approved-requests",
       purchase: "/purchase",
       inventory: "/inventory/operation",
       contacts: "/contact",
@@ -305,7 +305,7 @@ export default function DashboardPage(): ReactElement {
       <NavBar title="Home" items={[]} />
 
       <main className="flex-1 py-8 bg-gray-100">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-350 mx-auto px-4 sm:px-6 lg:px-8">
           <section aria-labelledby="dashboard-heading" className="mb-8">
             {/* Grid */}
             <div

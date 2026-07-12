@@ -303,7 +303,7 @@ export default function ConvertToPOModal({
       <div className="space-y-6">
         {/* Notice Box */}
         <div className="bg-amber-50 border border-amber-200 rounded px-4 py-3 flex items-start gap-2">
-          <InfoIcon className="w-4 h-4 text-amber-800 mt-0.5 flex-shrink-0" />
+          <InfoIcon className="w-4 h-4 text-amber-800 mt-0.5 shrink-0" />
           <p className="text-sm text-amber-800">
             Once issued, this Purchase Order will be sent to{" "}
             <strong>{selectedVendor}</strong>. The Committed Amount of{" "}
