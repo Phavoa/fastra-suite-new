@@ -12,7 +12,7 @@ import { useCreatePettyCashRequestMutation } from "@/api/requests/pettyCashReque
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
   phase: z.string().min(1, "Please select a phase"),
-  task: z.string().min(1, "Please select a task"),
+  task: z.string().min(1, "Please select an activity"),
   amountRequested: z.coerce
     .number()
     .positive("Enter a valid amount")
@@ -98,9 +98,9 @@ export default function NewPettyCashRequestPage() {
           },
           {
             name: "task",
-            label: "Task",
+            label: "Activity",
             type: "select",
-            placeholder: "Select a task",
+            placeholder: "Select an activity",
             dependsOn: "phase",
             options: [],
           },
@@ -118,12 +118,6 @@ export default function NewPettyCashRequestPage() {
           const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
           return (
             <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-gray-500">Cost Code</span>
-                <span className="text-sm font-semibold text-gray-500">
-                  {data.project === "2" ? "CC-05" : data.project ? "CC-04" : "-"}
-                </span>
-              </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-900">Available Budget</span>
                 <span className="text-sm font-semibold text-[#3B7CED]">

@@ -6,27 +6,10 @@ export default function ProjectCostingLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const navItems = [
-    {
-      label: "Project Costing",
-      href: "/project-costing",
-      application: "project-costing",
-      module: "project-costing",
-    },
-    {
-      label: "New Project",
-      href: "/project-costing/new",
-      application: "project-costing",
-      module: "new-project",
-    }
-  ];
-
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
-      <NavBar title="Project Costing" items={navItems} />
-      <main className="flex-1">
-        {children}
-      </main>
+    <div className="min-h-screen flex flex-col gap-3 bg-[#F1F2F4] pl-3">
+      <NavBar title="Project Costing" items={[]} />
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

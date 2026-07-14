@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bell, Pencil, Trash, X, Plus } from "lucide-react";
+import { ArrowLeft, Bell, Pencil, Trash, X, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,10 +17,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  useGetProjectsQuery,
   useGetAvailableBudgetQuery,
 } from "@/api/projectApi";
+import {
+  useGetProjectCostingProjectsQuery,
+  useGetProjectCostingProjectQuery,
+} from "@/api/projectCostingApi";
 import { useGetProductsQuery } from "@/api/purchase/productsApi";
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 import { useGetCurrenciesQuery } from "@/api/purchase/currencyApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
@@ -41,19 +45,13 @@ interface ItemState {
   error?: string;
 }
 
-const DEFAULT_PRODUCTS = [
-  { id: "office-chair", name: "Office Chair" },
-  { id: "laptop-stand", name: "Laptop Stand" },
-  { id: "keyboard", name: "Keyboard" },
-  { id: "cassava", name: "Cassava" },
-];
-
 export default function NewPurchaseRequestPage() {
   const router = useRouter();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
 
   // API queries
-  const { data: projects = [] } = useGetProjectsQuery();
+  const { data: rawCostingProjects = [] } = useGetProjectCostingProjectsQuery({});
+  const { data: rawInventoryProducts = [] } = useGetInventoryProductsQuery({});
   const { data: dbProducts = [] } = useGetProductsQuery({});
   const { data: currencies } = useGetCurrenciesQuery({});
   const { data: vendors } = useGetVendorsQuery({});
@@ -72,12 +70,6 @@ export default function NewPurchaseRequestPage() {
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [location, setLocation] = useState<string>("");
-
-  useEffect(() => {
-    if (activeLocations && activeLocations.length > 0 && !location) {
-      setLocation(String(activeLocations[0].id));
-    }
-  }, [activeLocations, location]);
   const [requiredDate, setRequiredDate] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
@@ -92,6 +84,8 @@ export default function NewPurchaseRequestPage() {
       description: "",
     },
   ]);
+
+  const [isProductLinesCollapsed, setIsProductLinesCollapsed] = useState(false);
 
   // Submission status modal
   const [statusModal, setStatusModal] = useState<{
@@ -128,49 +122,232 @@ export default function NewPurchaseRequestPage() {
     { skip: !selectedProjectId || !selectedTaskId },
   );
 
-  const availableBudget = budgetData?.available_budget
-    ? Number(budgetData.available_budget)
-    : 0;
+  // Filter Phases (parent WBS) from Project Costing
+  const approvedProjects = useMemo(() => {
+    const list = Array.isArray(rawCostingProjects)
+      ? rawCostingProjects
+      : (rawCostingProjects as any)?.results || [];
+    return list.filter((p: any) => {
+      if (!p) return false;
+      const st = String(p.status || "").toUpperCase();
+      return (
+        st === "APPROVED" ||
+        st === "ACTIVE" ||
+        p.is_approved === true ||
+        !p.status
+      );
+    });
+  }, [rawCostingProjects]);
 
-  // Filter Phases (parent WBS)
+  const { data: costingProjectDetail } = useGetProjectCostingProjectQuery(
+    Number(selectedProjectId),
+    { skip: !selectedProjectId || isNaN(Number(selectedProjectId)) },
+  );
+
   const currentProject = useMemo(() => {
-    return projects.find((p) => String(p.id) === selectedProjectId);
-  }, [projects, selectedProjectId]);
+    return (
+      costingProjectDetail ||
+      approvedProjects.find((p: any) => String(p.id) === selectedProjectId)
+    );
+  }, [costingProjectDetail, approvedProjects, selectedProjectId]);
+
+  const wbsList = useMemo(() => {
+    if (!currentProject) return [];
+
+    if (Array.isArray((currentProject as any).wbs) && (currentProject as any).wbs.length > 0) {
+      return (currentProject as any).wbs;
+    }
+
+    const items: any[] = [];
+    const phasesArray = Array.isArray(currentProject.phases)
+      ? currentProject.phases
+      : Array.isArray((currentProject as any)?.phase_list)
+        ? (currentProject as any).phase_list
+        : [];
+
+    phasesArray.forEach((ph: any, idx: number) => {
+      const phaseId = ph.id || ph.phase_id || `phase-${idx + 1}`;
+      const phaseName = ph.name || ph.phase_name || `Phase ${idx + 1}`;
+
+      items.push({
+        id: phaseId,
+        name: phaseName,
+        is_activity: false,
+      });
+
+      const acts = Array.isArray(ph.activities)
+        ? ph.activities
+        : Array.isArray(ph.activity_list)
+          ? ph.activity_list
+          : [];
+
+      acts.forEach((act: any, actIdx: number) => {
+        const actId =
+          act.id || act.activity_id || `act-${phaseId}-${actIdx + 1}`;
+        const actName =
+          act.name || act.activity_name || `Activity ${actIdx + 1}`;
+        items.push({
+          ...act,
+          id: actId,
+          name: actName,
+          is_activity: true,
+          parent: phaseId,
+          amount: Number(
+            act.available_budget ??
+            act.budget ??
+            act.amount ??
+            act.budgeted_amount ??
+            act.total_amount ??
+            act.cost ??
+            0
+          ),
+        });
+      });
+    });
+
+    if (Array.isArray((currentProject as any).activities)) {
+      (currentProject as any).activities.forEach((act: any, actIdx: number) => {
+        const actId = act.id || act.activity_id || `act-${actIdx + 1}`;
+        if (!items.some((it) => String(it.id) === String(actId))) {
+          items.push({
+            ...act,
+            id: actId,
+            name: act.name || act.activity_name || `Activity ${actIdx + 1}`,
+            is_activity: true,
+            parent: act.phase || act.phase_id || act.parent || null,
+            amount: Number(
+              act.available_budget ??
+              act.budget ??
+              act.amount ??
+              act.budgeted_amount ??
+              act.total_amount ??
+              act.cost ??
+              0
+            ),
+          });
+        }
+      });
+    }
+
+    return items;
+  }, [currentProject]);
 
   const phases = useMemo(() => {
-    if (!currentProject) return [];
-    return currentProject.wbs.filter((w) => !w.is_activity);
-  }, [currentProject]);
+    return wbsList.filter((w: any) => !w.is_activity);
+  }, [wbsList]);
 
   // Filter Tasks (activity WBS with selected phase parent)
   const tasks = useMemo(() => {
-    if (!currentProject || !selectedPhaseId) return [];
-    return currentProject.wbs.filter(
-      (w) => w.is_activity && w.parent === Number(selectedPhaseId),
+    if (!selectedPhaseId) return [];
+    return wbsList.filter(
+      (w: any) => w.is_activity && String(w.parent) === String(selectedPhaseId),
     );
-  }, [currentProject, selectedPhaseId]);
+  }, [wbsList, selectedPhaseId]);
+
+  // Selected Activity/Task object from WBS
+  const selectedTaskObj = useMemo(() => {
+    return tasks.find((t: any) => String(t.id) === String(selectedTaskId));
+  }, [tasks, selectedTaskId]);
+
+  const availableBudget = useMemo(() => {
+    // 1. If we have a selected task/activity from WBS/Project Costing, get its budget/amount
+    if (selectedTaskObj) {
+      const budgetVal = Number(
+        selectedTaskObj.available_budget ??
+        selectedTaskObj.amount ??
+        selectedTaskObj.budget ??
+        selectedTaskObj.budgeted_amount ??
+        selectedTaskObj.total_amount ??
+        selectedTaskObj.cost ??
+        0
+      );
+      if (!isNaN(budgetVal) && budgetVal !== 0) {
+        return budgetVal;
+      }
+    }
+    // 2. Otherwise if the legacy API returned a non-zero budget, use it
+    if (budgetData?.available_budget && Number(budgetData.available_budget) > 0) {
+      return Number(budgetData.available_budget);
+    }
+    // 3. Or check the selected phase if task not picked yet
+    if (selectedPhaseId) {
+      const phaseObj = phases.find((p: any) => String(p.id) === String(selectedPhaseId));
+      if (phaseObj) {
+        const phaseBudget = Number(
+          (phaseObj as any).available_budget ??
+          (phaseObj as any).amount ??
+          (phaseObj as any).budget ??
+          (phaseObj as any).total_amount ??
+          0
+        );
+        if (!isNaN(phaseBudget) && phaseBudget > 0) return phaseBudget;
+      }
+    }
+    // 4. Or check the project-level available budget
+    if (currentProject) {
+      const projBudget = Number(
+        (currentProject as any).available_budget ??
+        (currentProject as any).budget ??
+        (currentProject as any).total_budget ??
+        0
+      );
+      if (!isNaN(projBudget) && projBudget > 0) {
+        return projBudget;
+      }
+    }
+    return 0;
+  }, [selectedTaskObj, budgetData, selectedPhaseId, phases, currentProject]);
+
+  // Normalize inventory products
+  const invProductsList = useMemo(() => {
+    if (!rawInventoryProducts) return [];
+    if (Array.isArray(rawInventoryProducts)) return rawInventoryProducts;
+    if ((rawInventoryProducts as any).results && Array.isArray((rawInventoryProducts as any).results)) {
+      return (rawInventoryProducts as any).results;
+    }
+    return [];
+  }, [rawInventoryProducts]);
 
   // Combine products
   const allProducts = useMemo(() => {
-    const list = [...DEFAULT_PRODUCTS];
-    dbProducts.forEach((dp) => {
-      if (
-        !list.some(
-          (item) => item.name.toLowerCase() === dp.product_name.toLowerCase(),
-        )
-      ) {
-        list.push({ id: String(dp.id), name: dp.product_name });
+    const list: { id: string; name: string; standardCost?: number; description?: string }[] = [];
+    invProductsList.forEach((ip: any) => {
+      if (ip && (ip.product_name || ip.name)) {
+        const pName = String(ip.product_name || ip.name).trim();
+        if (!list.some((item) => item.name.toLowerCase() === pName.toLowerCase())) {
+          list.push({
+            id: String(ip.id),
+            name: pName,
+            standardCost: Number(ip.standard_cost || ip.estimated_unit_cost || 0),
+            description: ip.description || ip.product_description || "",
+          });
+        }
+      }
+    });
+    dbProducts.forEach((dp: any) => {
+      if (dp && dp.product_name) {
+        const pName = String(dp.product_name).trim();
+        if (!list.some((item) => item.name.toLowerCase() === pName.toLowerCase())) {
+          list.push({
+            id: String(dp.id),
+            name: pName,
+            standardCost: Number(dp.standard_cost || dp.estimated_unit_cost || 0),
+            description: dp.product_description || dp.description || "",
+          });
+        }
       }
     });
     customProducts.forEach((cp) => {
-      if (
-        !list.some((item) => item.name.toLowerCase() === cp.name.toLowerCase())
-      ) {
-        list.push(cp);
+      if (!list.some((item) => item.name.toLowerCase() === cp.name.toLowerCase())) {
+        list.push({
+          ...cp,
+          standardCost: 0,
+          description: "",
+        });
       }
     });
     return list;
-  }, [dbProducts, customProducts]);
+  }, [invProductsList, dbProducts, customProducts]);
 
   // Total cost
   const totalCost = useMemo(() => {
@@ -288,7 +465,7 @@ export default function NewPurchaseRequestPage() {
         isOpen: true,
         type: "error",
         title: "Validation Error",
-        description: "Please select phase and task.",
+        description: "Please select phase and activity.",
       });
       return;
     }
@@ -326,45 +503,65 @@ export default function NewPurchaseRequestPage() {
     const requesterId = currentUserProfile?.id || loggedInUser?.id || 1;
 
     // Build API payload
-    const phaseName = phases.find((p) => String(p.id) === selectedPhaseId)?.name || "Phase";
-    const taskName = tasks.find((t) => String(t.id) === selectedTaskId)?.name || "Task";
+    const phaseName = phases.find((p: any) => String(p.id) === selectedPhaseId)?.name || "Phase";
+    const taskName = tasks.find((t: any) => String(t.id) === selectedTaskId)?.name || "Task";
     const projectName = currentProject?.name || "Project";
 
-    const payload = {
+    const locationName = activeLocations?.find((loc) => String(loc.id) === location)?.location_name || location || "Lagos Site";
+    const linesPayload = validatedItems.map((item) => {
+      const cleanId = item.productId || item.id;
+      const parsedId = parseInt(cleanId);
+      const productDbId = !isNaN(parsedId)
+        ? parsedId
+        : (invProductsList.find(
+            (p: any) =>
+              String(p.product_name || p.name || "").toLowerCase() === item.productName.toLowerCase(),
+          )?.id ||
+          dbProducts.find(
+            (p) =>
+              String(p.product_name || "").toLowerCase() === item.productName.toLowerCase(),
+          )?.id ||
+          invProductsList[0]?.id ||
+          dbProducts[0]?.id ||
+          1);
+
+      return {
+        product: productDbId,
+        description: item.description || item.productName || "",
+        quantity: String(item.quantity || 1),
+        estimated_unit_cost: String(item.unitCost || 0),
+        qty: item.quantity || 1,
+        estimated_unit_price: String(item.unitCost || 0),
+      };
+    });
+
+    const purposeStr = `Project: ${projectName} | Phase: ${phaseName} | Activity: ${taskName} | Notes: ${notes}`;
+
+    const payload: any = {
+      project: Number(selectedProjectId) || 1,
+      activity: String(selectedTaskId || ""),
+      site_location: locationName,
+      required_by_date: requiredDate,
+      notes: purposeStr,
+      lines: linesPayload,
+
       status: "pending" as const,
       currency: currencies?.[0]?.id || 1,
       requester: requesterId,
       requesting_location: location || String(activeLocations?.[0]?.id || 1),
-      purpose: `Project: ${projectName} | Phase: ${phaseName} | Task: ${taskName} | Notes: ${notes}`,
+      purpose: purposeStr,
       vendor: vendors?.[0]?.id || 1,
-      items: validatedItems.map((item) => {
-        const cleanId = item.productId || item.id;
-        const parsedId = parseInt(cleanId);
-        const productDbId = !isNaN(parsedId)
-          ? parsedId
-          : (dbProducts.find(
-              (p) =>
-                p.product_name.toLowerCase() === item.productName.toLowerCase(),
-            )?.id ||
-            dbProducts[0]?.id ||
-            1);
-
-        return {
-          product: productDbId,
-          qty: item.quantity || 1,
-          estimated_unit_price: String(item.unitCost || 0),
-        };
-      }),
+      items: linesPayload,
     };
 
     try {
-      await createProjectPurchaseRequest(payload).unwrap();
+      const result = await createProjectPurchaseRequest(payload).unwrap();
 
       const newRequest = {
-        id: `pr-${Date.now()}`,
-        reference_id: requestId,
+        id: result?.id || `pr-${Date.now()}`,
+        reference_id: result?.reference_id || requestId,
         title: validatedItems.map((it) => it.productName).join(", "),
-        status: "pending" as const,
+        status: (result?.status || "pending") as any,
         quantity: validatedItems.reduce(
           (acc, it) => acc + Number(it.quantity || 0),
           0,
@@ -373,27 +570,20 @@ export default function NewPurchaseRequestPage() {
         requester: loggedInUser?.username || "Firstname Lastname",
         date: formattedDate,
         project: projectName,
-        location: activeLocations?.find((loc) => String(loc.id) === location)?.location_name || "Lagos Site",
+        location: locationName,
         requiredDate,
         phase: phaseName,
         task: taskName,
         notes,
+        lines: validatedItems.map((item, idx) => ({
+          id: idx + 1,
+          productName: item.productName,
+          description: item.description || "",
+          quantity: Number(item.quantity || 1),
+          unitCost: Number(item.unitCost || 0),
+          lineTotal: Number(item.quantity || 1) * Number(item.unitCost || 0),
+        })),
       };
-
-      const stored = localStorage.getItem("project_purchase_requests");
-      let requestsList = [];
-      if (stored) {
-        try {
-          requestsList = JSON.parse(stored);
-        } catch (e) {
-          requestsList = [];
-        }
-      }
-      requestsList.unshift(newRequest);
-      localStorage.setItem(
-        "project_purchase_requests",
-        JSON.stringify(requestsList),
-      );
 
       setStatusModal({
         isOpen: true,
@@ -417,11 +607,19 @@ export default function NewPurchaseRequestPage() {
         requester: loggedInUser?.username || "Firstname Lastname",
         date: formattedDate,
         project: projectName,
-        location,
+        location: locationName,
         requiredDate,
         phase: phaseName,
         task: taskName,
         notes,
+        lines: validatedItems.map((item, idx) => ({
+          id: idx + 1,
+          productName: item.productName,
+          description: item.description || "",
+          quantity: Number(item.quantity || 1),
+          unitCost: Number(item.unitCost || 0),
+          lineTotal: Number(item.quantity || 1) * Number(item.unitCost || 0),
+        })),
       };
 
       const stored = localStorage.getItem("project_purchase_requests");
@@ -560,9 +758,9 @@ export default function NewPurchaseRequestPage() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((p) => (
+                  {approvedProjects.map((p: any) => (
                     <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name}
+                      {p.name} {p.project_code ? `(${p.project_code})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -573,22 +771,13 @@ export default function NewPurchaseRequestPage() {
               <Label className="text-xs font-semibold text-gray-700">
                 Site Location
               </Label>
-              <Select
+              <Input
+                type="text"
+                placeholder="Enter site location e.g. Lagos Site"
                 value={location}
-                onValueChange={(val) => setLocation(val)}
-                disabled={isLoadingLocations}
-              >
-                <SelectTrigger className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white">
-                  <SelectValue placeholder={isLoadingLocations ? "Loading locations..." : "Select location"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeLocations?.map((loc) => (
-                    <SelectItem key={loc.id} value={String(loc.id)}>
-                      {loc.location_name} {loc.location_code ? `(${loc.location_code})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setLocation(e.target.value)}
+                className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white"
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -629,7 +818,7 @@ export default function NewPurchaseRequestPage() {
                   <SelectValue placeholder="Select a phase" />
                 </SelectTrigger>
                 <SelectContent>
-                  {phases.map((ph) => (
+                  {phases.map((ph: any) => (
                     <SelectItem key={ph.id} value={String(ph.id)}>
                       {ph.name}
                     </SelectItem>
@@ -640,7 +829,7 @@ export default function NewPurchaseRequestPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-700">
-                Task
+                Activity
               </Label>
               <Select
                 value={selectedTaskId}
@@ -648,23 +837,16 @@ export default function NewPurchaseRequestPage() {
                 disabled={!selectedPhaseId}
               >
                 <SelectTrigger className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white disabled:bg-gray-50 disabled:text-gray-400">
-                  <SelectValue placeholder="Select a task" />
+                  <SelectValue placeholder="Select an activity" />
                 </SelectTrigger>
                 <SelectContent>
-                  {tasks.map((t) => (
+                  {tasks.map((t: any) => (
                     <SelectItem key={t.id} value={String(t.id)}>
                       {t.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="flex justify-between items-center py-2 border-t border-gray-100 pt-4 mt-2">
-              <span className="text-xs font-semibold text-gray-500">
-                Cost Code
-              </span>
-              <span className="text-xs font-semibold text-gray-500">-</span>
             </div>
 
             <div className="flex justify-between items-center py-2 border-t border-gray-100">
@@ -683,97 +865,110 @@ export default function NewPurchaseRequestPage() {
 
         {/* Product Line Section */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
-          <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            {/* <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" /> */}
-            Product Line
-          </h2>
-
-          <div className="space-y-4">
-            {items.map((item, index) => {
-              if (item.isEditing) {
-                return (
-                  <ItemEditForm
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    allProducts={allProducts}
-                    onSave={saveItem}
-                    onDelete={deleteItem}
-                    onUpdate={(patch) => {
-                      setItems((prev) =>
-                        prev.map((it) =>
-                          it.id === item.id ? { ...it, ...patch } : it,
-                        ),
-                      );
-                    }}
-                  />
-                );
-              }
-
-              return (
-                <div
-                  key={item.id}
-                  className="p-4 border border-gray-200 rounded-lg bg-[#F8FAFC] relative space-y-1.5"
-                >
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-medium text-gray-400">
-                      Item {index + 1}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => editItem(item.id)}
-                        className="p-1 rounded-md hover:bg-gray-200 transition-colors text-blue-500"
-                        aria-label="Edit Item"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="p-1 rounded-md hover:bg-gray-200 transition-colors text-red-500"
-                        aria-label="Delete Item"
-                      >
-                        <Trash size={15} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-baseline">
-                    <h3 className="text-sm font-bold text-gray-900">
-                      {item.productName}
-                    </h3>
-                  </div>
-
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-gray-800 font-medium">
-                      {item.quantity} QTY
-                    </span>
-                    <span className="text-xs font-bold text-[#3B7CED]">
-                      ₦
-                      {(item.quantity * item.unitCost).toLocaleString("en-NG", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-
-                  {item.description && (
-                    <p className="text-xs text-gray-500 italic mt-1">
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Add Another Product Button */}
-            <button
-              type="button"
-              onClick={addAnotherProduct}
-              className="w-full h-12 border-2 border-dashed border-blue-200 hover:border-[#3B7CED] hover:bg-blue-50/20 text-[#3B7CED] rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all"
-            >
-              <Plus size={16} />
-              Add Another Product
-            </button>
+          <div
+            onClick={() => setIsProductLinesCollapsed(!isProductLinesCollapsed)}
+            className="flex justify-between items-center cursor-pointer select-none"
+          >
+            <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+              Product Line
+            </h2>
+            <ChevronDown
+              className={`h-5 w-5 text-[#3B7CED] transition-transform duration-200 ${
+                isProductLinesCollapsed ? "" : "rotate-180"
+              }`}
+            />
           </div>
+
+          {!isProductLinesCollapsed && (
+            <div className="space-y-4">
+              {items.map((item, index) => {
+                if (item.isEditing) {
+                  return (
+                    <ItemEditForm
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      allProducts={allProducts}
+                      onSave={saveItem}
+                      onDelete={deleteItem}
+                      onUpdate={(patch) => {
+                        setItems((prev) =>
+                          prev.map((it) =>
+                            it.id === item.id ? { ...it, ...patch } : it,
+                          ),
+                        );
+                      }}
+                    />
+                  );
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className="p-4 border border-gray-200 rounded-lg bg-[#F8FAFC] relative space-y-1.5"
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="text-xs font-medium text-gray-400">
+                        Item {index + 1}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => editItem(item.id)}
+                          className="p-1 rounded-md hover:bg-gray-200 transition-colors text-blue-500"
+                          aria-label="Edit Item"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteItem(item.id)}
+                          className="p-1 rounded-md hover:bg-gray-200 transition-colors text-red-500"
+                          aria-label="Delete Item"
+                        >
+                          <Trash size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-baseline">
+                      <h3 className="text-sm font-bold text-gray-900">
+                        {item.productName}
+                      </h3>
+                    </div>
+
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-xs text-gray-800 font-medium">
+                        {item.quantity} QTY
+                      </span>
+                      <span className="text-xs font-bold text-[#3B7CED]">
+                        ₦
+                        {(item.quantity * item.unitCost).toLocaleString("en-NG", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+
+                    {item.description && (
+                      <p className="text-xs text-gray-500 italic mt-1">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add Another Product Button */}
+              <button
+                type="button"
+                onClick={addAnotherProduct}
+                className="w-full h-12 border-2 border-dashed border-blue-200 hover:border-[#3B7CED] hover:bg-blue-50/20 text-[#3B7CED] rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+              >
+                <Plus size={16} />
+                Add Another Product
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Cost Summary Section */}
@@ -851,7 +1046,7 @@ function ItemEditForm({
 }: {
   item: ItemState;
   index: number;
-  allProducts: Array<{ id: string; name: string }>;
+  allProducts: Array<{ id: string; name: string; standardCost?: number; description?: string }>;
   onSave: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdate: (patch: Partial<ItemState>) => void;
@@ -888,7 +1083,14 @@ function ItemEditForm({
   }, [allProducts, searchQuery]);
 
   const handleSelect = (name: string, id: string) => {
-    onUpdate({ productName: name, productId: id, error: undefined });
+    const selectedProd = allProducts.find((p) => p.id === id || p.name.toLowerCase() === name.toLowerCase());
+    onUpdate({
+      productName: name,
+      productId: id,
+      ...(selectedProd?.standardCost ? { unitCost: selectedProd.standardCost } : {}),
+      ...(selectedProd?.description ? { description: selectedProd.description } : {}),
+      error: undefined,
+    });
     setSearchQuery(name);
     setIsOpen(false);
   };

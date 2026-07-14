@@ -395,9 +395,9 @@ export default function MaterialConsumptionForm() {
                   control={form.control}
                   name="wbsElement"
                   render={({ field }) => (
-                    <FormItem className="col-span-1">
+                    <FormItem className="col-span-2">
                       <FormLabel className="text-sm font-semibold text-gray-900">
-                        WBS Element (Leaf)
+                        Activity
                       </FormLabel>
                       <Select
                         onValueChange={field.onChange}
@@ -411,7 +411,7 @@ export default function MaterialConsumptionForm() {
                                 "border-red-500 focus:ring-red-500/20",
                             )}
                           >
-                            <SelectValue placeholder="Select WBS" />
+                            <SelectValue placeholder="Select Activity" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -420,35 +420,6 @@ export default function MaterialConsumptionForm() {
                           </SelectItem>
                           <SelectItem value="wbs-2">
                             Structure / Framing
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="costCode"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel className="text-sm font-semibold text-gray-900">
-                        Cost Code
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled
-                      >
-                        <FormControl>
-                          <SelectTrigger className="h-11 w-full bg-gray-50 border-gray-200 text-gray-500">
-                            <SelectValue placeholder="Select Code" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="cc-mat">
-                            Materials (CC-02)
                           </SelectItem>
                         </SelectContent>
                       </Select>

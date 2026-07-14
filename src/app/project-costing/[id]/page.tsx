@@ -948,20 +948,40 @@ export default function ProjectDashboardPage() {
                     <TableCell className="py-3 text-sm text-gray-600">
                       {tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString() : "N/A"}
                     </TableCell>
-                    <TableCell className="py-3 text-sm text-gray-800 font-medium">{tx.description || tx.name || tx.desc || "Transaction"}</TableCell>
-                    <TableCell className="py-3 text-sm text-gray-600 capitalize">{tx.category || tx.type || "-"}</TableCell>
-                    <TableCell className="py-3 text-sm text-gray-600 font-mono uppercase">{tx.cost_category || tx.cost_code || tx.costCat || "-"}</TableCell>
-                    <TableCell className="py-3 text-sm text-gray-800 font-semibold">₦{Number(tx.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell className="py-3 text-sm text-gray-800 font-medium">
+                      {tx.description || tx.name || tx.desc || tx.detail?.lines?.[0]?.description || tx.detail?.notes || tx.reference_id || "Transaction"}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-gray-600 capitalize">
+                      {tx.category || tx.type || tx.request_type || tx.project_type || "-"}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-gray-600 font-mono uppercase">
+                      {tx.cost_category || tx.cost_category_code || tx.cost_code || tx.costCat || "-"}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-gray-800 font-semibold">
+                      N{Number(tx.amount || tx.detail?.total_amount || tx.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </TableCell>
                     <TableCell className="py-3 text-sm">
-                      <Badge className={`px-2 py-0.5 text-xs font-medium border-0 ${
-                        (tx.status || 'approved').toLowerCase() === 'approved' || (tx.status || '').toLowerCase() === 'paid'
-                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                          : (tx.status || '').toLowerCase() === 'cancelled'
-                          ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-100'
-                      }`}>
-                        {tx.status || "Approved"}
-                      </Badge>
+                      {(() => {
+                        const statusStr = tx.status || "Approved";
+                        const statusLower = statusStr.toLowerCase();
+                        let badgeClass = "bg-gray-150 text-gray-700";
+                        if (statusLower.includes("approv") || statusLower === "done" || statusLower === "success") {
+                          badgeClass = "bg-[#E2F2E9] text-[#1E8E3E]";
+                        } else if (statusLower === "paid" || statusLower === "invoice") {
+                          badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
+                        } else if (statusLower.includes("cancel") || statusLower.includes("reject")) {
+                          badgeClass = "bg-[#FCE8E6] text-[#C5221F]";
+                        } else if (statusLower.includes("pend")) {
+                          badgeClass = "bg-[#FFF2CC] text-[#D66011]";
+                        } else if (statusLower.includes("draft")) {
+                          badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
+                        }
+                        return (
+                          <Badge className={`border-none font-semibold px-2.5 py-0.5 rounded-full text-xs hover:bg-opacity-80 transition-all ${badgeClass}`}>
+                            {statusStr}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))
