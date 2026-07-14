@@ -221,15 +221,9 @@ export default function PettyCashRequestDetailPage() {
               <span className="text-gray-500 font-semibold">Phase</span>
               <span className="font-bold text-gray-900">{request.phase}</span>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Task</span>
-              <span className="font-bold text-gray-900">{request.task}</span>
-            </div>
             <div className="flex justify-between py-1.5">
-              <span className="text-gray-500 font-semibold">Cost Code</span>
-              <span className="font-bold text-gray-900">
-                {request.project.includes("Mall Construction") ? "CC-04" : request.project.includes("Office Complex") ? "CC-05" : "-"}
-              </span>
+              <span className="text-gray-500 font-semibold">Activity</span>
+              <span className="font-bold text-gray-900">{request.task}</span>
             </div>
           </div>
         </div>

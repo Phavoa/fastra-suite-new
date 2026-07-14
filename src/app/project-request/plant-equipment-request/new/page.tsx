@@ -114,7 +114,7 @@ export default function NewPlantEquipmentRequestPage() {
       return;
     }
     if (!selectedTaskId) {
-      setValidationError("Please select a WBS task.");
+      setValidationError("Please select a WBS activity.");
       return;
     }
     if (!estimatedCost || Number(estimatedCost) <= 0) {
@@ -392,16 +392,16 @@ export default function NewPlantEquipmentRequestPage() {
               </Select>
             </div>
 
-            {/* Task */}
+            {/* Activity */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-700">Task</Label>
+              <Label className="text-xs font-semibold text-gray-700">Activity</Label>
               <Select
                 value={selectedTaskId}
                 onValueChange={setSelectedTaskId}
                 disabled={!selectedPhaseId}
               >
                 <SelectTrigger className="h-11 border-gray-200 bg-white disabled:bg-gray-50 w-full shadow-none">
-                  <SelectValue placeholder="Select a task" />
+                  <SelectValue placeholder="Select an activity" />
                 </SelectTrigger>
                 <SelectContent>
                   {tasks.map((t) => (
@@ -413,12 +413,7 @@ export default function NewPlantEquipmentRequestPage() {
               </Select>
             </div>
 
-            <div className="flex justify-between items-center py-2 border-t border-gray-100 pt-4 mt-2 text-xs">
-              <span className="font-semibold text-gray-500">Cost Code</span>
-              <span className="font-semibold text-gray-900">
-                {selectedProjectId === "2" ? "CC-05" : selectedProjectId ? "CC-04" : "-"}
-              </span>
-            </div>
+
 
             <div className="flex justify-between items-center py-2 border-t border-gray-100 text-xs">
               <span className="font-bold text-gray-900">Available Budget</span>

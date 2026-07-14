@@ -1,6 +1,8 @@
 export interface ProjectCostingFilterParams {
   ordering?: string;
   search?: string;
+  status?: string;
+  [key: string]: any;
 }
 
 export interface Activity {

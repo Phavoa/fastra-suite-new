@@ -4,10 +4,19 @@ export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { ArrowLeft, Bell, FileText, CheckCircle, Clock, XCircle, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  FileText,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Plus,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useGetProjectPurchaseRequestsQuery } from "@/api/requests/projectPurchaseRequestApi";
+import { useSidebarContext } from "@/app/AppWrapper";
 
 interface PurchaseRequestItem {
   id: string;
@@ -24,54 +33,137 @@ interface PurchaseRequestItem {
   phase: string;
   task: string;
   notes: string;
+  lineCount?: number;
 }
 
-
-
 const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
-  let parsedProject = "Project";
-  let parsedPhase = "Phase";
-  let parsedTask = "Task";
-  let parsedNotes = req.purpose || "";
+  let parsedProject =
+    req.project_details?.name ||
+    (typeof req.project_request === "object"
+      ? req.project_request?.project_details?.name
+      : null) ||
+    (typeof req.project === "number"
+      ? `Project #${req.project}`
+      : req.project) ||
+    "Project";
+  let parsedPhase = req.phase || "Phase";
+  let parsedTask = req.activity
+    ? `Activity ${req.activity}`
+    : req.task || "Task";
+  const rawNotes = req.notes || req.purpose || "";
+  let parsedNotes = rawNotes;
 
-  if (req.purpose && req.purpose.includes(" | ")) {
-    const parts = req.purpose.split(" | ");
+  if (rawNotes && typeof rawNotes === "string" && rawNotes.includes(" | ")) {
+    const parts = rawNotes.split(" | ");
     parts.forEach((part: string) => {
-      if (part.startsWith("Project: ")) parsedProject = part.replace("Project: ", "");
+      if (part.startsWith("Project: "))
+        parsedProject = part.replace("Project: ", "");
       if (part.startsWith("Phase: ")) parsedPhase = part.replace("Phase: ", "");
       if (part.startsWith("Task: ")) parsedTask = part.replace("Task: ", "");
+      if (part.startsWith("Activity: "))
+        parsedTask = part.replace("Activity: ", "");
       if (part.startsWith("Notes: ")) parsedNotes = part.replace("Notes: ", "");
     });
   }
 
-  const totalQty = req.items?.reduce((sum: number, item: any) => sum + Number(item.qty || 0), 0) || 0;
-  const totalAmount = Number(req.pr_total_price || 0);
+  const rawLines = req.lines || req.items || [];
+  const totalQty =
+    rawLines.reduce(
+      (sum: number, item: any) => sum + Number(item.quantity || item.qty || 0),
+      0,
+    ) || Number(req.quantity || 0);
+  const totalAmount = Number(
+    req.total_amount ||
+      req.pr_total_price ||
+      req.amount ||
+      rawLines.reduce(
+        (sum: number, item: any) =>
+          sum +
+          Number(
+            item.line_total ||
+              (item.quantity || item.qty || 0) *
+                (item.estimated_unit_cost || item.estimated_unit_price || 0) ||
+              0,
+          ),
+        0,
+      ),
+  );
 
-  const requesterName = req.requester_details?.user
-    ? `${req.requester_details.user.first_name || ""} ${req.requester_details.user.last_name || ""}`.trim() || req.requester_details.user.username
-    : "Requester";
+  let requesterName = "Requester";
+  if (
+    req.requester &&
+    typeof req.requester === "string" &&
+    isNaN(Number(req.requester))
+  ) {
+    requesterName = req.requester;
+  } else if (req.requester_details?.user) {
+    requesterName =
+      `${req.requester_details.user.first_name || ""} ${req.requester_details.user.last_name || ""}`.trim() ||
+      req.requester_details.user.username;
+  } else if (
+    typeof req.project_request === "object" &&
+    req.project_request?.created_by_details
+  ) {
+    requesterName =
+      `${req.project_request.created_by_details.first_name || ""} ${req.project_request.created_by_details.last_name || ""}`.trim() ||
+      req.project_request.created_by_details.username;
+  }
 
-  const formattedDate = new Date(req.date_created).toLocaleDateString("en-GB", {
+  const dateValue =
+    req.created_at || req.date_created || req.date || Date.now();
+  const formattedDate = new Date(dateValue).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 
+  const refId =
+    req.reference_id ||
+    (typeof req.project_request === "object"
+      ? req.project_request?.reference_id
+      : null) ||
+    String(req.id || "PR-REQ");
+  const statusVal =
+    req.status ||
+    (typeof req.project_request === "object"
+      ? req.project_request?.status
+      : null) ||
+    "pending";
+  const locationVal =
+    req.site_location ||
+    req.requesting_location_details?.location_name ||
+    req.requesting_location ||
+    req.location ||
+    "Lagos Site";
+  const reqDateVal =
+    req.required_by_date ||
+    req.requiredDate ||
+    (req.date_updated
+      ? new Date(req.date_updated).toISOString().split("T")[0]
+      : "");
+
+  const titleVal =
+    req.title ||
+    (parsedProject && parsedProject !== "Project"
+      ? `Purchase Request - ${parsedProject}`
+      : `Purchase Request #${req.id || refId}`);
+
   return {
-    id: req.id,
-    reference_id: req.id,
-    title: req.items?.map((it: any) => it.product_details?.product_name || "Product").join(", ") || parsedProject || "Purchase Request",
-    status: req.status || "pending",
+    id: String(req.id),
+    reference_id: refId,
+    title: titleVal,
+    status: (statusVal.toLowerCase() as any) || "pending",
     quantity: totalQty,
     amount: totalAmount,
     requester: requesterName,
     date: formattedDate,
     project: parsedProject,
-    location: req.requesting_location_details?.location_name || req.requesting_location || "Lagos Site",
-    requiredDate: req.date_updated ? new Date(req.date_updated).toISOString().split("T")[0] : "",
+    location: locationVal,
+    requiredDate: reqDateVal,
     phase: parsedPhase,
     task: parsedTask,
     notes: parsedNotes,
+    lineCount: rawLines.length || 1,
   };
 };
 
@@ -79,45 +171,34 @@ export default function PurchaseRequestsDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeStatusQuery = searchParams.get("status") as "draft" | "approved" | "pending" | "rejected" | null;
+  const { isExpanded } = useSidebarContext();
+  const activeStatusQuery = searchParams.get("status") as
+    | "draft"
+    | "approved"
+    | "pending"
+    | "rejected"
+    | null;
   const [requests, setRequests] = useState<PurchaseRequestItem[]>([]);
-  const [activeFilter, setActiveFilter] = useState<"all" | "draft" | "approved" | "pending" | "rejected">("all");
+  const [activeFilter, setActiveFilter] = useState<
+    "all" | "draft" | "approved" | "pending" | "rejected"
+  >("all");
 
-  const { data: apiRequests, isLoading: isApiLoading } = useGetProjectPurchaseRequestsQuery({});
+  const { data: apiRequests, isLoading: isApiLoading } =
+    useGetProjectPurchaseRequestsQuery({});
 
   useEffect(() => {
-    const stored = localStorage.getItem("project_purchase_requests");
-    let localList: PurchaseRequestItem[] = [];
-    if (stored) {
-      try {
-        localList = JSON.parse(stored).filter(
-          (item: any) =>
-            item.id !== "pr-1" && item.id !== "pr-2" && item.id !== "pr-3",
-        );
-      } catch (e) {
-        localList = [];
-      }
-    }
-
     let apiList: PurchaseRequestItem[] = [];
     if (apiRequests && Array.isArray(apiRequests)) {
       apiList = apiRequests.map(mapApiRequestToUi);
+    } else if (apiRequests && Array.isArray((apiRequests as any).results)) {
+      apiList = (apiRequests as any).results.map(mapApiRequestToUi);
     }
-
-    const combined = [...localList];
-    apiList.forEach((apiReq) => {
-      const existingIdx = combined.findIndex((item) => item.id === apiReq.id);
-      if (existingIdx > -1) {
-        combined[existingIdx] = apiReq;
-      } else {
-        combined.unshift(apiReq);
-      }
-    });
-
-    setRequests(combined);
+    setRequests(apiList);
   }, [apiRequests]);
 
-  const getStatusBadgeVariant = (status: "draft" | "approved" | "pending" | "rejected") => {
+  const getStatusBadgeVariant = (
+    status: "draft" | "approved" | "pending" | "rejected",
+  ) => {
     switch (status) {
       case "approved":
         return "validated";
@@ -137,10 +218,10 @@ export default function PurchaseRequestsDashboard() {
       draft: 0,
       approved: 0,
       pending: 0,
-      rejected: 0
+      rejected: 0,
     };
 
-    requests.forEach(req => {
+    requests.forEach((req) => {
       if (counts[req.status] !== undefined) {
         counts[req.status]++;
       }
@@ -151,13 +232,76 @@ export default function PurchaseRequestsDashboard() {
 
   const statusCounts = getStatusCounts();
 
-  const filteredRequests = requests.filter(
-    (req) => {
-      const matchesFilter = activeFilter === "all" || req.status === activeFilter;
-      const matchesStatusQuery = !activeStatusQuery || req.status === activeStatusQuery;
-      return matchesFilter && matchesStatusQuery;
-    }
-  );
+  const filteredRequests = requests.filter((req) => {
+    const matchesFilter = activeFilter === "all" || req.status === activeFilter;
+    const matchesStatusQuery =
+      !activeStatusQuery || req.status === activeStatusQuery;
+    return matchesFilter && matchesStatusQuery;
+  });
+
+  if (isApiLoading && requests.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] pb-28">
+        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
+          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+              <div className="h-6 bg-gray-200 rounded w-36 animate-pulse"></div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs">
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="p-4 border border-gray-100 rounded-lg h-24 bg-gray-50 animate-pulse"
+                >
+                  <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-10"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs space-y-4">
+            <div className="h-5 bg-gray-200 rounded w-40 animate-pulse"></div>
+            <div className="flex gap-2 pb-1">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="h-8 bg-gray-200 rounded-full w-20 animate-pulse"
+                ></div>
+              ))}
+            </div>
+            <div className="space-y-3 pt-2">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="p-4 border border-gray-100 rounded-lg space-y-3 animate-pulse"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    <div className="h-5 bg-gray-200 rounded-full w-16"></div>
+                  </div>
+                  <div className="h-5 bg-gray-200 rounded w-64"></div>
+                  <div className="h-3 bg-gray-200 rounded w-32"></div>
+                  <div className="grid grid-cols-3 gap-2 border-t border-gray-50 pt-3">
+                    <div className="h-8 bg-gray-200 rounded"></div>
+                    <div className="h-8 bg-gray-200 rounded"></div>
+                    <div className="h-8 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-28">
@@ -178,7 +322,9 @@ export default function PurchaseRequestsDashboard() {
             >
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
-            <h1 className="text-lg font-bold text-gray-800">Purchase Request</h1>
+            <h1 className="text-lg font-bold text-gray-800">
+              Purchase Request
+            </h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -209,26 +355,51 @@ export default function PurchaseRequestsDashboard() {
                 const getStatusStyle = (st: string) => {
                   switch (st) {
                     case "approved":
-                      return { color: "text-[#2BA24D]", bgColor: "bg-[#2BA24D]", label: "Approved" };
+                      return {
+                        color: "text-[#2BA24D]",
+                        bgColor: "bg-[#2BA24D]",
+                        label: "Approved",
+                      };
                     case "pending":
-                      return { color: "text-[#F0B401]", bgColor: "bg-[#F0B401]", label: "Pending" };
+                      return {
+                        color: "text-[#F0B401]",
+                        bgColor: "bg-[#F0B401]",
+                        label: "Pending",
+                      };
                     case "draft":
-                      return { color: "text-[#3B7CED]", bgColor: "bg-[#3B7CED]", label: "Draft" };
+                      return {
+                        color: "text-[#3B7CED]",
+                        bgColor: "bg-[#3B7CED]",
+                        label: "Draft",
+                      };
                     case "rejected":
-                      return { color: "text-[#E43D2B]", bgColor: "bg-[#E43D2B]", label: "Rejected" };
+                      return {
+                        color: "text-[#E43D2B]",
+                        bgColor: "bg-[#E43D2B]",
+                        label: "Rejected",
+                      };
                     default:
-                      return { color: "text-[#F0B401]", bgColor: "bg-[#F0B401]", label: "Pending" };
+                      return {
+                        color: "text-[#F0B401]",
+                        bgColor: "bg-[#F0B401]",
+                        label: "Pending",
+                      };
                   }
                 };
                 const style = getStatusStyle(activeStatusQuery);
                 return (
                   <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded-full ${style.bgColor}`}></div>
+                    <div
+                      className={`w-4 h-4 rounded-full ${style.bgColor}`}
+                    ></div>
                     <h2 className="text-xl font-semibold">
                       {style.label} Purchase Requests
                     </h2>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${style.color} bg-gray-100`}>
-                      {filteredRequests.length} {filteredRequests.length === 1 ? "request" : "requests"}
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${style.color} bg-gray-100`}
+                    >
+                      {filteredRequests.length}{" "}
+                      {filteredRequests.length === 1 ? "request" : "requests"}
                     </span>
                   </div>
                 );
@@ -248,9 +419,13 @@ export default function PurchaseRequestsDashboard() {
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <FileText size={16} className="text-[#3B7CED]" />
-                  <span className="text-xs font-semibold text-[#3B7CED]">Draft</span>
+                  <span className="text-xs font-semibold text-[#3B7CED]">
+                    Draft
+                  </span>
                 </div>
-                <span className="text-3xl font-bold text-[#3B7CED]">{statusCounts.draft}</span>
+                <span className="text-3xl font-semibold text-[#3B7CED]">
+                  {statusCounts.draft}
+                </span>
               </div>
 
               {/* Approved */}
@@ -260,9 +435,13 @@ export default function PurchaseRequestsDashboard() {
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <CheckCircle size={16} className="text-[#2BA24D]" />
-                  <span className="text-xs font-semibold text-[#2BA24D]">Approved</span>
+                  <span className="text-xs font-semibold text-[#2BA24D]">
+                    Approved
+                  </span>
                 </div>
-                <span className="text-3xl font-bold text-[#2BA24D]">{statusCounts.approved}</span>
+                <span className="text-3xl font-sembold text-[#2BA24D]">
+                  {statusCounts.approved}
+                </span>
               </div>
 
               {/* Pending */}
@@ -272,9 +451,13 @@ export default function PurchaseRequestsDashboard() {
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Clock size={16} className="text-[#F0B401]" />
-                  <span className="text-xs font-semibold text-[#F0B401]">Pending</span>
+                  <span className="text-xs font-semibold text-[#F0B401]">
+                    Pending
+                  </span>
                 </div>
-                <span className="text-3xl font-bold text-[#F0B401]">{statusCounts.pending}</span>
+                <span className="text-3xl font-semibold text-[#F0B401]">
+                  {statusCounts.pending}
+                </span>
               </div>
 
               {/* Rejected */}
@@ -284,9 +467,13 @@ export default function PurchaseRequestsDashboard() {
               >
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <XCircle size={16} className="text-[#E43D2B]" />
-                  <span className="text-xs font-semibold text-[#E43D2B]">Rejected</span>
+                  <span className="text-xs font-semibold text-[#E43D2B]">
+                    Rejected
+                  </span>
                 </div>
-                <span className="text-3xl font-bold text-[#E43D2B]">{statusCounts.rejected}</span>
+                <span className="text-3xl font-semibold text-[#E43D2B]">
+                  {statusCounts.rejected}
+                </span>
               </div>
             </div>
           </div>
@@ -303,7 +490,9 @@ export default function PurchaseRequestsDashboard() {
           {/* Filter Pills (hidden when status query is active) */}
           {!activeStatusQuery && (
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {(["all", "draft", "approved", "pending", "rejected"] as const).map((filter) => (
+              {(
+                ["all", "draft", "approved", "pending", "rejected"] as const
+              ).map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setActiveFilter(filter)}
@@ -330,7 +519,9 @@ export default function PurchaseRequestsDashboard() {
               filteredRequests.map((req) => (
                 <div
                   key={req.id}
-                  onClick={() => router.push(`/project-request/purchase-request/${req.id}`)}
+                  onClick={() =>
+                    router.push(`/project-request/purchase-request/${req.id}`)
+                  }
                   className="p-4 border border-gray-200 rounded-lg hover:border-[#3B7CED] hover:shadow-xs transition-all cursor-pointer group"
                 >
                   <div className="flex justify-between items-center mb-1">
@@ -342,23 +533,42 @@ export default function PurchaseRequestsDashboard() {
                     </Badge>
                   </div>
 
-                  <h3 className="text-sm font-bold text-gray-900 mb-4 group-hover:text-[#3B7CED] transition-colors">
+                  <h3 className="text-sm font-bold text-gray-900 mb-1 group-hover:text-[#3B7CED] transition-colors">
                     {req.title}
                   </h3>
+                  <div className="text-xs text-gray-500 mb-4 flex items-center gap-2">
+                    <span className="font-semibold text-[#3B7CED]">
+                      {req.lineCount || 1} Line Item
+                      {(req.lineCount || 1) > 1 ? "s" : ""}
+                    </span>
+                    &bull;
+                    <span>{req.location}</span>
+                  </div>
 
                   <div className="grid grid-cols-3 text-xs gap-2 border-t border-gray-50 pt-3">
                     <div>
-                      <span className="block text-gray-400 font-medium mb-0.5">Quantity</span>
-                      <span className="font-bold text-gray-800">{req.quantity}</span>
+                      <span className="block text-gray-400 font-medium mb-0.5">
+                        Quantity
+                      </span>
+                      <span className="font-bold text-gray-800">
+                        {req.quantity}
+                      </span>
                     </div>
                     <div className="text-center">
-                      <span className="block text-gray-400 font-medium mb-0.5">Amount</span>
+                      <span className="block text-gray-400 font-medium mb-0.5">
+                        Amount
+                      </span>
                       <span className="font-bold text-gray-800">
-                        ₦{req.amount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        ₦
+                        {req.amount.toLocaleString("en-NG", {
+                          minimumFractionDigits: 2,
+                        })}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="block text-gray-400 font-medium mb-0.5">Requester</span>
+                      <span className="block text-gray-400 font-medium mb-0.5">
+                        Requester
+                      </span>
                       <span className="font-bold text-gray-800 truncate block">
                         {req.requester}
                       </span>
@@ -372,8 +582,10 @@ export default function PurchaseRequestsDashboard() {
       </main>
 
       {/* Floating Action Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20">
-        <div className="max-w-2xl mx-auto">
+      <div
+        className={`fixed bottom-0 left-0 ${isExpanded ? "md:left-64" : "md:left-16"} right-0 bg-white border-t border-gray-100 p-4 z-20 transition-all duration-300`}
+      >
+        <div className="max-w-2xl mx-auto px-4">
           <Button
             onClick={() => router.push("/project-request/purchase-request/new")}
             className="w-full h-12 text-sm font-bold flex items-center justify-center gap-2 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-sm"

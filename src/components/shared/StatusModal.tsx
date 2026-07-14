@@ -35,6 +35,8 @@ export interface StatusModalProps {
   onSecondary?: () => void;
   /** Whether to show the close button in the header */
   showCloseButton?: boolean;
+  /** Optional visual style variant for the primary action button */
+  actionVariant?: "primary" | "destructive";
 }
 
 const statusConfig: Record<
@@ -88,6 +90,7 @@ export function StatusModal({
   secondaryText,
   onSecondary,
   showCloseButton = true,
+  actionVariant,
 }: StatusModalProps) {
   const config = statusConfig[type];
   const Icon = config.icon;
@@ -100,26 +103,38 @@ export function StatusModal({
     }
   };
 
+  const isDestructive =
+    actionVariant === "destructive" ||
+    actionText === "Delete" ||
+    actionText?.toLowerCase().includes("delete");
+
+  const iconBgClass = isDestructive ? "bg-[#FFF2F0]" : config.bgColor;
+  const iconBorderClass = isDestructive ? "border-[#FFE0DB]" : config.borderColor;
+  const iconColorClass = isDestructive ? "text-[#E43D2B]" : config.iconColor;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[400px] w-[calc(100%-2rem)] p-6 rounded-2xl bg-white gap-0 border-none shadow-xl" showCloseButton={showCloseButton}>
+      <DialogContent
+        className="max-w-[400px] w-[calc(100%-2rem)] p-6 rounded-2xl bg-white gap-0 border-none shadow-xl"
+        showCloseButton={showCloseButton}
+      >
         <div className="flex flex-col items-start w-full text-left">
           {/* Header section with Icon, Title and Message (Left-aligned) */}
           <div className="flex flex-col items-start text-left gap-0 p-0 w-full">
             <div
               className={cn(
                 "w-12 h-12 rounded-full flex items-center justify-center border",
-                config.bgColor,
-                config.borderColor
+                iconBgClass,
+                iconBorderClass
               )}
             >
-              <Icon className={cn("w-6 h-6", config.iconColor)} />
+              <Icon className={cn("w-6 h-6", iconColorClass)} />
             </div>
-            
+
             <DialogTitle className="text-lg font-bold text-gray-900 mt-5 leading-snug">
               {title}
             </DialogTitle>
-            
+
             <DialogDescription className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
               {message}
             </DialogDescription>
@@ -132,13 +147,23 @@ export function StatusModal({
                 <Button
                   variant="outline"
                   onClick={onSecondary}
-                  className="w-full h-12 border border-[#3B7CED] hover:bg-[#EEF4FF]/50 text-[#3B7CED] bg-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center shadow-none"
+                  className={cn(
+                    "w-full h-12 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center shadow-none bg-white",
+                    isDestructive
+                      ? "border border-gray-300 hover:bg-gray-50 text-gray-700"
+                      : "border border-[#3B7CED] hover:bg-[#EEF4FF]/50 text-[#3B7CED]"
+                  )}
                 >
                   {secondaryText}
                 </Button>
                 <Button
                   onClick={handleAction}
-                  className="w-full h-12 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none"
+                  className={cn(
+                    "w-full h-12 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none text-white",
+                    isDestructive
+                      ? "bg-[#E43D2B] hover:bg-[#c93322]"
+                      : "bg-[#3B7CED] hover:bg-[#2d63c7]"
+                  )}
                 >
                   {actionText || config.defaultActionText}
                 </Button>
@@ -146,7 +171,12 @@ export function StatusModal({
             ) : (
               <Button
                 onClick={handleAction}
-                className="w-full h-12 bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none"
+                className={cn(
+                  "w-full h-12 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center border-none shadow-none text-white",
+                  isDestructive || type === "error"
+                    ? "bg-[#E43D2B] hover:bg-[#c93322]"
+                    : "bg-[#3B7CED] hover:bg-[#2d63c7]"
+                )}
               >
                 {actionText || config.defaultActionText}
               </Button>
@@ -164,10 +194,31 @@ export interface UseStatusModalReturn {
   type: StatusType;
   title: string;
   message: string;
-  showSuccess: (title: string, message: string) => void;
-  showError: (title: string, message: string) => void;
-  showWarning: (title: string, message: string) => void;
-  showInfo: (title: string, message: string) => void;
+  actionText?: string;
+  onAction?: () => void;
+  secondaryText?: string;
+  onSecondary?: () => void;
+  actionVariant?: "primary" | "destructive";
+  showSuccess: (title: string, message: string, actionText?: string, onAction?: () => void) => void;
+  showError: (title: string, message: string, actionText?: string, onAction?: () => void) => void;
+  showWarning: (
+    title: string,
+    message: string,
+    actionText?: string,
+    onAction?: () => void,
+    secondaryText?: string,
+    onSecondary?: () => void,
+    actionVariant?: "primary" | "destructive"
+  ) => void;
+  showInfo: (title: string, message: string, actionText?: string, onAction?: () => void) => void;
+  showConfirm: (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    confirmText?: string,
+    cancelText?: string,
+    actionVariant?: "primary" | "destructive"
+  ) => void;
   close: () => void;
 }
 
@@ -176,16 +227,40 @@ export function useStatusModal(): UseStatusModalReturn {
   const [type, setType] = React.useState<StatusType>("info");
   const [title, setTitle] = React.useState("");
   const [message, setMessage] = React.useState("");
+  const [actionText, setActionText] = React.useState<string | undefined>();
+  const [onAction, setOnAction] = React.useState<(() => void) | undefined>();
+  const [secondaryText, setSecondaryText] = React.useState<string | undefined>();
+  const [onSecondary, setOnSecondary] = React.useState<(() => void) | undefined>();
+  const [actionVariant, setActionVariant] = React.useState<"primary" | "destructive" | undefined>();
 
   const show = (
     statusType: StatusType,
     statusTitle: string,
-    statusMessage: string
+    statusMessage: string,
+    customActionText?: string,
+    customOnAction?: () => void,
+    customSecondaryText?: string,
+    customOnSecondary?: () => void,
+    customActionVariant?: "primary" | "destructive"
   ) => {
     setType(statusType);
     setTitle(statusTitle);
     setMessage(statusMessage);
+    setActionText(customActionText);
+    setOnAction(() => customOnAction);
+    setSecondaryText(customSecondaryText);
+    setOnSecondary(() => customOnSecondary);
+    setActionVariant(customActionVariant);
     setIsOpen(true);
+  };
+
+  const close = () => {
+    setIsOpen(false);
+    setActionText(undefined);
+    setOnAction(undefined);
+    setSecondaryText(undefined);
+    setOnSecondary(undefined);
+    setActionVariant(undefined);
   };
 
   return {
@@ -193,12 +268,116 @@ export function useStatusModal(): UseStatusModalReturn {
     type,
     title,
     message,
-    showSuccess: (t, m) => show("success", t, m),
-    showError: (t, m) => show("error", t, m),
-    showWarning: (t, m) => show("warning", t, m),
-    showInfo: (t, m) => show("info", t, m),
-    close: () => setIsOpen(false),
+    actionText,
+    onAction,
+    secondaryText,
+    onSecondary,
+    actionVariant,
+    showSuccess: (t, m, actText, actCb) => show("success", t, m, actText, actCb, undefined, undefined, "primary"),
+    showError: (t, m, actText, actCb) => show("error", t, m, actText, actCb, undefined, undefined, "destructive"),
+    showWarning: (t, m, actText, actCb, secText, secCb, actVar) =>
+      show("warning", t, m, actText, actCb, secText, secCb, actVar),
+    showInfo: (t, m, actText, actCb) => show("info", t, m, actText, actCb, undefined, undefined, "primary"),
+    showConfirm: (
+      confirmTitle,
+      confirmMessage,
+      onConfirm,
+      confirmText = "Delete",
+      cancelText = "Cancel",
+      actVar = "destructive"
+    ) => {
+      show(
+        "warning",
+        confirmTitle,
+        confirmMessage,
+        confirmText,
+        () => {
+          onConfirm();
+        },
+        cancelText,
+        () => {
+          close();
+        },
+        actVar
+      );
+    },
+    close,
   };
+}
+
+export function extractErrorMessage(
+  err: any,
+  fallback = "An unexpected error occurred. Please try again."
+): string {
+  if (!err) return fallback;
+
+  if (typeof err === "string") return err;
+  if (typeof err?.message === "string" && !err.data) return err.message;
+
+  const payload =
+    err?.data !== undefined
+      ? err.data
+      : err?.error !== undefined
+      ? err.error
+      : err;
+
+  if (!payload) return fallback;
+  if (typeof payload === "string") return payload;
+
+  const parseObject = (obj: any): string[] => {
+    if (!obj || typeof obj !== "object") return [String(obj)];
+    const messages: string[] = [];
+
+    for (const [key, val] of Object.entries(obj)) {
+      if (val === null || val === undefined) continue;
+
+      const cleanKey =
+        key === "non_field_errors" ||
+        key === "detail" ||
+        key === "message" ||
+        key === "error"
+          ? ""
+          : key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) + ": ";
+
+      if (typeof val === "string") {
+        messages.push(`${cleanKey}${val}`);
+      } else if (Array.isArray(val)) {
+        val.forEach((item) => {
+          if (typeof item === "string") {
+            messages.push(`${cleanKey}${item}`);
+          } else if (typeof item === "object" && item !== null) {
+            const nested = parseObject(item);
+            nested.forEach((n) => messages.push(`${cleanKey}${n}`));
+          } else {
+            messages.push(`${cleanKey}${String(item)}`);
+          }
+        });
+      } else if (typeof val === "object") {
+        const nested = parseObject(val);
+        nested.forEach((n) => messages.push(`${cleanKey}${n}`));
+      } else {
+        messages.push(`${cleanKey}${String(val)}`);
+      }
+    }
+    return messages.filter(Boolean);
+  };
+
+  if (Array.isArray(payload)) {
+    const parsed = payload.flatMap((item) =>
+      typeof item === "string" ? item : parseObject(item)
+    );
+    return parsed.length > 0 ? parsed.join(" | ") : fallback;
+  }
+
+  if (typeof payload === "object") {
+    if (typeof payload.detail === "string") return payload.detail;
+    if (typeof payload.message === "string") return payload.message;
+
+    const parsed = parseObject(payload);
+    return parsed.length > 0 ? parsed.join(" | ") : fallback;
+  }
+
+  return fallback;
 }
 
 export default StatusModal;

@@ -20,7 +20,7 @@ const formSchema = z.object({
   contract_value: z.string().min(1, "Contract value is required"),
   payment_terms: z.string().min(2, "Payment terms are required"),
   phase: z.string().min(1, "Please select a phase"),
-  task: z.string().min(1, "Please select a task"),
+  task: z.string().min(1, "Please select an activity"),
   justification_notes: z.string().optional(),
 }).refine((data) => {
   if (data.start_date && data.end_date) {
@@ -141,9 +141,9 @@ export default function NewSubcontractorRequestPage() {
           },
           {
             name: "task",
-            label: "Task",
+            label: "Activity",
             type: "select",
-            placeholder: "Select a task",
+            placeholder: "Select an activity",
             dependsOn: "phase",
             options: [],
           },
@@ -161,12 +161,6 @@ export default function NewSubcontractorRequestPage() {
           const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
           return (
             <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-gray-500">Cost Code</span>
-                <span className="text-sm font-semibold text-gray-500">
-                  {data.project === "2" ? "CC-05" : data.project ? "CC-04" : "-"}
-                </span>
-              </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-900">Available Budget</span>
                 <span className="text-sm font-semibold text-[#3B7CED]">
