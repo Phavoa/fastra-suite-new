@@ -24,7 +24,12 @@ const topItems = [{ id: "menu", icon: MenuIcon, label: "Menu", route: "/" }];
 const middleItems = [
   // --- Functional Modules ---
   { id: "dashboard", icon: DashboardIcon, label: "Dashboard", route: "/" },
-  { id: "account", icon: AccountIcon, label: "Invoice", route: "/invoice" },
+  {
+    id: "account",
+    icon: AccountIcon,
+    label: "Invoice",
+    route: "/invoice/approved-requests",
+  },
   { id: "purchase", icon: PurchaseIcon, label: "Purchase", route: "/purchase" },
   {
     id: "inventory",
