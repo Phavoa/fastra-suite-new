@@ -4,7 +4,7 @@ import React from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Bell, Calendar, User, Loader2 } from "lucide-react";
 import { useGetProjectRequestQuery } from "@/api/requests/projectRequestApi";
-import { useGetProjectsQuery } from "@/api/projectApi";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { Badge } from "@/components/ui/badge";
 
 interface PettyCashRequestDetail {
@@ -29,12 +29,16 @@ export default function PettyCashRequestDetailPage() {
   const { data: apiRequest, isLoading: apiLoading } = useGetProjectRequestQuery(numericId, {
     skip: isNaN(numericId),
   });
-  const { data: projects = [] } = useGetProjectsQuery();
+  const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
+  const projects = React.useMemo(() => {
+    const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];
+    return list;
+  }, [rawProjects]);
 
   const getProjectName = (projectId?: number) => {
     if (!projectId) return "General Project";
-    const proj = projects.find((p) => p.id === projectId);
-    return proj ? proj.name : `Project #${projectId}`;
+    const proj = projects?.find((p: any) => p.id === projectId);
+    return proj ? (proj.name || proj.project_name || `Project #${projectId}`) : `Project #${projectId}`;
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -70,14 +74,14 @@ export default function PettyCashRequestDetailPage() {
     }
 
     // Attempt to map Phase name and Task name from mock project database if they are numeric IDs
-    const matchedProject = projects.find((p) => p.id === apiRequest.project);
+    const matchedProject = projects.find((p: any) => p.id === apiRequest.project);
     let phaseName = detail.phase || "Foundation";
     let taskName = detail.task || "Concrete Pouring";
 
     if (matchedProject && matchedProject.wbs) {
-      const matchPhase = matchedProject.wbs.find((w) => String(w.id) === String(detail.phase));
+      const matchPhase = matchedProject.wbs.find((w: any) => String(w.id) === String(detail.phase));
       if (matchPhase) phaseName = matchPhase.name;
-      const matchTask = matchedProject.wbs.find((w) => String(w.id) === String(detail.task));
+      const matchTask = matchedProject.wbs.find((w: any) => String(w.id) === String(detail.task));
       if (matchTask) taskName = matchTask.name;
     }
 

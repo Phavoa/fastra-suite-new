@@ -17,6 +17,7 @@ export interface PettyCashRequest {
 export interface CreatePettyCashRequest {
   project: number;
   wbs_element: string; // UUID of task
+  activity?: string; // UUID of task
   amount_requested: string; // decimal string
   purpose: string;
   description: string;

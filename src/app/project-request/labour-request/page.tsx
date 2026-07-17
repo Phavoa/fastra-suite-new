@@ -18,12 +18,8 @@ import {
   RequestDashboardConfig,
   RequestStatus,
 } from "@/components/requests/types";
-import { useGetLabourRequestsQuery } from "@/api/requests/labourRequestApi";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { db } from "@/lib/database/labourRequestDb";
-import { syncService } from "@/lib/database/syncService";
-import { LocalLabourRequest } from "@/lib/database/labourRequestDb";
-import { LabourRequest } from "@/api/requests/labourRequestApi";
+import { useGetLabourRequestsQuery, LabourRequest } from "@/api/requests/labourRequestApi";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 
 // Combined interface for both online and offline data
 interface DisplayLabourRequest {
@@ -34,20 +30,21 @@ interface DisplayLabourRequest {
   role: string;
   requester: string;
   status: RequestStatus;
-  isOffline?: boolean;
-  localId?: string;
 }
 
 export default function LabourRequestPage() {
   const router = useRouter();
-  const networkStatus = useNetworkStatus();
   const {
     data: apiData,
     isLoading,
     error,
     refetch,
   } = useGetLabourRequestsQuery({});
-  const [localData, setLocalData] = useState<LocalLabourRequest[]>([]);
+  const { data: projectsData } = useGetProjectCostingProjectsQuery({});
+  const projects = Array.isArray(projectsData)
+    ? projectsData
+    : (projectsData as any)?.results || [];
+
   const [combinedData, setCombinedData] = useState<DisplayLabourRequest[]>([]);
   const [statusCounts, setStatusCounts] = useState<
     Record<RequestStatus, number>
@@ -58,86 +55,45 @@ export default function LabourRequestPage() {
     rejected: 0,
   });
 
-  // Load local data on mount
   useEffect(() => {
-    const loadLocalData = async () => {
-      try {
-        const localRequests = await db.labourRequests.toArray();
-        setLocalData(localRequests);
-      } catch (error) {
-        console.error("Failed to load local data:", error);
-      }
-    };
-    loadLocalData();
-  }, []);
+    const rawApiData = apiData || [];
+    const apiRequests: LabourRequest[] = Array.isArray(rawApiData)
+      ? rawApiData
+      : (rawApiData as any).results || [];
 
-  // Combine API and local data
-  useEffect(() => {
-    const combineData = () => {
-      const rawApiData = apiData || [];
-      const apiRequests: LabourRequest[] = Array.isArray(rawApiData)
-        ? rawApiData
-        : (rawApiData as any).results || [];
-      const localRequests = localData;
-      console.log("API requests:", apiRequests);
-      console.log("Local requests:", localRequests);
-
-      // Convert API data to display format
-      const displayApiRequests: DisplayLabourRequest[] = apiRequests.map(
-        (req) => ({
+    const displayApiRequests: DisplayLabourRequest[] = apiRequests.map(
+      (req) => {
+        const projectId = req.project_request?.project || (req as any).project;
+        const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
+        return {
           id: req.id,
           referenceId: req.reference_id,
-          // project: `${req?.project || "Name here"}`, // to be added later
+          project: projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
           workers: req.detail?.number_of_workers || 0,
           role: req.detail?.role_type || "Unknown",
           requester: req.detail?.created_by_name || "Requester",
           status: req.status || "draft",
-          isOffline: false,
-        }),
-      );
+        };
+      },
+    );
 
-      // Convert local data to display format (only show unsynced ones)
-      const displayLocalRequests: DisplayLabourRequest[] = localRequests
-        .filter((req) => !req.isSynced)
-        .map((req) => ({
-          id: req.id || 0,
-          referenceId: req.reference_id,
-          project: `${req.project_request?.project || "Project name"}`,
-          workers: req.detail?.number_of_workers || 0,
-          role: req.detail?.role_type || "Unknown",
-          requester: "You (Offline)",
-          status: req.project_request?.status || "draft",
-          isOffline: true,
-          localId: req.localId,
-        }));
+    setCombinedData(displayApiRequests);
 
-      // Combine and deduplicate (prefer API data for synced items)
-      const allRequests = [...displayLocalRequests, ...displayApiRequests];
-      const uniqueRequests = allRequests.filter(
-        (req, index, self) => index === self.findIndex((r) => r.id === req.id),
-      );
+    const counts = displayApiRequests.reduce(
+      (acc, req) => {
+        acc[req.status] = (acc[req.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<RequestStatus, number>,
+    );
 
-      setCombinedData(uniqueRequests);
-
-      // Calculate status counts
-      const counts = uniqueRequests.reduce(
-        (acc, req) => {
-          acc[req.status] = (acc[req.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<RequestStatus, number>,
-      );
-
-      setStatusCounts({
-        draft: counts.draft || 0,
-        approved: counts.approved || 0,
-        pending: counts.pending || 0,
-        rejected: counts.rejected || 0,
-      });
-    };
-
-    combineData();
-  }, [apiData, localData]);
+    setStatusCounts({
+      draft: counts.draft || 0,
+      approved: counts.approved || 0,
+      pending: counts.pending || 0,
+      rejected: counts.rejected || 0,
+    });
+  }, [apiData, projects]);
 
   const getStatusBadgeVariant = (status: RequestStatus) => {
     switch (status) {
@@ -193,20 +149,16 @@ export default function LabourRequestPage() {
     ],
     renderItem: (request) => (
       <Card
-        className={`p-4 hover:shadow-md transition-shadow cursor-pointer ${request.isOffline ? "border-orange-200 bg-orange-50/30" : ""}`}
-        onClick={() => router.push(`/project-request/labour-request/${request.id}`)}
+        className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() =>
+          router.push(`/project-request/labour-request/${request.id}`)
+        }
       >
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-blue-500">
               {request.referenceId}
             </span>
-            {request.isOffline && (
-              <div className="flex items-center gap-1 text-orange-600 text-xs">
-                <WifiOff className="h-3 w-3" />
-                <span>Offline</span>
-              </div>
-            )}
           </div>
           <Badge variant={getStatusBadgeVariant(request.status)}>
             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
@@ -249,37 +201,10 @@ export default function LabourRequestPage() {
 
   return (
     <div>
-      {/* Network Status Indicator */}
-      <div className="bg-white px-4 py-2 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {networkStatus.isOnline ? (
-              <>
-                <Wifi className="h-4 w-4 text-green-500" />
-                <span className="text-sm text-green-600">Online</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-4 w-4 text-orange-500" />
-                <span className="text-sm text-orange-600">
-                  Offline - Changes saved locally
-                </span>
-              </>
-            )}
-          </div>
-          {!networkStatus.isOnline && (
-            <button
-              onClick={() => syncService.performSync()}
-              className="text-sm text-[#3B7CED] hover:text-[#2d63c7] flex items-center gap-1"
-            >
-              <RefreshCw className="h-3 w-3" />
-              Sync Now
-            </button>
-          )}
-        </div>
-      </div>
-
-      <RequestDashboard config={config} backUrl="/project-request/make-request" />
+      <RequestDashboard
+        config={config}
+        backUrl="/project-request/make-request"
+      />
     </div>
   );
 }

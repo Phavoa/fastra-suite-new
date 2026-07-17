@@ -6,10 +6,10 @@ import { z } from "zod";
 import { RequestForm } from "@/components/requests/RequestForm";
 import { RequestFormConfig } from "@/components/requests/types";
 import { useCreateLabourRequestMutation } from "@/api/requests/labourRequestApi";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { syncService } from "@/lib/database/syncService";
 import { StatusModal } from "@/components/shared/StatusModal";
 import extractErrorMessage from "@/components/requests/utils/RequestErrorHandler";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -25,7 +25,9 @@ const formSchema = z.object({
     .number()
     .positive("Enter a valid duration")
     .min(1, "Duration must be at least 1"),
-  durationUnit: z.enum(["days"], "Please select duration unit"),
+  durationUnit: z.enum(["days", "weeks", "months"], {
+    message: "Please select duration unit",
+  }),
   dailyRate: z.coerce
     .number()
     .positive("Enter a valid daily rate")
@@ -40,7 +42,13 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function NewLabourRequestPage() {
   const router = useRouter();
-  const networkStatus = useNetworkStatus();
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = React.useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
+
   const [createLabourRequest, { isLoading: isCreating }] =
     useCreateLabourRequestMutation();
   const [statusModal, setStatusModal] = useState<{
@@ -57,6 +65,18 @@ export default function NewLabourRequestPage() {
 
   const handleSubmit = async (data: FormValues) => {
     try {
+      const ensureValidUUID = (val: string): string => {
+        if (!val) return "";
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(val)) return val;
+        const numericVal = parseInt(val, 10);
+        if (!isNaN(numericVal)) {
+          const hexString = numericVal.toString(16).padStart(12, "0");
+          return `00000000-0000-0000-0000-${hexString}`;
+        }
+        return val;
+      };
+
       const submitData = {
         project: parseInt(data.project),
         date_required: new Date().toISOString().split("T")[0], // Today's date
@@ -66,51 +86,22 @@ export default function NewLabourRequestPage() {
         duration_unit: data.durationUnit,
         estimated_daily_rate: data.dailyRate.toString(),
         justification_notes: data.justification || "",
+        activity: ensureValidUUID(data.task),
       };
 
-      if (networkStatus.isOnline) {
-        // Online submission
-        console.log("submitData from new page", submitData);
-        const result = await createLabourRequest(submitData).unwrap();
+      console.log("submitData from new page", submitData);
+      await createLabourRequest(submitData).unwrap();
 
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Created",
-          description: "Your labour request has been submitted successfully.",
-        });
+      setStatusModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Created",
+        description: "Your labour request has been submitted successfully.",
+      });
 
-        // Navigate to list page after a delay (since we don't have the full object with id)
-        setTimeout(() => {
-          router.push(`/project-request/labour-request`);
-        }, 2000);
-      } else {
-        // Offline submission - save locally
-        try {
-          await syncService.createRequestOffline(submitData);
-
-          setStatusModal({
-            isOpen: true,
-            type: "success",
-            title: "Request Saved Locally",
-            description:
-              "Your labour request has been saved locally and will be synchronized when you're back online.",
-          });
-
-          // Navigate back to list after a delay
-          setTimeout(() => {
-            router.push("/project-request/labour-request");
-          }, 2000);
-        } catch (error) {
-          console.error("Failed to save request locally:", error);
-          setStatusModal({
-            isOpen: true,
-            type: "error",
-            title: "Error",
-            description: "Failed to save request locally. Please try again.",
-          });
-        }
-      }
+      setTimeout(() => {
+        router.push(`/project-request/labour-request`);
+      }, 2000);
     } catch (error) {
       console.error("Failed to create labour request:", error);
       const errorMessage = extractErrorMessage(error);
@@ -123,10 +114,17 @@ export default function NewLabourRequestPage() {
     }
   };
 
+  const calculateLabourTotalCost = (data: Partial<FormValues>) => {
+    const workers = Number(data.numberOfWorkers) || 0;
+    const rate = Number(data.dailyRate) || 0;
+    const dur = Number(data.duration) || 1;
+    return workers * rate * dur;
+  };
+
   const config: RequestFormConfig<FormValues> = {
     title: "Labour Request",
-    requestId: "", // Will be generated
-    requesterName: "You", // Will be populated from auth
+    requestId: "LR00001",
+    requesterName: loggedInUserName,
     date: new Date().toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
@@ -141,13 +139,7 @@ export default function NewLabourRequestPage() {
             label: "Project",
             type: "select",
             placeholder: "Select a project",
-            options: [
-              // TODO: Load real projects from API
-              { label: "Project #1", value: "1" },
-              { label: "Project #2", value: "2" },
-              { label: "Project #3", value: "3" },
-              { label: "Project #4", value: "4" },
-            ],
+            options: [],
           },
           {
             name: "numberOfWorkers",
@@ -159,7 +151,7 @@ export default function NewLabourRequestPage() {
             name: "role",
             label: "Role / Trade Type",
             type: "text",
-            placeholder: "Enter role or trade type",
+            placeholder: "Enter role",
           },
         ],
       },
@@ -170,35 +162,19 @@ export default function NewLabourRequestPage() {
             name: "phase",
             label: "Phase",
             type: "select",
-            placeholder: "Select phase",
-            options: [
-              { label: "Phase #1", value: "1" },
-              { label: "Phase #2", value: "2" },
-              { label: "Phase #3", value: "3" },
-              { label: "Phase #4", value: "4" },
-            ],
+            placeholder: "Select a phase",
+            options: [],
+            dependsOn: "project",
           },
           {
             name: "task",
             label: "Activity",
             type: "select",
-            placeholder: "Select activity",
-            options: [
-              { label: "Activity #1", value: "1" },
-              { label: "Activity #2", value: "2" },
-              { label: "Activity #3", value: "3" },
-              { label: "Activity #4", value: "4" },
-            ],
+            placeholder: "Select a task",
+            options: [],
+            dependsOn: "phase",
           },
         ],
-        renderBottom: (data: FormValues) => (
-          <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-              <span className="text-sm font-semibold text-[#3B7CED]">₦5,000,000.00</span>
-            </div>
-          </div>
-        ),
       },
       {
         title: "Cost Details",
@@ -218,8 +194,8 @@ export default function NewLabourRequestPage() {
             placeholder: "Select unit",
             options: [
               { label: "Days", value: "days" },
-              // { label: "Weeks", value: "weeks" },
-              // { label: "Months", value: "months" },
+              { label: "Weeks", value: "weeks" },
+              { label: "Months", value: "months" },
             ],
             halfWidth: true,
           },
@@ -227,7 +203,19 @@ export default function NewLabourRequestPage() {
             name: "dailyRate",
             label: "Estimated Daily Rate",
             type: "number",
-            placeholder: "Enter estimated daily rate",
+            placeholder: "Enter daily rate",
+            getDynamicLabel: (values: any) =>
+              values?.durationUnit === "weeks"
+                ? "Estimated Weekly Rate"
+                : values?.durationUnit === "months"
+                  ? "Estimated Monthly Rate"
+                  : "Estimated Daily Rate",
+            getDynamicPlaceholder: (values: any) =>
+              values?.durationUnit === "weeks"
+                ? "Enter weekly rate"
+                : values?.durationUnit === "months"
+                  ? "Enter monthly rate"
+                  : "Enter daily rate",
           },
         ],
       },
@@ -237,24 +225,42 @@ export default function NewLabourRequestPage() {
             name: "justification",
             label: "Notes / Justification",
             type: "textarea",
-            placeholder: "Enter justification notes (optional)",
+            placeholder: "Enter note",
             rows: 4,
           },
         ],
-        renderTop: (data: FormValues) => (
-          <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-              <span className="text-sm font-semibold text-[#3B7CED]">₦5,000,000.00</span>
+        renderTop: (data: FormValues, extra?: any) => {
+          const totalCost = calculateLabourTotalCost(data);
+          const availBudget = extra?.availableBudget || 0;
+          return (
+            <div className="pb-4 mb-4 border-b border-gray-200 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-900">
+                  Available Budget
+                </span>
+                <span className="text-sm font-bold text-[#3B7CED]">
+                  ₦
+                  {availBudget.toLocaleString("en-NG", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-900">
+                  Total Cost
+                </span>
+                <span className="text-sm font-bold text-[#3B7CED]">
+                  ₦
+                  {totalCost.toLocaleString("en-NG", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-900">Total Cost</span>
-              <span className="text-sm font-semibold text-[#3B7CED]">
-                ₦{((data.numberOfWorkers || 0) * (data.dailyRate || 0) * (data.duration || 1)).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-        ),
+          );
+        },
       },
     ],
     schema: formSchema,
@@ -276,11 +282,7 @@ export default function NewLabourRequestPage() {
     },
     backPath: "/project-request/labour-request",
     calculateProjectedCost: (data) => {
-      return (
-        (data.numberOfWorkers || 0) *
-        (data.dailyRate || 0) *
-        (data.duration || 1)
-      );
+      return calculateLabourTotalCost(data);
     },
   };
 

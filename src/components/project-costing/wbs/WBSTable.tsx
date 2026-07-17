@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Maximize2, Minimize2, Plus } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -8,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Phase, Subphase, Activity } from "../types";
+import { Phase, Activity } from "../types";
 import { WBSPhaseRow } from "./WBSPhaseRow";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -16,36 +17,36 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 interface WBSTableProps {
   phases: Phase[];
   setPhases: React.Dispatch<React.SetStateAction<Phase[]>>;
+  extraColumns: string[];
+  setExtraColumns: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-export function WBSTable({ phases, setPhases }: WBSTableProps) {
+export function WBSTable({
+  phases,
+  setPhases,
+  extraColumns,
+  setExtraColumns,
+}: WBSTableProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [newColName, setNewColName] = useState("");
 
   // Compute total budget
   const totalBudget = useMemo(() => {
     let total = 0;
     phases.forEach((p) => {
       p.activities.forEach((a) => (total += a.budget || 0));
-      p.subphases.forEach((s) => {
-        s.activities.forEach((a) => (total += a.budget || 0));
-      });
     });
     return total;
   }, [phases]);
 
+  // Count total activities
+  const totalActivities = useMemo(() => {
+    return phases.reduce((sum, p) => sum + p.activities.length, 0);
+  }, [phases]);
+
   // Helper to get Phase Budget
   const getPhaseBudget = (phase: Phase) => {
-    let total = 0;
-    phase.activities.forEach((a) => (total += a.budget || 0));
-    phase.subphases.forEach((s) => {
-      s.activities.forEach((a) => (total += a.budget || 0));
-    });
-    return total;
-  };
-
-  // Helper to get Subphase Budget
-  const getSubphaseBudget = (subphase: Subphase) => {
-    return subphase.activities.reduce((sum, a) => sum + (a.budget || 0), 0);
+    return phase.activities.reduce((sum, a) => sum + (a.budget || 0), 0);
   };
 
   // --- Handlers ---
@@ -53,44 +54,24 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
     const newPhase: Phase = {
       id: generateId(),
       name: `Phase ${phases.length + 1}`,
-      subphases: [],
       activities: [],
     };
     setPhases([...phases, newPhase]);
-  };
-
-  const addSubphase = (phaseId: string) => {
-    setPhases((prev) =>
-      prev.map((p) => {
-        if (p.id === phaseId) {
-          return {
-            ...p,
-            subphases: [
-              ...p.subphases,
-              {
-                id: generateId(),
-                name: `Sub Phase ${p.subphases.length + 1}`,
-                activities: [],
-              },
-            ],
-          };
-        }
-        return p;
-      }),
-    );
   };
 
   const addPhaseActivity = (phaseId: string) => {
     setPhases((prev) =>
       prev.map((p) => {
         if (p.id === phaseId) {
+          const nextSn = `${p.activities.length + 1}`;
           return {
             ...p,
             activities: [
               ...p.activities,
               {
                 id: generateId(),
-                name: `Activities ${p.activities.length + 1}`,
+                sn: nextSn,
+                name: `Activity ${nextSn}`,
                 budget: 0,
                 quantity: 1,
                 rate: 0,
@@ -99,135 +80,47 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
           };
         }
         return p;
-      }),
-    );
-  };
-
-  const addSubphaseActivity = (phaseId: string, subphaseId: string) => {
-    setPhases((prev) =>
-      prev.map((p) => {
-        if (p.id === phaseId) {
-          return {
-            ...p,
-            subphases: p.subphases.map((s) => {
-              if (s.id === subphaseId) {
-                return {
-                  ...s,
-                  activities: [
-                    ...s.activities,
-                    {
-                      id: generateId(),
-                      name: `Activities ${s.activities.length + 1}`,
-                      budget: 0,
-                      quantity: 1,
-                      rate: 0,
-                    },
-                  ],
-                };
-              }
-              return s;
-            }),
-          };
-        }
-        return p;
-      }),
+      })
     );
   };
 
   const updatePhaseName = (phaseId: string, name: string) => {
     setPhases((prev) =>
-      prev.map((p) => (p.id === phaseId ? { ...p, name } : p)),
-    );
-  };
-
-  const updateSubphaseName = (
-    phaseId: string,
-    subphaseId: string,
-    name: string,
-  ) => {
-    setPhases((prev) =>
-      prev.map((p) => {
-        if (p.id === phaseId) {
-          return {
-            ...p,
-            subphases: p.subphases.map((s) =>
-              s.id === subphaseId ? { ...s, name } : s,
-            ),
-          };
-        }
-        return p;
-      }),
+      prev.map((p) => (p.id === phaseId ? { ...p, name } : p))
     );
   };
 
   const updateActivity = (
     phaseId: string,
     activityId: string,
-    updates: Partial<Activity>,
-    subphaseId?: string,
+    updates: Partial<Activity>
   ) => {
     setPhases((prev) =>
       prev.map((p) => {
         if (p.id === phaseId) {
-          if (!subphaseId) {
-            return {
-              ...p,
-              activities: p.activities.map((a) =>
-                a.id === activityId ? { ...a, ...updates } : a,
-              ),
-            };
-          } else {
-            return {
-              ...p,
-              subphases: p.subphases.map((s) => {
-                if (s.id === subphaseId) {
-                  return {
-                    ...s,
-                    activities: s.activities.map((a) =>
-                      a.id === activityId ? { ...a, ...updates } : a,
-                    ),
-                  };
-                }
-                return s;
-              }),
-            };
-          }
+          return {
+            ...p,
+            activities: p.activities.map((a) =>
+              a.id === activityId ? { ...a, ...updates } : a
+            ),
+          };
         }
         return p;
-      }),
+      })
     );
   };
 
-  const removeActivity = (
-    phaseId: string,
-    activityId: string,
-    subphaseId?: string,
-  ) => {
+  const removeActivity = (phaseId: string, activityId: string) => {
     setPhases((prev) =>
       prev.map((p) => {
         if (p.id === phaseId) {
-          if (!subphaseId) {
-            return {
-              ...p,
-              activities: p.activities.filter((a) => a.id !== activityId),
-            };
-          } else {
-            return {
-              ...p,
-              subphases: p.subphases.map((s) => {
-                if (s.id === subphaseId) {
-                  return {
-                    ...s,
-                    activities: s.activities.filter((a) => a.id !== activityId),
-                  };
-                }
-                return s;
-              }),
-            };
-          }
+          return {
+            ...p,
+            activities: p.activities.filter((a) => a.id !== activityId),
+          };
         }
         return p;
-      }),
+      })
     );
   };
 
@@ -235,39 +128,110 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
     setPhases((prev) => prev.filter((p) => p.id !== phaseId));
   };
 
-  const removeSubphase = (phaseId: string, subphaseId: string) => {
+  const handleAddColumn = () => {
+    const clean = newColName.trim();
+    if (!clean) return;
+    const lowerClean = clean.toLowerCase();
+    if (
+      ["sn", "s/n", "phase", "activity", "quantity", "rate", "amount", "budget"].includes(
+        lowerClean
+      )
+    ) {
+      alert("Cannot add a mandatory column name.");
+      return;
+    }
+    if (extraColumns.includes(clean)) {
+      alert("Column already exists.");
+      return;
+    }
+    setExtraColumns([...extraColumns, clean]);
+    setNewColName("");
+  };
+
+  const handleDeleteColumn = (colName: string) => {
+    setExtraColumns(extraColumns.filter((c) => c !== colName));
     setPhases((prev) =>
-      prev.map((p) => {
-        if (p.id === phaseId) {
-          return {
-            ...p,
-            subphases: p.subphases.filter((s) => s.id !== subphaseId),
-          };
-        }
-        return p;
-      }),
+      prev.map((p) => ({
+        ...p,
+        activities: p.activities.map((a) => {
+          const copy = { ...a };
+          delete copy[colName];
+          return copy;
+        }),
+      }))
     );
   };
 
   const tableContent = (
-      <div className="border border-gray-200 rounded overflow-hidden bg-white">
-        <Table>
-          <TableHeader className="bg-gray-50 border-b border-gray-200">
-            <TableRow className="hover:bg-gray-50 border-0">
-              <TableHead className="w-[40%] font-medium text-gray-500 py-3">
-                Name
+    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+      <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="New Column Header"
+            value={newColName}
+            onChange={(e) => setNewColName(e.target.value)}
+            className="h-9 w-48 bg-white border-gray-300 focus-visible:ring-[#3B7CED]"
+          />
+          <Button
+            type="button"
+            onClick={handleAddColumn}
+            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 flex items-center gap-1.5 font-medium"
+          >
+            <Plus className="w-4 h-4" /> Add Column
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto w-full">
+        <Table className="min-w-[1100px] table-fixed">
+          <colgroup>
+            <col className="w-[80px]" />
+            <col className="min-w-[300px]" />
+            <col className="w-[100px]" />
+            <col className="w-[130px]" />
+            <col className="w-[140px]" />
+            {extraColumns.map((col) => (
+              <col key={col} className="min-w-[150px]" />
+            ))}
+            <col className="w-[80px]" />
+          </colgroup>
+          <TableHeader className="bg-gray-50 border-b border-gray-200 sticky top-0 z-20 shadow-xs">
+            <TableRow className="hover:bg-gray-50 border-0 bg-gray-50">
+              <TableHead className="font-semibold text-gray-600 py-3 pl-4 text-center sticky top-0 bg-gray-50 z-20">
+                S/N
               </TableHead>
-              <TableHead className="w-[20%] font-medium text-gray-500 py-3">
-                Activities
+              <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
+                Activity
               </TableHead>
-              <TableHead className="w-[10%] font-medium text-gray-500 py-3">
-                Qty
+              <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
+                Quantity
               </TableHead>
-              <TableHead className="w-[15%] font-medium text-gray-500 py-3">
+              <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
                 Rate
               </TableHead>
-              <TableHead className="w-[15%] font-medium text-gray-500 py-3">
+              <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
                 Amount
+              </TableHead>
+              {extraColumns.map((col) => (
+                <TableHead
+                  key={col}
+                  className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20"
+                >
+                  <div className="flex items-center justify-between gap-1 group">
+                    <span className="truncate">{col}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteColumn(col)}
+                      className="text-red-500 hover:text-red-700 text-sm font-bold px-1 rounded hover:bg-red-50"
+                      title={`Delete column "${col}"`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </TableHead>
+              ))}
+              <TableHead className="font-semibold text-gray-600 py-3 text-center sticky top-0 bg-gray-50 z-20">
+                Action
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -277,62 +241,74 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
                 key={phase.id}
                 phase={phase}
                 phaseBudget={getPhaseBudget(phase)}
-                getSubphaseBudget={getSubphaseBudget}
+                extraColumns={extraColumns}
                 onUpdatePhaseName={(name) => updatePhaseName(phase.id, name)}
-                onAddSubphase={() => addSubphase(phase.id)}
                 onAddPhaseActivity={() => addPhaseActivity(phase.id)}
-                onUpdateSubphaseName={(subphaseId, name) =>
-                  updateSubphaseName(phase.id, subphaseId, name)
+                onUpdateActivity={(activityId, updates) =>
+                  updateActivity(phase.id, activityId, updates)
                 }
-                onAddSubphaseActivity={(subphaseId) =>
-                  addSubphaseActivity(phase.id, subphaseId)
-                }
-                onUpdateActivity={(activityId, updates, subphaseId) =>
-                  updateActivity(phase.id, activityId, updates, subphaseId)
-                }
-                onRemoveActivity={(activityId, subphaseId) =>
-                  removeActivity(phase.id, activityId, subphaseId)
+                onRemoveActivity={(activityId) =>
+                  removeActivity(phase.id, activityId)
                 }
                 onRemovePhase={() => removePhase(phase.id)}
-                onRemoveSubphase={(subphaseId) => removeSubphase(phase.id, subphaseId)}
               />
             ))}
           </TableBody>
         </Table>
+      </div>
 
-        {/* WBS Footer */}
-        <div className="flex items-center justify-between p-4 bg-white border-t border-gray-200">
-          <Button
-            onClick={addPhase}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-6 rounded"
-          >
-            Add a Phase
-          </Button>
-          <div className="text-gray-600 text-sm">
-            Total Project Budget:{" "}
-            <span className="text-xl font-semibold text-gray-800 ml-2">
-              {totalBudget.toLocaleString()}
-            </span>
-          </div>
+      {/* WBS Footer */}
+      <div className="flex items-center justify-between p-4 bg-white border-t border-gray-200">
+        <Button
+          type="button"
+          onClick={addPhase}
+          className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-6 rounded font-medium"
+        >
+          Add a Phase
+        </Button>
+        <div className="text-gray-600 text-sm font-medium">
+          Total Project Budget:{" "}
+          <span className="text-xl font-bold text-gray-800 ml-2">
+            N {totalBudget.toLocaleString()}
+          </span>
         </div>
       </div>
+    </div>
   );
 
   return (
     <>
       {isExpanded && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-              <h2 className="text-[#3B7CED] text-lg font-medium">Work Breakdown Structure (WBS)</h2>
-              <button 
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[96vw] h-[92vh] flex flex-col overflow-hidden border border-gray-100">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+              <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
+                <h2 className="text-[#3B7CED] text-lg font-semibold">
+                  Work Breakdown Structure (WBS) Workspace
+                </h2>
+                <div className="flex flex-wrap gap-3 text-xs text-gray-500 font-medium">
+                  <span className="bg-blue-50 text-[#3B7CED] px-2.5 py-1 rounded">
+                    Phases: {phases.length}
+                  </span>
+                  <span className="bg-blue-50 text-[#3B7CED] px-2.5 py-1 rounded">
+                    Activities: {totalActivities}
+                  </span>
+                  <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded font-semibold">
+                    Total Budget: N {totalBudget.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
                 onClick={() => setIsExpanded(false)}
-                className="text-gray-500 hover:text-gray-700 p-1 flex items-center gap-1 hover:underline"
+                className="text-gray-500 hover:text-gray-700 p-1.5 flex items-center gap-1.5 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium"
               >
-                <Minimize2 className="w-5 h-5" /> Collapse
+                <Minimize2 className="w-4 h-4" /> Minimize Workspace
               </button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50/20">
               {tableContent}
             </div>
           </div>
@@ -344,7 +320,8 @@ export function WBSTable({ phases, setPhases }: WBSTableProps) {
           <h2 className="text-[#3B7CED] text-base font-medium">
             Work Breakdown Structure (WBS)
           </h2>
-          <button 
+          <button
+            type="button"
             onClick={() => setIsExpanded(true)}
             className="text-[#3B7CED] text-sm font-medium flex items-center gap-1 hover:underline"
           >

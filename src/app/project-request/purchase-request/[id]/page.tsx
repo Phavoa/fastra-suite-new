@@ -127,7 +127,7 @@ export default function PurchaseRequestDetailPage() {
 
   const { data: apiData, isLoading: isApiLoading } = useGetProjectPurchaseRequestQuery(
     id as string,
-    { skip: !id || String(id).startsWith("pr-") }
+    { skip: !id }
   );
 
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteProjectPurchaseRequestMutation();
@@ -135,19 +135,7 @@ export default function PurchaseRequestDetailPage() {
 
   const handleDelete = async () => {
     try {
-      const stored = localStorage.getItem("project_purchase_requests");
-      if (stored) {
-        try {
-          const list = JSON.parse(stored);
-          const updated = list.filter((r: any) => String(r.id) !== String(id));
-          localStorage.setItem("project_purchase_requests", JSON.stringify(updated));
-        } catch (e) {}
-      }
-
-      if (!String(id).startsWith("pr-")) {
-        await deleteRequest(id as string).unwrap();
-      }
-
+      await deleteRequest(id as string).unwrap();
       router.push("/project-request/purchase-request");
     } catch (error) {
       alert("Failed to delete purchase request. Please try again.");
@@ -159,53 +147,17 @@ export default function PurchaseRequestDetailPage() {
       if (request) {
         setRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
-
-      const stored = localStorage.getItem("project_purchase_requests");
-      if (stored) {
-        try {
-          const list = JSON.parse(stored);
-          const idx = list.findIndex((r: any) => String(r.id) === String(id));
-          if (idx > -1) {
-            list[idx].status = newStatus;
-            localStorage.setItem("project_purchase_requests", JSON.stringify(list));
-          }
-        } catch (e) {}
-      }
-
-      if (!String(id).startsWith("pr-")) {
-        await patchRequest({ id: id as string, data: { status: newStatus } }).unwrap();
-      }
+      await patchRequest({ id: id as string, data: { status: newStatus } }).unwrap();
     } catch (error) {
       alert("Failed to update status on server.");
     }
   };
 
   useEffect(() => {
-    if (id && String(id).startsWith("pr-")) {
-      const stored = localStorage.getItem("project_purchase_requests");
-      let list: PurchaseRequestItem[] = [];
-      if (stored) {
-        try {
-          list = JSON.parse(stored).filter(
-            (item: any) =>
-              item.id !== "pr-1" && item.id !== "pr-2" && item.id !== "pr-3",
-          );
-        } catch (e) {
-          list = [];
-        }
-      } else {
-        list = [];
-      }
-
-      const found = list.find((r) => r.id === id);
-      if (found) {
-        setRequest(found);
-      } else {
-        const fallback = list[0];
-        if (fallback) setRequest(fallback);
-      }
-    } else if (apiData) {
+    if (apiData) {
       setRequest(mapApiRequestToUi(apiData));
+    } else {
+      setRequest(null);
     }
   }, [id, apiData]);
 

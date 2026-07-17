@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useGetAvailableBudgetQuery } from "@/api/projectApi";
 import { useCreatePettyCashRequestMutation } from "@/api/requests/pettyCashRequestApi";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -26,6 +28,12 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function NewPettyCashRequestPage() {
   const [createPettyCashRequest] = useCreatePettyCashRequestMutation();
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = React.useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
 
   const [requestId] = React.useState(() => {
     const num = Math.floor(Math.random() * 90000) + 10000;
@@ -43,7 +51,7 @@ export default function NewPettyCashRequestPage() {
   const config: RequestFormConfig<FormValues> = {
     title: "Petty Cash Request",
     requestId: requestId,
-    requesterName: "Firstname Lastname",
+    requesterName: loggedInUserName,
     date: currentDate,
     renderHeader: () => (
       <div className="bg-white px-4 py-6">
@@ -56,6 +64,10 @@ export default function NewPettyCashRequestPage() {
           <div className="space-y-2">
             <Label htmlFor="date" className="text-sm font-semibold text-gray-900">Date</Label>
             <Input id="date" value={currentDate} readOnly className="bg-white text-gray-900" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="requestedBy" className="text-sm font-semibold text-gray-900">Requested by</Label>
+            <Input id="requestedBy" value={loggedInUserName} readOnly className="bg-white text-gray-900" />
           </div>
         </div>
       </div>
@@ -105,28 +117,6 @@ export default function NewPettyCashRequestPage() {
             options: [],
           },
         ],
-        renderBottom: (data: FormValues) => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const { data: budgetData } = useGetAvailableBudgetQuery(
-            {
-              project_id: Number(data.project),
-              wbs_id: Number(data.task),
-              cost_code: data.project === "2" ? "CC-05" : "CC-04",
-            },
-            { skip: !data.project || !data.task }
-          );
-          const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
-          return (
-            <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-                <span className="text-sm font-semibold text-[#3B7CED]">
-                  N{available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          );
-        },
       },
       {
         title: "Cost Details",
@@ -150,24 +140,8 @@ export default function NewPettyCashRequestPage() {
           },
         ],
         renderTop: (data: FormValues) => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const { data: budgetData } = useGetAvailableBudgetQuery(
-            {
-              project_id: Number(data.project),
-              wbs_id: Number(data.task),
-              cost_code: data.project === "2" ? "CC-05" : "CC-04",
-            },
-            { skip: !data.project || !data.task }
-          );
-          const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
           return (
             <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-                <span className="text-sm font-semibold text-[#3B7CED]">
-                  N{available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-900">Total Cost</span>
                 <span className="text-sm font-semibold text-[#3B7CED]">
@@ -208,6 +182,7 @@ export default function NewPettyCashRequestPage() {
       const payload = {
         project: Number(data.project),
         wbs_element: ensureValidUUID(data.task), // Ensures valid UUID format for task ID
+        activity: ensureValidUUID(data.task), // Resolves backend "This field is required." error
         amount_requested: data.amountRequested.toFixed(2), // Converts numeric amount to decimal string
         purpose: data.purpose,
         description: data.description,

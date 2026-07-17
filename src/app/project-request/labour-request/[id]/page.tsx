@@ -3,20 +3,19 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  ArrowLeft,
+  Bell,
+  Calendar,
+  User,
   Edit,
   Trash2,
   Send,
   CheckCircle,
   XCircle,
-  Wifi,
-  WifiOff,
-  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -27,12 +26,6 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PageHeader } from "@/components/purchase/products/PageHeader";
-import {
-  FadeIn,
-  SlideUp,
-  StaggerContainer,
-} from "@/components/shared/AnimatedWrapper";
 import {
   useGetLabourRequestQuery,
   useDeleteLabourRequestMutation,
@@ -40,63 +33,12 @@ import {
   useApproveLabourRequestMutation,
   useRejectLabourRequestMutation,
 } from "@/api/requests/labourRequestApi";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { syncService } from "@/lib/database/syncService";
 import { usePermissionContext } from "@/contexts/PermissionContext";
-import { db } from "@/lib/database/labourRequestDb";
-
-interface LabourRequestDetail {
-  id: number;
-  date_required: string;
-  number_of_workers: number;
-  role_type: string;
-  duration: number;
-  duration_unit: "days";
-  estimated_daily_rate: string;
-  projected_cost: string;
-  justification_notes: string;
-  status?: "draft" | "pending" | "approved" | "rejected" | "cancelled";
-}
-
-interface LabourRequestFull {
-  id: number;
-  reference_id: string;
-  request_type: string;
-  module_destination: string;
-  status: "draft" | "pending" | "approved" | "rejected";
-  created_by: number;
-  created_at: string;
-  updated_at: string;
-  detail: LabourRequestDetail;
-  project_request: {
-    id: number;
-    reference_id: string;
-    request_type: string;
-    status: "draft" | "pending" | "approved" | "rejected";
-    module_destination: string;
-    created_at: string;
-    updated_at: string;
-    project: number;
-    created_by: number;
-    created_by_details?: {
-      id: number;
-      user: {
-        id: number;
-        username: string;
-        first_name: string;
-        last_name: string;
-        email: string;
-      };
-      role: string;
-    };
-  };
-}
 
 export default function LabourRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = parseInt(params.id as string);
-  const networkStatus = useNetworkStatus();
   const { permissions, isAdmin } = usePermissionContext();
   const statusModal = useStatusModal();
 
@@ -124,25 +66,20 @@ export default function LabourRequestDetailPage() {
   const [approvalNotes, setApprovalNotes] = useState("");
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
-  const getStatusBadgeVariant = (status?: string) => {
-    if (!status) return "draft";
+  const getStatusBadgeClass = (status?: string) => {
     switch (status) {
       case "approved":
-        return "validated";
+        return "bg-[#EAFDF0] text-[#2BA24D] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
       case "pending":
-        return "pending";
+        return "bg-[#FFFDF0] text-[#F0B401] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
       case "draft":
-        return "draft";
+        return "bg-[#EEF4FF] text-[#3B7CED] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
       case "rejected":
-        return "rejected";
+      case "cancelled":
+        return "bg-[#FFF2F0] text-[#E43D2B] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
       default:
-        return "draft";
+        return "bg-[#FFFDF0] text-[#F0B401] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
     }
-  };
-
-  const getStatusLabel = (status?: string) => {
-    if (!status) return "Draft";
-    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const handleEdit = () => {
@@ -151,26 +88,12 @@ export default function LabourRequestDetailPage() {
 
   const handleDelete = async () => {
     try {
-      if (networkStatus.isOnline) {
-        await deleteRequest(id).unwrap();
-        setIsConfirmDeleteOpen(false);
-        statusModal.showSuccess(
-          "Request Deleted",
-          "The labour request has been deleted successfully."
-        );
-      } else {
-        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
-        if (localRequests.length > 0) {
-          await syncService.deleteRequestOffline(localRequests[0].localId);
-        } else {
-          await syncService.deleteRequestOffline(`server_${id}`);
-        }
-        setIsConfirmDeleteOpen(false);
-        statusModal.showSuccess(
-          "Request Marked for Deletion",
-          "The request will be deleted when you're back online."
-        );
-      }
+      await deleteRequest(id).unwrap();
+      setIsConfirmDeleteOpen(false);
+      statusModal.showSuccess(
+        "Request Deleted",
+        "The labour request has been deleted successfully."
+      );
     } catch (error) {
       console.error("Failed to delete request:", error);
       statusModal.showError("Error", "Failed to delete the request. Please try again.");
@@ -179,26 +102,12 @@ export default function LabourRequestDetailPage() {
 
   const handleSubmit = async () => {
     try {
-      if (networkStatus.isOnline) {
-        await submitRequest({ id, data: {} }).unwrap();
-        statusModal.showSuccess(
-          "Request Submitted",
-          "The labour request has been submitted for approval."
-        );
-        refetch();
-      } else {
-        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
-        if (localRequests.length > 0) {
-          await syncService.submitRequestOffline(localRequests[0].localId);
-        } else {
-          await syncService.submitRequestOffline(`server_${id}`);
-        }
-        statusModal.showSuccess(
-          "Request Marked for Submission",
-          "The request will be submitted when you're back online."
-        );
-        refetch();
-      }
+      await submitRequest({ id, data: {} }).unwrap();
+      statusModal.showSuccess(
+        "Request Submitted",
+        "The labour request has been submitted for approval."
+      );
+      refetch();
     } catch (error) {
       console.error("Failed to submit request:", error);
       statusModal.showError("Error", "Failed to submit the request. Please try again.");
@@ -207,31 +116,16 @@ export default function LabourRequestDetailPage() {
 
   const handleApprove = async () => {
     try {
-      if (networkStatus.isOnline) {
-        await approveLabourRequest({
-          id,
-          data: { status: "approved", approval_notes: approvalNotes },
-        }).unwrap();
-        setIsApproveModalOpen(false);
-        statusModal.showSuccess(
-          "Request Approved",
-          "The labour request has been approved successfully."
-        );
-        refetch();
-      } else {
-        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
-        const localId = localRequests.length > 0 ? localRequests[0].localId : `server_${id}`;
-        await syncService.approveRequestOffline(localId, {
-          status: "approved",
-          approval_notes: approvalNotes,
-        });
-        setIsApproveModalOpen(false);
-        statusModal.showSuccess(
-          "Request Approved Locally",
-          "The request will be approved when you're back online."
-        );
-        refetch();
-      }
+      await approveLabourRequest({
+        id,
+        data: { status: "approved", approval_notes: approvalNotes },
+      }).unwrap();
+      setIsApproveModalOpen(false);
+      statusModal.showSuccess(
+        "Request Approved",
+        "The labour request has been approved successfully."
+      );
+      refetch();
     } catch (error) {
       console.error("Failed to approve request:", error);
       statusModal.showError("Error", "Failed to approve the request. Please try again.");
@@ -241,31 +135,15 @@ export default function LabourRequestDetailPage() {
   const handleReject = async () => {
     if (!rejectionReason.trim()) return;
     try {
-      if (networkStatus.isOnline) {
-        await rejectLabourRequest({
-          id,
-          data: { status: "rejected", rejection_notes: rejectionReason },
-        }).unwrap();
-        setIsRejectModalOpen(false);
-        statusModal.showSuccess(
-          "Request Rejected",
-          "The labour request has been rejected."
-        );
-        refetch();
-      } else {
-        const localRequests = await db.labourRequests.where('id').equals(id).toArray();
-        const localId = localRequests.length > 0 ? localRequests[0].localId : `server_${id}`;
-        await syncService.rejectRequestOffline(localId, {
-          status: "rejected",
-          rejection_notes: rejectionReason,
-        });
-        setIsRejectModalOpen(false);
-        statusModal.showSuccess(
-          "Request Rejected Locally",
-          "The request will be rejected when you're back online."
-        );
-        refetch();
-      }
+      await rejectLabourRequest({
+        id,
+        data: { status: "rejected", rejection_notes: rejectionReason },
+      }).unwrap();
+      setIsRejectModalOpen(false);
+      statusModal.showSuccess(
+        "Request Rejected",
+        "The labour request has been rejected."
+      );
     } catch (error) {
       console.error("Failed to reject request:", error);
       statusModal.showError("Error", "Failed to reject the request. Please try again.");
@@ -274,7 +152,12 @@ export default function LabourRequestDetailPage() {
 
   const handleModalClose = () => {
     statusModal.close();
-    if (statusModal.type === "success" && !isApproveModalOpen && !isRejectModalOpen && !isConfirmDeleteOpen) {
+    if (
+      statusModal.type === "success" &&
+      !isApproveModalOpen &&
+      !isRejectModalOpen &&
+      !isConfirmDeleteOpen
+    ) {
       router.push("/project-request/labour-request");
     }
   };
@@ -290,21 +173,11 @@ export default function LabourRequestDetailPage() {
   const canApproveReject =
     isAdmin || permissions["labour-request"]?.has("approve");
 
-  const breadcrumbs = [
-    { label: "Home", href: "/" },
-    { label: "Labour Request", href: "/project-request/labour-request" },
-    {
-      label: request?.reference_id || "Details",
-      href: `/project-request/labour-request/${id}`,
-      current: true,
-    },
-  ];
-
   if (isLoading) {
     return (
-      <div className="p-8 space-y-4">
-        <Skeleton className="h-12 w-1/3" />
-        <Skeleton className="h-64 w-full" />
+      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-[#3B7CED] animate-spin" />
+        <p className="text-sm font-semibold text-gray-500">Loading request details...</p>
       </div>
     );
   }
@@ -315,159 +188,257 @@ export default function LabourRequestDetailPage() {
         <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-sm w-full">
           <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
           <p className="text-gray-700 font-semibold mb-4">Failed to load request details</p>
-          <Button onClick={() => router.back()} className="w-full bg-[#3B7CED] text-white hover:bg-blue-600">Go Back</Button>
+          <Button
+            onClick={() => router.back()}
+            className="w-full bg-[#3B7CED] text-white hover:bg-blue-600 font-bold h-11 rounded-xl"
+          >
+            Go Back
+          </Button>
         </div>
       </div>
     );
   }
 
-  return (
-    <FadeIn className="h-full text-gray-900 font-sans antialiased pr-4 bg-[#F9FAFB]">
-      <PageHeader items={breadcrumbs} title="Labour Request Details" />
+  const detail = request?.detail || (request as any) || {};
+  const projectRequest = request?.project_request || (request as any) || {};
 
-      <div className="max-w-5xl mx-auto px-6 py-8 bg-white min-h-screen shadow-sm rounded-lg my-4">
-        <FadeIn delay={0.2}>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-            <div>
-              <h2 className="text-sm font-medium text-[#3B7CED] uppercase tracking-wider mb-1">
-                Basic Information
-              </h2>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {request.reference_id}
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant={getStatusBadgeVariant(request.status)}>
-                {getStatusLabel(request.status)}
-              </Badge>
-              
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-                {networkStatus.isOnline ? (
-                  <>
-                    <Wifi size={14} className="text-green-500" />
-                    <span className="text-green-600">Online</span>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff size={14} className="text-orange-500" />
-                    <span className="text-orange-600">Offline</span>
-                  </>
-                )}
-              </div>
+  const requesterName =
+    projectRequest?.created_by_details?.user?.first_name ||
+    projectRequest?.created_by_details?.user?.username ||
+    detail?.created_by_name ||
+    (request as any)?.created_by_name ||
+    `User #${request?.created_by || 1}`;
+
+  const formattedRequiredDate = detail?.date_required
+    ? new Date(detail.date_required).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : new Date(request?.created_at || Date.now()).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
+  const calculatedCost =
+    parseFloat(detail?.projected_cost || "0") ||
+    (detail?.number_of_workers || 0) *
+      parseFloat(detail?.estimated_daily_rate || "0") *
+      (detail?.duration || 1);
+
+  const totalCostFormatted = calculatedCost.toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  return (
+    <div className="min-h-screen bg-[#F9FAFB] pb-24 font-sans antialiased text-gray-900">
+      {/* Header Bar */}
+      <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
+        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/project-request/labour-request")}
+              className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft size={20} className="text-gray-600" />
+            </button>
+            <h1 className="text-lg font-bold text-gray-800">Request Details</h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button className="p-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <Bell size={20} className="text-gray-800" />
+            </button>
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
+              <img
+                src="https://api.dicebear.com/7.x/pixel-art/svg?seed=user123"
+                alt="User Profile"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
-        </FadeIn>
+        </div>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <SlideUp delay={0.3}>
-            <div className="space-y-6">
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Workers Count</Label>
-                <p className="text-gray-900 font-semibold text-lg">{request.detail.number_of_workers} Workers</p>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Role / Trade Type</Label>
-                <p className="text-gray-900 font-medium capitalize">{request.detail.role_type}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Duration</Label>
-                <p className="text-gray-900 font-medium capitalize">{request.detail.duration} {request.detail.duration_unit}</p>
-              </div>
+      {/* Content */}
+      <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+        {/* Basic Header Info */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-xs font-bold text-[#3B7CED] uppercase">
+                {request.reference_id || `LR-${request.id}`}
+              </span>
+              <h2 className="text-lg font-bold text-gray-900 mt-1 capitalize">
+                {detail.role_type || "Worker"} ({detail.number_of_workers || 1} Workers)
+              </h2>
             </div>
-          </SlideUp>
+            <span className={getStatusBadgeClass(request.status)}>
+              {request.status
+                ? request.status.charAt(0).toUpperCase() + request.status.slice(1)
+                : "Draft"}
+            </span>
+          </div>
 
-          <SlideUp delay={0.4}>
-            <div className="space-y-6">
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Daily Rate</Label>
-                <p className="text-gray-900 font-semibold">
-                  ₦{parseFloat(request.detail.estimated_daily_rate || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Projected Cost</Label>
-                <p className="text-2xl font-black text-[#3B7CED]">
-                  ₦{parseFloat(request.detail.projected_cost || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Destination Module</Label>
-                <p className="text-gray-950 capitalize">{request.module_destination.replace("_", " ")}</p>
-              </div>
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 text-xs">
+            <div>
+              <span className="block text-gray-400 font-semibold mb-0.5">
+                Date Required
+              </span>
+              <span className="font-bold text-gray-800 flex items-center gap-1">
+                <Calendar size={14} className="text-gray-500" /> {formattedRequiredDate}
+              </span>
             </div>
-          </SlideUp>
-
-          <SlideUp delay={0.5}>
-            <div className="space-y-6">
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Project</Label>
-                <p className="text-gray-900 font-semibold">Project #{request.project_request?.project || "N/A"}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Requester</Label>
-                <p className="text-gray-900">{request.detail.created_by_name || "Unknown Submit"}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500 font-bold uppercase">Date Created</Label>
-                <p className="text-gray-900">
-                  {new Date(request.created_at).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
+            <div>
+              <span className="block text-gray-400 font-semibold mb-0.5">
+                Requested By
+              </span>
+              <span className="font-bold text-gray-800 flex items-center gap-1">
+                <User size={14} className="text-gray-500" /> {requesterName}
+              </span>
             </div>
-          </SlideUp>
+          </div>
         </div>
 
-        {/* Audit Trail Timeline */}
-        <div className="mt-12">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <span className="w-2 h-6 bg-amber-500 rounded-full"></span>
-            Audit Trail & History
+        {/* Labour Details */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
+          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+            Labour Details
           </h3>
-          <div className="space-y-6 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
-            <div className="relative pl-10">
-              <span className="absolute left-0 top-0 w-9 h-9 bg-blue-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+
+          <div className="space-y-3 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Project</span>
+              <span className="font-bold text-gray-900">
+                Project #{projectRequest?.project || "General"}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Number of Workers</span>
+              <span className="font-bold text-gray-900">
+                {detail.number_of_workers || 1} Workers
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Role / Trade Type</span>
+              <span className="font-bold text-gray-900 capitalize">
+                {detail.role_type || "Worker"}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-gray-500 font-semibold">Duration</span>
+              <span className="font-bold text-gray-900 capitalize">
+                {detail.duration || 1} {detail.duration_unit || "days"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cost & Justification */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
+          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+            Cost Breakdown
+          </h3>
+
+          <div className="space-y-3 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">
+                {detail.duration_unit === "weeks"
+                  ? "Weekly Rate"
+                  : detail.duration_unit === "months"
+                  ? "Monthly Rate"
+                  : "Daily Rate"}
+              </span>
+              <span className="font-bold text-gray-900">
+                ₦
+                {parseFloat(detail.estimated_daily_rate || "0").toLocaleString(
+                  "en-NG",
+                  { minimumFractionDigits: 2 }
+                )}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Projected Cost</span>
+              <span className="font-black text-[#3B7CED] text-sm">
+                ₦{totalCostFormatted}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Destination Module</span>
+              <span className="font-bold text-gray-900 capitalize">
+                {request.module_destination ? request.module_destination.replace("_", " ") : "N/A"}
+              </span>
+            </div>
+            {detail.justification_notes && (
+              <div className="pt-2">
+                <span className="block text-gray-500 font-semibold mb-1">
+                  Justification Notes
+                </span>
+                <p className="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">
+                  {detail.justification_notes}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Audit Trail & History */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
+          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+            Audit Trail
+          </h3>
+
+          <div className="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100 text-xs">
+            <div className="relative pl-7">
+              <span className="absolute left-0 top-0.5 w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
               </span>
               <div>
-                <p className="text-sm font-bold text-gray-900">Request Created</p>
-                <p className="text-xs text-gray-500">
+                <p className="font-bold text-gray-900">Request Created</p>
+                <p className="text-gray-400 text-[11px]">
                   {new Date(request.created_at).toLocaleString("en-GB")}
                 </p>
-                <p className="text-sm text-gray-600 mt-1">Initiated by {request.detail.created_by_name || "requester"}</p>
+                <p className="text-gray-600 mt-0.5">
+                  Initiated by {requesterName}
+                </p>
               </div>
             </div>
 
             {request.status !== "draft" && (
-              <div className="relative pl-10">
-                <span className="absolute left-0 top-0 w-9 h-9 bg-amber-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+              <div className="relative pl-7">
+                <span className="absolute left-0 top-0.5 w-6 h-6 bg-amber-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
                   <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-gray-900">Submitted for Approval</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(request.updated_at || request.created_at).toLocaleString("en-GB")}
+                  <p className="font-bold text-gray-900">Submitted for Approval</p>
+                  <p className="text-gray-400 text-[11px]">
+                    {new Date(request.updated_at || request.created_at).toLocaleString(
+                      "en-GB"
+                    )}
                   </p>
                 </div>
               </div>
             )}
 
             {request.status === "approved" && (
-              <div className="relative pl-10">
-                <span className="absolute left-0 top-0 w-9 h-9 bg-green-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+              <div className="relative pl-7">
+                <span className="absolute left-0 top-0.5 w-6 h-6 bg-green-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-gray-900">Request Approved</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="font-bold text-gray-900">Request Approved</p>
+                  <p className="text-gray-400 text-[11px]">
                     {new Date(request.updated_at).toLocaleString("en-GB")}
                   </p>
                   {approvalNotes && (
-                    <p className="text-sm text-gray-600 mt-1 italic font-medium text-green-700">
-                      "Notes: {approvalNotes}"
+                    <p className="text-green-700 mt-1 italic font-medium">
+                      "{approvalNotes}"
                     </p>
                   )}
                 </div>
@@ -475,18 +446,18 @@ export default function LabourRequestDetailPage() {
             )}
 
             {request.status === "rejected" && (
-              <div className="relative pl-10">
-                <span className="absolute left-0 top-0 w-9 h-9 bg-red-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+              <div className="relative pl-7">
+                <span className="absolute left-0 top-0.5 w-6 h-6 bg-red-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
                   <span className="w-2 h-2 bg-red-500 rounded-full"></span>
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-gray-900">Request Rejected</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="font-bold text-gray-900">Request Rejected</p>
+                  <p className="text-gray-400 text-[11px]">
                     {new Date(request.updated_at).toLocaleString("en-GB")}
                   </p>
                   {rejectionReason && (
-                    <p className="text-sm text-red-600 mt-1 italic font-medium">
-                      "Reason: {rejectionReason}"
+                    <p className="text-red-600 mt-1 italic font-medium">
+                      "{rejectionReason}"
                     </p>
                   )}
                 </div>
@@ -495,75 +466,70 @@ export default function LabourRequestDetailPage() {
           </div>
         </div>
 
-        {/* Justification Notes */}
-        {request.detail.justification_notes && (
-          <div className="mt-10 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
-            <Label className="text-[10px] font-black uppercase text-blue-600">Justification Notes</Label>
-            <p className="mt-1 text-gray-700 text-sm leading-relaxed">
-              "{request.detail.justification_notes}"
-            </p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="mt-16 pt-8 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-4">
-          {canEdit && (
-            <Button
-              variant="outline"
-              onClick={handleEdit}
-              className="px-8 h-12 rounded-xl font-bold border-gray-300 text-gray-700 hover:bg-gray-50"
-            >
-              <Edit size={16} className="mr-2" />
-              Edit Request
-            </Button>
-          )}
-
-          {canDelete && (
-            <Button
-              variant="outline"
-              onClick={() => setIsConfirmDeleteOpen(true)}
-              disabled={isDeleting}
-              className="px-8 h-12 rounded-xl font-bold border-red-200 text-red-600 hover:bg-red-50"
-            >
-              <Trash2 size={16} className="mr-2" />
-              Delete Request
-            </Button>
-          )}
-
-          {canSubmit && (
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="px-12 h-12 rounded-xl font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white shadow-lg shadow-blue-200"
-            >
-              <Send size={16} className="mr-2" />
-              {isSubmitting ? "Submitting..." : "Submit for Approval"}
-            </Button>
-          )}
-
-          {canApproveReject && request.status === "pending" && (
-            <>
+        {/* Action Buttons inside Card */}
+        {(canEdit ||
+          canDelete ||
+          canSubmit ||
+          (canApproveReject && request.status === "pending")) && (
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none flex flex-wrap justify-end gap-3">
+            {canEdit && (
               <Button
                 variant="outline"
-                onClick={() => setIsRejectModalOpen(true)}
-                disabled={isRejecting}
-                className="px-8 h-12 rounded-xl font-bold border-red-200 text-red-600 hover:bg-red-50"
+                onClick={handleEdit}
+                className="h-10 px-5 text-xs font-bold border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
               >
-                <XCircle size={16} className="mr-2" />
-                Reject Request
+                <Edit size={14} className="mr-2" />
+                Edit Request
               </Button>
+            )}
+
+            {canDelete && (
               <Button
-                onClick={() => setIsApproveModalOpen(true)}
-                disabled={isApproving}
-                className="px-12 h-12 rounded-xl font-bold bg-[#2BA24D] hover:bg-[#238c3f] text-white shadow-lg shadow-green-200 animate-pulse-subtle"
+                variant="outline"
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                disabled={isDeleting}
+                className="h-10 px-5 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 rounded-xl"
               >
-                <CheckCircle size={16} className="mr-2" />
-                Approve Request
+                <Trash2 size={14} className="mr-2" />
+                Delete Request
               </Button>
-            </>
-          )}
-        </div>
-      </div>
+            )}
+
+            {canSubmit && (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="h-10 px-6 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white shadow-xs rounded-xl"
+              >
+                <Send size={14} className="mr-2" />
+                {isSubmitting ? "Submitting..." : "Submit for Approval"}
+              </Button>
+            )}
+
+            {canApproveReject && request.status === "pending" && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsRejectModalOpen(true)}
+                  disabled={isRejecting}
+                  className="h-10 px-5 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 rounded-xl"
+                >
+                  <XCircle size={14} className="mr-2" />
+                  Reject Request
+                </Button>
+                <Button
+                  onClick={() => setIsApproveModalOpen(true)}
+                  disabled={isApproving}
+                  className="h-10 px-6 text-xs font-bold bg-[#2BA24D] hover:bg-[#238c3f] text-white shadow-xs rounded-xl"
+                >
+                  <CheckCircle size={14} className="mr-2" />
+                  Approve Request
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </main>
 
       {/* Reject Modal */}
       <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
@@ -571,23 +537,33 @@ export default function LabourRequestDetailPage() {
           <DialogHeader>
             <DialogTitle className="text-red-600">Reject Request</DialogTitle>
             <DialogDescription>
-              Please provide a reason for rejecting this labour request. This will be logged in the history.
+              Please provide a reason for rejecting this labour request. This will be
+              logged in the history.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="reason" className="mb-2 block">Rejection Reason *</Label>
+            <Label htmlFor="reason" className="mb-2 block text-xs font-bold">
+              Rejection Reason *
+            </Label>
             <Textarea
               id="reason"
               placeholder="e.g. Rate exceeds WBS allocation limit."
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={4}
+              className="text-xs rounded-xl"
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
+              variant="ghost"
+              onClick={() => setIsRejectModalOpen(false)}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl"
               onClick={handleReject}
               disabled={!rejectionReason.trim() || isRejecting}
             >
@@ -607,19 +583,28 @@ export default function LabourRequestDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="notes" className="mb-2 block">Approval Notes</Label>
+            <Label htmlFor="notes" className="mb-2 block text-xs font-bold">
+              Approval Notes
+            </Label>
             <Textarea
               id="notes"
               placeholder="e.g. Budget check passed."
               value={approvalNotes}
               onChange={(e) => setApprovalNotes(e.target.value)}
               rows={4}
+              className="text-xs rounded-xl"
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsApproveModalOpen(false)}>Cancel</Button>
             <Button
-              className="bg-[#2BA24D] hover:bg-green-700 text-white"
+              variant="ghost"
+              onClick={() => setIsApproveModalOpen(false)}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#2BA24D] hover:bg-green-700 text-white text-xs font-bold rounded-xl"
               onClick={handleApprove}
               disabled={isApproving}
             >
@@ -635,13 +620,20 @@ export default function LabourRequestDetailPage() {
           <DialogHeader>
             <DialogTitle className="text-red-600">Delete Request</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this labour request? This action cannot be undone.
+              Are you sure you want to delete this labour request? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsConfirmDeleteOpen(false)}>Cancel</Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
+              variant="ghost"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl"
               onClick={handleDelete}
               disabled={isDeleting}
             >
@@ -662,6 +654,6 @@ export default function LabourRequestDetailPage() {
         onAction={handleModalClose}
         showCloseButton={false}
       />
-    </FadeIn>
+    </div>
   );
 }

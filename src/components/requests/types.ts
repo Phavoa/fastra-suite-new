@@ -47,6 +47,8 @@ export interface RequestFormField {
   halfWidth?: boolean;
   dependsOn?: string;
   visibleIf?: { field: string; value: any }; // New: only show if field equals value
+  getDynamicLabel?: (values: any) => string;
+  getDynamicPlaceholder?: (values: any) => string;
 }
 
 export interface RequestFormConfig<T extends Record<string, any>> {
@@ -57,11 +59,12 @@ export interface RequestFormConfig<T extends Record<string, any>> {
   sections: {
     title?: string;
     fields: RequestFormField[];
-    renderTop?: (data: T) => React.ReactNode;
-    renderBottom?: (data: T) => React.ReactNode;
+    renderTop?: (data: T, extra?: any) => React.ReactNode;
+    renderBottom?: (data: T, extra?: any) => React.ReactNode;
   }[];
   schema: z.ZodSchema<T>;
   defaultValues: T;
+  costCode?: string;
   onSubmit: (data: T) => Promise<void>;
   successMessage: {
     title: string;

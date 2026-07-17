@@ -11,7 +11,7 @@ import {
   useApproveProjectRequestMutation, 
   useRejectProjectRequestMutation 
 } from "@/api/requests/projectRequestApi";
-import { useGetProjectsQuery } from "@/api/projectApi";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 
 export default function ApproveRequestPage() {
@@ -22,15 +22,19 @@ export default function ApproveRequestPage() {
   const { data: apiRequests, isLoading: isRequestsLoading, refetch } = useGetProjectRequestsQuery({
     status: "pending"
   });
-  const { data: projects } = useGetProjectsQuery();
+  const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
+  const projects = React.useMemo(() => {
+    const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];
+    return list;
+  }, [rawProjects]);
 
   const [approveRequest, { isLoading: isApproving }] = useApproveProjectRequestMutation();
   const [rejectRequest, { isLoading: isRejecting }] = useRejectProjectRequestMutation();
 
   const getProjectName = (projectId?: number) => {
     if (!projectId) return "General Project";
-    const proj = projects?.find((p) => p.id === projectId);
-    return proj ? proj.name : `Project #${projectId}`;
+    const proj = projects?.find((p: any) => p.id === projectId);
+    return proj ? (proj.name || proj.project_name || `Project #${projectId}`) : `Project #${projectId}`;
   };
 
   const getRequestTypeLabel = (type: string) => {

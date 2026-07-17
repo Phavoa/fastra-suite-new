@@ -65,7 +65,7 @@ export interface LocalLabourRequest {
     number_of_workers: number;
     role_type: string;
     duration: number;
-    duration_unit: "days";
+    duration_unit: "days" | "weeks" | "months" | string;
     estimated_daily_rate: string;
     projected_cost: string;
     justification_notes: string;
