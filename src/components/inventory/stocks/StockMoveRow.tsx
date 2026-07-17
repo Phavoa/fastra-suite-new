@@ -1,80 +1,80 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { StockMove } from "@/types/stockMove";
+import Link from "next/link";
 
 interface StockMoveRowProps {
   move: StockMove;
-  isSelected: boolean;
-  onToggleSelect: (id: string) => void;
 }
 
-export function StockMoveRow({
-  move,
-  isSelected,
-  onToggleSelect,
-}: StockMoveRowProps) {
-  const handleCheckboxChange = (checked: boolean) => {
-    onToggleSelect(String(move.id));
+export function StockMoveRow({ move }: StockMoveRowProps) {
+  const router = useRouter();
+
+  const handleRowClick = () => {
+    router.push(`/inventory/stocks/stock-moves/${move.id}`);
   };
 
   const isPositive = move.quantity >= 0;
 
   return (
-    <motion.div
-      className={cn(
-        "grid grid-cols-[40px_1.1fr_1.1fr_0.8fr_1fr_1.3fr_0.6fr_0.7fr_0.9fr_1fr_1.5fr] items-center px-4 py-3.5 text-xs text-slate-700 border-b border-gray-100 hover:bg-gray-50 transition-colors",
-      )}
-      role="row"
+    <TableRow
+      onClick={handleRowClick}
+      className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
     >
-      <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-        <Checkbox
-          id={`cb-${move.id}`}
-          checked={isSelected}
-          onCheckedChange={handleCheckboxChange}
-          className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white transition-all duration-200"
-        />
-      </div>
+      {/* 1. Move ID */}
+      <TableCell className="px-6 py-3.5 whitespace-nowrap font-mono text-sm font-semibold">
+        <Link
+          href={`/inventory/stocks/stock-moves/${move.id}`}
+          className="text-[#3B7CED] hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {move.id}
+        </Link>
+      </TableCell>
 
-      <div className="text-slate-600 truncate">{move.date_moved || "N/A"}</div>
+      {/* 2. Product Name */}
+      <TableCell className="px-6 py-3.5 whitespace-nowrap text-sm font-medium text-[#32325D]">
+        {move.product?.product_name || "Unknown Product"}
+      </TableCell>
 
-      <div className="text-slate-700 font-medium truncate" title={move.user || "System"}>
-        {move.user || "System Admin"}
-      </div>
+      {/* 3. Quantity */}
+      <TableCell
+        className={`px-6 py-3.5 whitespace-nowrap font-mono text-sm font-bold text-center ${
+          isPositive ? "text-[#2BA24D]" : "text-[#E43D2B]"
+        }`}
+      >
+        {isPositive ? `+${move.quantity}` : move.quantity}
+      </TableCell>
 
-      <div>
-        <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium text-[11px]">
+      {/* 4. Date and Time */}
+      <TableCell className="px-6 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
+        {move.date_moved || "N/A"}
+      </TableCell>
+
+      {/* 5. Total Value */}
+      <TableCell className="px-6 py-3.5 whitespace-nowrap font-mono text-right text-sm font-bold text-[#32325D]">
+        {move.total_value !== undefined ? `₦${move.total_value.toLocaleString()}` : "—"}
+      </TableCell>
+
+      {/* 6. Type */}
+      <TableCell className="px-6 py-3.5 whitespace-nowrap text-center">
+        <span
+          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+            move.transaction_type === "Receipt"
+              ? "bg-[#E2F2E9] text-[#2BA24D]"
+              : move.transaction_type === "Consumption"
+              ? "bg-[#E8F0FE] text-[#1A73E8]"
+              : move.transaction_type === "Scrap"
+              ? "bg-[#FCE8E6] text-[#E43D2B]"
+              : "bg-[#E8F0FE] text-[#1A73E8]"
+          }`}
+        >
           {move.transaction_type || "Move"}
         </span>
-      </div>
-
-      <div className="font-mono text-slate-600 truncate">{move.reference_document || move.source_document_id || "N/A"}</div>
-
-      <div className="font-medium text-slate-800 truncate">{move.product?.product_name || "Unknown Product"}</div>
-
-      <div className={`font-semibold text-center ${isPositive ? "text-green-600" : "text-red-600"}`}>
-        {isPositive ? `+${move.quantity}` : move.quantity}
-      </div>
-
-      <div className="font-mono text-center font-medium text-slate-700">
-        {move.running_balance !== undefined ? move.running_balance.toLocaleString() : "—"}
-      </div>
-
-      <div className="text-right pr-2 text-slate-600">
-        {move.unit_cost !== undefined ? `₦${move.unit_cost.toLocaleString()}` : "—"}
-      </div>
-
-      <div className="text-right pr-2 font-medium text-slate-800">
-        {move.total_value !== undefined ? `₦${move.total_value.toLocaleString()}` : "—"}
-      </div>
-
-      <div className="text-slate-600 truncate pl-2">
-        <div className="font-medium text-slate-800">{move.wbs_phase && move.wbs_activity ? `${move.wbs_phase} / ${move.wbs_activity}` : "General Stock"}</div>
-        {move.cost_code && <div className="text-[10px] text-gray-400 font-mono">{move.cost_code}</div>}
-      </div>
-    </motion.div>
+      </TableCell>
+    </TableRow>
   );
 }

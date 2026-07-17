@@ -48,6 +48,11 @@ interface ItemState {
 export default function NewPurchaseRequestPage() {
   const router = useRouter();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
 
   // API queries
   const { data: rawCostingProjects = [] } = useGetProjectCostingProjectsQuery({});
@@ -537,9 +542,22 @@ export default function NewPurchaseRequestPage() {
 
     const purposeStr = `Project: ${projectName} | Phase: ${phaseName} | Activity: ${taskName} | Notes: ${notes}`;
 
+    const ensureValidUUID = (val: string): string => {
+      if (!val) return "";
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(val)) return val;
+      const numericVal = parseInt(val, 10);
+      if (!isNaN(numericVal)) {
+        const hexString = numericVal.toString(16).padStart(12, "0");
+        return `00000000-0000-0000-0000-${hexString}`;
+      }
+      return val;
+    };
+
     const payload: any = {
       project: Number(selectedProjectId) || 1,
-      activity: String(selectedTaskId || ""),
+      activity: ensureValidUUID(selectedTaskId),
+      wbs_element: ensureValidUUID(selectedTaskId),
       site_location: locationName,
       required_by_date: requiredDate,
       notes: purposeStr,
@@ -567,7 +585,7 @@ export default function NewPurchaseRequestPage() {
           0,
         ),
         amount: totalCost,
-        requester: loggedInUser?.username || "Firstname Lastname",
+        requester: loggedInUserName,
         date: formattedDate,
         project: projectName,
         location: locationName,
@@ -592,56 +610,13 @@ export default function NewPurchaseRequestPage() {
         description: "Your request has successfully been submitted",
       });
     } catch (err: any) {
-      console.warn("API submission failed, falling back to local storage:", err);
+      console.error("API submission failed:", err);
       
-      const newRequest = {
-        id: `pr-${Date.now()}`,
-        reference_id: requestId,
-        title: validatedItems.map((it) => it.productName).join(", "),
-        status: "pending" as const,
-        quantity: validatedItems.reduce(
-          (acc, it) => acc + Number(it.quantity || 0),
-          0,
-        ),
-        amount: totalCost,
-        requester: loggedInUser?.username || "Firstname Lastname",
-        date: formattedDate,
-        project: projectName,
-        location: locationName,
-        requiredDate,
-        phase: phaseName,
-        task: taskName,
-        notes,
-        lines: validatedItems.map((item, idx) => ({
-          id: idx + 1,
-          productName: item.productName,
-          description: item.description || "",
-          quantity: Number(item.quantity || 1),
-          unitCost: Number(item.unitCost || 0),
-          lineTotal: Number(item.quantity || 1) * Number(item.unitCost || 0),
-        })),
-      };
-
-      const stored = localStorage.getItem("project_purchase_requests");
-      let requestsList = [];
-      if (stored) {
-        try {
-          requestsList = JSON.parse(stored);
-        } catch (e) {
-          requestsList = [];
-        }
-      }
-      requestsList.unshift(newRequest);
-      localStorage.setItem(
-        "project_purchase_requests",
-        JSON.stringify(requestsList),
-      );
-
       setStatusModal({
         isOpen: true,
-        type: "success",
-        title: "Request Submitted (Offline)",
-        description: "Submission saved locally. API reported: " + (err.data?.message || err.message || "Connection issue"),
+        type: "error",
+        title: "Submission Unsuccessful",
+        description: err.data?.message || err.message || "There was an error submitting your request. Please check your connection and try again.",
       });
     }
   };
@@ -723,7 +698,7 @@ export default function NewPurchaseRequestPage() {
                 Requested by
               </Label>
               <Input
-                value={loggedInUser?.username || "Firstname Lastname"}
+                value={loggedInUserName}
                 readOnly
                 className="bg-gray-50 border-gray-200 text-gray-500 h-11"
               />

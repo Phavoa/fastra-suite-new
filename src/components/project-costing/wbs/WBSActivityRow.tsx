@@ -6,59 +6,96 @@ import { Activity } from "../types";
 
 interface WBSActivityRowProps {
   activity: Activity;
-  isSubphaseActivity?: boolean;
+  extraColumns: string[];
   onUpdate: (updates: Partial<Activity>) => void;
   onRemove: () => void;
 }
 
 export function WBSActivityRow({
   activity,
-  isSubphaseActivity = false,
+  extraColumns,
   onUpdate,
   onRemove,
 }: WBSActivityRowProps) {
   return (
-    <TableRow className="border-b border-gray-100 hover:bg-transparent group">
-      <TableCell className={isSubphaseActivity ? "relative" : "border-l border-gray-400 ml-4 relative"}>
-        {isSubphaseActivity ? (
-          <div className="absolute left-[3.2rem] top-0 bottom-0 w-px bg-gray-200"></div>
-        ) : (
-          <div className="absolute left-6 top-0 bottom-0 w-px bg-gray-300"></div>
-        )}
+    <TableRow className="border-b border-gray-100 hover:bg-gray-50/40 transition-colors">
+      {/* S/N */}
+      <TableCell className="py-2 pl-4 text-center">
+        <Input
+          value={activity.sn || ""}
+          onChange={(e) => onUpdate({ sn: e.target.value })}
+          className="h-8 w-full bg-transparent border-gray-200 focus-visible:ring-1 focus-visible:ring-[#3B7CED] text-sm p-1 text-center shadow-none border-dashed hover:border-solid rounded"
+        />
       </TableCell>
+
+      {/* Activity */}
       <TableCell className="py-2">
         <Input
           value={activity.name}
           onChange={(e) => onUpdate({ name: e.target.value })}
-          className="h-8 w-full bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+          className="h-8 w-full bg-transparent border-gray-200 focus-visible:ring-1 focus-visible:ring-[#3B7CED] text-sm p-1 shadow-none border-dashed hover:border-solid rounded"
         />
       </TableCell>
+
+      {/* Quantity */}
       <TableCell className="py-2">
         <Input
           type="number"
           value={activity.quantity || ""}
-          onChange={(e) => onUpdate({ quantity: Number(e.target.value), budget: Number(e.target.value) * (activity.rate || 0) })}
-          className="h-8 w-full max-w-[80px] bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+          onChange={(e) => {
+            const val = Number(e.target.value);
+            onUpdate({
+              quantity: val,
+              budget: val * (activity.rate || 0),
+            });
+          }}
+          className="h-8 w-full bg-transparent border-gray-200 focus-visible:ring-1 focus-visible:ring-[#3B7CED] text-sm p-1 shadow-none border-dashed hover:border-solid rounded"
         />
       </TableCell>
+
+      {/* Rate */}
       <TableCell className="py-2">
         <Input
           type="number"
           value={activity.rate || ""}
-          onChange={(e) => onUpdate({ rate: Number(e.target.value), budget: (activity.quantity || 0) * Number(e.target.value) })}
-          className="h-8 w-full max-w-[120px] bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white text-sm p-1 shadow-none"
+          onChange={(e) => {
+            const val = Number(e.target.value);
+            onUpdate({
+              rate: val,
+              budget: (activity.quantity || 0) * val,
+            });
+          }}
+          className="h-8 w-full bg-transparent border-gray-200 focus-visible:ring-1 focus-visible:ring-[#3B7CED] text-sm p-1 shadow-none border-dashed hover:border-solid rounded"
         />
       </TableCell>
-      <TableCell className="py-2 flex items-center gap-2">
+
+      {/* Amount (Budget) */}
+      <TableCell className="py-2">
         <Input
           type="number"
           value={activity.budget || ""}
           disabled
-          className="h-8 w-full max-w-[120px] bg-gray-50 border-gray-200 text-sm p-1 shadow-none cursor-not-allowed"
+          className="h-8 w-full bg-gray-50 border-gray-200 text-sm p-1 shadow-none cursor-not-allowed font-medium text-gray-700 rounded"
         />
+      </TableCell>
+
+      {/* Custom Extra Columns */}
+      {extraColumns.map((colName) => (
+        <TableCell key={colName} className="py-2">
+          <Input
+            value={activity[colName] || ""}
+            onChange={(e) => onUpdate({ [colName]: e.target.value })}
+            className="h-8 w-full bg-transparent border-gray-200 focus-visible:ring-1 focus-visible:ring-[#3B7CED] text-sm p-1 shadow-none border-dashed hover:border-solid rounded"
+          />
+        </TableCell>
+      ))}
+
+      {/* Action */}
+      <TableCell className="py-2 text-center">
         <button
+          type="button"
           onClick={onRemove}
-          className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-gray-400 hover:text-red-500 transition-colors p-1"
         >
           <Trash2 className="w-4 h-4" />
         </button>

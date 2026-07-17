@@ -36,6 +36,9 @@ export interface SubcontractorRequest {
   created_at: string;
   project_request: number;
   vendor: number;
+  created_by?: number;
+  created_by_name?: string;
+  requester?: string;
 }
 
 export interface CreateSubcontractorRequest {

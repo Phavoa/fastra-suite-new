@@ -11,7 +11,7 @@ import {
   useApproveProjectRequestMutation, 
   useRejectProjectRequestMutation 
 } from "@/api/requests/projectRequestApi";
-import { useGetProjectsQuery } from "@/api/projectApi";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 
 const DataField = ({ label, value, fullWidth = false }: { label: string; value: string | React.ReactNode; fullWidth?: boolean }) => (
@@ -42,15 +42,19 @@ export default function RequestDetailsPage() {
   const { data: request, isLoading: isRequestLoading } = useGetProjectRequestQuery(numericId, {
     skip: !requestId || isNaN(numericId),
   });
-  const { data: projects } = useGetProjectsQuery();
+  const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
+  const projects = React.useMemo(() => {
+    const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];
+    return list;
+  }, [rawProjects]);
 
   const [approveRequest, { isLoading: isApproving }] = useApproveProjectRequestMutation();
   const [rejectRequest, { isLoading: isRejecting }] = useRejectProjectRequestMutation();
 
   const getProjectName = (projectId?: number) => {
     if (!projectId) return "General Project";
-    const proj = projects?.find((p) => p.id === projectId);
-    return proj ? proj.name : `Project #${projectId}`;
+    const proj = projects?.find((p: any) => p.id === projectId);
+    return proj ? (proj.name || proj.project_name || `Project #${projectId}`) : `Project #${projectId}`;
   };
 
   const getRequestTypeLabel = (type: string) => {
@@ -112,10 +116,13 @@ export default function RequestDetailsPage() {
   const getTotalCost = () => {
     if (isPettyCash) return detail.amountRequested || detail.amount || 0;
     if (isLabour) {
-      if (detail.projected_cost) return parseFloat(detail.projected_cost);
-      return (Number(detail.estimated_daily_rate) || 0) * 
-             (Number(detail.number_of_workers) || 0) * 
-             (Number(detail.duration) || 0);
+      if (detail.projected_cost && parseFloat(detail.projected_cost) > 0)
+        return parseFloat(detail.projected_cost);
+      return (
+        (Number(detail.estimated_daily_rate) || 0) *
+        (Number(detail.number_of_workers) || 0) *
+        (Number(detail.duration) || 0)
+      );
     }
     if (isSubcontractor) return detail.contract_value || 0;
     if (isPlantEquipment) return detail.estimated_cost || 0;
@@ -276,7 +283,16 @@ export default function RequestDetailsPage() {
                 <SectionHeader title="Cost Details" />
                 <div className="grid grid-cols-2 gap-y-5 gap-x-4">
                   <DataField label="Duration" value={`${detail.duration || 0} ${detail.duration_unit || "days"}`} />
-                  <DataField label="Estimated Daily Rate" value={formatCurrency(detail.estimated_daily_rate)} />
+                  <DataField
+                    label={
+                      detail.duration_unit === "weeks"
+                        ? "Estimated Weekly Rate"
+                        : detail.duration_unit === "months"
+                          ? "Estimated Monthly Rate"
+                          : "Estimated Daily Rate"
+                    }
+                    value={formatCurrency(detail.estimated_daily_rate)}
+                  />
                   <DataField label="Note" value={detail.justification_notes || "N/A"} fullWidth />
                 </div>
               </>
