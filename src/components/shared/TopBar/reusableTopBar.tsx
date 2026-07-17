@@ -108,7 +108,6 @@ export function NavBar({
     }
   };
 
-  console.log("user", user);
   return (
     <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
       <div className="max-w-360 mx-auto px-4 h-16 flex items-center justify-between">
@@ -137,12 +136,21 @@ export function NavBar({
             </h1>
             {items && items.length > 0 && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="md:hidden ml-1.5 p-1 rounded hover:bg-gray-100 text-gray-600 flex items-center focus:outline-none" aria-label="Module navigation">
+                <DropdownMenuTrigger
+                  className="md:hidden ml-1.5 p-1 rounded hover:bg-gray-100 text-gray-600 flex items-center focus:outline-none"
+                  aria-label="Module navigation"
+                >
                   <ChevronDown size={20} />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64 bg-white border border-gray-200 shadow-xl rounded-lg p-2 mt-2 max-h-[75vh] overflow-y-auto z-50">
+                <DropdownMenuContent
+                  align="start"
+                  className="w-64 bg-white border border-gray-200 shadow-xl rounded-lg p-2 mt-2 max-h-[75vh] overflow-y-auto z-50"
+                >
                   {items.map((item, idx) => (
-                    <div key={`mob-nav-${idx}`} className="py-1.5 border-b border-gray-100 last:border-none">
+                    <div
+                      key={`mob-nav-${idx}`}
+                      className="py-1.5 border-b border-gray-100 last:border-none"
+                    >
                       {item.children && item.children.length > 0 ? (
                         <>
                           <div className="px-3 py-1 text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
@@ -152,7 +160,11 @@ export function NavBar({
                             {item.children.map((child) => {
                               const Wrapper =
                                 child.module && child.application
-                                  ? ({ children }: { children: React.ReactNode }) => (
+                                  ? ({
+                                      children,
+                                    }: {
+                                      children: React.ReactNode;
+                                    }) => (
                                       <ProtectedComponent
                                         key={child.href}
                                         application={child.application! as any}
@@ -162,9 +174,11 @@ export function NavBar({
                                         {children}
                                       </ProtectedComponent>
                                     )
-                                  : ({ children }: { children: React.ReactNode }) => (
-                                      <>{children}</>
-                                    );
+                                  : ({
+                                      children,
+                                    }: {
+                                      children: React.ReactNode;
+                                    }) => <>{children}</>;
 
                               return (
                                 <Wrapper key={child.href}>

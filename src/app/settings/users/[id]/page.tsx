@@ -32,11 +32,12 @@ import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
   getUserPermissions,
   saveUserPermissions,
-  getPermissionTemplates,
   UserPermissions,
   createEmptyPermissions,
   convertPermissionsToApiFormat,
+  convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
+import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
 import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
 
 interface CompanyRoleDetails {
@@ -72,6 +73,8 @@ export default function UsersDetails() {
   );
   const access_token = useSelector((state: any) => state.auth.access_token);
   const [updateUser] = useUpdateUserByIdMutation();
+
+  const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
 
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"basic" | "access" | "permissions">("basic");
@@ -624,19 +627,20 @@ export default function UsersDetails() {
                 <select
                   onChange={(e) => {
                     if (e.target.value) {
-                      const selected = getPermissionTemplates().find(t => t.id === e.target.value);
+                      const selected = permissionTemplates.find((t: any) => t.id === Number(e.target.value));
                       if (selected) {
-                        setDirectPermissions(selected.permissions);
+                        setDirectPermissions(convertApiItemsToPermissions(selected.items));
                       }
                     }
                   }}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   defaultValue=""
+                  disabled={templatesLoading}
                 >
                   <option value="" disabled>-- Select a Template --</option>
-                  {getPermissionTemplates()
-                    .filter((t) => !t.isArchived)
-                    .map((t) => (
+                  {permissionTemplates
+                    .filter((t: any) => t.is_active)
+                    .map((t: any) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
                       </option>

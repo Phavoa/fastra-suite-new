@@ -67,184 +67,78 @@ export const createEmptyPermissions = (): UserPermissions => ({
   settings: {},
 });
 
-// Typical Configurations from Section 8.8
-const PRELOADED_TEMPLATES: PermissionTemplate[] = [
-  {
-    id: "tpl-1",
-    name: "Field worker submitting requests",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: { requester: true },
-      projectCosting: {},
-      invoice: {},
-      inventory: { requester: true },
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-2",
-    name: "Person reviewing and approving site requests",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: { reviewer: true, approver: true },
-      projectCosting: {},
-      invoice: {},
-      inventory: {},
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-3",
-    name: "Person managing projects and budgets",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: { approver: true },
-      projectCosting: { manager: true },
-      invoice: {},
-      inventory: {},
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-4",
-    name: "Person monitoring financial performance only",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: {},
-      projectCosting: { reviewer: true },
-      invoice: { reviewer: true },
-      inventory: {},
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-5",
-    name: "Person processing purchase orders",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: { reviewer: true },
-      projectCosting: {},
-      invoice: { processor: true },
-      inventory: {},
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-6",
-    name: "Person authorising payments",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: {},
-      projectCosting: {},
-      invoice: { payer: true, approver: true },
-      inventory: {},
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-7",
-    name: "Person managing stock on site",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: {},
-      projectCosting: {},
-      invoice: {},
-      inventory: { approver: true, reviewer: true },
-      settings: {},
-    },
-  },
-  {
-    id: "tpl-8",
-    name: "Person managing the whole system (System Admin)",
-    isArchived: false,
-    createdAt: new Date().toISOString(),
-    permissions: {
-      projectRequest: { administrator: true },
-      projectCosting: { administrator: true },
-      invoice: { administrator: true },
-      inventory: { administrator: true },
-      settings: { administrator: true },
-    },
-  },
-];
-
 const LOCAL_STORAGE_KEYS = {
   USER_PERMISSIONS: "fastrasuite_user_permissions",
-  TEMPLATES: "fastrasuite_permission_templates",
 };
 
-// --- Templates Storage Functions ---
-export const getPermissionTemplates = (): PermissionTemplate[] => {
-  if (typeof window === "undefined") return PRELOADED_TEMPLATES;
-  try {
-    const data = localStorage.getItem(LOCAL_STORAGE_KEYS.TEMPLATES);
-    if (!data) {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TEMPLATES, JSON.stringify(PRELOADED_TEMPLATES));
-      return PRELOADED_TEMPLATES;
-    }
-    return JSON.parse(data);
-  } catch (error) {
-    console.error("Error reading permission templates:", error);
-    return PRELOADED_TEMPLATES;
-  }
-};
-
-export const savePermissionTemplate = (template: PermissionTemplate): void => {
-  if (typeof window === "undefined") return;
-  try {
-    const templates = getPermissionTemplates();
-    const index = templates.findIndex((t) => t.id === template.id);
-    if (index >= 0) {
-      templates[index] = template;
-    } else {
-      templates.push(template);
-    }
-    localStorage.setItem(LOCAL_STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
-  } catch (error) {
-    console.error("Error saving permission template:", error);
-  }
-};
-
-export const deletePermissionTemplate = (id: string): void => {
-  if (typeof window === "undefined") return;
-  try {
-    const templates = getPermissionTemplates();
-    const filtered = templates.filter((t) => t.id !== id);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.TEMPLATES, JSON.stringify(filtered));
-  } catch (error) {
-    console.error("Error deleting permission template:", error);
-  }
-};
-
-// --- User Permissions Storage Functions ---
-export const getUserPermissions = (userId: number | string): UserPermissions => {
+export const getUserPermissions = (
+  userId: number | string,
+): UserPermissions => {
   if (typeof window === "undefined") return createEmptyPermissions();
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEYS.USER_PERMISSIONS);
     if (!data) {
-      // By default, return all permissions checked so default users aren't locked out
       return {
-        projectRequest: { requester: true, reviewer: true, approver: true, manager: true, administrator: true },
-        projectCosting: { reviewer: true, approver: true, manager: true, administrator: true },
-        invoice: { reviewer: true, approver: true, processor: true, payer: true, administrator: true },
-        inventory: { requester: true, reviewer: true, approver: true, manager: true, administrator: true },
+        projectRequest: {
+          requester: true,
+          reviewer: true,
+          approver: true,
+          manager: true,
+          administrator: true,
+        },
+        projectCosting: {
+          reviewer: true,
+          approver: true,
+          manager: true,
+          administrator: true,
+        },
+        invoice: {
+          reviewer: true,
+          approver: true,
+          processor: true,
+          payer: true,
+          administrator: true,
+        },
+        inventory: {
+          requester: true,
+          reviewer: true,
+          approver: true,
+          manager: true,
+          administrator: true,
+        },
         settings: { administrator: true },
       };
     }
     const map = JSON.parse(data);
     if (!map[userId]) {
       return {
-        projectRequest: { requester: true, reviewer: true, approver: true, manager: true, administrator: true },
-        projectCosting: { reviewer: true, approver: true, manager: true, administrator: true },
-        invoice: { reviewer: true, approver: true, processor: true, payer: true, administrator: true },
-        inventory: { requester: true, reviewer: true, approver: true, manager: true, administrator: true },
+        projectRequest: {
+          requester: true,
+          reviewer: true,
+          approver: true,
+          manager: true,
+          administrator: true,
+        },
+        projectCosting: {
+          reviewer: true,
+          approver: true,
+          manager: true,
+          administrator: true,
+        },
+        invoice: {
+          reviewer: true,
+          approver: true,
+          processor: true,
+          payer: true,
+          administrator: true,
+        },
+        inventory: {
+          requester: true,
+          reviewer: true,
+          approver: true,
+          manager: true,
+          administrator: true,
+        },
         settings: { administrator: true },
       };
     }
@@ -255,19 +149,71 @@ export const getUserPermissions = (userId: number | string): UserPermissions => 
   }
 };
 
-// Mapping from frontend module keys to backend module keys
+export const saveUserPermissions = (
+  userId: number | string,
+  permissions: UserPermissions,
+): void => {
+  if (typeof window === "undefined") return;
+  try {
+    const data = localStorage.getItem(LOCAL_STORAGE_KEYS.USER_PERMISSIONS);
+    const map = data ? JSON.parse(data) : {};
+    map[userId] = permissions;
+    localStorage.setItem(
+      LOCAL_STORAGE_KEYS.USER_PERMISSIONS,
+      JSON.stringify(map),
+    );
+  } catch (error) {
+    console.error("Error saving user permissions:", error);
+  }
+};
+
 export const MODULE_KEY_MAP: Record<keyof UserPermissions, string> = {
-  projectRequest: "project-request",
-  projectCosting: "project-costing",
+  projectRequest: "project_request",
+  projectCosting: "project_costing",
   invoice: "invoice",
   inventory: "inventory",
   settings: "settings",
 };
 
-/**
- * Convert frontend UserPermissions (boolean flags) to backend format
- * Option A: { "project-request": ["create", "view"], ... }
- */
+export const REVERSE_MODULE_KEY_MAP: Record<string, keyof UserPermissions> = {
+  project_request: "projectRequest",
+  project_costing: "projectCosting",
+  invoice: "invoice",
+  inventory: "inventory",
+  settings: "settings",
+};
+
+export interface PermissionTemplateItem {
+  module: string;
+  permission_types: Array<{
+    permission_type: string;
+    is_selected: boolean;
+  }>;
+}
+
+export function convertPermissionsToApiItems(
+  permissions: UserPermissions,
+): PermissionTemplateItem[] {
+  const items: PermissionTemplateItem[] = [];
+
+  for (const [moduleKey, modulePerms] of Object.entries(permissions)) {
+    const backendKey = MODULE_KEY_MAP[moduleKey as keyof UserPermissions];
+    if (!backendKey) continue;
+
+    const permissionTypes = ALL_PERMISSION_TYPES.map((type) => ({
+      permission_type: type.key,
+      is_selected: !!modulePerms[type.key],
+    }));
+
+    items.push({
+      module: backendKey,
+      permission_types: permissionTypes,
+    });
+  }
+
+  return items;
+}
+
 export function convertPermissionsToApiFormat(
   permissions: UserPermissions,
 ): Record<string, string[]> {
@@ -292,14 +238,50 @@ export function convertPermissionsToApiFormat(
   return result;
 }
 
-export const saveUserPermissions = (userId: number | string, permissions: UserPermissions): void => {
-  if (typeof window === "undefined") return;
-  try {
-    const data = localStorage.getItem(LOCAL_STORAGE_KEYS.USER_PERMISSIONS);
-    const map = data ? JSON.parse(data) : {};
-    map[userId] = permissions;
-    localStorage.setItem(LOCAL_STORAGE_KEYS.USER_PERMISSIONS, JSON.stringify(map));
-  } catch (error) {
-    console.error("Error saving user permissions:", error);
+export function convertApiItemsToPermissions(
+  items: PermissionTemplateItem[] | undefined,
+): UserPermissions {
+  const result = createEmptyPermissions();
+
+  if (!items) return result;
+
+  for (const item of items) {
+    const frontendKey = REVERSE_MODULE_KEY_MAP[item.module];
+    if (!frontendKey) continue;
+
+    const modulePerms: Record<string, boolean> = {};
+    for (const perm of item.permission_types) {
+      if (typeof perm === "string") {
+        modulePerms[perm] = true;
+      } else {
+        modulePerms[perm.permission_type] = perm.is_selected;
+      }
+    }
+
+    result[frontendKey] = modulePerms;
   }
+
+  return result;
+}
+
+export const convertApiTemplateToFrontend = (
+  apiTemplate: any,
+): PermissionTemplate => {
+  return {
+    id: String(apiTemplate.id),
+    name: apiTemplate.name,
+    permissions: convertApiItemsToPermissions(apiTemplate.items),
+    isArchived: !apiTemplate.is_active,
+    createdAt: apiTemplate.created_at || new Date().toISOString(),
+  };
+};
+
+export const convertFrontendTemplateToApi = (
+  frontendTemplate: PermissionTemplate,
+): { name: string; is_active: boolean; items: PermissionTemplateItem[] } => {
+  return {
+    name: frontendTemplate.name,
+    is_active: !frontendTemplate.isArchived,
+    items: convertPermissionsToApiItems(frontendTemplate.permissions),
+  };
 };
