@@ -6,8 +6,11 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { PageGuard } from "@/components/auth/PageGuard";
+import Breadcrumbs from "@/components/shared/BreadScrumbs";
+import { AutoSaveIcon } from "@/components/shared/icons";
+import { BreadcrumbItem } from "@/types/purchase";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash, ArrowLeft } from "lucide-react";
+import { Plus, Trash, ArrowLeft, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -191,7 +194,7 @@ export default function CreateScrapPage() {
       });
 
       setTimeout(() => {
-        router.push("/inventory/operation");
+        router.push("/inventory/operation/scrap");
       }, 1000);
     }, 500);
   }
@@ -233,7 +236,7 @@ export default function CreateScrapPage() {
       });
 
       setTimeout(() => {
-        router.push("/inventory/operation");
+        router.push("/inventory/operation/scrap");
       }, 1000);
     }, 500);
   }
@@ -242,54 +245,95 @@ export default function CreateScrapPage() {
     setNotification((prev) => ({ ...prev, show: false }));
   }
 
+  const breadcrumbsItem: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Inventory", href: "/inventory" },
+    { label: "Operation", href: "/inventory/operation" },
+    { label: "Scrap Recording", href: "/inventory/operation/scrap" },
+    { label: "Record Scrap", href: "/inventory/operation/scrap/new", current: true },
+  ];
+
+  const totalWriteOff = items.reduce(
+    (acc, curr) => acc + (Number(curr.scrap_quantity) || 0) * (curr.unit_cost || 0),
+    0
+  );
+
   return (
     <PageGuard application="inventory" module="scrap">
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
-        <div className="flex items-center px-6 py-4 border-b border-gray-100">
-          <Link href="/inventory/operation">
-            <Button variant="ghost" size="icon" className="mr-2">
-              <ArrowLeft className="h-5 w-5 text-gray-500" />
-            </Button>
-          </Link>
-          <h1 className="text-lg font-medium text-gray-800">Record Scrap (Damage / Loss)</h1>
-        </div>
+      {/* Two-tone: gray page canvas */}
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-28">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
+          <Breadcrumbs
+            items={breadcrumbsItem}
+            action={
+              <Button
+                variant="ghost"
+                className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
+              >
+                Autosaved <AutoSaveIcon />
+              </Button>
+            }
+          />
 
-        <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
-          <form ref={formRef} className="flex flex-col gap-10">
-            <section>
-              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Scrap & Accounting Allocation</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
+          {/* Top Bar Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-[#FCE8E6] text-[#E43D2B]">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-[#32325D]">
+                  Record Scrap (Damage / Spoilage / Loss)
+                </h1>
+                <p className="text-xs text-[#8898AA] mt-0.5">
+                  Document unusable inventory write-offs and automatically allocate losses to accounting cost centers.
+                </p>
+              </div>
+            </div>
+            <Link href="/inventory/operation/scrap">
+              <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 text-sm h-9 px-3">
+                <ArrowLeft className="w-4 h-4 mr-1.5" /> Cancel
+              </Button>
+            </Link>
+          </div>
+
+          <form ref={formRef} className="flex flex-col gap-6">
+            {/* Scrap & Accounting Allocation Card */}
+            <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6">
+              <h2 className="text-base font-semibold text-[#32325D] mb-4 pb-3 border-b border-gray-100">
+                Scrap & Accounting Allocation
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">
-                    Cause <span className="text-red-500">*</span>
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Cause <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("adjustment_type")}
                     onValueChange={(value) => setValue("adjustment_type", value as any)}
                   >
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                       <SelectValue placeholder="Select cause" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="damage">Damage</SelectItem>
-                      <SelectItem value="loss">Loss</SelectItem>
+                      <SelectItem value="damage">Damage / Spoilage</SelectItem>
+                      <SelectItem value="loss">Theft / Unexplained Loss</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.adjustment_type && (
-                    <p className="text-xs text-red-500 mt-1">{errors.adjustment_type.message}</p>
+                    <p className="text-[11px] text-[#E43D2B]">{errors.adjustment_type.message}</p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">
-                    Warehouse Location <span className="text-red-500">*</span>
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Warehouse Location <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("warehouse_location")}
                     onValueChange={(value) => setValue("warehouse_location", value)}
                   >
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
@@ -299,19 +343,19 @@ export default function CreateScrapPage() {
                     </SelectContent>
                   </Select>
                   {errors.warehouse_location && (
-                    <p className="text-xs text-red-500 mt-1">{errors.warehouse_location.message}</p>
+                    <p className="text-[11px] text-[#E43D2B]">{errors.warehouse_location.message}</p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">
-                    Authorizing Manager <span className="text-red-500">*</span>
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Authorizing Manager <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("authorizing_manager")}
                     onValueChange={(value) => setValue("authorizing_manager", value)}
                   >
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                       <SelectValue placeholder="Select manager" />
                     </SelectTrigger>
                     <SelectContent>
@@ -321,19 +365,19 @@ export default function CreateScrapPage() {
                     </SelectContent>
                   </Select>
                   {errors.authorizing_manager && (
-                    <p className="text-xs text-red-500 mt-1">{errors.authorizing_manager.message}</p>
+                    <p className="text-[11px] text-[#E43D2B]">{errors.authorizing_manager.message}</p>
                   )}
                 </div>
 
-                <div className="flex flex-col gap-2 md:col-span-2">
-                  <Label className="text-gray-700 font-medium">
-                    Expense Account Allocation (WBS / Cost Center) <span className="text-red-500">*</span>
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Expense Account Allocation (WBS / Cost Center) <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("expense_account")}
                     onValueChange={(value) => setValue("expense_account", value)}
                   >
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                       <SelectValue placeholder="Select accounting destination" />
                     </SelectTrigger>
                     <SelectContent>
@@ -343,146 +387,161 @@ export default function CreateScrapPage() {
                     </SelectContent>
                   </Select>
                   {errors.expense_account && (
-                    <p className="text-xs text-red-500 mt-1">{errors.expense_account.message}</p>
+                    <p className="text-[11px] text-[#E43D2B]">{errors.expense_account.message}</p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Notes & Incident Summary</Label>
+                  <Label className="text-xs font-semibold text-[#525F7F]">Notes & Incident Summary</Label>
                   <Input
                     {...register("notes")}
-                    placeholder="Enter reason for scrap..."
-                    className="bg-white border-gray-300 rounded"
+                    placeholder="Enter explanation for scrap..."
+                    className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
                   />
                 </div>
-
               </div>
-            </section>
+            </div>
 
-            <section>
-              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Scrapped Items</h2>
-              <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto w-full">
-                  <Table className="min-w-[900px] w-full">
-                    <TableHeader>
-                      <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
-                        <TableHead className="w-64 font-medium text-gray-500 pl-4">Product</TableHead>
-                        <TableHead className="w-24 font-medium text-gray-500 text-center">Unit</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Current Stock</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Scrap QTY</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-right">Unit Cost (₦)</TableHead>
-                        <TableHead className="w-36 font-medium text-gray-500 text-right">Total Loss (₦)</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Remaining Stock</TableHead>
-                        <TableHead className="w-16 font-medium text-gray-500 text-center pr-4">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((it) => {
-                        const remaining = (Number(it.current_quantity) || 0) - (Number(it.scrap_quantity) || 0);
-                        const totalLoss = (Number(it.scrap_quantity) || 0) * (it.unit_cost || 0);
-                        return (
-                          <TableRow key={it.id} className="group hover:bg-gray-50 border-b-gray-100 transition-colors">
-                            <TableCell className="pl-4 py-2 align-middle">
-                              <Select
-                                value={it.product}
-                                onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
-                              >
-                                <SelectTrigger className="bg-white border-gray-300 rounded h-9 text-xs">
-                                  <SelectValue placeholder="Select product" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {productOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <span className="text-xs text-gray-700 font-medium">
-                                {it.unit_of_measure || "N/A"}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <span className="text-xs text-gray-700 font-medium">
-                                {it.current_quantity}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={it.scrap_quantity}
-                                onChange={(e) => updateScrapQty(it.id, e.target.value)}
-                                placeholder="0"
-                                className="bg-white border-gray-300 rounded h-9 text-xs text-center w-24 mx-auto"
-                              />
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-right font-mono text-xs text-gray-700">
-                              {it.unit_cost ? `₦${it.unit_cost.toLocaleString()}` : "—"}
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-right font-mono font-bold text-red-600 text-xs">
-                              {totalLoss > 0 ? `₦${totalLoss.toLocaleString()}` : "₦0"}
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <span className={`text-xs font-semibold ${remaining < 0 ? "text-red-600" : "text-gray-700"}`}>
-                                {it.product ? remaining.toFixed(2) : "—"}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center pr-4">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeRow(it.id)}
-                                disabled={items.length === 1}
-                                className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                title="Remove line"
-                              >
-                                <Trash className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                    <TableFooter className="bg-[#F8F9FA] border-t border-gray-200">
-                      <TableRow>
-                        <TableCell colSpan={8} className="py-2 pl-4">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={addRow}
-                            className="text-[#3B7CED] hover:bg-blue-50 text-xs font-medium h-8 px-3"
-                          >
-                            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Product Line
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
+            {/* Scrapped Items Table Card */}
+            <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100">
+                <h2 className="text-base font-semibold text-[#32325D]">
+                  Scrapped Items & Stock Deduction
+                </h2>
               </div>
-            </section>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[900px] w-full">
+                  <TableHeader>
+                    <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap w-64">
+                        Product
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-24">
+                        Unit
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-32">
+                        Current Stock
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-32">
+                        Scrap Qty
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right w-32">
+                        Unit Cost
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right w-36">
+                        Total Loss
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-32">
+                        Remaining
+                      </TableHead>
+                      <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-16"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((it) => {
+                      const remaining = (Number(it.current_quantity) || 0) - (Number(it.scrap_quantity) || 0);
+                      const totalLoss = (Number(it.scrap_quantity) || 0) * (it.unit_cost || 0);
+                      return (
+                        <TableRow key={it.id} className="hover:bg-gray-50 border-b border-gray-100 transition-colors">
+                          <TableCell className="px-6 py-3.5">
+                            <Select
+                              value={it.product}
+                              onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
+                            >
+                              <SelectTrigger className="bg-white border-gray-200 rounded h-9 text-sm font-semibold text-[#32325D]">
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {productOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 text-center text-sm text-[#525F7F] font-medium">
+                            {it.unit_of_measure || "—"}
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 text-center text-sm font-semibold text-[#32325D]">
+                            {it.current_quantity}
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 text-center">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={it.scrap_quantity}
+                              onChange={(e) => updateScrapQty(it.id, e.target.value)}
+                              placeholder="0"
+                              className="bg-white border-gray-200 rounded h-8 text-sm text-center font-bold text-[#E43D2B] w-24 mx-auto"
+                            />
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 text-right font-mono text-sm text-[#525F7F]">
+                            {it.unit_cost ? `₦${it.unit_cost.toLocaleString()}` : "—"}
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 text-right font-mono font-bold text-[#E43D2B] text-sm">
+                            {totalLoss > 0 ? `₦${totalLoss.toLocaleString()}` : "₦0"}
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 text-center">
+                            <span className={`text-sm font-bold font-mono ${remaining < 0 ? "text-[#E43D2B]" : "text-[#2BA24D]"}`}>
+                              {it.product ? remaining.toFixed(2) : "—"}
+                            </span>
+                          </TableCell>
+
+                          <TableCell className="pr-6 py-3.5 text-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeRow(it.id)}
+                              disabled={items.length === 1}
+                              className="h-8 w-8 text-gray-400 hover:text-[#E43D2B] hover:bg-red-50"
+                              title="Remove line"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                  <TableFooter className="bg-[#F6F9FC] border-t border-gray-100">
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-3.5 px-6">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={addRow}
+                          className="text-[#3B7CED] hover:bg-blue-50 text-sm font-semibold h-8 px-3"
+                        >
+                          <Plus className="w-4 h-4 mr-1.5" /> Add Product Line
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+            </div>
           </form>
-        </div>
+        </main>
 
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-between shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+        {/* Sticky Action Bar */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-between shadow-lg z-30">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 uppercase font-semibold">Total Financial Write-off:</span>
-            <span className="text-lg font-bold font-mono text-red-600">
-              ₦{items.reduce((acc, curr) => acc + ((Number(curr.scrap_quantity) || 0) * (curr.unit_cost || 0)), 0).toLocaleString()}
+            <span className="text-xs text-[#8898AA] uppercase font-semibold tracking-wide">
+              Total Financial Write-off:
+            </span>
+            <span className="text-lg font-bold font-mono text-[#E43D2B]">
+              ₦{totalWriteOff.toLocaleString()}
             </span>
           </div>
-          <div className="flex gap-4">
-            <Link href="/inventory/operation">
-              <Button variant="outline" type="button" className="border-blue-400 text-blue-500 hover:bg-blue-50">
+          <div className="flex items-center gap-3">
+            <Link href="/inventory/operation/scrap">
+              <Button variant="outline" type="button" className="border-gray-200 text-gray-600 hover:bg-gray-50 h-9 px-4 text-sm font-medium">
                 Cancel
               </Button>
             </Link>
@@ -491,7 +550,7 @@ export default function CreateScrapPage() {
               disabled={isSubmitting}
               onClick={handleSubmit(onSave)}
               variant="outline"
-              className="border-blue-400 text-blue-500 hover:bg-blue-50"
+              className="border-gray-200 text-gray-600 hover:bg-gray-50 h-9 px-4 text-sm font-medium"
             >
               {isSubmitting ? "Saving..." : "Save Draft"}
             </Button>
@@ -499,7 +558,7 @@ export default function CreateScrapPage() {
               type="button"
               disabled={isSubmitting}
               onClick={handleSubmit(onValidate)}
-              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-5 text-sm font-medium shadow-2xs transition-all"
             >
               {isSubmitting ? "Validating..." : "Validate & Deduct Stock"}
             </Button>

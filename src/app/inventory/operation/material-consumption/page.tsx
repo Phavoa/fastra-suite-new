@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowLeft, MoreHorizontal, Eye, CheckCircle2, AlertCircle, XCircle, Clock } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Search, Hammer } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
+import { Input } from "@/components/ui/input";
+import Breadcrumbs from "@/components/shared/BreadScrumbs";
+import { AutoSaveIcon } from "@/components/shared/icons";
+import { BreadcrumbItem } from "@/types/purchase";
 import {
   Table,
   TableBody,
@@ -14,29 +16,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-const pendingRequests = [
+const DUMMY_CONSUMPTION_REQUESTS = [
   {
     id: "REQ-2026-0142",
     project: "Project #1 - Site A Construction",
     wbsPhase: "Superstructure",
     wbsActivity: "First Floor Slab Reinforcement",
-    costCode: "CC-2040 (Structural Reinforcement)",
-    availableBudget: 15000000,
-    equipmentId: "Tower Crane TC-01 (EQ-102)",
     requester: "Eng. John Doe (Site Engineer)",
-    gateReceiver: "Mr. Abubakar (Site Foreman)",
-    requisitionDate: "2026-06-27",
-    itemsCount: 2,
     totalCost: 10200000,
     status: "pending",
+    queue: "normal",
     isOverrun: false,
   },
   {
@@ -44,270 +35,413 @@ const pendingRequests = [
     project: "Project #2 - Site B Infrastructure",
     wbsPhase: "Substructure / Foundation",
     wbsActivity: "Drainage Trench Concrete",
-    costCode: "CC-1020 (Concrete Materials)",
-    availableBudget: 3500000,
-    equipmentId: "Concrete Mixer CM-04 (EQ-088)",
     requester: "Eng. Jane Smith (Site Supervisor)",
-    gateReceiver: "Engr. Kenneth (Project Supervisor)",
-    requisitionDate: "2026-06-28",
-    itemsCount: 1,
     totalCost: 1375000,
     status: "pending",
+    queue: "normal",
     isOverrun: false,
   },
-];
-
-const overrunRequests = [
   {
     id: "REQ-2026-0189",
     project: "Project #1 - Site A Construction",
     wbsPhase: "Substructure / Foundation",
     wbsActivity: "Retaining Wall Concrete Pour",
-    costCode: "CC-1020 (Concrete Materials)",
-    availableBudget: 2000000,
-    equipmentId: "Batching Plant BP-01",
     requester: "Eng. Samuel (Site Supervisor)",
-    gateReceiver: "Mr. Abubakar (Site Foreman)",
-    requisitionDate: "2026-06-29",
-    itemsCount: 4,
     totalCost: 4850000,
     status: "held_overrun",
+    queue: "overrun",
     isOverrun: true,
+  },
+  {
+    id: "REQ-2026-0192",
+    project: "Project #3 - Victoria Island Office Tower",
+    wbsPhase: "MEP / Electrical",
+    wbsActivity: "Main Switchboard Cabling",
+    requester: "Eng. Chinedu (Electrical Lead)",
+    totalCost: 6200000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
+  },
+  {
+    id: "REQ-2026-0195",
+    project: "Project #1 - Site A Construction",
+    wbsPhase: "External Works",
+    wbsActivity: "Perimeter Interlocking Paving",
+    requester: "Eng. John Doe (Site Engineer)",
+    totalCost: 3800000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
+  },
+  {
+    id: "REQ-2026-0198",
+    project: "Project #2 - Site B Infrastructure",
+    wbsPhase: "Superstructure",
+    wbsActivity: "Steel Columns Erection",
+    requester: "Eng. David (Structural Engineer)",
+    totalCost: 14500000,
+    status: "held_overrun",
+    queue: "overrun",
+    isOverrun: true,
+  },
+  {
+    id: "REQ-2026-0201",
+    project: "Project #3 - Victoria Island Office Tower",
+    wbsPhase: "Finishing",
+    wbsActivity: "Drywall Partitions Level 4",
+    requester: "Eng. Tunde (Finishing Lead)",
+    totalCost: 5100000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
+  },
+  {
+    id: "REQ-2026-0205",
+    project: "Project #1 - Site A Construction",
+    wbsPhase: "Finishing",
+    wbsActivity: "Ground Floor Tiling & Mortar",
+    requester: "Eng. Samuel (Site Supervisor)",
+    totalCost: 5300000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
+  },
+  {
+    id: "REQ-2026-0208",
+    project: "Project #2 - Site B Infrastructure",
+    wbsPhase: "MEP / Plumbing",
+    wbsActivity: "Underground Soil & Waste Piping",
+    requester: "Eng. Jane Smith (Site Supervisor)",
+    totalCost: 3950000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
+  },
+  {
+    id: "REQ-2026-0211",
+    project: "Project #3 - Victoria Island Office Tower",
+    wbsPhase: "Roofing & Waterproofing",
+    wbsActivity: "Terrace Waterproofing Membrane",
+    requester: "Eng. Chinedu (Electrical Lead)",
+    totalCost: 3450000,
+    status: "held_overrun",
+    queue: "overrun",
+    isOverrun: true,
+  },
+  {
+    id: "REQ-2026-0215",
+    project: "Project #1 - Site A Construction",
+    wbsPhase: "External Works",
+    wbsActivity: "Site Access Road Asphalt",
+    requester: "Eng. John Doe (Site Engineer)",
+    totalCost: 8700000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
+  },
+  {
+    id: "REQ-2026-0218",
+    project: "Project #2 - Site B Infrastructure",
+    wbsPhase: "Substructure / Foundation",
+    wbsActivity: "Pile Cap Reinforcement",
+    requester: "Eng. David (Structural Engineer)",
+    totalCost: 16800000,
+    status: "pending",
+    queue: "normal",
+    isOverrun: false,
   },
 ];
 
+const STATUS_TABS = [
+  { label: "All Requisitions", value: "all" },
+  { label: "Within Budget Queue", value: "normal" },
+  { label: "Overrun Queue (Action Req.)", value: "overrun" },
+];
+
+const ITEMS_PER_PAGE = 10;
+
 export default function MaterialConsumptionApprovalsPage() {
-  const router = useRouter();
-  const [activeQueue, setActiveQueue] = useState<"normal" | "overrun">("normal");
-  const [normalList, setNormalList] = useState(pendingRequests);
-  const [overrunList, setOverrunList] = useState(overrunRequests);
-  const statusModal = useStatusModal();
+  const [query, setQuery] = useState("");
+  const [selectedTab, setSelectedTab] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const currentList = activeQueue === "normal" ? normalList : overrunList;
+  const filteredRequests = useMemo(() => {
+    return DUMMY_CONSUMPTION_REQUESTS.filter((item) => {
+      const matchesTab =
+        selectedTab === "all" || item.queue === selectedTab;
 
-  const handleAction = (id: string, action: "approve" | "reject" | "clarify") => {
-    if (activeQueue === "normal") {
-      setNormalList(normalList.filter((r) => r.id !== id));
-    } else {
-      setOverrunList(overrunList.filter((r) => r.id !== id));
-    }
+      const lowerQuery = query.toLowerCase();
+      const matchesSearch =
+        !query ||
+        item.id.toLowerCase().includes(lowerQuery) ||
+        item.project.toLowerCase().includes(lowerQuery) ||
+        item.wbsPhase.toLowerCase().includes(lowerQuery) ||
+        item.wbsActivity.toLowerCase().includes(lowerQuery) ||
+        item.requester.toLowerCase().includes(lowerQuery);
 
-    if (action === "approve") {
-      statusModal.showSuccess(
-        "Requisition Approved",
-        `Material Consumption ${id} approved successfully. Actual project costing and warehouse stock deduction have been posted.`
-      );
-    } else if (action === "reject") {
-      statusModal.showSuccess(
-        "Requisition Rejected",
-        `Material Consumption ${id} has been rejected. The submitter has been notified.`
-      );
-    } else {
-      statusModal.showSuccess(
-        "Clarification Requested",
-        `Material Consumption ${id} sent back to the submitter for clarification.`
-      );
-    }
+      return matchesTab && matchesSearch;
+    });
+  }, [query, selectedTab]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / ITEMS_PER_PAGE));
+  const paginatedRequests = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredRequests.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredRequests, currentPage]);
+
+  const handleTabChange = (tab: string) => {
+    setSelectedTab(tab);
+    setCurrentPage(1);
   };
+
+  const handleQueryChange = (q: string) => {
+    setQuery(q);
+    setCurrentPage(1);
+  };
+
+  const breadcrumbsItem: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Inventory", href: "/inventory" },
+    { label: "Operation", href: "/inventory/operation" },
+    {
+      label: "Material Consumption",
+      href: "/inventory/operation/material-consumption",
+      current: true,
+    },
+  ];
 
   return (
     <PageGuard application="inventory" module="materialconsumption">
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
-          <div className="flex items-center">
-            <Link href="/inventory/operation">
-              <Button variant="ghost" size="icon" className="mr-2">
-                <ArrowLeft className="h-5 w-5 text-gray-500" />
+      {/* Two-tone: gray page canvas */}
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
+          {/* Breadcrumbs — sits on gray */}
+          <Breadcrumbs
+            items={breadcrumbsItem}
+            action={
+              <Button
+                variant="ghost"
+                className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors duration-200"
+              >
+                Autosaved <AutoSaveIcon />
               </Button>
-            </Link>
-            <div>
-              <h1 className="text-lg font-medium text-gray-800">
-                Material Consumption Approvals
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Review site requisitions against WBS job allocations and authorize warehouse stock deductions.
-              </p>
-            </div>
-          </div>
-        </div>
+            }
+          />
 
-        <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6">
-          
-          {/* PRD 10.2 Queue Switcher */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setActiveQueue("normal")}
-                className={`px-4 py-2 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-2 ${
-                  activeQueue === "normal"
-                    ? "bg-[#3B7CED] text-white shadow-xs"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <CheckCircle2 className="w-4 h-4" /> Within Budget Queue ({normalList.length})
-              </button>
-              <button
-                onClick={() => setActiveQueue("overrun")}
-                className={`px-4 py-2 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-2 ${
-                  activeQueue === "overrun"
-                    ? "bg-red-600 text-white shadow-xs animate-pulse"
-                    : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
-                }`}
-              >
-                <AlertCircle className="w-4 h-4" /> Overrun Queue - Budget Exceeded ({overrunList.length})
-              </button>
-            </div>
-            <span className="text-xs text-gray-500">
-              {activeQueue === "normal"
-                ? "Items within WBS budget proceed to stock deduction upon supervisor approval."
-                : "PRD 10.2: Items held by Budget Validation Gate. Stock is NOT deducted until PM resolves."}
-            </span>
-          </div>
+          {/* White section 1: top bar + search + status tabs */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            {/* Top Bar: title + search + actions */}
+            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold text-[#32325D] shrink-0">
+                  Material Consumption Approvals
+                </h2>
+                <div className="relative w-[240px] md:w-[320px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search requisition ID, project, or WBS..."
+                    className="pl-9 bg-white border-gray-200 h-9 text-sm rounded-lg focus-visible:ring-1 focus-visible:ring-[#3B7CED] focus-visible:border-[#3B7CED] text-[#32325D]"
+                    value={query}
+                    onChange={(e) => handleQueryChange(e.target.value)}
+                    aria-label="Search material requisitions"
+                  />
+                </div>
+              </div>
 
-          <section>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className={`text-xl font-medium ${activeQueue === "normal" ? "text-[#3B7CED]" : "text-red-600"}`}>
-                {activeQueue === "normal" ? "Pending Site Requisitions (Within Budget)" : "Overrun Queue — PM Review Required"}
-              </h2>
-              <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded">
-                {currentList.length} Request{currentList.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-
-            <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto w-full">
-                <Table className="min-w-[900px] w-full">
-                  <TableHeader>
-                    <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
-                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Requisition ID</TableHead>
-                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Project & WBS Allocation</TableHead>
-                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Budget Gate Validation</TableHead>
-                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase">Requester & Equipment</TableHead>
-                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase text-right">Total Valuation</TableHead>
-                      <TableHead className="py-3 px-4 font-medium text-gray-500 text-xs uppercase text-center">Status</TableHead>
-                      <TableHead className="py-3 pr-6 font-medium text-gray-500 text-xs uppercase text-right">Options</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentList.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="px-6 py-12 text-center text-gray-400 italic">
-                          No pending requisitions in this queue.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      currentList.map((req) => (
-                        <TableRow
-                          key={req.id}
-                          className="hover:bg-gray-50 border-b-gray-100 transition-colors"
-                        >
-                          <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold text-gray-900">
-                            <Link
-                              href={`/inventory/operation/material-consumption/${req.id}`}
-                              className="text-[#3B7CED] hover:underline"
-                            >
-                              {req.id}
-                            </Link>
-                          </TableCell>
-                          <TableCell className="px-4 py-3.5">
-                            <div className="font-medium text-gray-800 text-sm">{req.project}</div>
-                            <div className="text-gray-500 text-xs mt-0.5">
-                              <span className="text-[#3B7CED] font-medium">{req.wbsPhase}</span> → {req.wbsActivity}
-                            </div>
-                            <div className="text-[11px] text-gray-400 font-mono mt-0.5">{req.costCode}</div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3.5">
-                            <div className="text-xs">
-                              <span className="text-gray-500">Avail. WBS Budget:</span>{" "}
-                              <strong className="text-gray-800 font-mono">₦{req.availableBudget.toLocaleString()}</strong>
-                            </div>
-                            <div className="mt-1">
-                              {req.isOverrun ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
-                                  OVERRUN (+₦{(req.totalCost - req.availableBudget).toLocaleString()})
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                                  Within Budget Gate
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3.5">
-                            <div className="text-gray-800 text-sm font-medium">{req.requester}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              Asset: <span className="font-medium text-gray-700">{req.equipmentId}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3.5 text-right font-semibold text-gray-800 text-sm">
-                            ₦{req.totalCost.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="px-4 py-3.5 text-center">
-                            <span className={`inline-block px-2 py-0.5 text-[11px] rounded font-medium uppercase ${req.isOverrun ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
-                              {req.isOverrun ? "HELD: OVERRUN" : "PENDING"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="pr-6 py-3.5 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-gray-500 hover:text-gray-900"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem
-                                  className="text-xs cursor-pointer text-gray-700 flex items-center py-2"
-                                  onClick={() => router.push(`/inventory/operation/material-consumption/${req.id}`)}
-                                >
-                                  <Eye className="w-3.5 h-3.5 mr-2 text-[#3B7CED]" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-xs cursor-pointer text-green-700 font-medium flex items-center py-2"
-                                  onClick={() => handleAction(req.id, "approve")}
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-green-600" />
-                                  Approve & Deduct Stock
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-xs cursor-pointer text-amber-700 flex items-center py-2"
-                                  onClick={() => handleAction(req.id, "clarify")}
-                                >
-                                  <AlertCircle className="w-3.5 h-3.5 mr-2 text-amber-600" />
-                                  Request Clarification
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-xs cursor-pointer text-red-600 flex items-center py-2"
-                                  onClick={() => handleAction(req.id, "reject")}
-                                >
-                                  <XCircle className="w-3.5 h-3.5 mr-2 text-red-600" />
-                                  Reject Requisition
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                  New Consumption Requisition
+                </Button>
               </div>
             </div>
-          </section>
-        </div>
 
-        <StatusModal
-          isOpen={statusModal.isOpen}
-          onClose={statusModal.close}
-          title={statusModal.title}
-          message={statusModal.message}
-          type={statusModal.type}
-        />
+            {/* Status Filter Pills */}
+            <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
+              {STATUS_TABS.map((tab) => {
+                const isSelected = selectedTab === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => handleTabChange(tab.value)}
+                    className={`px-4 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer ${
+                      isSelected
+                        ? "bg-[#E8F0FE] text-[#1A73E8] font-semibold"
+                        : "bg-[#E9ECEF] text-[#8898AA] font-normal hover:bg-gray-200"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* White section 2: table card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table className="min-w-[800px] w-full">
+                <TableHeader>
+                  <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
+                      REQUISITION ID
+                    </TableHead>
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
+                      PROJECT
+                    </TableHead>
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
+                      WBS ALLOCATION
+                    </TableHead>
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
+                      REQUESTER
+                    </TableHead>
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-right">
+                      TOTAL VALUATION
+                    </TableHead>
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-center">
+                      STATUS
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="px-6 py-12 text-center text-[#8898AA] text-sm"
+                      >
+                        No requisitions found matching your criteria.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedRequests.map((req) => (
+                      <TableRow
+                        key={req.id}
+                        className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors"
+                      >
+                        <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
+                          <Link
+                            href={`/inventory/operation/material-consumption/${req.id}`}
+                            className="text-[#3B7CED] hover:underline"
+                          >
+                            {req.id}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5">
+                          <span className="text-[#32325D] text-sm font-medium">
+                            {req.project}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5">
+                          <span className="text-[#525F7F] text-sm">
+                            {req.wbsPhase} → {req.wbsActivity}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5">
+                          <span className="text-[#32325D] text-sm font-medium">
+                            {req.requester}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-right font-semibold text-[#32325D] text-sm">
+                          ₦{req.totalCost.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-center">
+                          <span
+                            className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold ${
+                              req.isOverrun
+                                ? "bg-[#FCE8E6] text-[#E43D2B]"
+                                : "bg-[#E8F0FE] text-[#1A73E8]"
+                            }`}
+                          >
+                            {req.isOverrun ? "Held: Overrun" : "Pending"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination footer */}
+            <div className="px-6 py-3.5 flex items-center justify-between border-t border-gray-100 bg-white text-sm text-[#8898AA]">
+              <span>
+                Showing{" "}
+                <span className="font-semibold text-[#32325D]">
+                  {filteredRequests.length === 0
+                    ? 0
+                    : (currentPage - 1) * ITEMS_PER_PAGE + 1}
+                </span>{" "}
+                –{" "}
+                <span className="font-semibold text-[#32325D]">
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)}
+                </span>{" "}
+                of{" "}
+                <span className="font-semibold text-[#32325D]">
+                  {filteredRequests.length}
+                </span>{" "}
+                results
+              </span>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md border border-gray-200 text-xs font-medium text-[#32325D] hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Prev
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(
+                    (p) =>
+                      p === 1 ||
+                      p === totalPages ||
+                      Math.abs(p - currentPage) <= 1,
+                  )
+                  .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                      acc.push("...");
+                    }
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-[#8898AA]">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setCurrentPage(item as number)}
+                        className={`w-8 h-7 rounded-md text-xs font-medium transition-colors ${
+                          currentPage === item
+                            ? "bg-[#3B7CED] text-white"
+                            : "border border-gray-200 text-[#32325D] hover:bg-gray-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ),
+                  )}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded-md border border-gray-200 text-xs font-medium text-[#32325D] hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     </PageGuard>
   );

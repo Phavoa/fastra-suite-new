@@ -19,76 +19,83 @@ export default function InventoryConfiguration() {
   const configModules = [
     {
       title: "Products",
-      description: "Company-wide master catalogue of all physical items and materials.",
+      description: "Company-wide list of all physical items and construction materials.",
       href: "/inventory/configuration/products",
       icon: Package,
-      color: "text-blue-500",
+      color: "text-[#3B7CED]",
       bg: "bg-blue-50",
     },
     {
       title: "Units of Measure",
-      description: "Standard measurement attributes (Bags, Tonnes, Liters, Meters).",
+      description: "Standard measurement attributes and conversion ratios (Bags, Tonnes, Liters, Meters).",
       href: "/inventory/configuration/units-of-measure",
       icon: Scale,
-      color: "text-emerald-500",
+      color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
     {
       title: "Product Categories",
-      description: "Classifications for grouping inventory items in reports.",
+      description: "Hierarchy and classifications for grouping inventory items in reports and cost codes.",
       href: "/inventory/configuration/categories",
       icon: Tags,
-      color: "text-purple-500",
+      color: "text-purple-600",
       bg: "bg-purple-50",
     },
     {
       title: "General Settings",
-      description: "Validation rules, waybill photos, and low stock notifications.",
+      description: "Validation thresholds, mandatory waybill photos, and low stock alert notifications.",
       href: "/inventory/configuration/settings",
       icon: Settings,
-      color: "text-orange-500",
+      color: "text-orange-600",
       bg: "bg-orange-50",
     },
   ];
 
   return (
     <PageGuard application="inventory" module="configuration">
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+      {/* Two-tone: gray page canvas */}
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs
             items={items}
             action={
-              <Button variant="ghost" className="text-sm text-gray-400 flex items-center gap-2">
+              <Button variant="ghost" className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors">
                 Autosaved <AutoSaveIcon />
               </Button>
             }
           />
 
-          <div className="flex items-center justify-between py-4 mb-2">
-            <h1 className="text-2xl font-semibold text-gray-900">Inventory Configuration</h1>
+          {/* White Header Control Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold text-[#32325D]">Inventory Configuration</h1>
+              <p className="text-xs text-[#8898AA] mt-0.5">
+                Manage master data, measurement units, categories, and system-wide inventory policies.
+              </p>
+            </div>
           </div>
 
-          {/* Quick Navigation Tiles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          {/* Quick Navigation Tiles on Gray Canvas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {configModules.map((mod) => (
               <Link 
                 key={mod.title} 
                 href={mod.href}
-                className="bg-white p-6 rounded border border-gray-200 shadow-sm hover:border-[#3B7CED] transition-all flex flex-col justify-between group"
+                className="bg-white p-6 rounded-lg border border-gray-100 shadow-2xs hover:border-[#3B7CED] hover:shadow-md transition-all flex flex-col justify-between group h-[220px]"
               >
                 <div>
-                  <div className={`w-10 h-10 rounded-full ${mod.bg} flex items-center justify-center mb-4`}>
+                  <div className={`w-11 h-11 rounded-full ${mod.bg} flex items-center justify-center mb-4`}>
                     <mod.icon className={`w-5 h-5 ${mod.color}`} />
                   </div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-1 group-hover:text-[#3B7CED] transition-colors">
+                  <h3 className="text-base font-semibold text-[#32325D] mb-1 group-hover:text-[#3B7CED] transition-colors">
                     {mod.title}
                   </h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">
+                  <p className="text-xs text-[#525F7F] leading-relaxed">
                     {mod.description}
                   </p>
                 </div>
-                <div className="mt-6 flex items-center text-xs font-medium text-[#3B7CED]">
-                  Manage <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
+                <div className="mt-4 flex items-center text-xs font-semibold text-[#3B7CED]">
+                  Manage <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1.5 transition-transform" />
                 </div>
               </Link>
             ))}

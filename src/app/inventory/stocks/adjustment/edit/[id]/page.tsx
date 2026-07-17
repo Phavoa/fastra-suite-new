@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash, ArrowLeft } from "lucide-react";
+import { Plus, Trash, ArrowLeft, Save, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -140,31 +140,20 @@ export default function EditStockAdjustmentPage() {
     );
   };
 
-  const updateAdjustedQty = (itemId: string, qty: string) => {
+  const updateAdjustedQty = (itemId: string, val: string) => {
     setItems((prev) =>
-      prev.map((it) => (it.id === itemId ? { ...it, adjusted_quantity: qty } : it))
+      prev.map((it) =>
+        it.id === itemId ? { ...it, adjusted_quantity: val } : it
+      )
     );
   };
 
-  async function onSave(data: StockAdjustmentFormData): Promise<void> {
-    const validItems = items.filter(
-      (item) => item.product && item.adjusted_quantity !== ""
-    );
-
-    if (validItems.length === 0) {
-      setNotification({
-        message: "Please add at least one valid product line to adjust",
-        type: "error",
-        show: true,
-      });
-      return;
-    }
-
+  function onSave(data: StockAdjustmentFormData) {
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
       setNotification({
-        message: "Stock adjustment draft updated!",
+        message: "Stock adjustment draft updated successfully!",
         type: "success",
         show: true,
       });
@@ -172,10 +161,10 @@ export default function EditStockAdjustmentPage() {
       setTimeout(() => {
         router.push(`/inventory/stocks/adjustment/${id}`);
       }, 1000);
-    }, 500);
+    }, 400);
   }
 
-  async function onValidate(data: StockAdjustmentFormData): Promise<void> {
+  function onValidate(data: StockAdjustmentFormData) {
     const validItems = items.filter(
       (item) => item.product && item.adjusted_quantity !== ""
     );
@@ -210,45 +199,40 @@ export default function EditStockAdjustmentPage() {
 
   return (
     <PageGuard application="inventory" module="adjustment">
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
-        {/* Clean Header */}
-        <div className="flex items-center px-6 py-4 border-b border-gray-100">
-          <Link href={`/inventory/stocks/adjustment/${id}`}>
-            <Button variant="ghost" size="icon" className="mr-2">
-              <ArrowLeft className="h-5 w-5 text-gray-500" />
-            </Button>
-          </Link>
-          <h1 className="text-lg font-medium text-gray-800">Edit Stock Adjustment Draft: {id}</h1>
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
+        {/* Clean Header Card */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <Link href={`/inventory/stocks/adjustment/${id}`}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-[#32325D]">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-lg font-semibold text-[#32325D]">Edit Stock Adjustment: {id}</h1>
+            </div>
+          </div>
         </div>
 
         {/* Main Form Container */}
-        <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
-          <form ref={formRef} className="flex flex-col gap-10">
-            <section>
-              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Adjustment Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* Adjustment Type (Fixed per PRD) */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Adjustment Type</Label>
-                  <Input
-                    value="Stock Level Update"
-                    readOnly
-                    className="bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed rounded"
-                  />
-                  <p className="text-[11px] text-gray-400">Fixed to Stock Level Update per PRD Core Tier.</p>
-                </div>
-
-                {/* Warehouse Location */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">
-                    Warehouse Location <span className="text-red-500">*</span>
+        <main className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6">
+          <form ref={formRef} className="flex flex-col gap-6">
+            
+            {/* Adjustment Details Card */}
+            <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100">
+                <h2 className="text-base font-semibold text-[#32325D]">Adjustment Details & Reason</h2>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-2.5">
+                  <Label className="text-sm font-semibold text-[#32325D]">
+                    Warehouse / Store Location <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("warehouse_location")}
-                    onValueChange={(value) => setValue("warehouse_location", value)}
+                    onValueChange={(val) => setValue("warehouse_location", val, { shouldValidate: true })}
                   >
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
@@ -262,140 +246,155 @@ export default function EditStockAdjustmentPage() {
                   )}
                 </div>
 
-                {/* Notes (Mandatory Reason per PRD) */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">
-                    Reason / Notes <span className="text-red-500">*</span>
+                <div className="flex flex-col gap-2.5">
+                  <Label className="text-sm font-semibold text-[#32325D]">
+                    Reason / Notes <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Input
                     {...register("notes")}
-                    placeholder="Mandatory reason for discrepancy..."
-                    className="bg-white border-gray-300 rounded"
+                    placeholder="Mandatory reason for physical vs system discrepancy..."
+                    className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
                   />
                   {errors.notes && (
                     <p className="text-xs text-red-500 mt-1">{errors.notes.message}</p>
                   )}
                 </div>
-
               </div>
-            </section>
+            </div>
 
-            <section>
-              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Lines</h2>
-              <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto w-full">
-                  <Table className="min-w-[900px] w-full">
-                    <TableHeader>
-                      <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
-                        <TableHead className="w-64 font-medium text-gray-500 pl-4">Product</TableHead>
-                        <TableHead className="w-64 font-medium text-gray-500">Description</TableHead>
-                        <TableHead className="w-24 font-medium text-gray-500 text-center">Unit</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Current System QTY</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">New Physical Count</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Variance</TableHead>
-                        <TableHead className="w-16 font-medium text-gray-500 text-center pr-4">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((it) => {
-                        const current = Number(it.current_quantity) || 0;
-                        const adjusted = Number(it.adjusted_quantity) || 0;
-                        const variance = adjusted - current;
-                        return (
-                          <TableRow key={it.id} className="group hover:bg-gray-50 border-b-gray-100 transition-colors">
-                            <TableCell className="pl-4 py-2 align-middle">
-                              <Select
-                                value={it.product}
-                                onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
-                              >
-                                <SelectTrigger className="bg-white border-gray-300 rounded h-9 text-xs">
-                                  <SelectValue placeholder="Select product" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {productOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle">
-                              <span className="text-xs text-gray-600 line-clamp-1">
-                                {it.product_description || "Select a product"}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <span className="text-xs text-gray-700 font-medium">
-                                {it.unit_of_measure || "N/A"}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <span className="text-xs text-gray-700 font-medium">
-                                {it.current_quantity}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={it.adjusted_quantity}
-                                onChange={(e) => updateAdjustedQty(it.id, e.target.value)}
-                                placeholder="0"
-                                className="bg-white border-gray-300 rounded h-9 text-xs text-center w-24 mx-auto"
-                              />
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center">
-                              <span className={`text-xs font-semibold ${variance < 0 ? "text-red-600" : variance > 0 ? "text-green-600" : "text-gray-700"}`}>
-                                {it.product ? (variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)) : "—"}
-                              </span>
-                            </TableCell>
-
-                            <TableCell className="py-2 align-middle text-center pr-4">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeRow(it.id)}
-                                disabled={items.length === 1}
-                                className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                title="Remove line"
-                              >
-                                <Trash className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                    <TableFooter className="bg-[#F8F9FA] border-t border-gray-200">
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-2 pl-4">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={addRow}
-                            className="text-[#3B7CED] hover:bg-blue-50 text-xs font-medium h-8 px-3"
-                          >
-                            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Product Line
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
+            {/* Product Lines Card */}
+            <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100">
+                <h2 className="text-base font-semibold text-[#32325D]">Count & Variance Table</h2>
               </div>
-            </section>
+              <div className="overflow-x-auto w-full">
+                <Table className="min-w-[900px] w-full">
+                  <TableHeader>
+                    <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                        Product
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                        Description
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                        Unit
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                        Current System QTY
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                        New Physical Count
+                      </TableHead>
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                        Variance
+                      </TableHead>
+                      <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((it) => {
+                      const current = Number(it.current_quantity) || 0;
+                      const adjusted = Number(it.adjusted_quantity) || 0;
+                      const variance = adjusted - current;
+                      return (
+                        <TableRow key={it.id} className="group hover:bg-gray-50 border-b border-gray-100 transition-colors">
+                          <TableCell className="px-6 py-3.5 align-middle whitespace-nowrap">
+                            <Select
+                              value={it.product}
+                              onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
+                            >
+                              <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED] min-w-[200px]">
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {productOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 align-middle whitespace-nowrap">
+                            <span className="text-sm text-[#525F7F]">
+                              {it.product_description || "Select a product"}
+                            </span>
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 align-middle text-center whitespace-nowrap">
+                            <span className="text-sm font-semibold text-[#525F7F]">
+                              {it.unit_of_measure || "N/A"}
+                            </span>
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 align-middle text-right font-mono font-semibold text-sm text-[#32325D] whitespace-nowrap">
+                            {it.current_quantity}
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 align-middle text-center whitespace-nowrap">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={it.adjusted_quantity}
+                              onChange={(e) => updateAdjustedQty(it.id, e.target.value)}
+                              placeholder="0"
+                              className="bg-white border-gray-200 rounded-md h-9 font-mono font-bold text-sm text-[#3B7CED] text-center w-28 mx-auto"
+                            />
+                          </TableCell>
+
+                          <TableCell className="px-6 py-3.5 align-middle text-right font-mono font-bold text-sm whitespace-nowrap">
+                            <span className={variance < 0 ? "text-[#E43D2B]" : variance > 0 ? "text-[#2BA24D]" : "text-[#525F7F]"}>
+                              {it.product ? (variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)) : "—"}
+                            </span>
+                          </TableCell>
+
+                          <TableCell className="pr-6 py-3.5 align-middle text-center whitespace-nowrap">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeRow(it.id)}
+                              disabled={items.length === 1}
+                              className="h-8 w-8 text-red-500 hover:bg-red-50"
+                              title="Remove line"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                  <TableFooter className="bg-gray-50/60 border-t border-gray-100">
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-3 px-6">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={addRow}
+                          className="text-[#3B7CED] hover:bg-blue-50/50 text-sm font-semibold h-9 px-4 flex items-center gap-1.5"
+                        >
+                          <Plus className="w-4 h-4" /> Add Product Line
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+            </div>
           </form>
-        </div>
+        </main>
 
-        {/* Signature Sticky Footer Bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+        {/* Fixed Signature Sticky Footer Bar */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
           <Link href={`/inventory/stocks/adjustment/${id}`}>
-            <Button variant="outline" type="button" className="border-blue-400 text-blue-500 hover:bg-blue-50">
+            <Button
+              variant="outline"
+              type="button"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 h-9 px-4 text-sm font-medium"
+            >
               Cancel
             </Button>
           </Link>
@@ -404,16 +403,18 @@ export default function EditStockAdjustmentPage() {
             disabled={isSubmitting}
             onClick={handleSubmit(onSave)}
             variant="outline"
-            className="border-blue-400 text-blue-500 hover:bg-blue-50"
+            className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50/50 h-9 px-4 text-sm font-semibold flex items-center gap-1.5"
           >
+            <Save className="w-4 h-4" />
             {isSubmitting ? "Saving..." : "Save Draft"}
           </Button>
           <Button
             type="button"
             disabled={isSubmitting}
             onClick={handleSubmit(onValidate)}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
           >
+            <CheckCircle className="w-4 h-4" />
             {isSubmitting ? "Validating..." : "Validate & Update Stock"}
           </Button>
         </div>

@@ -1,13 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Breadcrumbs from "@/components/shared/BreadScrumbs";
+import { AutoSaveIcon } from "@/components/shared/icons";
+import { BreadcrumbItem } from "@/components/shared/types";
 import {
   Table,
   TableBody,
@@ -47,6 +50,13 @@ export default function ProductCategoriesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("all");
 
+  const items: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Inventory", href: "/inventory" },
+    { label: "Configuration", href: "/inventory/configuration" },
+    { label: "Categories", href: "/inventory/configuration/categories", current: true },
+  ];
+
   const handleRowClick = (id: string) => {
     router.push(`/inventory/configuration/categories/${id}`);
   };
@@ -59,94 +69,120 @@ export default function ProductCategoriesPage() {
 
   return (
     <PageGuard application="inventory" module="productcategories">
-      <div className="p-6 max-w-7xl mx-auto flex flex-col gap-6 w-full">
-        {/* Top Bar Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-4 rounded shadow-sm gap-4">
-          <div className="flex flex-wrap items-center gap-4 flex-1">
-            <h1 className="text-xl font-semibold text-gray-800">Product Categories</h1>
-            
-            <div className="relative w-full sm:w-[240px]">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-gray-50 border-gray-200 h-9 text-sm"
-              />
+      {/* Two-tone: gray page canvas */}
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
+          <Breadcrumbs
+            items={items}
+            action={
+              <Button variant="ghost" className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors">
+                Autosaved <AutoSaveIcon />
+              </Button>
+            }
+          />
+
+          {/* White Header Control Card with Filter Pills */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            {/* Top Bar: title + search + actions */}
+            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
+              <div className="flex items-center gap-4">
+                <h1 className="text-xl font-semibold text-[#32325D] shrink-0">Product Categories</h1>
+                <div className="relative w-[240px] md:w-[320px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search category or description..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9 bg-white border-gray-200 rounded-lg h-9 text-sm w-full focus:ring-1 focus:ring-[#3B7CED] text-[#32325D]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <Link href="/inventory/configuration/categories/new">
+                  <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all flex items-center gap-1.5">
+                    <Plus className="h-4 w-4" /> New Category
+                  </Button>
+                </Link>
+              </div>
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowFilters(!showFilters)}
-              className={`h-9 w-9 border border-gray-200 rounded ${showFilters ? "bg-blue-50 text-[#3B7CED] border-blue-200" : "text-gray-500 hover:text-gray-900"}`}
-              title="Toggle Filters"
-            >
-              <Filter className="h-4 w-4" />
-            </Button>
-
-            {showFilters && (
-              <div className="flex items-center gap-3">
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-[140px] h-9 border-gray-200 bg-white text-xs">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="ACTIVE">Active</SelectItem>
-                    <SelectItem value="INACTIVE">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Status Filter Pills */}
+            <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
+              {[
+                { label: "All Categories", value: "all" },
+                { label: "Active", value: "ACTIVE" },
+                { label: "Inactive", value: "INACTIVE" },
+              ].map((tab) => {
+                const isSelected = selectedStatus === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setSelectedStatus(tab.value)}
+                    className={`px-4 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer ${
+                      isSelected
+                        ? "bg-[#E8F0FE] text-[#1A73E8] font-semibold"
+                        : "bg-[#E9ECEF] text-[#8898AA] font-normal hover:bg-gray-200"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <Link href="/inventory/configuration/categories/new">
-              <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 text-sm">
-                New Category
-              </Button>
-            </Link>
-          </div>
-        </div>
 
-        {/* Table Content */}
-        <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
-                <TableHead className="font-medium text-gray-500">Category Name</TableHead>
-                <TableHead className="font-medium text-gray-500">Description</TableHead>
-                <TableHead className="font-medium text-gray-500 text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCategories.map((cat) => (
-                <TableRow 
-                  key={cat.id} 
-                  className="cursor-pointer hover:bg-gray-50 border-b-gray-100 transition-colors"
-                  onClick={() => handleRowClick(cat.id)}
-                >
-                  <TableCell className="text-gray-900 font-medium">{cat.name}</TableCell>
-                  <TableCell className="text-gray-600">{cat.description}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={getStatusVariant(cat.status) as any} className="px-3 py-1 font-normal">
-                      {cat.status || "DRAFT"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredCategories.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-gray-500">
-                    No categories found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+          {/* Main Table Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto w-full">
+              <Table className="min-w-[700px] w-full">
+                <TableHeader>
+                  <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap w-64">
+                      Category Name
+                    </TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      Description
+                    </TableHead>
+                    <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-36">
+                      Status
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCategories.map((cat) => (
+                    <TableRow 
+                      key={cat.id} 
+                      className="cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-colors"
+                      onClick={() => handleRowClick(cat.id)}
+                    >
+                      <TableCell className="px-6 py-3.5 text-sm font-semibold text-[#32325D] whitespace-nowrap">
+                        {cat.name}
+                      </TableCell>
+                      <TableCell className="px-6 py-3.5 text-sm text-[#525F7F]">
+                        {cat.description}
+                      </TableCell>
+                      <TableCell className="pr-6 py-3.5 text-center whitespace-nowrap">
+                        <Badge variant={getStatusVariant(cat.status) as any} className="px-2.5 py-0.5 font-semibold text-xs shadow-none">
+                          {cat.status || "DRAFT"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredCategories.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-12 text-[#8898AA] text-sm">
+                        No categories found matching your search criteria.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </main>
       </div>
     </PageGuard>
   );

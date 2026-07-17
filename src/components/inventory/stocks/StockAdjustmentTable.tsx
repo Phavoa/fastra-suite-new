@@ -1,8 +1,15 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Checkbox } from "../../ui/checkbox";
-import { motion } from "framer-motion";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { StockAdjustmentRow as StockAdjustmentRowType } from "../types";
 import { StockAdjustmentRow } from "./StockAdjustmentRow";
 
@@ -22,7 +29,8 @@ export function StockAdjustmentTable({
         r.id.toLowerCase().includes(query.toLowerCase()) ||
         r.adjustmentType.toLowerCase().includes(query.toLowerCase()) ||
         r.location.toLowerCase().includes(query.toLowerCase()) ||
-        r.adjustedDate.toLowerCase().includes(query.toLowerCase())
+        r.adjustedDate.toLowerCase().includes(query.toLowerCase()) ||
+        (r.product && r.product.toLowerCase().includes(query.toLowerCase()))
     );
   }, [rows, query]);
 
@@ -44,88 +52,79 @@ export function StockAdjustmentTable({
   }
 
   return (
-    <section className="mx-auto mt-6 mr-4">
-      <motion.div
-        className="px-6 bg-white h-full"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <div className="mt-2 pt-4 bg-white rounded-lg overflow-hidden">
-          <motion.div
-            className="hidden md:grid grid-cols-[48px_1fr_1fr_1fr_1fr_0.5fr] items-center bg-gray-100 rounded-md px-4 py-3 text-sm font-medium text-gray-500 border-b border-gray-100"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-          >
-            <div className="flex items-center">
-              <Checkbox
-                id="select-all"
-                aria-label="Select all purchase requests"
-                checked={allSelected}
-                onCheckedChange={() => toggleAll()}
-                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700 transition-all duration-200"
-              />
-            </div>
-            <div>Stock Adjustment ID</div>
-            <div>Adjustment Type</div>
-            <div>Location</div>
-            <div>Adjusted Date</div>
-            <div>Status</div>
-          </motion.div>
-
-          {/* Desktop Table */}
-          <div className="">
-            {filtered.map((v, index) => (
-              <motion.div
-                key={v.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.4,
-                  ease: "easeOut",
-                  delay: index * 0.1,
-                }}
-              >
-                <StockAdjustmentRow
-                  request={v}
-                  isSelected={!!selected[v.id]}
-                  onToggleSelect={toggleOne}
+    <div className="w-full">
+      <div className="overflow-x-auto">
+        <Table className="min-w-[950px] w-full">
+          <TableHeader>
+            <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
+              <TableHead className="w-12 py-3.5 pl-6 pr-2">
+                <Checkbox
+                  id="select-all"
+                  aria-label="Select all adjustments"
+                  checked={allSelected}
+                  onCheckedChange={() => toggleAll()}
+                  className="data-[state=checked]:border-[#3B7CED] data-[state=checked]:bg-[#3B7CED] transition-all duration-200"
                 />
-              </motion.div>
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                Stock Adjustment ID
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                Adjustment Type
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                Location
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                Product
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                Quantity Adjusted
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                Adjusted Date
+              </TableHead>
+              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                Status
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((v) => (
+              <StockAdjustmentRow
+                key={v.id}
+                request={v}
+                isSelected={!!selected[v.id]}
+                onToggleSelect={toggleOne}
+              />
             ))}
-          </div>
-        </div>
+          </TableBody>
+        </Table>
+      </div>
 
-        {filtered.length === 0 && (
-          <motion.div
-            className="p-8 text-center text-gray-400"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
-          >
-            No stock adjustments found
-          </motion.div>
-        )}
-
-        <div className="px-6 py-4 flex items-center justify-between text-sm text-gray-500">
-          <div>{filtered.length} results</div>
-          <nav aria-label="Pagination">
-            <ul className="inline-flex items-center gap-2">
-              <li>
-                <button className="px-3 py-1 rounded-md border border-gray-200">
-                  Prev
-                </button>
-              </li>
-              <li>
-                <button className="px-3 py-1 rounded-md border border-gray-200">
-                  Next
-                </button>
-              </li>
-            </ul>
-          </nav>
+      {filtered.length === 0 && (
+        <div className="p-12 text-center text-[#8898AA] text-sm">
+          No stock adjustments found matching your query.
         </div>
-      </motion.div>
-    </section>
+      )}
+
+      <div className="px-6 py-4 flex items-center justify-between text-sm text-[#525F7F] bg-[#F6F9FC] border-t border-gray-100">
+        <div>Showing {filtered.length} entries</div>
+        <nav aria-label="Pagination">
+          <ul className="inline-flex items-center gap-2">
+            <li>
+              <button disabled className="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-400 cursor-not-allowed text-xs">
+                Prev
+              </button>
+            </li>
+            <li>
+              <button disabled className="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-400 cursor-not-allowed text-xs">
+                Next
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
   );
 }
