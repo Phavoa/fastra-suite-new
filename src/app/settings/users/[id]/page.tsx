@@ -15,7 +15,6 @@ import FormSubmitButton from "@/components/Settings/form/FormSubmitButton";
 import FormImageUpload from "@/components/Settings/form/FormImageUpload";
 import FormSelect from "@/components/Settings/form/FormSelect";
 import FormMultiSelect from "@/components/Settings/form/FormMultiSelect";
-import SignaturePad from "@/components/Settings/form/SignaturePad";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
@@ -47,14 +46,13 @@ interface UserData {
   first_name: string;
   last_name: string;
   email: string;
-  company_role: number | null;
+  company_role: number | null | undefined;
   company_role_details?: CompanyRoleDetails | null;
   phone_number: string;
   language: string;
   timezone: string;
   in_app_notifications: boolean;
   email_notifications: boolean;
-  signature_image?: File | string | null;
   user_image_image?: File | string | null;
 }
 
@@ -91,7 +89,6 @@ export default function UsersDetails() {
     timezone: "Africa/Abidjan",
     in_app_notifications: true,
     email_notifications: true,
-    signature_image: null,
     user_image_image: null,
   });
 
@@ -123,7 +120,6 @@ export default function UsersDetails() {
         timezone: userData.timezone || "Africa/Abidjan",
         in_app_notifications: userData.in_app_notifications ?? true,
         email_notifications: userData.email_notifications ?? true,
-        signature_image: userData.signature || null,
         user_image_image: userData.user_image || null,
       });
     }
@@ -163,25 +159,6 @@ export default function UsersDetails() {
     });
   };
 
-  const base64ToFile = (base64: string, fileName: string) => {
-    if (!base64.startsWith("data:")) {
-      console.warn("Invalid base64 string provided:", base64);
-      return null;
-    }
-
-    const arr = base64.split(",");
-    const mime = arr[0].match(/:(.*?);/)![1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-
-    return new File([u8arr], fileName, { type: mime });
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editMode) return;
@@ -207,9 +184,6 @@ export default function UsersDetails() {
       formData.append("email_notifications", String(form.email_notifications));
 
       // Append files if they exist
-      if (form.signature_image instanceof File) {
-        formData.append("signature_image", form.signature_image);
-      }
       if (form.user_image_image instanceof File) {
         formData.append("user_image_image", form.user_image_image);
       }
@@ -550,44 +524,6 @@ export default function UsersDetails() {
                 </div>
               ))}
             </div>
-          </FormSection>
-
-          {/* Signature */}
-          <FormSection title="Signature">
-            {editMode ? (
-              <SignaturePad
-                onChange={(base64) => {
-                  // Ignore empty signatures
-                  if (!base64) {
-                    setForm((prev) => ({ ...prev, signature_image: null }));
-                    return;
-                  }
-
-                  // If base64 does not include the data URL prefix, add it
-                  let normalized = base64;
-                  if (!base64.startsWith("data:")) {
-                    normalized = `data:image/png;base64,${base64}`;
-                  }
-
-                  const file = base64ToFile(normalized, "signature.png");
-
-                  setForm((prev) => ({
-                    ...prev,
-                    signature_image: file,
-                  }));
-                }}
-              />
-            ) : (
-              <img
-                src={
-                  form.signature_image
-                    ? `data:image/png;base64,${form.signature_image}`
-                    : "/images/signature-placeholder.png"
-                }
-                alt="Signature"
-                className="h-20"
-              />
-            )}
           </FormSection>
 
           {/* Footer Buttons */}

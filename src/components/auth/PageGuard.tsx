@@ -2,22 +2,23 @@
 
 import { ReactNode } from "react";
 import { usePermission } from "../../hooks/usePermission";
-import { PermissionAction, ApplicationName } from "../../types/permissions";
+import { CanParamsV2 } from "../../types/permissions";
 import { LoadingDots } from "../shared/LoadingComponents";
 import { UnauthorizedMessage } from "../shared/UnauthorizedMessage";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 
-interface PageGuardProps {
-  application: ApplicationName;
-  module: string;
-  action?: PermissionAction; // Defaults to 'view'
+interface PageGuardProps extends CanParamsV2 {
   children: ReactNode;
 }
 
 /**
  * Specialized guard for protecting entire pages.
  * Handles loading states consistently and renders an inline unauthorized message.
+ *
+ * Supports two APIs:
+ * 1. Legacy: <PageGuard application="settings" module="user" action="view">
+ * 2. New:    <PageGuard module="project_costing" entitlement="view_project">
  *
  * Permission resolution order:
  * 1. If user is not authenticated at all → show loading (auth rehydration in progress)
@@ -29,6 +30,7 @@ export function PageGuard({
   application,
   module,
   action = "view",
+  entitlement,
   children,
 }: PageGuardProps) {
   const { can, isAdmin, isLoading } = usePermission();
@@ -63,7 +65,7 @@ export function PageGuard({
     );
   }
 
-  const hasAccess = can({ application, module, action });
+  const hasAccess = can({ application, module, action, entitlement });
 
   // If we don't have access and are not loading, show the inline unauthorized message
   if (!hasAccess) {

@@ -13,7 +13,6 @@ import FormSection from "@/components/Settings/form/FormSection";
 import FormInput from "@/components/Settings/form/FormInput";
 import FormImageUpload from "@/components/Settings/form/FormImageUpload";
 import FormSelect from "@/components/Settings/form/FormSelect";
-import SignaturePad from "@/components/Settings/form/SignaturePad";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
@@ -36,14 +35,13 @@ import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTempla
 const userCreateSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
-  company_role: z.coerce.number().min(1, "Role is required"),
+  company_role: z.coerce.number().min(1, "Role is required").optional(),
   phone_number: z.string().min(1, "Phone number is required"),
   language: z.string().min(1, "Language is required"),
   timezone: z.string().min(1, "Timezone is required"),
   in_app_notifications: z.boolean().default(true),
   email_notifications: z.boolean().default(true),
   user_image_image: z.any().optional(),
-  signature_image: z.any().optional(),
 });
 
 type UserCreateInput = z.infer<typeof userCreateSchema>;
@@ -101,6 +99,7 @@ export default function NewUser() {
       in_app_notifications: true,
       email_notifications: true,
       company_role: 0,
+      user_image_image: null,
     },
   });
 
@@ -128,8 +127,9 @@ export default function NewUser() {
     formData.append("tenant_schema_name", tenant_schema_name || "");
 
     // Ensure company_role is a string-represented number
-    const roleId = String(data.company_role);
-    formData.append("company_role", roleId);
+    if (data.company_role) {
+      formData.append("company_role", String(data.company_role));
+    }
 
     formData.append("phone_number", data.phone_number);
     formData.append("language", data.language);
@@ -145,11 +145,6 @@ export default function NewUser() {
 
     if (data.user_image_image) {
       formData.append("user_image_image", data.user_image_image);
-      formData.append("image", data.user_image_image);
-    }
-
-    if (data.signature_image) {
-      formData.append("signature_image", data.signature_image);
     }
 
     const permissionsPayload = Object.entries(directPermissions)
@@ -255,18 +250,6 @@ export default function NewUser() {
         show: true,
       });
     }
-  };
-
-  const base64ToFile = (base64: string, filename: string) => {
-    const arr = base64.split(",");
-    const mime = arr[0].match(/:(.*?);/)?.[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -515,23 +498,6 @@ export default function NewUser() {
                     />
                   </div>
                 </div>
-              </FormSection>
-
-              {/* Signature Pad */}
-              <FormSection title="Signature">
-                <SignaturePad
-                  onChange={(base64) => {
-                    if (base64) {
-                      const file = base64ToFile(
-                        `data:image/png;base64,${base64}`,
-                        "signature.png",
-                      );
-                      setValue("signature_image", file);
-                    } else {
-                      setValue("signature_image", null);
-                    }
-                  }}
-                />
               </FormSection>
 
               {/* Footer Buttons */}

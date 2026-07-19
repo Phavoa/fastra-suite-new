@@ -6,8 +6,8 @@ export default function NewUserRoleSelect({
   value,
   onChange,
 }: {
-  value: number;
-  onChange: (value: number) => void;
+  value: number | null | undefined;
+  onChange: (value: number | null | undefined) => void;
 }) {
   // Fetch company info including roles
   const { data: company, isLoading, error } = useGetCompanyQuery();
@@ -24,8 +24,10 @@ export default function NewUserRoleSelect({
     <FormSelect
       label="Role"
       name="company_role"
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      value={value ?? ""}
+      onChange={(e) =>
+        onChange(e.target.value ? Number(e.target.value) : null)
+      }
       placeholder={isLoading ? "Loading roles..." : "Select role"}
       options={roleOptions}
     />

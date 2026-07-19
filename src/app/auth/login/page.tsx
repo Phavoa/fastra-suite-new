@@ -108,7 +108,7 @@ const LoginPage: NextPage = () => {
       localStorage.removeItem(`auth_failures_${data.email}`);
       localStorage.removeItem(`auth_lockout_${data.email}`);
 
-      // Store core auth data including new user_permissions field
+      // Store core auth data including new permission fields
       dispatch(
         setAuthData({
           user: result.user,
@@ -120,16 +120,21 @@ const LoginPage: NextPage = () => {
           tenant_company_name: result.tenant_company_name,
           isOnboarded: result.isOnboarded,
           user_permissions: result.user_permissions ?? [],
+          permission_details: result.permission_details ?? [],
           // Temporarily set isAdmin = false; will be confirmed below
           isAdmin: false,
         }),
       );
 
-      // --- Determine admin status from tenant-user profile ---
-      // The backend returns user_permissions: [] for admin/superusers,
-      // but also for users with literally no permissions assigned.
-      // We resolve this by fetching the tenant-user profile and
-      // checking company_role (role 1 = owner/admin).
+      // --- Determine admin status from username ---
+      // Admin usernames always start with "admin_" (e.g. "admin_lukudev")
+      const username = result.user?.username ?? "";
+      const isAdminByUsername = username.startsWith("admin_");
+      dispatch(setIsAdmin(isAdminByUsername));
+
+      // --- Fetch tenant-user profile for permission_details ---
+      // The login response may not include permission_details,
+      // so we fetch the tenant-user profile to get them.
       try {
         const tenantUserId = result.tenant_user_id;
         const tenantSchema = result.tenant_schema_name;
@@ -144,15 +149,14 @@ const LoginPage: NextPage = () => {
           );
           if (profileRes.ok) {
             const profile = await profileRes.json();
-            // company_role 1 = primary owner/admin; or if backend explicitly sets a role name
-            const roleId: number = profile?.company_role ?? 0;
-            const roleName: string = (profile?.company_role_details?.name ?? "").toLowerCase();
-            const adminByRole = roleId === 1 || roleName === "admin" || roleName === "owner" || roleName === "super admin" || roleName === "superadmin";
-            dispatch(setIsAdmin(adminByRole));
+            // Update permission details from profile if available
+            if (profile.permission_details) {
+              dispatch(setAuthData({ permission_details: profile.permission_details }));
+            }
           }
         }
       } catch {
-        // Profile fetch failed — leave isAdmin as false; non-critical
+        // Profile fetch failed — permission_details may be missing, non-critical
       }
 
       // Set httpOnly cookie via API route for security

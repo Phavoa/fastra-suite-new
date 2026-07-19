@@ -21,3 +21,13 @@ export interface CanParams {
   module: ModuleName;
   action: PermissionAction;
 }
+
+/**
+ * Extended interface supporting the new entitlement-based permission check.
+ */
+export interface CanParamsV2 {
+  application?: ApplicationName;
+  module: ModuleName;
+  action?: PermissionAction;
+  entitlement?: string;
+}
