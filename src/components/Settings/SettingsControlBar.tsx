@@ -11,7 +11,12 @@ import { useDispatch, useSelector } from "react-redux";
 import { PermissionGuard } from "../ProtectedComponent";
 
 type SettingsControlBarProps = {
-  activeSection: "company" | "user" | "accessgroup" | "application" | "permissiontemplates";
+  activeSection:
+    | "company"
+    | "user"
+    | "accessgroup"
+    | "application"
+    | "permissiontemplates";
   onSearch?: (query: string) => void;
   onNew?: () => void;
   onShowArchivedUsers?: () => void; // NEW HANDLER
@@ -40,7 +45,6 @@ export const SettingsControlBar = ({
   const handleToggleView = (mode: "grid" | "list") => {
     dispatch(setViewMode(mode));
   };
-  console.log(activeSection);
   const getButtonLabel = () => {
     switch (activeSection) {
       case "company":
@@ -93,20 +97,26 @@ export const SettingsControlBar = ({
           </GrayButton>
         </PermissionGuard>
 
-        {/* Secondary Button (ONLY on Users Page) */}
-        {activeSection === "user" && onShowArchivedUsers && (
-          <GrayButton
-            size="md"
-            className={
-              archive
-                ? "bg-[#3B7CED] text-white"
-                : "bg-white border border-[#3B7CED] text-[#3B7CED]"
-            }
-            onClick={onShowArchivedUsers}
-          >
-            Archived Users
-          </GrayButton>
-        )}
+        {/* Secondary Button (ONLY on Users and Permission Templates Page) */}
+        {(activeSection === "user" ||
+          activeSection === "permissiontemplates") &&
+          onShowArchivedUsers && (
+            <GrayButton
+              size="md"
+              className={
+                archive
+                  ? "bg-[#3B7CED] text-white"
+                  : "bg-white border border-[#3B7CED] text-[#3B7CED]"
+              }
+              onClick={onShowArchivedUsers}
+            >
+              {activeSection === "user"
+                ? "Archived Users"
+                : archive
+                  ? "Active Templates"
+                  : "Archived Templates"}
+            </GrayButton>
+          )}
 
         {/* Grid/List Toggle */}
         <div className="flex items-center border border-[#E2E6E9] rounded-sm px-2 h-11">

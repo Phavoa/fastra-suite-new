@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import type { PermissionDetail } from "@/utils/normalizePermissions";
 
 export interface User {
   id: number;
@@ -18,11 +19,16 @@ export interface AuthState {
   tenant_company_name: string | null;
   isOnboarded: boolean | null;
   /**
-   * New backend permission format (Django codenames).
+   * New backend permission format (array of {module, permission_type}).
    * Empty array [] signals that the user is an admin (bypasses all checks).
-   * Non-empty array contains explicit permission codenames for regular users.
+   * Non-empty array contains explicit permission entries for regular users.
    */
-  user_permissions: string[];
+  user_permissions: Array<{ module: string; permission_type: string }>;
+  /**
+   * Detailed permissions from backend with expanded entitlements per permission type.
+   * Used for permission checking and UI rendering.
+   */
+  permission_details: PermissionDetail[];
   /**
    * Whether this user is an admin/owner of the tenant.
    * Derived after login by checking company_role from the tenant-user profile endpoint.
@@ -41,6 +47,7 @@ const initialState: AuthState = {
   tenant_company_name: null,
   isOnboarded: null,
   user_permissions: [],
+  permission_details: [],
   isAdmin: false,
 };
 

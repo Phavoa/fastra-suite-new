@@ -8,21 +8,23 @@ import FormInput from "@/components/Settings/form/FormInput";
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
   createEmptyPermissions,
-  savePermissionTemplate,
   PermissionTemplate,
   UserPermissions,
+  convertPermissionsToApiItems,
 } from "@/utils/modulePermissionsStore";
 import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
+import { useCreatePermissionTemplateMutation } from "@/api/settings/permissionsTemplateApi";
 
 export default function NewPermissionTemplatePage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [permissions, setPermissions] = useState<UserPermissions>(createEmptyPermissions());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const statusModal = useStatusModal();
 
-  const handleSave = (e: React.FormEvent) => {
+  const statusModal = useStatusModal();
+  const [createTemplate] = useCreatePermissionTemplateMutation();
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -32,16 +34,13 @@ export default function NewPermissionTemplatePage() {
 
     setIsSubmitting(true);
     try {
-      const newTemplate: PermissionTemplate = {
-        id: `tpl-${Date.now()}`,
+      const body = {
         name: name.trim(),
-        permissions,
-        isArchived: false,
-        createdAt: new Date().toISOString(),
+        is_active: true,
+        items: convertPermissionsToApiItems(permissions),
       };
 
-      savePermissionTemplate(newTemplate);
-      
+      await createTemplate(body).unwrap();
       statusModal.showSuccess("Success", "Permission template created successfully!");
       setTimeout(() => {
         router.push("/settings/permission-templates");
@@ -49,13 +48,13 @@ export default function NewPermissionTemplatePage() {
     } catch (error) {
       console.error(error);
       statusModal.showError("Error", "Failed to create permission template.");
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="pb-6 w-full mx-auto mw-full rounded-xs bg-white">
-      {/* Top bar */}
       <div className="flex px-6 items-center border-b py-4 border-[#E2E6E9]">
         <button
           type="button"
@@ -83,7 +82,7 @@ export default function NewPermissionTemplatePage() {
 
         <FormSection title="Permissions Configuration">
           <p className="text-sm text-gray-500 mb-4 mt-2">
-            Configure the default permissions that will be applied to users when using this template. 
+            Configure the default permissions that will be applied to users when using this template.
             Admins can still customize individual cell checkboxes after applying this template to a user.
           </p>
           <PermissionsGrid

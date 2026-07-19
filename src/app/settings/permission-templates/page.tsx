@@ -1,35 +1,52 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import {
-  getPermissionTemplates,
   PermissionTemplate,
-  savePermissionTemplate,
+  UserPermissions,
+  createEmptyPermissions,
+  convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
 import { ClipboardList, Trash2, Archive, Shield, CheckCircle } from "lucide-react";
 import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
+import {
+  useGetPermissionTemplatesQuery,
+  useActivatePermissionTemplateMutation,
+  useArchivePermissionTemplateMutation,
+} from "@/api/settings/permissionsTemplateApi";
+import type { PermissionTemplate as ApiPermissionTemplate } from "@/api/settings/permissionsTemplateApi";
 
 export default function PermissionTemplatesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search") ?? "";
-  
+
   const viewMode = useSelector((state: RootState) => state.viewMode.mode);
   const archiveFlag = useSelector((state: RootState) => state.viewMode.archive);
-  
-  const [templates, setTemplates] = useState<PermissionTemplate[]>([]);
+
+  const { data: apiTemplates = [], isLoading, refetch } = useGetPermissionTemplatesQuery(
+    searchQuery ? { search: searchQuery } : undefined
+  );
+
+  const [activateTemplate] = useActivatePermissionTemplateMutation();
+  const [archiveTemplate] = useArchivePermissionTemplateMutation();
   const statusModal = useStatusModal();
 
-  useEffect(() => {
-    setTemplates(getPermissionTemplates());
-  }, []);
+  const templates: PermissionTemplate[] = useMemo(() => {
+    return apiTemplates.map((t: ApiPermissionTemplate) => ({
+      id: String(t.id),
+      name: t.name,
+      permissions: convertApiItemsToPermissions(t.items),
+      isArchived: !t.is_active,
+      createdAt: t.created_at || new Date().toISOString(),
+    }));
+  }, [apiTemplates]);
 
   const formattedTemplates = useMemo(() => {
     return templates.map((t) => {
-      // Calculate how many permissions are enabled in this template
       let enabledCount = 0;
       Object.values(t.permissions).forEach((modulePerms) => {
         Object.values(modulePerms).forEach((val) => {
@@ -44,11 +61,9 @@ export default function PermissionTemplatesPage() {
     });
   }, [templates]);
 
-  // Filter based on search and archive status
   const filteredTemplates = useMemo(() => {
     let result = formattedTemplates;
-    
-    // Archive filter: if archiveFlag is true, show archived; else show active
+
     result = result.filter((t) => (archiveFlag ? t.isArchived : !t.isArchived));
 
     if (searchQuery) {
@@ -59,14 +74,26 @@ export default function PermissionTemplatesPage() {
     return result;
   }, [formattedTemplates, archiveFlag, searchQuery]);
 
-  const handleArchiveToggle = (template: PermissionTemplate) => {
-    const updated = { ...template, isArchived: !template.isArchived };
-    savePermissionTemplate(updated);
-    setTemplates(getPermissionTemplates());
-    statusModal.showSuccess(
-      "Success",
-      `Template "${template.name}" has been ${template.isArchived ? "activated" : "archived"} successfully!`
-    );
+  const handleArchiveToggle = async (template: PermissionTemplate) => {
+    try {
+      if (template.isArchived) {
+        await activateTemplate({ id: Number(template.id) }).unwrap();
+        statusModal.showSuccess(
+          "Success",
+          `Template "${template.name}" has been activated successfully!`
+        );
+      } else {
+        await archiveTemplate({ id: Number(template.id) }).unwrap();
+        statusModal.showSuccess(
+          "Success",
+          `Template "${template.name}" has been archived successfully!`
+        );
+      }
+      refetch();
+    } catch (error) {
+      console.error(error);
+      statusModal.showError("Error", `Failed to ${template.isArchived ? "activate" : "archive"} template.`);
+    }
   };
 
   const handleEdit = (id: string) => {
@@ -86,6 +113,14 @@ export default function PermissionTemplatesPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="py-20 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="py-6 px-6 w-full max-w-[1400px] mx-auto">
       {filteredTemplates.length === 0 ? (
@@ -97,7 +132,6 @@ export default function PermissionTemplatesPage() {
           </p>
         </div>
       ) : viewMode === "grid" ? (
-        // Premium Grid Cards View
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTemplates.map((t) => (
             <div
@@ -144,7 +178,6 @@ export default function PermissionTemplatesPage() {
           ))}
         </div>
       ) : (
-        // Premium Table List View
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full text-left border-collapse">
             <thead>

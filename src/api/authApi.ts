@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import type { PermissionDetail } from "@/utils/normalizePermissions";
 
 // Define types for requests and responses
 export interface RegisterRequest {
@@ -38,10 +39,13 @@ export interface LoginResponse {
   /**
    * New backend permission format.
    * - Empty array [] for admin/superusers (they bypass all permission checks)
-   * - Array of Django permission codenames for regular users
-   *   e.g. ["inventory.view_deliveryorder", "purchase.add_purchaserequest"]
+   * - Array of {module, permission_type} objects for regular users
    */
-  user_permissions: string[];
+  user_permissions: Array<{ module: string; permission_type: string }>;
+  /**
+   * Detailed permissions from backend with expanded entitlements per permission type.
+   */
+  permission_details: PermissionDetail[];
 }
 
 export interface ForgetPasswordRequest {

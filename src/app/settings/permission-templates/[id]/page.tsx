@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Form from "@/components/Settings/form/form";
 import FormSection from "@/components/Settings/form/FormSection";
@@ -8,14 +8,20 @@ import FormInput from "@/components/Settings/form/FormInput";
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import ReadOnlyField from "@/components/Settings/ReadOnlyField";
 import {
-  getPermissionTemplates,
-  savePermissionTemplate,
-  deletePermissionTemplate,
-  PermissionTemplate,
-  UserPermissions,
   createEmptyPermissions,
+  convertPermissionsToApiItems,
+  convertApiItemsToPermissions,
+  convertFrontendTemplateToApi,
 } from "@/utils/modulePermissionsStore";
 import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
+import {
+  useGetPermissionTemplateQuery,
+  useUpdatePermissionTemplateMutation,
+  useDeletePermissionTemplateMutation,
+  useActivatePermissionTemplateMutation,
+  useArchivePermissionTemplateMutation,
+  useDuplicatePermissionTemplateMutation,
+} from "@/api/settings/permissionsTemplateApi";
 
 export default function PermissionTemplateDetailsPage() {
   const router = useRouter();
@@ -23,31 +29,50 @@ export default function PermissionTemplateDetailsPage() {
   const templateId = params?.id as string;
 
   const [editMode, setEditMode] = useState(false);
-  const [template, setTemplate] = useState<PermissionTemplate | null>(null);
   const [name, setName] = useState("");
-  const [permissions, setPermissions] = useState<UserPermissions>(createEmptyPermissions());
+  const [permissions, setPermissions] = useState(createEmptyPermissions());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const statusModal = useStatusModal();
 
-  useEffect(() => {
-    if (templateId) {
-      const allTemplates = getPermissionTemplates();
-      const found = allTemplates.find((t) => t.id === templateId);
-      if (found) {
-        setTemplate(found);
-        setName(found.name);
-        setPermissions(found.permissions);
-      } else {
-        statusModal.showError("Not Found", "The requested permission template was not found.");
-        setTimeout(() => {
-          router.push("/settings/permission-templates");
-        }, 1500);
-      }
-    }
-  }, [templateId]);
+  const { data: apiTemplate, isLoading, refetch } = useGetPermissionTemplateQuery(Number(templateId), {
+    skip: !templateId,
+  });
 
-  const handleSave = (e: React.FormEvent) => {
+  const template = useMemo(() => {
+    if (!apiTemplate) return null;
+    return {
+      id: String(apiTemplate.id),
+      name: apiTemplate.name,
+      permissions: convertApiItemsToPermissions(apiTemplate.items),
+      isArchived: !apiTemplate.is_active,
+      createdAt: apiTemplate.created_at || new Date().toISOString(),
+    };
+  }, [apiTemplate]);
+
+  const effectivePermissions = editMode ? permissions : (template?.permissions || createEmptyPermissions());
+  const effectiveName = editMode ? name : (template?.name || "");
+
+  const [updateTemplate] = useUpdatePermissionTemplateMutation();
+  const [deleteTemplate] = useDeletePermissionTemplateMutation();
+  const [activateTemplate] = useActivatePermissionTemplateMutation();
+  const [archiveTemplate] = useArchivePermissionTemplateMutation();
+  const [duplicateTemplate] = useDuplicatePermissionTemplateMutation();
+
+  const revertToTemplate = () => {
+    if (template) {
+      setName(template.name);
+      setPermissions(template.permissions);
+    }
+  };
+
+  const handleEditToggle = () => {
+    revertToTemplate();
+    setEditMode((prev) => !prev);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!template) return;
 
@@ -58,16 +83,19 @@ export default function PermissionTemplateDetailsPage() {
 
     setIsSubmitting(true);
     try {
-      const updatedTemplate: PermissionTemplate = {
-        ...template,
-        name: name.trim(),
-        permissions,
-      };
-
-      savePermissionTemplate(updatedTemplate);
-      setTemplate(updatedTemplate);
+      await updateTemplate({
+        id: Number(template.id),
+        body: convertFrontendTemplateToApi({
+          id: template.id,
+          name: name.trim(),
+          permissions,
+          isArchived: template.isArchived,
+          createdAt: template.createdAt,
+        }),
+      }).unwrap();
       setEditMode(false);
       statusModal.showSuccess("Success", "Permission template updated successfully!");
+      refetch();
     } catch (error) {
       console.error(error);
       statusModal.showError("Error", "Failed to update permission template.");
@@ -76,45 +104,52 @@ export default function PermissionTemplateDetailsPage() {
     }
   };
 
-  const handleArchiveToggle = () => {
+  const handleArchiveToggle = async () => {
     if (!template) return;
     try {
-      const updated = { ...template, isArchived: !template.isArchived };
-      savePermissionTemplate(updated);
-      setTemplate(updated);
-      statusModal.showSuccess(
-        "Success",
-        `Template has been ${updated.isArchived ? "archived" : "activated"} successfully!`
-      );
+      if (template.isArchived) {
+        await activateTemplate({ id: Number(template.id) }).unwrap();
+        statusModal.showSuccess("Success", "Template activated successfully!");
+      } else {
+        await archiveTemplate({ id: Number(template.id) }).unwrap();
+        statusModal.showSuccess("Success", "Template archived successfully!");
+      }
+      refetch();
     } catch (error) {
       console.error(error);
       statusModal.showError("Error", "Failed to toggle archive status.");
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!template) return;
-    
-    // Show a confirmation dialog or action
-    const confirmDelete = window.confirm(
-      "Are you sure you want to permanently delete this template? This action cannot be undone."
-    );
-
-    if (confirmDelete) {
-      try {
-        deletePermissionTemplate(template.id);
-        statusModal.showSuccess("Success", "Template deleted successfully.");
-        setTimeout(() => {
-          router.push("/settings/permission-templates");
-        }, 1500);
-      } catch (error) {
-        console.error(error);
-        statusModal.showError("Error", "Failed to delete template.");
-      }
+    try {
+      await deleteTemplate(Number(template.id)).unwrap();
+      statusModal.showSuccess("Success", "Template deleted successfully.");
+      setTimeout(() => {
+        router.push("/settings/permission-templates");
+      }, 1500);
+    } catch (error) {
+      console.error(error);
+      statusModal.showError("Error", "Failed to delete template.");
+    } finally {
+      setShowDeleteConfirm(false);
     }
   };
 
-  if (!template) {
+  const handleDuplicate = async () => {
+    if (!template) return;
+    try {
+      await duplicateTemplate({ id: Number(template.id) }).unwrap();
+      statusModal.showSuccess("Success", "Template duplicated successfully.");
+      router.push("/settings/permission-templates");
+    } catch (error) {
+      console.error(error);
+      statusModal.showError("Error", "Failed to duplicate template.");
+    }
+  };
+
+  if (isLoading || !template) {
     return (
       <div className="py-20 flex justify-center items-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -124,7 +159,6 @@ export default function PermissionTemplateDetailsPage() {
 
   return (
     <div className="pb-6 w-full mx-auto mw-full rounded-xs bg-white">
-      {/* Top bar */}
       <div className="flex px-6 justify-between border-b py-4 border-[#E2E6E9]">
         <div className="flex px-6 items-center">
           <button
@@ -143,14 +177,20 @@ export default function PermissionTemplateDetailsPage() {
             {template.isArchived ? "Unarchive Template" : "Archive Template"}
           </button>
           <button
+            className="text-blue-600 hover:text-blue-800 transition-colors text-sm"
+            onClick={handleDuplicate}
+          >
+            Duplicate
+          </button>
+          <button
             className="text-red-500 hover:text-red-700 transition-colors text-sm"
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
           >
             Delete
           </button>
           <button
             className="text-[#3B7CED] text-sm"
-            onClick={() => setEditMode((prev) => !prev)}
+            onClick={handleEditToggle}
           >
             {editMode ? "Back to View" : "Edit"}
           </button>
@@ -164,13 +204,13 @@ export default function PermissionTemplateDetailsPage() {
               <FormInput
                 label="Template Name"
                 name="name"
-                value={name}
+                value={effectiveName}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Template name"
                 required
               />
             ) : (
-              <ReadOnlyField label="Template Name" value={name} />
+              <ReadOnlyField label="Template Name" value={effectiveName} />
             )}
 
             <ReadOnlyField
@@ -195,7 +235,7 @@ export default function PermissionTemplateDetailsPage() {
             This grid defines the active permission set for this template.
           </p>
           <PermissionsGrid
-            permissions={permissions}
+            permissions={effectivePermissions}
             onChange={setPermissions}
             readOnly={!editMode}
           />
@@ -207,8 +247,7 @@ export default function PermissionTemplateDetailsPage() {
               type="button"
               onClick={() => {
                 setEditMode(false);
-                setName(template.name);
-                setPermissions(template.permissions);
+                revertToTemplate();
               }}
               className="px-6 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-150 transition-colors"
             >
@@ -224,6 +263,18 @@ export default function PermissionTemplateDetailsPage() {
           </div>
         )}
       </Form>
+
+      <StatusModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        type="warning"
+        title="Delete Template"
+        message="Are you sure you want to permanently delete this template? This action cannot be undone."
+        actionText="Delete"
+        onAction={handleDelete}
+        secondaryText="Cancel"
+        onSecondary={() => setShowDeleteConfirm(false)}
+      />
 
       <StatusModal
         isOpen={statusModal.isOpen}

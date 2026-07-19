@@ -17,6 +17,8 @@ import {
   SettingsIcon,
 } from "./icons";
 import { ClipboardList, Coins } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
 
 // Navigation items grouped into sections
 const topItems = [{ id: "menu", icon: MenuIcon, label: "Menu", route: "/" }];
@@ -94,6 +96,43 @@ const Sidebar: React.FC<SidebarProps> = ({
     y: number;
   } | null>(null);
   const router = useRouter();
+  const { isAdmin } = usePermission();
+  const { hasAccess } = useModulePermissions();
+
+  const visibleMiddleItems = middleItems.filter((item) => {
+    if (!isAdmin && ["sales", "finance", "hr", "logistics"].includes(item.id)) {
+      return false;
+    }
+
+    if (!isAdmin) {
+      switch (item.id) {
+        case "dashboard":
+          return true;
+        case "account":
+          return hasAccess("invoice");
+        case "purchase":
+          return hasAccess("purchase");
+        case "inventory":
+          return hasAccess("inventory");
+        case "project-request":
+          return hasAccess("projectRequest");
+        case "project-costing":
+          return hasAccess("projectCosting");
+        case "contact":
+          return hasAccess("contact");
+        default:
+          return true;
+      }
+    }
+
+    return true;
+  });
+
+  const visibleBottomItems = bottomItems.filter((item) => {
+    if (!isAdmin && item.id === "app") return false;
+    if (!isAdmin && item.id === "settings") return hasAccess("settings");
+    return true;
+  });
 
   const handleNavigation = (item: {
     id: string;
@@ -160,7 +199,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div
           className={`flex-1 flex flex-col space-y-2 ${isExpanded ? "px-4" : "px-4 md:px-0 md:items-center"}`}
         >
-          {middleItems.map((item) => {
+          {visibleMiddleItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = isActiveItem(item.route);
             return (
@@ -198,7 +237,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div
           className={`mt-auto pb-4 pt-8 flex flex-col space-y-2 ${isExpanded ? "px-4" : "px-4 md:px-0 md:items-center"}`}
         >
-          {bottomItems.map((item) => {
+          {visibleBottomItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = isActiveItem(item.route);
             return (

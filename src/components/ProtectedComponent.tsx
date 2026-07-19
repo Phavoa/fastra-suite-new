@@ -2,12 +2,9 @@
 
 import { ReactNode } from "react";
 import { usePermission } from "../hooks/usePermission";
-import { PermissionAction, ApplicationName } from "../types/permissions";
+import { CanParamsV2 } from "../types/permissions";
 
-interface ProtectedComponentProps {
-  application: ApplicationName;
-  module: string;
-  action: PermissionAction;
+interface ProtectedComponentProps extends CanParamsV2 {
   children: ReactNode;
   fallback?: ReactNode;
   /**
@@ -19,11 +16,16 @@ interface ProtectedComponentProps {
 
 /**
  * Declarative component for protecting UI elements based on user permissions.
+ *
+ * Supports two APIs:
+ * 1. Legacy: <PermissionGuard application="settings" module="user" action="edit">
+ * 2. New:    <PermissionGuard module="project_costing" entitlement="view_project">
  */
 export function ProtectedComponent({
   application,
   module,
   action,
+  entitlement,
   children,
   fallback = null,
   hideWhileLoading = true,
@@ -34,7 +36,7 @@ export function ProtectedComponent({
     return null;
   }
 
-  if (can({ application, module, action })) {
+  if (can({ application, module, action, entitlement })) {
     return <>{children}</>;
   }
 

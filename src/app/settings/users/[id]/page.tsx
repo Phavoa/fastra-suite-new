@@ -15,7 +15,6 @@ import FormSubmitButton from "@/components/Settings/form/FormSubmitButton";
 import FormImageUpload from "@/components/Settings/form/FormImageUpload";
 import FormSelect from "@/components/Settings/form/FormSelect";
 import FormMultiSelect from "@/components/Settings/form/FormMultiSelect";
-import SignaturePad from "@/components/Settings/form/SignaturePad";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
@@ -30,14 +29,13 @@ import {
 
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
-  getUserPermissions,
-  saveUserPermissions,
-  getPermissionTemplates,
   UserPermissions,
   createEmptyPermissions,
-  convertPermissionsToApiFormat,
+  MODULE_KEY_MAP,
+  convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
-import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
+import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
+import { useResetPasswordMutation } from "@/api/settings/tenantUserApi";
 
 interface CompanyRoleDetails {
   id: number;
@@ -48,14 +46,13 @@ interface UserData {
   first_name: string;
   last_name: string;
   email: string;
-  company_role: number | null;
+  company_role: number | null | undefined;
   company_role_details?: CompanyRoleDetails | null;
   phone_number: string;
   language: string;
   timezone: string;
   in_app_notifications: boolean;
   email_notifications: boolean;
-  signature_image?: File | string | null;
   user_image_image?: File | string | null;
 }
 
@@ -70,8 +67,10 @@ export default function UsersDetails() {
   const tenant_schema_name = useSelector(
     (state: any) => state.auth.tenant_schema_name,
   );
-  const access_token = useSelector((state: any) => state.auth.access_token);
   const [updateUser] = useUpdateUserByIdMutation();
+  const [resetPassword] = useResetPasswordMutation();
+
+  const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
 
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"basic" | "access" | "permissions">("basic");
@@ -90,7 +89,6 @@ export default function UsersDetails() {
     timezone: "Africa/Abidjan",
     in_app_notifications: true,
     email_notifications: true,
-    signature_image: null,
     user_image_image: null,
   });
 
@@ -99,12 +97,14 @@ export default function UsersDetails() {
   });
   console.log(userData);
 
-  // Load direct permissions on userId change
+  // Load direct permissions from API response
   useEffect(() => {
-    if (userId) {
-      setDirectPermissions(getUserPermissions(userId));
+    if (userData) {
+      setDirectPermissions(
+        convertApiItemsToPermissions(userData.user_permissions),
+      );
     }
-  }, [userId]);
+  }, [userData]);
 
   // ----------------- Load user data into state -----------------
   useEffect(() => {
@@ -120,7 +120,6 @@ export default function UsersDetails() {
         timezone: userData.timezone || "Africa/Abidjan",
         in_app_notifications: userData.in_app_notifications ?? true,
         email_notifications: userData.email_notifications ?? true,
-        signature_image: userData.signature || null,
         user_image_image: userData.user_image || null,
       });
     }
@@ -160,25 +159,6 @@ export default function UsersDetails() {
     });
   };
 
-  const base64ToFile = (base64: string, fileName: string) => {
-    if (!base64.startsWith("data:")) {
-      console.warn("Invalid base64 string provided:", base64);
-      return null;
-    }
-
-    const arr = base64.split(",");
-    const mime = arr[0].match(/:(.*?);/)![1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-
-    return new File([u8arr], fileName, { type: mime });
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editMode) return;
@@ -204,25 +184,26 @@ export default function UsersDetails() {
       formData.append("email_notifications", String(form.email_notifications));
 
       // Append files if they exist
-      if (form.signature_image instanceof File) {
-        formData.append("signature_image", form.signature_image);
-      }
       if (form.user_image_image instanceof File) {
         formData.append("user_image_image", form.user_image_image);
       }
 
-      const userPermissionsPayload = convertPermissionsToApiFormat(directPermissions);
-      formData.append("user_permissions", JSON.stringify(userPermissionsPayload));
+      const permissionsPayload = Object.entries(directPermissions)
+        .filter(([, perms]) => Object.values(perms).some((v) => v))
+        .map(([moduleKey, perms]) => ({
+          module: MODULE_KEY_MAP[moduleKey as keyof UserPermissions],
+          permission_types: Object.entries(perms)
+            .filter(([, selected]) => selected)
+            .map(([permType]) => permType),
+        }));
+
+      formData.append("permissions", JSON.stringify(permissionsPayload));
 
       for (const [key, value] of formData.entries()) {
         console.log(key, value);
       }
 
       await updateUser({ id: userId, data: formData }).unwrap();
-
-      // Save direct permissions to localStorage and trigger updates
-      saveUserPermissions(userId, directPermissions);
-      window.dispatchEvent(new Event(PERMISSIONS_UPDATE_EVENT));
 
       statusModal.showSuccess("Success", "User updated successfully!");
       setEditMode(false);
@@ -239,30 +220,16 @@ export default function UsersDetails() {
   const handleResetPassword = async () => {
     setResetLoading(true);
     try {
-      const response = await fetch(
-        "https://propconnect.fastrasuiteapi.com.ng/users/tenant-users/reset-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(access_token && { Authorization: `Bearer ${access_token}` }),
-          },
-          body: JSON.stringify({ email: form.email }),
-        },
+      await resetPassword({ email: form.email }).unwrap();
+      statusModal.showSuccess(
+        "Success",
+        "Password reset email sent successfully!",
       );
-      if (response.ok) {
-        statusModal.showSuccess(
-          "Success",
-          "Password reset email sent successfully!",
-        );
-      } else {
-        statusModal.showError(
-          "Error",
-          "Failed to reset password. Please try again.",
-        );
-      }
-    } catch (error) {
-      statusModal.showError("Error", "An error occurred. Please try again.");
+    } catch (err: any) {
+      statusModal.showError(
+        "Error",
+        err?.data?.detail || "Failed to reset password. Please try again.",
+      );
     } finally {
       setResetLoading(false);
     }
@@ -559,44 +526,6 @@ export default function UsersDetails() {
             </div>
           </FormSection>
 
-          {/* Signature */}
-          <FormSection title="Signature">
-            {editMode ? (
-              <SignaturePad
-                onChange={(base64) => {
-                  // Ignore empty signatures
-                  if (!base64) {
-                    setForm((prev) => ({ ...prev, signature_image: null }));
-                    return;
-                  }
-
-                  // If base64 does not include the data URL prefix, add it
-                  let normalized = base64;
-                  if (!base64.startsWith("data:")) {
-                    normalized = `data:image/png;base64,${base64}`;
-                  }
-
-                  const file = base64ToFile(normalized, "signature.png");
-
-                  setForm((prev) => ({
-                    ...prev,
-                    signature_image: file,
-                  }));
-                }}
-              />
-            ) : (
-              <img
-                src={
-                  form.signature_image
-                    ? `data:image/png;base64,${form.signature_image}`
-                    : "/images/signature-placeholder.png"
-                }
-                alt="Signature"
-                className="h-20"
-              />
-            )}
-          </FormSection>
-
           {/* Footer Buttons */}
           {editMode && activeTab === "basic" && (
             <div className="mt-6 flex justify-end gap-4 px-6">
@@ -624,19 +553,20 @@ export default function UsersDetails() {
                 <select
                   onChange={(e) => {
                     if (e.target.value) {
-                      const selected = getPermissionTemplates().find(t => t.id === e.target.value);
+                      const selected = permissionTemplates.find((t: any) => t.id === Number(e.target.value));
                       if (selected) {
-                        setDirectPermissions(selected.permissions);
+                        setDirectPermissions(convertApiItemsToPermissions(selected.items));
                       }
                     }
                   }}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   defaultValue=""
+                  disabled={templatesLoading}
                 >
                   <option value="" disabled>-- Select a Template --</option>
-                  {getPermissionTemplates()
-                    .filter((t) => !t.isArchived)
-                    .map((t) => (
+                  {permissionTemplates
+                    .filter((t: any) => t.is_active)
+                    .map((t: any) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
                       </option>

@@ -6,6 +6,22 @@ export interface NormalizedPermissions {
   isReady: boolean;
 }
 
+export interface PermissionDetail {
+  module: string;
+  permissions: Array<{
+    permission_type: string;
+    entitlements: string[];
+  }>;
+}
+
+export interface PermissionDetailsResponse {
+  permissions: Array<{
+    module: string;
+    permission_type: string;
+  }>;
+  permission_details: PermissionDetail[];
+}
+
 /**
  * Maps Django permission codenames to frontend (application:module) keys.
  *
@@ -44,27 +60,71 @@ const APP_LABEL_MAP: Record<string, string> = {
 /**
  * Normalizes the new backend permission format into the frontend permission map.
  *
- * Input: string[] of Django codenames, e.g.:
- *   ["inventory.view_deliveryorder", "purchase.add_purchaserequest"]
+ * Input: permission_details array from backend
  *
- * Output: NormalizedPermissions with a Record of "application:module" → Set<PermissionAction>
- *
- * Admin users receive user_permissions: [] from the backend.
- * They are identified via the isAdmin flag stored in the Redux auth state,
- * NOT via this function. This function is only called for non-admin users.
+ * Output: NormalizedPermissions with a Record of "module" → Set<entitlement>
  */
-export function normalizePermissionsFromBackend(
-  user_permissions: string[]
+export function normalizePermissionDetails(
+  permissionDetails: PermissionDetail[] | undefined,
 ): NormalizedPermissions {
   const permissions: Record<string, Set<PermissionAction>> = {};
 
-  if (!Array.isArray(user_permissions)) {
+  if (!Array.isArray(permissionDetails)) {
     return { isAdmin: false, permissions, isReady: false };
   }
 
-  for (const codename of user_permissions) {
-    // Django codenames look like "inventory.view_deliveryorder"
-    // Some might also be plain "view_deliveryorder" (without app label)
+  for (const detail of permissionDetails) {
+    for (const perm of detail.permissions) {
+      for (const entitlement of perm.entitlements) {
+        // Normalize entitlement names to PermissionAction vocabulary
+        const action = DJANGO_ACTION_MAP[entitlement] ?? entitlement;
+        if (!permissions[detail.module]) {
+          permissions[detail.module] = new Set();
+        }
+        permissions[detail.module].add(action);
+      }
+    }
+  }
+
+  return { isAdmin: false, permissions, isReady: true };
+}
+
+/**
+ * Normalizes the old backend permission format (array of Django codenames).
+ *
+ * Input: string[] of Django codenames, e.g.:
+ *   ["inventory.view_deliveryorder", "purchase.add_purchaserequest"]
+ *
+ * Or the new format (array of {module, permission_type}):
+ *   [{module: "project_costing", permission_type: "reviewer"}]
+ *
+ * Output: NormalizedPermissions with a Record of "application:module" → Set<PermissionAction>
+ *
+ * @deprecated Use normalizePermissionDetails instead.
+ */
+export function normalizePermissionsFromBackend(
+  user_permissions: string[] | Array<{ module: string; permission_type: string }>
+): NormalizedPermissions {
+  const permissions: Record<string, Set<PermissionAction>> = {};
+
+  if (!Array.isArray(user_permissions) || user_permissions.length === 0) {
+    return { isAdmin: false, permissions, isReady: true };
+  }
+
+  // New format: array of {module, permission_type}
+  if (typeof user_permissions[0] === "object" && "module" in user_permissions[0]) {
+    for (const entry of user_permissions as Array<{ module: string; permission_type: string }>) {
+      const key = entry.module;
+      if (!permissions[key]) {
+        permissions[key] = new Set();
+      }
+      permissions[key].add(entry.permission_type as PermissionAction);
+    }
+    return { isAdmin: false, permissions, isReady: true };
+  }
+
+  // Old format: array of Django codenames
+  for (const codename of user_permissions as string[]) {
     const parts = codename.split(".");
     let appLabel: string;
     let actionAndModel: string;
@@ -72,13 +132,11 @@ export function normalizePermissionsFromBackend(
     if (parts.length === 2) {
       [appLabel, actionAndModel] = parts;
     } else if (parts.length === 1) {
-      // No app label prefix — skip or use a default
       continue;
     } else {
       continue;
     }
 
-    // Split "view_deliveryorder" into action="view", model="deliveryorder"
     const underscoreIdx = actionAndModel.indexOf("_");
     if (underscoreIdx === -1) continue;
 
@@ -86,7 +144,7 @@ export function normalizePermissionsFromBackend(
     const modelName = actionAndModel.substring(underscoreIdx + 1);
 
     const action = DJANGO_ACTION_MAP[djangoAction];
-    if (!action) continue; // Unknown action — skip
+    if (!action) continue;
 
     const application = APP_LABEL_MAP[appLabel] ?? appLabel;
     const key = `${application}:${modelName}`;

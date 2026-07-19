@@ -29,6 +29,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
+import { usePermission } from "@/hooks/usePermission";
 
 type Module = {
   id: string;
@@ -290,8 +291,10 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
 
 export default function DashboardPage(): ReactElement {
   const { hasAccess } = useModulePermissions();
+  const { isAdmin } = usePermission();
 
   const filteredModules = MODULES.filter((m) => {
+    if (!isAdmin && !m.isFunctional) return false;
     if (m.id === "invoice" || m.id === "purchase") return hasAccess("invoice");
     if (m.id === "inventory") return hasAccess("inventory");
     if (m.id === "project-request") return hasAccess("projectRequest");

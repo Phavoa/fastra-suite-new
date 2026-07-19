@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 import {
   NormalizedPermissions,
+  normalizePermissionDetails,
   normalizePermissionsFromBackend,
 } from "../utils/normalizePermissions";
 
@@ -20,6 +21,9 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   const user_permissions = useSelector(
     (state: RootState) => state.auth.user_permissions
   );
+  const permission_details = useSelector(
+    (state: RootState) => state.auth.permission_details
+  );
   const isAdmin = useSelector((state: RootState) => state.auth.isAdmin);
   const username = useSelector(
     (state: RootState) => state.auth.user?.username ?? ""
@@ -29,25 +33,22 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   const effectiveIsAdmin = isAdmin || usernameContainsAdmin;
 
   const normalized = useMemo((): NormalizedPermissions => {
-    /**
-     * Admin users: isAdmin=true in the Redux store means full access.
-     * We return isReady:true immediately so PageGuard never blocks them.
-     */
     if (effectiveIsAdmin) {
       return { isAdmin: true, permissions: {}, isReady: true };
     }
 
-    /**
-     * Non-admin users: user_permissions is an array of Django codenames.
-     * If it's still null/undefined (not yet loaded), return isReady:false.
-     */
+    // Prefer new permission_details format if available
+    if (permission_details && Array.isArray(permission_details) && permission_details.length > 0) {
+      return normalizePermissionDetails(permission_details);
+    }
+
+    // Fall back to old user_permissions format
     if (!Array.isArray(user_permissions)) {
       return { isAdmin: false, permissions: {}, isReady: false };
     }
 
-    const result = normalizePermissionsFromBackend(user_permissions);
-    return result;
-  }, [user_permissions, effectiveIsAdmin]);
+    return normalizePermissionsFromBackend(user_permissions);
+  }, [user_permissions, permission_details, effectiveIsAdmin]);
 
   return (
     <PermissionContext.Provider value={normalized}>

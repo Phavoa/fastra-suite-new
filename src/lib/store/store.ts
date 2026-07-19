@@ -21,9 +21,8 @@ import { purchaseOrderApi } from "../../api/purchase/purchaseOrderApi";
 import { requestForQuotationApi } from "../../api/purchase/requestForQuotationApi";
 import { companyApi } from "@/api/settings/companyApi";
 import { usersApi } from "@/api/settings/usersApi";
-import { accessGroupRightApi } from "@/api/settings/accessGroupRightApi";
-import { applicationsApi } from "@/api/settings/applicationsApi";
 import { tenantUserApi } from "@/api/settings/tenantUserApi";
+import { permissionsTemplateApi } from "@/api/settings/permissionsTemplateApi";
 import { currencyApi } from "../../api/purchase/currencyApi";
 import { locationApi } from "../../api/inventory/locationApi";
 import { multilocationApi } from "../../api/inventory/multilocationApi";
@@ -75,6 +74,7 @@ const rootReducer = combineReducers({
   [userApi.reducerPath]: userApi.reducer,
   [usersApi.reducerPath]: usersApi.reducer,
   [tenantUserApi.reducerPath]: tenantUserApi.reducer,
+  [permissionsTemplateApi.reducerPath]: permissionsTemplateApi.reducer,
 
   [productsApi.reducerPath]: productsApi.reducer,
   [unitOfMeasureApi.reducerPath]: unitOfMeasureApi.reducer,
@@ -110,14 +110,8 @@ const rootReducer = combineReducers({
   [projectRequestApi.reducerPath]: projectRequestApi.reducer,
   [pettyCashRequestApi.reducerPath]: pettyCashRequestApi.reducer,
   [materialConsumptionRequestApi.reducerPath]: materialConsumptionRequestApi.reducer,
-
   [invoiceApi.reducerPath]: invoiceApi.reducer,
-
   [companyApi.reducerPath]: companyApi.reducer,
-
-  [accessGroupRightApi.reducerPath]: accessGroupRightApi.reducer,
-
-  [applicationsApi.reducerPath]: applicationsApi.reducer,
 });
 
 export const store = configureStore({
@@ -133,6 +127,7 @@ export const store = configureStore({
       userApi.middleware,
       usersApi.middleware,
       tenantUserApi.middleware,
+      permissionsTemplateApi.middleware,
 
       productsApi.middleware,
       unitOfMeasureApi.middleware,
@@ -169,8 +164,6 @@ export const store = configureStore({
 
       invoiceApi.middleware,
       companyApi.middleware,
-      accessGroupRightApi.middleware,
-      applicationsApi.middleware,
     ),
 });
 

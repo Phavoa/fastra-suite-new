@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "@/lib/store/store";
+import type { PermissionTemplateItem } from "@/utils/modulePermissionsStore";
 
 // User interface
 export interface User {
@@ -52,6 +53,7 @@ export interface TenantUserWithAccess {
   temp_password?: string;
   date_created: string;
   application_accesses: ApplicationAccess[];
+  user_permissions?: PermissionTemplateItem[];
 }
 
 
@@ -115,6 +117,7 @@ const getTenantBaseUrl = (state: RootState) => {
 
 export const usersApi = createApi({
   reducerPath: "usersApi",
+  tagTypes: ["User"],
   baseQuery: async (args, api) => {
   const state = api.getState() as RootState;
   const baseUrl = getTenantBaseUrl(state);
@@ -164,16 +167,19 @@ export const usersApi = createApi({
   endpoints: (builder) => ({
   getUsers: builder.query<User[], void>({
     query: () => "/users/tenant-users/", // list all users
+    providesTags: ["User"],
   }),
 
   // Original getUser (keep it)
   getUser: builder.query<User, number>({
     query: (id) => `/users/users/${id}/`,
+    providesTags: (result, error, id) => [{ type: "User", id }],
   }),
 
   // ✅ New tenant-specific getUserById
   getUserById: builder.query<TenantUserWithAccess, number>({
     query: (id) => `/users/tenant-users/${id}/`,
+    providesTags: (result, error, id) => [{ type: "User", id }],
   }),
 
   // ✅ Update user mutation for tenant users
@@ -183,6 +189,10 @@ export const usersApi = createApi({
       method: "PATCH",
       body: data,
     }),
+    invalidatesTags: (result, error, { id }) => [
+      { type: "User", id },
+      "User",
+    ],
   }),
 
   createUser: builder.mutation<NewUserResponse, FormData>({
@@ -191,6 +201,7 @@ export const usersApi = createApi({
       method: "POST",
       body,
     }),
+    invalidatesTags: ["User"],
   }),
 })
 

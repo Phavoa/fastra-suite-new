@@ -13,7 +13,6 @@ import FormSection from "@/components/Settings/form/FormSection";
 import FormInput from "@/components/Settings/form/FormInput";
 import FormImageUpload from "@/components/Settings/form/FormImageUpload";
 import FormSelect from "@/components/Settings/form/FormSelect";
-import SignaturePad from "@/components/Settings/form/SignaturePad";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
@@ -26,26 +25,23 @@ import { RootState } from "@/lib/store/store";
 
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
-  getUserPermissions,
-  saveUserPermissions,
-  getPermissionTemplates,
   UserPermissions,
   createEmptyPermissions,
-  convertPermissionsToApiFormat,
+  MODULE_KEY_MAP,
+  convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
-import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
+import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
 
 const userCreateSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
-  company_role: z.coerce.number().min(1, "Role is required"),
+  company_role: z.coerce.number().min(1, "Role is required").optional(),
   phone_number: z.string().min(1, "Phone number is required"),
   language: z.string().min(1, "Language is required"),
   timezone: z.string().min(1, "Timezone is required"),
   in_app_notifications: z.boolean().default(true),
   email_notifications: z.boolean().default(true),
   user_image_image: z.any().optional(),
-  signature_image: z.any().optional(),
 });
 
 type UserCreateInput = z.infer<typeof userCreateSchema>;
@@ -65,6 +61,8 @@ export default function NewUser() {
   );
 
   const [createUser, { isLoading: isSubmitting }] = useCreateUserMutation();
+
+  const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
 
   // Notification state
   const [notification, setNotification] = useState<{
@@ -101,6 +99,7 @@ export default function NewUser() {
       in_app_notifications: true,
       email_notifications: true,
       company_role: 0,
+      user_image_image: null,
     },
   });
 
@@ -128,8 +127,9 @@ export default function NewUser() {
     formData.append("tenant_schema_name", tenant_schema_name || "");
 
     // Ensure company_role is a string-represented number
-    const roleId = String(data.company_role);
-    formData.append("company_role", roleId);
+    if (data.company_role) {
+      formData.append("company_role", String(data.company_role));
+    }
 
     formData.append("phone_number", data.phone_number);
     formData.append("language", data.language);
@@ -145,16 +145,18 @@ export default function NewUser() {
 
     if (data.user_image_image) {
       formData.append("user_image_image", data.user_image_image);
-      formData.append("image", data.user_image_image);
     }
 
-    if (data.signature_image) {
-      formData.append("signature_image", data.signature_image);
-    }
+    const permissionsPayload = Object.entries(directPermissions)
+      .filter(([, perms]) => Object.values(perms).some((v) => v))
+      .map(([moduleKey, perms]) => ({
+        module: MODULE_KEY_MAP[moduleKey as keyof UserPermissions],
+        permission_types: Object.entries(perms)
+          .filter(([, selected]) => selected)
+          .map(([permType]) => permType),
+      }));
 
-    const userPermissionsPayload =
-      convertPermissionsToApiFormat(directPermissions);
-    formData.append("user_permissions", JSON.stringify(userPermissionsPayload));
+    formData.append("permissions", JSON.stringify(permissionsPayload));
 
     // Log FormData contents for debugging
     console.log("FormData entries:");
@@ -167,10 +169,6 @@ export default function NewUser() {
 
     try {
       const res = await createUser(formData).unwrap();
-      if (res?.id) {
-        saveUserPermissions(res.id, directPermissions);
-        window.dispatchEvent(new Event(PERMISSIONS_UPDATE_EVENT));
-      }
       setNotification({
         message: `User ${data.name} created successfully!`,
         type: "success",
@@ -252,18 +250,6 @@ export default function NewUser() {
         show: true,
       });
     }
-  };
-
-  const base64ToFile = (base64: string, filename: string) => {
-    const arr = base64.split(",");
-    const mime = arr[0].match(/:(.*?);/)?.[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -514,23 +500,6 @@ export default function NewUser() {
                 </div>
               </FormSection>
 
-              {/* Signature Pad */}
-              <FormSection title="Signature">
-                <SignaturePad
-                  onChange={(base64) => {
-                    if (base64) {
-                      const file = base64ToFile(
-                        `data:image/png;base64,${base64}`,
-                        "signature.png",
-                      );
-                      setValue("signature_image", file);
-                    } else {
-                      setValue("signature_image", null);
-                    }
-                  }}
-                />
-              </FormSection>
-
               {/* Footer Buttons */}
               <div className="mt-6 flex justify-end gap-4 px-6 pb-6">
                 <button
@@ -564,23 +533,26 @@ export default function NewUser() {
                     name="template"
                     onChange={(e) => {
                       if (e.target.value) {
-                        const selected = getPermissionTemplates().find(
-                          (t) => t.id === e.target.value,
+                        const selected = permissionTemplates.find(
+                          (t: any) => t.id === Number(e.target.value),
                         );
                         if (selected) {
-                          setDirectPermissions(selected.permissions);
+                          setDirectPermissions(
+                            convertApiItemsToPermissions(selected.items),
+                          );
                         }
                       }
                     }}
                     className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     defaultValue=""
+                    disabled={templatesLoading}
                   >
                     <option value="" disabled>
                       -- Select a Template --
                     </option>
-                    {getPermissionTemplates()
-                      .filter((t) => !t.isArchived)
-                      .map((t) => (
+                    {permissionTemplates
+                      .filter((t: any) => t.is_active)
+                      .map((t: any) => (
                         <option key={t.id} value={t.id}>
                           {t.name}
                         </option>

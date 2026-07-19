@@ -127,7 +127,7 @@ export default function SettingsLayout({
     router.push(newPath);
   };
 
-  const handleShowArchivedUsers = () => {
+  const handleShowArchived = () => {
     dispatch(setArchive());
   };
 
@@ -153,18 +153,17 @@ export default function SettingsLayout({
         </div>
       </div>
 
-      {/* Settings control bar */}
-      {!hideControlBar && (
-        <SettingsControlBar
-          activeSection={activeSection}
-          onSearch={handleSearch}
-          onNew={handleNew}
-          initialView="grid"
-          onShowArchivedUsers={
-            activeSection === "user" ? handleShowArchivedUsers : undefined
-          }
-        />
-      )}
+      <SettingsControlBar
+        activeSection={activeSection}
+        onSearch={handleSearch}
+        onNew={handleNew}
+        initialView="grid"
+        onShowArchivedUsers={
+          activeSection === "user" || activeSection === "permissiontemplates"
+            ? handleShowArchived
+            : undefined
+        }
+       />
 
       {/* Page content */}
       <main>{children}</main>
