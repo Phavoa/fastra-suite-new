@@ -26,15 +26,12 @@ import { RootState } from "@/lib/store/store";
 
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
-  getUserPermissions,
-  saveUserPermissions,
   UserPermissions,
   createEmptyPermissions,
-  convertPermissionsToApiFormat,
+  MODULE_KEY_MAP,
   convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
 import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
-import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
 
 const userCreateSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -155,9 +152,16 @@ export default function NewUser() {
       formData.append("signature_image", data.signature_image);
     }
 
-    const userPermissionsPayload =
-      convertPermissionsToApiFormat(directPermissions);
-    formData.append("user_permissions", JSON.stringify(userPermissionsPayload));
+    const permissionsPayload = Object.entries(directPermissions)
+      .filter(([, perms]) => Object.values(perms).some((v) => v))
+      .map(([moduleKey, perms]) => ({
+        module: MODULE_KEY_MAP[moduleKey as keyof UserPermissions],
+        permission_types: Object.entries(perms)
+          .filter(([, selected]) => selected)
+          .map(([permType]) => permType),
+      }));
+
+    formData.append("permissions", JSON.stringify(permissionsPayload));
 
     // Log FormData contents for debugging
     console.log("FormData entries:");
@@ -170,10 +174,6 @@ export default function NewUser() {
 
     try {
       const res = await createUser(formData).unwrap();
-      if (res?.id) {
-        saveUserPermissions(res.id, directPermissions);
-        window.dispatchEvent(new Event(PERMISSIONS_UPDATE_EVENT));
-      }
       setNotification({
         message: `User ${data.name} created successfully!`,
         type: "success",

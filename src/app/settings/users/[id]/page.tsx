@@ -30,15 +30,13 @@ import {
 
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
-  getUserPermissions,
-  saveUserPermissions,
   UserPermissions,
   createEmptyPermissions,
-  convertPermissionsToApiFormat,
+  MODULE_KEY_MAP,
   convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
 import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
-import { PERMISSIONS_UPDATE_EVENT } from "@/hooks/useModulePermissions";
+import { useResetPasswordMutation } from "@/api/settings/tenantUserApi";
 
 interface CompanyRoleDetails {
   id: number;
@@ -71,8 +69,8 @@ export default function UsersDetails() {
   const tenant_schema_name = useSelector(
     (state: any) => state.auth.tenant_schema_name,
   );
-  const access_token = useSelector((state: any) => state.auth.access_token);
   const [updateUser] = useUpdateUserByIdMutation();
+  const [resetPassword] = useResetPasswordMutation();
 
   const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
 
@@ -102,12 +100,14 @@ export default function UsersDetails() {
   });
   console.log(userData);
 
-  // Load direct permissions on userId change
+  // Load direct permissions from API response
   useEffect(() => {
-    if (userId) {
-      setDirectPermissions(getUserPermissions(userId));
+    if (userData) {
+      setDirectPermissions(
+        convertApiItemsToPermissions(userData.user_permissions),
+      );
     }
-  }, [userId]);
+  }, [userData]);
 
   // ----------------- Load user data into state -----------------
   useEffect(() => {
@@ -214,18 +214,22 @@ export default function UsersDetails() {
         formData.append("user_image_image", form.user_image_image);
       }
 
-      const userPermissionsPayload = convertPermissionsToApiFormat(directPermissions);
-      formData.append("user_permissions", JSON.stringify(userPermissionsPayload));
+      const permissionsPayload = Object.entries(directPermissions)
+        .filter(([, perms]) => Object.values(perms).some((v) => v))
+        .map(([moduleKey, perms]) => ({
+          module: MODULE_KEY_MAP[moduleKey as keyof UserPermissions],
+          permission_types: Object.entries(perms)
+            .filter(([, selected]) => selected)
+            .map(([permType]) => permType),
+        }));
+
+      formData.append("permissions", JSON.stringify(permissionsPayload));
 
       for (const [key, value] of formData.entries()) {
         console.log(key, value);
       }
 
       await updateUser({ id: userId, data: formData }).unwrap();
-
-      // Save direct permissions to localStorage and trigger updates
-      saveUserPermissions(userId, directPermissions);
-      window.dispatchEvent(new Event(PERMISSIONS_UPDATE_EVENT));
 
       statusModal.showSuccess("Success", "User updated successfully!");
       setEditMode(false);
@@ -242,30 +246,16 @@ export default function UsersDetails() {
   const handleResetPassword = async () => {
     setResetLoading(true);
     try {
-      const response = await fetch(
-        "https://propconnect.fastrasuiteapi.com.ng/users/tenant-users/reset-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(access_token && { Authorization: `Bearer ${access_token}` }),
-          },
-          body: JSON.stringify({ email: form.email }),
-        },
+      await resetPassword({ email: form.email }).unwrap();
+      statusModal.showSuccess(
+        "Success",
+        "Password reset email sent successfully!",
       );
-      if (response.ok) {
-        statusModal.showSuccess(
-          "Success",
-          "Password reset email sent successfully!",
-        );
-      } else {
-        statusModal.showError(
-          "Error",
-          "Failed to reset password. Please try again.",
-        );
-      }
-    } catch (error) {
-      statusModal.showError("Error", "An error occurred. Please try again.");
+    } catch (err: any) {
+      statusModal.showError(
+        "Error",
+        err?.data?.detail || "Failed to reset password. Please try again.",
+      );
     } finally {
       setResetLoading(false);
     }

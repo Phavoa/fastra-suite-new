@@ -66,18 +66,7 @@ export interface ChangePasswordRequest {
 
 // Reset password request interface
 export interface ResetPasswordRequest {
-  user_id: number;
-  name: string;
   email: string;
-  company_role: number;
-  phone_number: string;
-  language: string;
-  timezone: string;
-  in_app_notifications: boolean;
-  email_notifications: boolean;
-  access_codes: string[];
-  signature_image: string;
-  user_image_image: string;
 }
 
 // Helper to get tenant-specific base URL
