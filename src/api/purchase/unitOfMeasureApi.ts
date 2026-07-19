@@ -3,6 +3,7 @@ import type { RootState } from "../../lib/store/store";
 
 // Define types for requests and responses
 export interface UnitOfMeasure {
+  id?: number;
   url: string;
   unit_name: string;
   unit_symbol: string;

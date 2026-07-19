@@ -1,11 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Plus, Trash2, AlertCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  AlertCircle,
+  Bell,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -28,35 +35,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 
-// --- Mock Data Services ---
-const MOCK_BUDGETS: Record<string, number> = {
-  "wbs-1_cc-mat": 500000,
-  "wbs-2_cc-mat": 150000,
-};
-
-const MOCK_INVENTORY: Record<
-  string,
-  { name: string; unit: string; unitCost: number; stockOnHand: number }
-> = {
-  "prod-1": {
-    name: "Cement (50kg)",
-    unit: "Bags",
-    unitCost: 4500,
-    stockOnHand: 100,
-  },
-  "prod-2": {
-    name: "Steel Rods (12mm)",
-    unit: "Lengths",
-    unitCost: 8500,
-    stockOnHand: 50,
-  },
-  "prod-3": {
-    name: "Marine Board",
-    unit: "Sheets",
-    unitCost: 15000,
-    stockOnHand: 20,
-  },
-};
+// API hooks
+import { useCreateMaterialConsumptionMutation } from "@/api/requests/materialConsumptionRequestApi";
+import {
+  useGetProjectCostingProjectsQuery,
+  useGetProjectCostingProjectQuery,
+} from "@/api/projectCostingApi";
+import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 
 // --- Schema ---
 const productLineSchema = z.object({
@@ -71,8 +59,8 @@ const productLineSchema = z.object({
 
 const formSchema = z.object({
   project: z.string().min(1, "Project is required"),
-  wbsElement: z.string().min(1, "WBS Element is required"),
-  costCode: z.string().min(1, "Cost Code is required"),
+  phase: z.string().min(1, "Phase is required"),
+  wbsElement: z.string().min(1, "Activity is required"),
   dateConsumed: z.string().min(1, "Date is required"),
   warehouse: z.string().min(1, "Location is required"),
   notes: z.string().max(500).optional(),
@@ -90,27 +78,68 @@ interface ProductLine {
 
 interface FormValues {
   project: string;
+  phase: string;
   wbsElement: string;
-  costCode: string;
   dateConsumed: string;
   warehouse: string;
   notes?: string;
   productLines: ProductLine[];
 }
 
+// Helper to convert numeric WBS ID to UUID
+const toUUID = (val: string): string => {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(val)) return val;
+  const num = parseInt(val, 10);
+  if (!isNaN(num)) {
+    const hex = num.toString(16).padStart(12, "0");
+    return `00000000-0000-0000-0000-${hex}`;
+  }
+  return "00000000-0000-0000-0000-000000000000";
+};
+
 export default function MaterialConsumptionForm() {
   const router = useRouter();
   const statusModal = useStatusModal();
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = React.useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
 
-  const [availableBudget, setAvailableBudget] = useState<number | null>(null);
-  const [stockErrors, setStockErrors] = useState<Record<number, string>>({});
+  // --- API Queries ---
+  const { data: rawCostingProjects = [] } = useGetProjectCostingProjectsQuery({});
+
+  // Filter approved/active projects only
+  const projects = useMemo(() => {
+    const list = Array.isArray(rawCostingProjects)
+      ? rawCostingProjects
+      : (rawCostingProjects as any)?.results || [];
+    return list.filter((p: any) => {
+      const st = String(p.status || "").toUpperCase();
+      return st === "APPROVED" || st === "ACTIVE" || p.is_approved === true || !p.status;
+    });
+  }, [rawCostingProjects]);
+
+  const isLoadingProjects = false;
+  const { data: locations = [], isLoading: isLoadingLocations } =
+    useGetActiveLocationsFilteredQuery();
+  const { data: inventoryProducts = [], isLoading: isLoadingProducts } =
+    useGetInventoryProductsQuery({});
+
+
+  // --- Mutation ---
+  const [createMaterialConsumption, { isLoading: isSubmitting }] =
+    useCreateMaterialConsumptionMutation();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
       project: "",
+      phase: "",
       wbsElement: "",
-      costCode: "cc-mat", // Default to Materials
       dateConsumed: new Date().toISOString().split("T")[0],
       warehouse: "",
       notes: "",
@@ -124,74 +153,114 @@ export default function MaterialConsumptionForm() {
     name: "productLines",
   });
 
+  const projectId = form.watch("project");
+  const phaseId = form.watch("phase");
   const wbsElement = form.watch("wbsElement");
-  const costCode = form.watch("costCode");
   const productLines = form.watch("productLines");
 
-  // Fetch Available Budget when WBS and Cost Code change
-  useEffect(() => {
-    if (wbsElement && costCode) {
-      const key = `${wbsElement}_${costCode}`;
-      setAvailableBudget(
-        MOCK_BUDGETS[key] !== undefined ? MOCK_BUDGETS[key] : 0,
-      );
-    } else {
-      setAvailableBudget(null);
-    }
-  }, [wbsElement, costCode]);
+  // Fetch selected project detail for WBS (declared after projectId is available)
+  const { data: selectedProjectDetail } = useGetProjectCostingProjectQuery(
+    Number(projectId),
+    { skip: !projectId || isNaN(Number(projectId)) },
+  );
 
-  // Dual Validation: Validate Stock & Calculate Totals when lines change
-  useEffect(() => {
-    const newStockErrors: Record<number, string> = {};
+  // Budget is not yet wired to a real endpoint; show null so indicator is hidden
+  const availableBudget = useMemo<number | null>(() => null, [projectId, wbsElement]);
 
+  // --- Derived WBS options (from project-costing data) ---
+  const buildWbsList = (proj: any): any[] => {
+    if (!proj) return [];
+    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) return proj.wbs;
+    const items: any[] = [];
+    const phasesArr = Array.isArray(proj.phases)
+      ? proj.phases
+      : Array.isArray(proj.phase_list) ? proj.phase_list : [];
+    phasesArr.forEach((ph: any, pi: number) => {
+      const phId = ph.id || ph.phase_id || `phase-${pi + 1}`;
+      const phName = ph.name || ph.phase_name || `Phase ${pi + 1}`;
+      items.push({ id: phId, name: phName, is_activity: false });
+      const acts = Array.isArray(ph.activities) ? ph.activities
+        : Array.isArray(ph.activity_list) ? ph.activity_list : [];
+      acts.forEach((act: any, ai: number) => {
+        items.push({ ...act, id: act.id || `act-${phId}-${ai + 1}`, name: act.name || `Activity ${ai + 1}`, is_activity: true, parent: phId });
+      });
+    });
+    return items;
+  };
+
+  const wbsList = useMemo(() => buildWbsList(selectedProjectDetail), [selectedProjectDetail]);
+
+  const phases = useMemo(() => {
+    return wbsList.filter((w: any) => !w.is_activity);
+  }, [wbsList]);
+
+  const activities = useMemo(() => {
+    if (!phaseId) return [];
+    return wbsList.filter((w: any) => w.is_activity && String(w.parent) === String(phaseId));
+  }, [wbsList, phaseId]);
+
+  // Reset dependent fields when project changes
+  useEffect(() => {
+    form.setValue("phase", "");
+    form.setValue("wbsElement", "");
+  }, [projectId, form]);
+
+  // Reset activity when phase changes
+  useEffect(() => {
+    form.setValue("wbsElement", "");
+  }, [phaseId, form]);
+
+  // --- Calculate totals when product lines change ---
+  useEffect(() => {
     productLines.forEach((line, index) => {
-      if (line.productId && line.quantity > 0) {
-        const product = MOCK_INVENTORY[line.productId];
-        if (product) {
-          // Pre-submission Stock Check
-          if (line.quantity > product.stockOnHand) {
-            newStockErrors[index] =
-              `Insufficient stock! Only ${product.stockOnHand} available.`;
-          }
-          // Calculate Total Cost
-          if (line.unitCost !== product.unitCost) {
-            form.setValue(`productLines.${index}.unitCost`, product.unitCost, {
-              shouldValidate: true,
-            });
-          }
-          const calculatedTotal = line.quantity * product.unitCost;
-          if (line.totalCost !== calculatedTotal) {
-            form.setValue(`productLines.${index}.totalCost`, calculatedTotal, {
-              shouldValidate: true,
-            });
-          }
-        }
+      if (!line.productId || line.quantity <= 0) return;
+      const product = inventoryProducts.find(
+        (p) => String(p.id) === line.productId,
+      );
+      if (!product) return;
+
+      const unitCost = Number(product.standard_cost) || 0;
+      const totalCost = line.quantity * unitCost;
+
+      if (line.unitCost !== unitCost) {
+        form.setValue(`productLines.${index}.unitCost`, unitCost, {
+          shouldValidate: true,
+        });
+      }
+      if (line.totalCost !== totalCost) {
+        form.setValue(`productLines.${index}.totalCost`, totalCost, {
+          shouldValidate: true,
+        });
       }
     });
-
-    setStockErrors(newStockErrors);
-  }, [productLines, form]);
+  }, [productLines, inventoryProducts, form]);
 
   const totalRequestCost = productLines.reduce(
     (sum, line) => sum + (line.totalCost || 0),
     0,
   );
-  const hasStockErrors = Object.keys(stockErrors).length > 0;
 
   const onSubmit = async (data: FormValues) => {
-    if (hasStockErrors) {
-      statusModal.showError(
-        "Validation Error",
-        "Please fix the stock availability errors before submitting.",
-      );
-      return;
-    }
-
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const payload = {
+        project: Number(data.project),
+        activity: toUUID(data.wbsElement),
+        location: data.warehouse,
+        date_consumed: data.dateConsumed,
+        notes: data.notes || "",
+        lines: data.productLines.map((line) => ({
+          id: Number(line.productId),
+          quantity: line.quantity,
+          unit_cost: line.unitCost.toFixed(2),
+          total_cost: line.totalCost.toFixed(2),
+        })),
+      };
+
+      await createMaterialConsumption(payload).unwrap();
+
       statusModal.showSuccess(
         "Request Submitted",
-        "Material consumption logged successfully. Actual costs and inventory have been updated.",
+        "Material consumption logged successfully.",
       );
     } catch (error) {
       statusModal.showError(
@@ -213,31 +282,40 @@ export default function MaterialConsumptionForm() {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="min-h-screen bg-[#F1F5F9]"
+        className="min-h-screen bg-[#F9FAFB] pb-28"
       >
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
-          <div className="flex items-center gap-3 max-w-2xl mx-auto">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-              onClick={() => router.back()}
-              type="button"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-semibold text-gray-900">
-              Material Consumption
-            </h1>
-          </div>
-        </div>
+        {/* Header Bar */}
+        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
+          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => router.back()}
+                className="p-1 rounded-lg hover:bg-gray-50 transition-colors"
+                aria-label="Back"
+                type="button"
+              >
+                <ArrowLeft size={20} className="text-gray-600" />
+              </button>
+              <h1 className="text-lg font-bold text-gray-800">
+                Material Consumption
+              </h1>
+            </div>
 
-        <div className="max-w-2xl mx-auto pb-24 pt-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <button
+                className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                type="button"
+              >
+                <Bell size={20} className="text-gray-800" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-2xl mx-auto pb-24 pt-4 space-y-4 px-4 sm:px-0">
           {/* Request Details Section */}
-          <div className="bg-white px-6 py-8 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold text-[#3B7CED] mb-6 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
+            <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
               Request Details
             </h2>
             <div className="space-y-4">
@@ -257,21 +335,20 @@ export default function MaterialConsumptionForm() {
                   {new Date().toLocaleDateString("en-GB")}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2">
+              <div className="flex justify-between items-center py-2 border-b border-gray-50">
                 <span className="text-sm font-semibold text-gray-900">
                   Requested by
                 </span>
                 <span className="text-sm text-gray-600 font-medium">
-                  Firstname Lastname
+                  {loggedInUserName}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Project & Location Section */}
-          <div className="bg-white px-6 py-8 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold text-[#3B7CED] mb-6 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
+            <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
               Project & Location
             </h2>
 
@@ -279,7 +356,7 @@ export default function MaterialConsumptionForm() {
             {availableBudget !== null && (
               <div
                 className={cn(
-                  "mb-6 p-4 rounded-xl flex items-start gap-3 transition-all duration-300 border shadow-sm",
+                  "mb-2 p-4 rounded-xl flex items-start gap-3 transition-all duration-300 border shadow-sm",
                   availableBudget > 0
                     ? "bg-blue-50/50 border-blue-100"
                     : "bg-red-50/50 border-red-100",
@@ -307,7 +384,7 @@ export default function MaterialConsumptionForm() {
                     )}
                   >
                     ₦
-                    {availableBudget.toLocaleString("en-NG", {
+                    {(availableBudget ?? 0).toLocaleString("en-NG", {
                       minimumFractionDigits: 2,
                     })}
                   </p>
@@ -315,156 +392,212 @@ export default function MaterialConsumptionForm() {
               </div>
             )}
 
-            <div className="p-4 border border-gray-100 bg-gray-50/50 rounded-lg space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="project"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel className="text-sm font-semibold text-gray-900">
-                        Project
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger
-                            className={cn(
-                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                              form.formState.errors.project &&
-                                "border-red-500 focus:ring-red-500/20",
-                            )}
-                          >
-                            <SelectValue placeholder="Select active project" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="proj-1">
-                            Project #1 - Alpha
+            <div className="grid grid-cols-2 gap-4">
+              {/* Project */}
+              <FormField
+                control={form.control}
+                name="project"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Project
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger
+                          className={cn(
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                            form.formState.errors.project &&
+                              "border-red-500 focus:ring-red-500/20",
+                          )}
+                        >
+                          <SelectValue
+                            placeholder={
+                              isLoadingProjects
+                                ? "Loading projects..."
+                                : "Select active project"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {projects.map((p: any) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name}
                           </SelectItem>
-                          <SelectItem value="proj-2">
-                            Project #2 - Beta
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="warehouse"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel className="text-sm font-semibold text-gray-900">
-                        Location / Warehouse
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger
-                            className={cn(
-                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                              form.formState.errors.warehouse &&
-                                "border-red-500 focus:ring-red-500/20",
-                            )}
-                          >
-                            <SelectValue placeholder="Select site store" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="store-main">
-                            Main Site Store
+              {/* Phase */}
+              <FormField
+                control={form.control}
+                name="phase"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Phase
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!projectId || phases.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger
+                          className={cn(
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                            form.formState.errors.phase &&
+                              "border-red-500 focus:ring-red-500/20",
+                          )}
+                        >
+                          <SelectValue
+                            placeholder={
+                              !projectId
+                                ? "Select a project first"
+                                : "Select phase"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {phases.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name}
                           </SelectItem>
-                          <SelectItem value="store-sub">
-                            Sub-Station B Store
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="wbsElement"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel className="text-sm font-semibold text-gray-900">
-                        WBS Element (Leaf)
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger
-                            className={cn(
-                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                              form.formState.errors.wbsElement &&
-                                "border-red-500 focus:ring-red-500/20",
-                            )}
-                          >
-                            <SelectValue placeholder="Select WBS" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="wbs-1">
-                            Foundation / Concrete Pour
+              {/* Activity / WBS Element */}
+              <FormField
+                control={form.control}
+                name="wbsElement"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Activity
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!phaseId || activities.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger
+                          className={cn(
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                            form.formState.errors.wbsElement &&
+                              "border-red-500 focus:ring-red-500/20",
+                          )}
+                        >
+                          <SelectValue
+                            placeholder={
+                              !phaseId
+                                ? "Select a phase first"
+                                : "Select activity"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activities.map((a) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.name}
                           </SelectItem>
-                          <SelectItem value="wbs-2">
-                            Structure / Framing
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="costCode"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel className="text-sm font-semibold text-gray-900">
-                        Cost Code
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled
-                      >
-                        <FormControl>
-                          <SelectTrigger className="h-11 w-full bg-gray-50 border-gray-200 text-gray-500">
-                            <SelectValue placeholder="Select Code" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="cc-mat">
-                            Materials (CC-02)
+              {/* Location / Warehouse */}
+              <FormField
+                control={form.control}
+                name="warehouse"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Location / Warehouse
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger
+                          className={cn(
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                            form.formState.errors.warehouse &&
+                              "border-red-500 focus:ring-red-500/20",
+                          )}
+                        >
+                          <SelectValue
+                            placeholder={
+                              isLoadingLocations
+                                ? "Loading locations..."
+                                : "Select site store"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.location_name}>
+                            {loc.location_name}
                           </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Date Consumed */}
+              <FormField
+                control={form.control}
+                name="dateConsumed"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Date Consumed
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className={cn(
+                          "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                          form.formState.errors.dateConsumed &&
+                            "border-red-500 focus:ring-red-500/20",
+                        )}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
 
           {/* Product Lines Section */}
-          <div className="bg-white px-6 py-8 rounded-xl shadow-sm border border-gray-100">
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+              <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
                 Product Lines
               </h2>
               <Button
@@ -502,6 +635,7 @@ export default function MaterialConsumptionForm() {
                   )}
 
                   <div className="grid grid-cols-2 gap-4">
+                    {/* Product Select */}
                     <FormField
                       control={form.control}
                       name={`productLines.${index}.productId`}
@@ -523,18 +657,27 @@ export default function MaterialConsumptionForm() {
                                     "border-red-500 focus:ring-red-500/20",
                                 )}
                               >
-                                <SelectValue placeholder="Search inventory..." />
+                                <SelectValue
+                                  placeholder={
+                                    isLoadingProducts
+                                      ? "Loading inventory..."
+                                      : "Search inventory..."
+                                  }
+                                />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {Object.entries(MOCK_INVENTORY).map(
-                                ([id, prod]) => (
-                                  <SelectItem key={id} value={id}>
-                                    {prod.name} (Stock: {prod.stockOnHand}{" "}
-                                    {prod.unit})
-                                  </SelectItem>
-                                ),
-                              )}
+                              {inventoryProducts.map((prod) => (
+                                <SelectItem
+                                  key={prod.id}
+                                  value={String(prod.id)}
+                                >
+                                  {prod.product_name}
+                                  {prod.unit_of_measure_details?.unit_symbol
+                                    ? ` (${prod.unit_of_measure_details.unit_symbol})`
+                                    : ""}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -542,6 +685,7 @@ export default function MaterialConsumptionForm() {
                       )}
                     />
 
+                    {/* Quantity */}
                     <FormField
                       control={form.control}
                       name={`productLines.${index}.quantity`}
@@ -556,24 +700,19 @@ export default function MaterialConsumptionForm() {
                               min="1"
                               className={cn(
                                 "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                                (form.formState.errors.productLines?.[index]
-                                  ?.quantity ||
-                                  stockErrors[index]) &&
+                                form.formState.errors.productLines?.[index]
+                                  ?.quantity &&
                                   "border-red-500 focus:ring-red-500/20",
                               )}
                               {...field}
                             />
                           </FormControl>
-                          {stockErrors[index] && (
-                            <p className="text-[10px] text-red-500 font-medium">
-                              {stockErrors[index]}
-                            </p>
-                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
+                    {/* Unit Cost (read-only) */}
                     <div className="col-span-1 space-y-2">
                       <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Unit Cost (Auto)
@@ -595,7 +734,9 @@ export default function MaterialConsumptionForm() {
                       ₦
                       {form
                         .watch(`productLines.${index}.totalCost`)
-                        ?.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        ?.toLocaleString("en-NG", {
+                          minimumFractionDigits: 2,
+                        })}
                     </span>
                   </div>
                 </div>
@@ -635,9 +776,8 @@ export default function MaterialConsumptionForm() {
           </div>
 
           {/* Additional Info Section */}
-          <div className="bg-white px-6 py-8 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold text-[#3B7CED] mb-6 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
+            <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
               Additional Info
             </h2>
             <FormField
@@ -645,7 +785,7 @@ export default function MaterialConsumptionForm() {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-semibold text-gray-900">
+                  <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Notes (Optional)
                   </FormLabel>
                   <FormControl>
@@ -663,15 +803,23 @@ export default function MaterialConsumptionForm() {
         </div>
 
         {/* Fixed Submit Button */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 md:left-16 md:max-w-[calc(100%-4rem)] mx-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <Button
-            variant="contained"
-            className="w-full max-w-2xl mx-auto h-12 text-base font-medium flex items-center justify-center block bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-md disabled:bg-gray-300 disabled:text-gray-500"
-            type="submit"
-            disabled={form.formState.isSubmitting || hasStockErrors}
-          >
-            {form.formState.isSubmitting ? "Validating..." : "Submit Request"}
-          </Button>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20 shadow-none">
+          <div className="max-w-2xl mx-auto px-4">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-12 text-sm font-bold flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-none"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Request"
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Status Modal */}
@@ -681,12 +829,7 @@ export default function MaterialConsumptionForm() {
           type={statusModal.type}
           title={statusModal.title}
           message={statusModal.message}
-          actionText={
-            statusModal.type === "success" ||
-            statusModal.title === "Budget Review Required"
-              ? "Done"
-              : "Try again"
-          }
+          actionText={statusModal.type === "success" ? "Done" : "Try again"}
           onAction={handleModalAction}
           showCloseButton={false}
         />

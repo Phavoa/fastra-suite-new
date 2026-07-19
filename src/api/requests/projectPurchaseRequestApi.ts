@@ -1,9 +1,8 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
 
 // Define nested response types
 export interface User {
-  url: string;
   id: number;
   username: string;
   first_name: string;
@@ -12,153 +11,168 @@ export interface User {
 }
 
 export interface RequesterDetails {
-  url: string;
   id: number;
-  user: User;
-  role: string;
-  phone_number: string;
-  language: string;
-  timezone: string;
-  in_app_notifications: boolean;
-  email_notifications: boolean;
-  groups: string[];
+  user?: User;
+  role?: string;
+  phone_number?: string;
+  language?: string;
+  timezone?: string;
+  in_app_notifications?: boolean;
+  email_notifications?: boolean;
+  groups?: string[];
 }
 
 export interface UnitOfMeasureDetails {
-  url: string;
-  unit_name: string;
-  unit_symbol: string;
-  unit_category: string;
-  created_on: string;
-  is_hidden: boolean;
+  unit_name?: string;
+  unit_symbol?: string;
+  unit_category?: string;
 }
 
 export interface ProductDetails {
-  url: string;
   id: number;
   product_name: string;
-  product_description: string;
-  product_category: string;
-  available_product_quantity: string;
-  total_quantity_purchased: string;
-  unit_of_measure: number;
-  created_on: string;
-  updated_on: string;
-  is_hidden: boolean;
-  unit_of_measure_details: UnitOfMeasureDetails;
+  product_description?: string;
+  product_category?: string;
+  unit_of_measure?: number;
+  unit_of_measure_details?: UnitOfMeasureDetails;
+  [key: string]: any;
 }
 
-export interface ProjectPurchaseRequestItemResponse {
-  id: number;
-  purchase_request: string;
+export interface ProjectPurchaseRequestLine {
+  id?: number;
   product: number;
-  product_details: ProductDetails;
-  qty: number;
-  estimated_unit_price: string;
+  product_details?: ProductDetails;
+  description?: string;
+  quantity: string | number;
+  estimated_unit_cost: string | number;
+  line_total?: string | number;
+  // Legacy or alternate fields for robustness across API formats
+  qty?: string | number;
+  estimated_unit_price?: string | number;
 }
 
-export interface RequestingLocationDetails {
-  id: string;
-  location_code: string;
-  location_name: string;
-  location_type: string;
-  address: string;
-  location_manager: number;
-  location_manager_details: RequesterDetails;
-  store_keeper: number;
-  store_keeper_details: RequesterDetails;
-  contact_information: string;
-  is_hidden: boolean;
+export interface ProjectDetails {
+  id: number;
+  name: string;
+  code: string;
+}
+
+export interface ProjectRequestMaster {
+  id: number;
+  reference_id?: string;
+  request_type?: string;
+  status?: "draft" | "approved" | "pending" | "rejected" | string;
+  project?: number;
+  project_details?: ProjectDetails;
+  created_by?: number;
+  created_by_details?: RequesterDetails;
+  created_at?: string;
+  updated_at?: string;
+  detail?: any;
 }
 
 export interface CurrencyDetails {
-  url: string;
   id: number;
   currency_name: string;
   currency_code: string;
   currency_symbol: string;
-  created_on: string;
-  is_hidden: boolean;
 }
 
 export interface VendorDetails {
-  url: string;
   id: number;
   company_name: string;
-  profile_picture: string;
-  email: string;
-  address: string;
-  phone_number: string;
-  is_hidden: boolean;
+  email?: string;
+  phone_number?: string;
 }
 
-// Main response type
+// Main response type matching both Swagger API docs & existing UI mapping
 export interface ProjectPurchaseRequest {
-  url: string;
-  id: string;
-  status: "draft" | "approved" | "pending" | "rejected";
-  date_created: string;
-  date_updated: string;
-  currency: number;
-  requester: number;
-  requester_details: RequesterDetails;
-  requesting_location: string;
-  purpose: string;
-  vendor: number;
-  items: ProjectPurchaseRequestItemResponse[];
-  pr_total_price: string;
-  can_edit: boolean;
-  is_submitted: boolean;
-  is_hidden: boolean;
-  requesting_location_details: RequestingLocationDetails;
-  currency_details: CurrencyDetails;
-  vendor_details: VendorDetails;
+  id: number | string;
+  project_request?: number | ProjectRequestMaster;
+  project?: number;
+  project_details?: ProjectDetails;
+  activity?: string;
+  site_location?: string;
+  required_by_date?: string;
+  notes?: string;
+  lines?: ProjectPurchaseRequestLine[];
+  total_amount?: string | number;
+  created_at?: string;
+  updated_at?: string;
+  // Fallbacks and legacy fields for compatibility
+  status?: "draft" | "approved" | "pending" | "rejected" | string;
+  purpose?: string;
+  date_created?: string;
+  date_updated?: string;
+  items?: ProjectPurchaseRequestLine[];
+  pr_total_price?: string | number;
+  requester?: number;
+  requester_details?: RequesterDetails;
+  requesting_location?: string;
+  requesting_location_details?: {
+    id: string;
+    location_name: string;
+    [key: string]: any;
+  };
+  currency?: number;
+  currency_details?: CurrencyDetails;
+  vendor?: number;
+  vendor_details?: VendorDetails;
+  [key: string]: any;
 }
 
 // Query parameters types
 export interface GetProjectPurchaseRequestsParams {
-  currency?: number;
   ordering?: string;
-  project_request__created_by?: number;
-  project_request__status?: "approved" | "cancelled" | "draft" | "pending" | "rejected";
-  requester?: number;
   search?: string;
-  status?: "approved" | "draft" | "pending" | "rejected";
+  status?: string;
+  project?: number;
+  requester?: number;
   vendor?: number;
   [key: string]: string | number | boolean | undefined;
 }
 
 // Request payload types
-export interface CreateProjectPurchaseRequestItem {
+export interface CreateProjectPurchaseRequestLineItem {
   product: number;
-  qty: number;
-  estimated_unit_price: string;
+  description?: string;
+  quantity: string | number;
+  estimated_unit_cost: string | number;
+  qty?: string | number;
+  estimated_unit_price?: string | number;
 }
 
 export interface CreateProjectPurchaseRequest {
-  status?: "draft" | "approved" | "pending" | "rejected";
-  currency: number;
-  requester: number;
-  requesting_location: string;
-  purpose: string;
-  vendor: number;
-  items: CreateProjectPurchaseRequestItem[];
-  can_edit?: boolean;
-  is_submitted?: boolean;
-  is_hidden?: boolean;
-}
-
-export interface UpdateProjectPurchaseRequest {
+  project: number;
+  activity?: string;
+  site_location: string;
+  required_by_date: string;
+  notes?: string;
+  lines: CreateProjectPurchaseRequestLineItem[];
+  // Legacy fields for backward compatibility
   status?: "draft" | "approved" | "pending" | "rejected";
   currency?: number;
   requester?: number;
   requesting_location?: string;
   purpose?: string;
   vendor?: number;
-  items?: CreateProjectPurchaseRequestItem[];
-  can_edit?: boolean;
-  is_submitted?: boolean;
-  is_hidden?: boolean;
+  items?: CreateProjectPurchaseRequestLineItem[];
+  [key: string]: any;
+}
+
+export interface UpdateProjectPurchaseRequest {
+  site_location?: string;
+  required_by_date?: string;
+  notes?: string;
+  lines?: CreateProjectPurchaseRequestLineItem[];
+  status?: "draft" | "approved" | "pending" | "rejected";
+  currency?: number;
+  requester?: number;
+  requesting_location?: string;
+  purpose?: string;
+  vendor?: number;
+  items?: CreateProjectPurchaseRequestLineItem[];
+  [key: string]: any;
 }
 
 // Helper to resolve the tenant schema name API base URL
@@ -171,6 +185,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const projectPurchaseRequestApi = createApi({
   reducerPath: "projectPurchaseRequestApi",
+  tagTypes: ["ProjectPurchaseRequest"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -182,6 +197,7 @@ export const projectPurchaseRequestApi = createApi({
       headers.set("authorization", `Bearer ${token}`);
     }
     headers.set("content-type", "application/json");
+    headers.set("accept", "application/json");
 
     let url: string;
     if (typeof args === "string") {
@@ -217,12 +233,16 @@ export const projectPurchaseRequestApi = createApi({
         return {
           error: {
             status: response.status,
-            data: await response.json(),
+            data: await response.json().catch(() => ({})),
           },
         };
       }
 
-      const data = await response.json();
+      if (response.status === 204) {
+        return { data: undefined };
+      }
+
+      const data = await response.json().catch(() => null);
       return { data };
     } catch (error) {
       return {
@@ -236,15 +256,22 @@ export const projectPurchaseRequestApi = createApi({
   endpoints: (builder) => ({
     getProjectPurchaseRequests: builder.query<
       ProjectPurchaseRequest[],
-      GetProjectPurchaseRequestsParams
+      GetProjectPurchaseRequestsParams | void
     >({
       query: (params) => ({
         url: "/project-requests/purchase-requests/",
-        params,
+        params: params || undefined,
       }),
+      providesTags: ["ProjectPurchaseRequest"],
     }),
-    getProjectPurchaseRequest: builder.query<ProjectPurchaseRequest, string>({
+    getProjectPurchaseRequest: builder.query<
+      ProjectPurchaseRequest,
+      string | number
+    >({
       query: (id) => `/project-requests/purchase-requests/${id}/`,
+      providesTags: (result, error, id) => [
+        { type: "ProjectPurchaseRequest", id },
+      ],
     }),
     createProjectPurchaseRequest: builder.mutation<
       ProjectPurchaseRequest,
@@ -255,32 +282,42 @@ export const projectPurchaseRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["ProjectPurchaseRequest"],
     }),
     updateProjectPurchaseRequest: builder.mutation<
       ProjectPurchaseRequest,
-      { id: string; data: UpdateProjectPurchaseRequest }
+      { id: string | number; data: UpdateProjectPurchaseRequest }
     >({
       query: ({ id, data }) => ({
         url: `/project-requests/purchase-requests/${id}/`,
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "ProjectPurchaseRequest",
+        { type: "ProjectPurchaseRequest", id },
+      ],
     }),
     patchProjectPurchaseRequest: builder.mutation<
       ProjectPurchaseRequest,
-      { id: string; data: Partial<CreateProjectPurchaseRequest> }
+      { id: string | number; data: Partial<UpdateProjectPurchaseRequest> }
     >({
       query: ({ id, data }) => ({
         url: `/project-requests/purchase-requests/${id}/`,
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "ProjectPurchaseRequest",
+        { type: "ProjectPurchaseRequest", id },
+      ],
     }),
-    deleteProjectPurchaseRequest: builder.mutation<void, string>({
+    deleteProjectPurchaseRequest: builder.mutation<void, string | number>({
       query: (id) => ({
         url: `/project-requests/purchase-requests/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: ["ProjectPurchaseRequest"],
     }),
   }),
 });
@@ -292,4 +329,5 @@ export const {
   useUpdateProjectPurchaseRequestMutation,
   usePatchProjectPurchaseRequestMutation,
   useDeleteProjectPurchaseRequestMutation,
-} = projectPurchaseRequestApi;
+} = projectPurchaseRequestApi; // Updated
+

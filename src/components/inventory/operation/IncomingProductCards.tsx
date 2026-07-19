@@ -1,10 +1,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, User, MapPin } from "lucide-react";
+import { Package } from "lucide-react";
 import type { IncomingProduct } from "@/types/incomingProduct";
-import { cn } from "@/lib/utils";
 
 interface IncomingProductCardsProps {
   incomingProducts: IncomingProduct[];
@@ -17,33 +14,37 @@ interface IncomingProductCardProps {
   query?: string;
 }
 
-function IncomingProductCard({
-  incomingProduct,
-  index,
-  query = "",
-}: IncomingProductCardProps) {
+function renderStatusBadge(status: string) {
+  if (status === "validated") {
+    return (
+      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#E2F2E9] text-[#1E8E3E] min-w-[80px]">
+        Validated
+      </span>
+    );
+  }
+  if (status === "draft") {
+    return (
+      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#E8F0FE] text-[#1A73E8] min-w-[80px]">
+        Draft
+      </span>
+    );
+  }
+  if (status === "canceled") {
+    return (
+      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FCE8E6] text-[#C5221F] min-w-[80px]">
+        Canceled
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#E9ECEF] text-[#8898AA] min-w-[80px]">
+      {status}
+    </span>
+  );
+}
+
+function IncomingProductCard({ incomingProduct, index }: IncomingProductCardProps) {
   const router = useRouter();
-
-  // Function to highlight search matches
-  const highlightText = (text: string, query: string) => {
-    if (!query) return text;
-
-    const regex = new RegExp(
-      `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-      "gi"
-    );
-    const parts = text.split(regex);
-
-    return parts.map((part, index) =>
-      regex.test(part) ? (
-        <span key={index} className="bg-yellow-200 text-yellow-800 font-medium">
-          {part}
-        </span>
-      ) : (
-        part
-      )
-    );
-  };
 
   const handleCardClick = () => {
     router.push(
@@ -52,126 +53,44 @@ function IncomingProductCard({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.4,
-        ease: "easeOut",
-        delay: index * 0.1,
-      }}
-      whileHover={{
-        y: -4,
-        transition: { duration: 0.2 },
-      }}
+    <div
+      onClick={handleCardClick}
+      className="bg-white rounded-xl border border-gray-200/80 p-5 shadow-2xs hover:shadow-md hover:border-blue-200/80 transition-all duration-200 flex flex-col justify-between cursor-pointer group"
     >
-      <Card
-        className={cn(
-          "cursor-pointer transition-all duration-200 hover:shadow border-2 border-gray-200 hover:border-gray-300 shadow-none rounded"
-        )}
-        onClick={handleCardClick}
-      >
-        <CardHeader>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
-                  <Package size={16} className="text-[#3B7CED]" />
-                </div>
-                <CardTitle className="text-lg font-semibold text-gray-900 truncate">
-                  {highlightText(incomingProduct.incoming_product_id, query)}
-                </CardTitle>
-              </div>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  incomingProduct.status === "validated"
-                    ? "bg-green-100 text-green-500"
-                    : incomingProduct.status === "draft"
-                    ? "bg-blue-100 text-blue-500"
-                    : incomingProduct.status === "canceled"
-                    ? "bg-red-100 text-red-500"
-                    : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {incomingProduct.status}
-              </span>
-            </div>
-          </div>
-        </CardHeader>
+      <div>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md tracking-wide truncate max-w-[120px]">
+            {incomingProduct.incoming_product_id}
+          </span>
+          {renderStatusBadge(incomingProduct.status)}
+        </div>
+        <h3 className="text-sm font-bold text-[#32325D] group-hover:text-[#3B7CED] transition-colors line-clamp-1 mb-1 capitalize">
+          {incomingProduct.receipt_type.replace(/_/g, " ")}
+        </h3>
+        <p className="text-xs text-[#8898AA] font-medium truncate">
+          {incomingProduct.supplier_details?.company_name || "—"}
+        </p>
+      </div>
 
-        <CardContent>
-          <div className="space-y-3">
-            {/* Inspection & Backorder Status */}
-            {(incomingProduct as any).accepted_qty !== undefined && (
-              <div className="flex items-center justify-between bg-gray-50 px-2.5 py-1.5 rounded border border-gray-100 text-xs">
-                <span className="font-semibold text-green-600">✓ {(incomingProduct as any).accepted_qty} Accepted</span>
-                {(incomingProduct as any).rejected_qty > 0 && (
-                  <span className="font-semibold text-red-600">✕ {(incomingProduct as any).rejected_qty} Rejected</span>
-                )}
-                {(incomingProduct as any).has_backorder && (
-                  <span className="bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.5 rounded text-[10px]">Backorder Created</span>
-                )}
-              </div>
-            )}
-
-            {/* Receipt Type */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Receipt Type:</span>
-              <span className="text-sm font-medium text-gray-900 capitalize">
-                {highlightText(
-                  incomingProduct.receipt_type.replace("_", " "),
-                  query
-                )}
-              </span>
-            </div>
-
-            {/* Supplier */}
-            <div className="flex justify-between items-start">
-              <span className="text-sm text-gray-600 flex items-center gap-1">
-                <User size={12} />
-                Supplier:
-              </span>
-              <span className="text-sm font-medium text-gray-900 text-right max-w-40 truncate">
-                {highlightText(
-                  incomingProduct.supplier_details?.company_name || "N/A",
-                  query
-                )}
-              </span>
-            </div>
-
-            {/* Source Location */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 flex items-center gap-1">
-                <MapPin size={12} />
-                Source:
-              </span>
-              <span className="text-sm font-medium text-gray-900 truncate max-w-32">
-                {highlightText(
-                  incomingProduct.source_location_details?.location_name ||
-                    "N/A",
-                  query
-                )}
-              </span>
-            </div>
-
-            {/* Destination Location */}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-              <span className="text-xs text-gray-500 flex items-center gap-1">
-                <MapPin size={10} />
-                Destination:
-              </span>
-              <span className="text-xs text-gray-600">
-                {highlightText(
-                  incomingProduct.destination_location_details?.location_name ||
-                    "N/A",
-                  query
-                )}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+      <div className="border-t border-gray-100 mt-4 pt-3 flex items-center justify-between text-xs">
+        <div>
+          <span className="text-[11px] text-gray-400 font-medium block uppercase tracking-wider mb-0.5">
+            Source
+          </span>
+          <span className="font-medium text-[#525F7F] block truncate max-w-[110px]">
+            {incomingProduct.source_location_details?.location_name || "N/A"}
+          </span>
+        </div>
+        <div className="text-right">
+          <span className="text-[11px] text-gray-400 font-medium block uppercase tracking-wider mb-0.5">
+            Destination
+          </span>
+          <span className="font-medium text-[#525F7F] block truncate max-w-[110px]">
+            {incomingProduct.destination_location_details?.location_name || "N/A"}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -180,15 +99,9 @@ export function IncomingProductCards({
   query = "",
 }: IncomingProductCardsProps) {
   return (
-    <motion.div
-      className="bg-white h-full rounded-md"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-    >
-      {/* Incoming Product Cards Grid */}
+    <div>
       {incomingProducts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {incomingProducts.map((incomingProduct, index) => (
             <IncomingProductCard
               key={incomingProduct.incoming_product_id}
@@ -199,20 +112,15 @@ export function IncomingProductCards({
           ))}
         </div>
       ) : (
-        <motion.div
-          className="flex items-center justify-center h-64"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
-        >
+        <div className="flex items-center justify-center h-64 bg-white rounded-lg border border-gray-100">
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 text-gray-300">
+            <div className="w-12 h-12 mx-auto mb-3 text-gray-300">
               <Package className="w-full h-full" />
             </div>
-            <p className="text-gray-400 text-sm">No incoming products found</p>
+            <p className="text-[#8898AA] text-sm">No incoming products found</p>
           </div>
-        </motion.div>
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 }

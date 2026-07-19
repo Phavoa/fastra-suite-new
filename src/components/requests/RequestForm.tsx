@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Plus, Trash2, AlertCircle } from "lucide-react";
+import { useGetAvailableBudgetQuery } from "@/api/projectApi";
 import {
-  useGetProjectQuery,
-  useGetAvailableBudgetQuery,
-  useGetProjectsQuery,
-} from "@/api/projectApi";
+  useGetProjectCostingProjectsQuery,
+  useGetProjectCostingProjectQuery,
+} from "@/api/projectCostingApi";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -187,7 +189,11 @@ function BudgetIndicator({ config, values }: { config: any; values: any }) {
       </div>
     );
 
-  const available = Number(budget?.available_budget || 0);
+  if (!budget || budget.available_budget === undefined || budget.available_budget === null) {
+    return null;
+  }
+
+  const available = Number(budget.available_budget);
 
   return (
     <div
@@ -231,6 +237,13 @@ export function RequestForm<T extends Record<string, any>>({
 }: RequestFormProps<T>) {
   const router = useRouter();
   const statusModal = useStatusModal();
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const currentUserName = React.useMemo(() => {
+    if (!loggedInUser) return "";
+    const anyUser = loggedInUser as any;
+    const fullName = `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim();
+    return fullName || loggedInUser.username || "";
+  }, [loggedInUser]);
 
   const {
     control,
@@ -248,6 +261,81 @@ export function RequestForm<T extends Record<string, any>>({
   const projectedCost = config.calculateProjectedCost
     ? config.calculateProjectedCost(currentValues)
     : null;
+
+  const projectVal = currentValues["project"] || currentValues["project_id"] || "";
+  const phaseVal = currentValues["phase"] || "";
+  const taskVal = currentValues["task"] || currentValues["activity"] || currentValues["wbsElement"] || "";
+
+  const { data: rawProjects = [] } = useGetProjectCostingProjectsQuery({});
+  const allProjects = Array.isArray(rawProjects)
+    ? rawProjects
+    : (rawProjects as any)?.results || [];
+  const approvedProjects = allProjects.filter((p: any) => {
+    const st = String(p.status || "").toUpperCase();
+    return st === "APPROVED" || st === "ACTIVE" || p.is_approved === true || !p.status;
+  });
+  const approvedProjectsOptions = approvedProjects.map((p: any) => ({
+    label: p.name || p.project_name || `Project #${p.id}`,
+    value: String(p.id),
+  }));
+
+  const { data: projectData } = useGetProjectCostingProjectQuery(
+    Number(projectVal),
+    { skip: !projectVal || isNaN(Number(projectVal)) }
+  );
+  const activeProject = projectData || allProjects.find((p: any) => String(p.id) === String(projectVal));
+
+  const buildWbsListHelper = (proj: any): any[] => {
+    if (!proj) return [];
+    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) return proj.wbs;
+    const items: any[] = [];
+    const phasesArr = Array.isArray(proj.phases)
+      ? proj.phases
+      : Array.isArray(proj.phase_list) ? proj.phase_list : [];
+    phasesArr.forEach((ph: any, pi: number) => {
+      const phId = ph.id || ph.phase_id || `phase-${pi + 1}`;
+      const phName = ph.name || ph.phase_name || `Phase ${pi + 1}`;
+      items.push({ id: phId, name: phName, is_activity: false });
+      const acts = Array.isArray(ph.activities) ? ph.activities
+        : Array.isArray(ph.activity_list) ? ph.activity_list : [];
+      acts.forEach((act: any, ai: number) => {
+        items.push({
+          ...act,
+          id: act.id || act.activity_id || `act-${phId}-${ai + 1}`,
+          name: act.name || act.activity_name || `Activity ${ai + 1}`,
+          is_activity: true,
+          parent: phId,
+        });
+      });
+    });
+    return items;
+  };
+
+  const wbsList = activeProject ? buildWbsListHelper(activeProject) : [];
+  const selectedActivity = wbsList.find((w: any) => String(w.id) === String(taskVal) && w.is_activity);
+
+  let availableBudgetAmount = 0;
+  if (selectedActivity) {
+    availableBudgetAmount = selectedActivity.available_budget !== undefined && selectedActivity.available_budget !== null
+      ? Number(selectedActivity.available_budget)
+      : selectedActivity.remaining_budget !== undefined && selectedActivity.remaining_budget !== null
+      ? Number(selectedActivity.remaining_budget)
+      : selectedActivity.amount !== undefined && selectedActivity.amount !== null
+      ? Number(selectedActivity.amount)
+      : activeProject?.financials?.remaining_budget !== undefined && activeProject?.financials?.remaining_budget !== null
+      ? Number(activeProject.financials.remaining_budget)
+      : activeProject?.financials?.budget !== undefined && activeProject?.financials?.budget !== null
+      ? Number(activeProject.financials.budget)
+      : 0;
+  } else if (activeProject?.financials) {
+    availableBudgetAmount = activeProject.financials.remaining_budget !== undefined && activeProject.financials.remaining_budget !== null
+      ? Number(activeProject.financials.remaining_budget)
+      : activeProject.financials.budget !== undefined && activeProject.financials.budget !== null
+      ? Number(activeProject.financials.budget)
+      : 0;
+  }
+
+  const selectedCostCode = selectedActivity?.cost_code || selectedActivity?.code || config.costCode || "-";
 
   const onSubmit = async (data: T) => {
     try {
@@ -278,9 +366,9 @@ export function RequestForm<T extends Record<string, any>>({
   };
   console.log("config", config);
   return (
-    <div className="min-h-screen bg-[#F1F5F9]">
+    <div className="min-h-screen bg-[#F9FAFB] pb-28">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
+      <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10 shadow-xs">
         <div className="flex items-center gap-3 max-w-2xl mx-auto">
           <Button
             variant="ghost"
@@ -296,46 +384,65 @@ export function RequestForm<T extends Record<string, any>>({
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto pb-24 pt-4 space-y-4">
+      <div className="max-w-2xl mx-auto pb-16 pt-6 px-4 space-y-6">
         {/* Request Details Section / Header */}
         {config.renderHeader ? (
           config.renderHeader()
         ) : (
-          <div className="bg-white px-4 py-6">
-            <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+            <h2 className="text-sm font-medium text-[#3B7CED] mb-2">
               Request Details
             </h2>
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold text-gray-900">
                   Request ID
-                </span>
-                <span className="text-sm text-gray-600">
-                  {config.requestId}
-                </span>
+                </Label>
+                <Input
+                  readOnly
+                  disabled
+                  value={config.requestId || "LR00001"}
+                  className="w-full bg-white border-gray-300 text-gray-700 font-normal h-10"
+                />
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold text-gray-900">
                   Date
-                </span>
-                <span className="text-sm text-gray-600">{config.date}</span>
+                </Label>
+                <Input
+                  readOnly
+                  disabled
+                  value={config.date}
+                  className="w-full bg-white border-gray-300 text-gray-700 font-normal h-10"
+                />
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold text-gray-900">
                   Requested by
-                </span>
-                <span className="text-sm text-gray-600">
-                  {config.requesterName}
-                </span>
+                </Label>
+                <Input
+                  readOnly
+                  disabled
+                  value={
+                    (config.requesterName &&
+                    config.requesterName !== "Firstname Lastname" &&
+                    config.requesterName !== "Current User" &&
+                    config.requesterName !== "John Doe" &&
+                    config.requesterName !== "Requester"
+                      ? config.requesterName
+                      : currentUserName) || "Current User"
+                  }
+                  className="w-full bg-white border-gray-300 text-gray-700 font-normal h-10"
+                />
               </div>
             </div>
           </div>
         )}
 
         {/* Dynamic Sections */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {config.sections.map((section, sIndex) => (
-            <div key={sIndex} className="bg-white px-4 py-6">
+            <div key={sIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
               {section.title && (
                 <h2 className="text-sm font-medium text-[#3B7CED] mb-4">
                   {section.title}
@@ -351,7 +458,12 @@ export function RequestForm<T extends Record<string, any>>({
               )}
 
               {/* Custom section top renderer */}
-              {section.renderTop && section.renderTop(currentValues)}
+              {section.renderTop &&
+                section.renderTop(currentValues, {
+                  availableBudget: availableBudgetAmount,
+                  costCode: selectedCostCode,
+                  projectedCost: projectedCost || 0,
+                })}
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-5">
                 {section.fields.map((field) => {
@@ -360,6 +472,26 @@ export function RequestForm<T extends Record<string, any>>({
                     const actualValue = currentValues[field.visibleIf.field];
                     if (actualValue !== field.visibleIf.value) return null;
                   }
+
+                  const dynamicLabel = field.getDynamicLabel
+                    ? field.getDynamicLabel(currentValues)
+                    : field.name === "dailyRate" &&
+                        currentValues["durationUnit"] === "weeks"
+                      ? "Estimated Weekly Rate"
+                      : field.name === "dailyRate" &&
+                          currentValues["durationUnit"] === "months"
+                        ? "Estimated Monthly Rate"
+                        : field.label;
+
+                  const dynamicPlaceholder = field.getDynamicPlaceholder
+                    ? field.getDynamicPlaceholder(currentValues)
+                    : field.name === "dailyRate" &&
+                        currentValues["durationUnit"] === "weeks"
+                      ? "Enter weekly rate"
+                      : field.name === "dailyRate" &&
+                          currentValues["durationUnit"] === "months"
+                        ? "Enter monthly rate"
+                        : field.placeholder;
 
                   return (
                     <div
@@ -370,7 +502,7 @@ export function RequestForm<T extends Record<string, any>>({
                         htmlFor={field.name}
                         className="text-sm font-semibold text-gray-900"
                       >
-                        {field.label}
+                        {dynamicLabel}
                       </Label>
                       <Controller
                         name={field.name as any}
@@ -379,72 +511,28 @@ export function RequestForm<T extends Record<string, any>>({
                           if (field.type === "select") {
                             let options = field.options || [];
 
-                            // Handle dynamic project listing
                             if (field.name === "project" && options.length === 0) {
-                              // eslint-disable-next-line react-hooks/rules-of-hooks
-                              const { data: projects = [] } = useGetProjectsQuery();
-                              options = projects.map((p) => ({
-                                label: p.name,
-                                value: String(p.id),
-                              }));
+                              options = approvedProjectsOptions;
                             }
 
-                            // Handle dynamic Phase filtering (dependsOn project)
                             if (field.name === "phase" && field.dependsOn) {
-                              const projectVal = currentValues[field.dependsOn];
-                              // eslint-disable-next-line react-hooks/rules-of-hooks
-                              const { data: project } = useGetProjectQuery(
-                                Number(projectVal),
-                                { skip: !projectVal }
-                              );
-                              if (project) {
-                                options = project.wbs
-                                  .filter((w) => !w.is_activity)
-                                  .map((w) => ({
-                                    label: w.name,
-                                    value: String(w.id),
-                                  }));
-                              }
+                              options = wbsList
+                                .filter((w: any) => !w.is_activity)
+                                .map((w: any) => ({ label: w.name, value: String(w.id) }));
                             }
 
-                            // Handle dynamic Task filtering (dependsOn phase)
                             if (field.name === "task" && field.dependsOn) {
-                              const phaseVal = currentValues[field.dependsOn];
-                              const projectVal = currentValues["project"];
-                              // eslint-disable-next-line react-hooks/rules-of-hooks
-                              const { data: project } = useGetProjectQuery(
-                                Number(projectVal),
-                                { skip: !projectVal }
-                              );
-                              if (project && phaseVal) {
-                                options = project.wbs
-                                  .filter((w) => w.is_activity && w.parent === Number(phaseVal))
-                                  .map((w) => ({
-                                    label: w.name,
-                                    value: String(w.id),
-                                  }));
+                              if (phaseVal) {
+                                options = wbsList
+                                  .filter((w: any) => w.is_activity && String(w.parent) === String(phaseVal))
+                                  .map((w: any) => ({ label: w.name, value: String(w.id) }));
                               }
                             }
 
-                            // Handle dynamic WBS filtering (dependsOn project)
-                            if (
-                              field.name === "wbsElement" &&
-                              field.dependsOn
-                            ) {
-                              const depValue = currentValues[field.dependsOn];
-                              // eslint-disable-next-line react-hooks/rules-of-hooks
-                              const { data: project } = useGetProjectQuery(
-                                Number(depValue),
-                                { skip: !depValue },
-                              );
-                              if (project) {
-                                options = project.wbs
-                                  .filter((w) => w.is_activity) // PRD: Site workers only select activity elements
-                                  .map((w) => ({
-                                    label: w.name,
-                                    value: String(w.id),
-                                  }));
-                              }
+                            if (field.name === "wbsElement" && field.dependsOn) {
+                              options = wbsList
+                                .filter((w: any) => w.is_activity)
+                                .map((w: any) => ({ label: w.name, value: String(w.id) }));
                             }
 
                             return (
@@ -457,7 +545,7 @@ export function RequestForm<T extends Record<string, any>>({
                                   className="w-full"
                                 >
                                   <SelectValue
-                                    placeholder={field.placeholder}
+                                    placeholder={dynamicPlaceholder}
                                   />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -477,7 +565,7 @@ export function RequestForm<T extends Record<string, any>>({
                             return (
                               <Textarea
                                 id={field.name}
-                                placeholder={field.placeholder}
+                                placeholder={dynamicPlaceholder}
                                 rows={field.rows || 4}
                                 className="resize-none"
                                 {...controllerField}
@@ -505,7 +593,7 @@ export function RequestForm<T extends Record<string, any>>({
                                   htmlFor={field.name}
                                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
-                                  {field.placeholder || field.label}
+                                  {dynamicPlaceholder || dynamicLabel}
                                 </Label>
                               </div>
                             );
@@ -514,7 +602,7 @@ export function RequestForm<T extends Record<string, any>>({
                             <Input
                               id={field.name}
                               type={field.type as any}
-                              placeholder={field.placeholder}
+                              placeholder={dynamicPlaceholder}
                               {...controllerField}
                               aria-invalid={!!errors[field.name]}
                               className={
@@ -542,14 +630,14 @@ export function RequestForm<T extends Record<string, any>>({
 
                 {/* Projected Cost (only shown in the last section for now, or based on logic) */}
                 {sIndex === config.sections.length - 1 &&
-                  projectedCost !== null && (
+                  projectedCost !== null && !section.renderTop && (
                     <div className="pt-5 border-t border-gray-100">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-semibold text-gray-900">
                           Projected Cost
                         </span>
                         <span className="text-lg font-bold text-gray-900">
-                          N
+                          ₦
                           {projectedCost.toLocaleString("en-NG", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -560,23 +648,56 @@ export function RequestForm<T extends Record<string, any>>({
                   )}
               </div>
 
+              {/* WBS section budget & cost code summary right below task */}
+              {!section.renderBottom &&
+                (section.title === "WBS" ||
+                  section.fields.some(
+                    (f) => f.name === "task" || f.name === "wbsElement",
+                  )) && (
+                  <div className="pt-4 mt-4 border-t border-gray-200 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-semibold text-gray-900">
+                        Cost Code
+                      </span>
+                      <span className="text-sm text-gray-600 font-medium">
+                        {selectedCostCode}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-semibold text-gray-900">
+                        Available Budget
+                      </span>
+                      <span className="text-sm font-bold text-[#3B7CED]">
+                        ₦
+                        {availableBudgetAmount.toLocaleString("en-NG", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
               {/* Custom section bottom renderer */}
               {section.renderBottom && section.renderBottom(currentValues)}
+
+              {/* Submit Button placed cleanly inside/below the last card */}
+              {sIndex === config.sections.length - 1 && (
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="contained"
+                    className="w-full h-12 text-base font-medium flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg"
+                    onClick={handleSubmit(onSubmit)}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Submitting..." : "Submit request"}
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </form>
-      </div>
-
-      {/* Fixed Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 md:left-16 md:max-w-[calc(100%-4rem)] mx-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <Button
-          variant="contained"
-          className="w-full max-w-2xl mx-auto h-12 text-base font-medium flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-md"
-          onClick={handleSubmit(onSubmit)}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Submitting..." : "Submit request"}
-        </Button>
       </div>
 
       {/* Status Modal */}

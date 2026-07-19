@@ -10,18 +10,16 @@ import {
   useUpdateLabourRequestMutation,
   usePatchLabourRequestMutation,
 } from "@/api/requests/labourRequestApi";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { syncService } from "@/lib/database/syncService";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { format } from "date-fns";
 import extractErrorMessage from "@/components/requests/utils/RequestErrorHandler";
-import { db } from "@/lib/database/labourRequestDb";
-import { get } from "http";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
   phase: z.string().min(1, "Please select a phase"),
-  task: z.string().min(1, "Please select a task"),
+  task: z.string().min(1, "Please select an activity"),
   numberOfWorkers: z.coerce
     .number()
     .positive("Enter a correct number")
@@ -32,7 +30,9 @@ const formSchema = z.object({
     .number()
     .positive("Enter a valid duration")
     .min(1, "Duration must be at least 1"),
-  durationUnit: z.enum(["days"], "Please select duration unit"),
+  durationUnit: z.enum(["days", "weeks", "months"], {
+    message: "Please select duration unit",
+  }),
   dailyRate: z.coerce
     .number()
     .positive("Enter a valid daily rate")
@@ -48,8 +48,13 @@ type FormValues = z.infer<typeof formSchema>;
 export default function EditLabourRequestPage() {
   const params = useParams();
   const router = useRouter();
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = React.useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
   const id = parseInt(params.id as string);
-  const networkStatus = useNetworkStatus();
 
   const {
     data: request,
@@ -79,10 +84,23 @@ export default function EditLabourRequestPage() {
 
   const handleSubmit = async (data: FormValues) => {
     try {
+      const ensureValidUUID = (val: string): string => {
+        if (!val) return "";
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(val)) return val;
+        const numericVal = parseInt(val, 10);
+        if (!isNaN(numericVal)) {
+          const hexString = numericVal.toString(16).padStart(12, "0");
+          return `00000000-0000-0000-0000-${hexString}`;
+        }
+        return val;
+      };
+
       const submitData = {
         project: parseInt(data.project),
         date_required:
-          request?.detail.date_required ||
+          request?.detail?.date_required ||
+          (request as any)?.date_required ||
           new Date().toISOString().split("T")[0],
         number_of_workers: data.numberOfWorkers,
         role_type: data.role,
@@ -90,55 +108,25 @@ export default function EditLabourRequestPage() {
         duration_unit: data.durationUnit,
         estimated_daily_rate: data.dailyRate.toString(),
         justification_notes: data.justification || "",
+        activity: ensureValidUUID(data.task),
       };
 
-      if (networkStatus.isOnline) {
-        // Prefer PATCH for partial updates
-        await patchLabourRequest({ id, data: submitData }).unwrap();
+      // Prefer PATCH for partial updates
+      await patchLabourRequest({ id, data: submitData }).unwrap();
 
-        const refetchResult = await refetch();
-        const updatedId = refetchResult.data?.detail.id || id;
+      const refetchResult = await refetch();
+      const updatedId = refetchResult.data?.detail?.id || refetchResult.data?.id || id;
 
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Updated",
-          description: "Your labour request has been updated successfully.",
-        });
+      setStatusModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Updated",
+        description: "Your labour request has been updated successfully.",
+      });
 
-        // Navigate back to detail page after a delay
-        setTimeout(() => {
-          router.push(`/project-request/labour-request/${updatedId}`);
-        }, 2000);
-      } else {
-        // Offline update - find local request by server id
-        const localRequests = await db.labourRequests
-          .where("id")
-          .equals(id)
-          .toArray();
-        if (localRequests.length > 0) {
-          await syncService.updateRequestOffline(
-            localRequests[0].localId,
-            submitData,
-          );
-        } else {
-          // If no local version exists, create one
-          await syncService.updateRequestOffline(`server_${id}`, submitData);
-        }
-
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          title: "Request Updated Locally",
-          description:
-            "Your changes have been saved locally and will be synchronized when you're back online.",
-        });
-
-        // Navigate back to detail page after a delay
-        setTimeout(() => {
-          router.push(`/project-request/labour-request/${id}`);
-        }, 2000);
-      }
+      setTimeout(() => {
+        router.push(`/project-request/labour-request/${updatedId}`);
+      }, 2000);
     } catch (error) {
       console.error("Failed to update labour request:", error);
       const errorMessage = extractErrorMessage(error);
@@ -163,11 +151,31 @@ export default function EditLabourRequestPage() {
     );
   }
 
+  const calculateLabourTotalCost = (data: Partial<FormValues>) => {
+    const workers = Number(data.numberOfWorkers) || 0;
+    const rate = Number(data.dailyRate) || 0;
+    const dur = Number(data.duration) || 1;
+    return workers * rate * dur;
+  };
+
   const config: RequestFormConfig<FormValues> = {
     title: "Edit Labour Request",
-    requestId: request.reference_id,
-    requesterName: request.detail.created_by_name || "John Doe",
-    date: format(new Date(request.created_at), "d MMM yyyy"),
+    requestId: request?.reference_id || `LR-${request?.id || id}`,
+    requesterName:
+      request?.detail?.created_by_name ||
+      request?.project_request?.created_by_details?.user?.first_name ||
+      (request as any)?.created_by_name ||
+      loggedInUserName,
+    date: new Date(
+      request?.detail?.created_at ||
+        request?.project_request?.created_at ||
+        request?.created_at ||
+        Date.now(),
+    ).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
     sections: [
       {
         title: "Labour Details",
@@ -177,17 +185,7 @@ export default function EditLabourRequestPage() {
             label: "Project",
             type: "select",
             placeholder: "Select a project",
-            options: [
-              // TODO: Load real projects from API
-              // {
-              //   label: `Project #${request.project_request.project}`,
-              //   value: request.project_request.project.toString(),
-              // },
-              { label: "Project #1", value: "1" },
-              { label: "Project #2", value: "2" },
-              { label: "Project #3", value: "3" },
-              { label: "Project #4", value: "4" },
-            ],
+            options: [],
           },
           {
             name: "numberOfWorkers",
@@ -199,7 +197,7 @@ export default function EditLabourRequestPage() {
             name: "role",
             label: "Role / Trade Type",
             type: "text",
-            placeholder: "Enter role or trade type",
+            placeholder: "Enter role",
           },
         ],
       },
@@ -210,39 +208,19 @@ export default function EditLabourRequestPage() {
             name: "phase",
             label: "Phase",
             type: "select",
-            placeholder: "Select phase",
-            options: [
-              { label: "Phase #1", value: "1" },
-              { label: "Phase #2", value: "2" },
-              { label: "Phase #3", value: "3" },
-              { label: "Phase #4", value: "4" },
-            ],
+            placeholder: "Select a phase",
+            options: [],
+            dependsOn: "project",
           },
           {
             name: "task",
-            label: "Task",
+            label: "Activity",
             type: "select",
-            placeholder: "Select task",
-            options: [
-              { label: "Task #1", value: "1" },
-              { label: "Task #2", value: "2" },
-              { label: "Task #3", value: "3" },
-              { label: "Task #4", value: "4" },
-            ],
+            placeholder: "Select a task",
+            options: [],
+            dependsOn: "phase",
           },
         ],
-        renderBottom: (data: FormValues) => (
-          <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-semibold text-gray-500">Cost Code</span>
-              <span className="text-sm font-semibold text-gray-500">-</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-              <span className="text-sm font-semibold text-[#3B7CED]">₦5,000,000.00</span>
-            </div>
-          </div>
-        ),
       },
       {
         title: "Cost Details",
@@ -262,8 +240,8 @@ export default function EditLabourRequestPage() {
             placeholder: "Select unit",
             options: [
               { label: "Days", value: "days" },
-              // { label: "Weeks", value: "weeks" },
-              // { label: "Months", value: "months" },
+              { label: "Weeks", value: "weeks" },
+              { label: "Months", value: "months" },
             ],
             halfWidth: true,
           },
@@ -271,7 +249,19 @@ export default function EditLabourRequestPage() {
             name: "dailyRate",
             label: "Estimated Daily Rate",
             type: "number",
-            placeholder: "Enter estimated daily rate",
+            placeholder: "Enter daily rate",
+            getDynamicLabel: (values: any) =>
+              values?.durationUnit === "weeks"
+                ? "Estimated Weekly Rate"
+                : values?.durationUnit === "months"
+                  ? "Estimated Monthly Rate"
+                  : "Estimated Daily Rate",
+            getDynamicPlaceholder: (values: any) =>
+              values?.durationUnit === "weeks"
+                ? "Enter weekly rate"
+                : values?.durationUnit === "months"
+                  ? "Enter monthly rate"
+                  : "Enter daily rate",
           },
         ],
       },
@@ -281,35 +271,69 @@ export default function EditLabourRequestPage() {
             name: "justification",
             label: "Notes / Justification",
             type: "textarea",
-            placeholder: "Enter justification notes (optional)",
+            placeholder: "Enter note",
             rows: 4,
           },
         ],
-        renderTop: (data: FormValues) => (
-          <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-              <span className="text-sm font-semibold text-[#3B7CED]">₦5,000,000.00</span>
+        renderTop: (data: FormValues, extra?: any) => {
+          const totalCost = calculateLabourTotalCost(data);
+          const availBudget = extra?.availableBudget || 0;
+          return (
+            <div className="pb-4 mb-4 border-b border-gray-200 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-900">
+                  Available Budget
+                </span>
+                <span className="text-sm font-bold text-[#3B7CED]">
+                  ₦
+                  {availBudget.toLocaleString("en-NG", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-900">
+                  Total Cost
+                </span>
+                <span className="text-sm font-bold text-[#3B7CED]">
+                  ₦
+                  {totalCost.toLocaleString("en-NG", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-900">Total Cost</span>
-              <span className="text-sm font-semibold text-[#3B7CED]">
-                ₦{((data.numberOfWorkers || 0) * (data.dailyRate || 0) * (data.duration || 1)).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-        ),
+          );
+        },
       },
     ],
     schema: formSchema,
     defaultValues: {
-      project: request?.project_request?.project.toString() || "",
-      numberOfWorkers: request.detail.number_of_workers,
-      role: request.detail.role_type,
-      duration: request.detail.duration,
-      durationUnit: request.detail.duration_unit,
-      dailyRate: parseFloat(request.detail.estimated_daily_rate),
-      justification: request.detail.justification_notes || "",
+      project:
+        request?.project_request?.project?.toString() ||
+        (request as any)?.project?.toString() ||
+        "",
+      numberOfWorkers:
+        request?.detail?.number_of_workers ??
+        (request as any)?.number_of_workers ??
+        1,
+      role: request?.detail?.role_type || (request as any)?.role_type || "",
+      duration: request?.detail?.duration ?? (request as any)?.duration ?? 1,
+      durationUnit:
+        (request?.detail?.duration_unit as any) ||
+        ((request as any)?.duration_unit as any) ||
+        "days",
+      dailyRate: parseFloat(
+        request?.detail?.estimated_daily_rate ||
+          (request as any)?.estimated_daily_rate ||
+          "0",
+      ),
+      justification:
+        request?.detail?.justification_notes ||
+        (request as any)?.justification_notes ||
+        "",
       phase: "1",
       task: "1",
     },
@@ -320,11 +344,7 @@ export default function EditLabourRequestPage() {
     },
     backPath: `/project-request/labour-request/${id}`,
     calculateProjectedCost: (data) => {
-      return (
-        (data.numberOfWorkers || 0) *
-        (data.dailyRate || 0) *
-        (data.duration || 1)
-      );
+      return calculateLabourTotalCost(data);
     },
   };
 

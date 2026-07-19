@@ -2,103 +2,78 @@ import React from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
-import { Activity, Phase, Subphase } from "../types";
+import { Activity, Phase } from "../types";
 import { WBSActivityRow } from "./WBSActivityRow";
-import { WBSSubphaseRow } from "./WBSSubphaseRow";
 
 interface WBSPhaseRowProps {
   phase: Phase;
   phaseBudget: number;
-  getSubphaseBudget: (subphase: Subphase) => number;
+  extraColumns: string[];
   onUpdatePhaseName: (name: string) => void;
-  onAddSubphase: () => void;
   onAddPhaseActivity: () => void;
-  onUpdateSubphaseName: (subphaseId: string, name: string) => void;
-  onAddSubphaseActivity: (subphaseId: string) => void;
-  onUpdateActivity: (activityId: string, updates: Partial<Activity>, subphaseId?: string) => void;
-  onRemoveActivity: (activityId: string, subphaseId?: string) => void;
+  onUpdateActivity: (activityId: string, updates: Partial<Activity>) => void;
+  onRemoveActivity: (activityId: string) => void;
   onRemovePhase: () => void;
-  onRemoveSubphase: (subphaseId: string) => void;
 }
 
 export function WBSPhaseRow({
   phase,
   phaseBudget,
-  getSubphaseBudget,
+  extraColumns,
   onUpdatePhaseName,
-  onAddSubphase,
   onAddPhaseActivity,
-  onUpdateSubphaseName,
-  onAddSubphaseActivity,
   onUpdateActivity,
   onRemoveActivity,
   onRemovePhase,
-  onRemoveSubphase,
 }: WBSPhaseRowProps) {
   return (
     <React.Fragment>
       {/* Phase Header */}
-      <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white">
-        <TableCell className="font-medium py-2 text-sm flex items-center">
-          <Input
-            value={phase.name}
-            onChange={(e) => onUpdatePhaseName(e.target.value)}
-            className="h-8 w-40 bg-transparent border-gray-200 hover:border-gray-300 focus:bg-white transition-all font-medium p-1 mr-4 shadow-none"
-          />
-          <button
-            onClick={onAddSubphase}
-            className="ml-4 text-[#3B7CED] text-xs font-normal hover:underline flex items-center"
-          >
-            <Plus className="w-3 h-3 mr-1" /> Subphase
-          </button>
-          <button
-            onClick={onAddPhaseActivity}
-            className="ml-4 text-[#3B7CED] text-xs font-normal hover:underline flex items-center"
-          >
-            <Plus className="w-3 h-3 mr-1" /> Activity
-          </button>
-          <button
-            onClick={onRemovePhase}
-            className="ml-4 text-gray-400 hover:text-red-500 flex items-center"
-            title="Delete Phase"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+      <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB]/80 border-b border-white">
+        <TableCell 
+          colSpan={4} 
+          className="font-medium p-0 text-sm bg-[#EEF2FB] h-12"
+        >
+          <div className="flex items-center px-4 h-full">
+            <Input
+              value={phase.name}
+              onChange={(e) => onUpdatePhaseName(e.target.value)}
+              className="h-8 w-60 bg-transparent border-0 hover:bg-white/50 focus:bg-white transition-all font-semibold text-gray-800 p-1 mr-4 shadow-none rounded"
+            />
+            <button
+              type="button"
+              onClick={onAddPhaseActivity}
+              className="ml-4 text-[#3B7CED] text-xs font-normal hover:underline flex items-center"
+            >
+              <Plus className="w-3 h-3 mr-1" /> Activity
+            </button>
+            <button
+              type="button"
+              onClick={onRemovePhase}
+              className="ml-4 text-gray-400 hover:text-red-500 flex items-center"
+              title="Delete Phase"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </TableCell>
-        <TableCell></TableCell>
-        <TableCell></TableCell>
-        <TableCell></TableCell>
-        <TableCell className="font-medium text-sm">
+        <TableCell className="font-semibold text-sm py-2 bg-[#EEF2FB] text-gray-800">
           {phaseBudget.toLocaleString()}
         </TableCell>
+        {extraColumns.length > 0 && (
+          <TableCell colSpan={extraColumns.length} className="py-2 bg-[#EEF2FB]" />
+        )}
+        <TableCell className="py-2 bg-[#EEF2FB]"></TableCell>
       </TableRow>
 
-      {/* Phase Direct Activities */}
+      {/* Phase Activities */}
       {phase.activities.map((activity) => (
         <WBSActivityRow
           key={activity.id}
           activity={activity}
-          isSubphaseActivity={false}
+          extraColumns={extraColumns}
           onUpdate={(updates) => onUpdateActivity(activity.id, updates)}
           onRemove={() => onRemoveActivity(activity.id)}
-        />
-      ))}
-
-      {/* Subphases */}
-      {phase.subphases.map((subphase) => (
-        <WBSSubphaseRow
-          key={subphase.id}
-          subphase={subphase}
-          subphaseBudget={getSubphaseBudget(subphase)}
-          onUpdateName={(name) => onUpdateSubphaseName(subphase.id, name)}
-          onAddActivity={() => onAddSubphaseActivity(subphase.id)}
-          onUpdateActivity={(activityId, updates) =>
-            onUpdateActivity(activityId, updates, subphase.id)
-          }
-          onRemoveActivity={(activityId) =>
-            onRemoveActivity(activityId, subphase.id)
-          }
-          onRemoveSubphase={() => onRemoveSubphase(subphase.id)}
         />
       ))}
     </React.Fragment>

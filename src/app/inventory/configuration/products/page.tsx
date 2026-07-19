@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, Filter } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Search, Filter, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Breadcrumbs from "@/components/shared/BreadScrumbs";
+import { AutoSaveIcon } from "@/components/shared/icons";
+import { BreadcrumbItem } from "@/components/shared/types";
 import {
   Table,
   TableBody,
@@ -23,17 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const mockProducts = [
-  { id: "1", code: "PRD-001", name: "Portland Cement", category: "Cement Products", uom: "Bags", reorder: 50, status: "ACTIVE" },
-  { id: "2", code: "PRD-002", name: "12mm Rebar Steel", category: "Steel and Iron", uom: "Tonnes", reorder: 10, status: "ACTIVE" },
-  { id: "3", code: "PRD-003", name: "White Emulsion Paint", category: "Finishing Materials", uom: "Liters", reorder: 20, status: "INACTIVE" },
-];
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 
 const getStatusVariant = (status: string) => {
   switch (status?.toUpperCase()) {
     case "ACTIVE":
       return "validated";
+    case "HIDDEN":
     case "INACTIVE":
       return "rejected";
     default:
@@ -48,131 +47,254 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
-  const handleRowClick = (id: string) => {
+  const { data: rawProducts, isLoading, error } = useGetInventoryProductsQuery({});
+
+  const items: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Inventory", href: "/inventory" },
+    { label: "Configuration", href: "/inventory/configuration" },
+    { label: "Products", href: "/inventory/configuration/products", current: true },
+  ];
+
+  const productsList = useMemo(() => {
+    if (!rawProducts) return [];
+    if (Array.isArray(rawProducts)) return rawProducts;
+    if ((rawProducts as any).results && Array.isArray((rawProducts as any).results)) {
+      return (rawProducts as any).results;
+    }
+    return [];
+  }, [rawProducts]);
+
+  const categories = useMemo(() => {
+    const cats = new Set<string>(["consumable", "stockable", "service-product"]);
+    productsList.forEach((p: any) => {
+      const cat = p.product_category || p.category;
+      if (cat) cats.add(String(cat));
+    });
+    return Array.from(cats);
+  }, [productsList]);
+
+  const formatCategoryName = (cat?: string) => {
+    if (!cat) return "-";
+    if (cat === "consumable") return "Consumable";
+    if (cat === "stockable") return "Stockable";
+    if (cat === "service-product") return "Service Product";
+    return cat;
+  };
+
+  const handleRowClick = (id: string | number) => {
     router.push(`/inventory/configuration/products/${id}`);
   };
 
-  const filteredProducts = mockProducts.filter((p) => {
-    const matchQuery = p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = selectedCategory === "all" || p.category === selectedCategory;
-    const matchStatus = selectedStatus === "all" || p.status.toUpperCase() === selectedStatus.toUpperCase();
-    return matchQuery && matchCategory && matchStatus;
-  });
+  const filteredProducts = useMemo(() => {
+    return productsList.filter((p: any) => {
+      if (!p) return false;
+      const nameStr = String(p.product_name || p.name || "").toLowerCase();
+      const codeStr = String(p.product_code || p.code || `PRD-${p.id}`).toLowerCase();
+      const matchQuery =
+        !search.trim() ||
+        nameStr.includes(search.toLowerCase()) ||
+        codeStr.includes(search.toLowerCase());
+      const matchCategory =
+        selectedCategory === "all" ||
+        String(p.product_category || p.category || "") === selectedCategory;
+      const statusStr = p.is_hidden
+        ? "HIDDEN"
+        : p.is_active !== false
+        ? "ACTIVE"
+        : "INACTIVE";
+      const matchStatus =
+        selectedStatus === "all" || statusStr === selectedStatus.toUpperCase();
+      return matchQuery && matchCategory && matchStatus;
+    });
+  }, [productsList, search, selectedCategory, selectedStatus]);
 
   return (
     <PageGuard application="inventory" module="products">
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto flex flex-col gap-6 w-full">
-        {/* Responsive Top Bar Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-4 rounded border border-gray-200 shadow-sm gap-4">
-          
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 w-full">
-            <h1 className="text-xl font-semibold text-gray-800 shrink-0">Products</h1>
-            
-            <div className="flex items-center gap-2 flex-1 w-full max-w-md">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search products or codes..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 bg-gray-50 border-gray-200 h-9 text-sm w-full"
-                />
+      {/* Two-tone: gray page canvas */}
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
+          <Breadcrumbs
+            items={items}
+            action={
+              <Button variant="ghost" className="text-sm text-gray-400 flex items-center gap-2 hover:text-[#3B7CED] transition-colors">
+                Autosaved <AutoSaveIcon />
+              </Button>
+            }
+          />
+
+          {/* White Header Card with Filter Pills */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            {/* Top Bar: title + search + actions */}
+            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
+              <div className="flex items-center gap-4">
+                <h1 className="text-xl font-semibold text-[#32325D] shrink-0">Products</h1>
+                <div className="relative w-[240px] md:w-[320px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search products or codes..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9 bg-white border-gray-200 rounded-lg h-9 text-sm w-full focus:ring-1 focus:ring-[#3B7CED] text-[#32325D]"
+                  />
+                </div>
               </div>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowFilters(!showFilters)}
-                className={`h-9 w-9 shrink-0 border border-gray-200 rounded ${showFilters ? "bg-blue-50 text-[#3B7CED] border-blue-200" : "text-gray-500 hover:text-gray-900"}`}
-                title="Toggle Filters"
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <Link href="/inventory/configuration/products/new">
+                  <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all flex items-center gap-1.5">
+                    <Plus className="h-4 w-4" /> New Product
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Status Filter Pills & Category Dropdown */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {[
+                  { label: "All Products", value: "all" },
+                  { label: "Active", value: "ACTIVE" },
+                  { label: "Hidden", value: "HIDDEN" },
+                  { label: "Inactive", value: "INACTIVE" },
+                ].map((tab) => {
+                  const isSelected = selectedStatus === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setSelectedStatus(tab.value)}
+                      className={`px-4 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer ${
+                        isSelected
+                          ? "bg-[#E8F0FE] text-[#1A73E8] font-semibold"
+                          : "bg-[#E9ECEF] text-[#8898AA] font-normal hover:bg-gray-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#8898AA] mr-1 uppercase tracking-wider">Category:</span>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-[180px] h-8 border-gray-200 bg-white text-xs text-[#32325D]">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {formatCategoryName(cat)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          
-          <div className="flex items-center justify-end pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
-            <Link href="/inventory/configuration/products/new" className="w-full sm:w-auto">
-              <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 text-sm w-full sm:w-auto">
-                New Product
-              </Button>
-            </Link>
-          </div>
-        </div>
 
-        {/* Filter Drawer / Bar */}
-        {showFilters && (
-          <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded border border-gray-200 shadow-sm animate-in fade-in-50 duration-200">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full sm:w-[180px] h-9 border-gray-200 bg-white text-xs">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Cement Products">Cement Products</SelectItem>
-                <SelectItem value="Steel and Iron">Steel and Iron</SelectItem>
-                <SelectItem value="Finishing Materials">Finishing Materials</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full sm:w-[150px] h-9 border-gray-200 bg-white text-xs">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Responsive Table Content */}
-        <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto w-full">
-            <Table className="min-w-[700px] w-full">
-              <TableHeader>
-                <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
-                  <TableHead className="font-medium text-gray-500 whitespace-nowrap pl-4">Product Code</TableHead>
-                  <TableHead className="font-medium text-gray-500 whitespace-nowrap">Product Name</TableHead>
-                  <TableHead className="font-medium text-gray-500 whitespace-nowrap">Category</TableHead>
-                  <TableHead className="font-medium text-gray-500 whitespace-nowrap">Unit</TableHead>
-                  <TableHead className="font-medium text-gray-500 text-right whitespace-nowrap">Reorder Pt.</TableHead>
-                  <TableHead className="font-medium text-gray-500 text-center whitespace-nowrap pr-4">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((prd) => (
-                  <TableRow 
-                    key={prd.id} 
-                    className="cursor-pointer hover:bg-gray-50 border-b-gray-100 transition-colors"
-                    onClick={() => handleRowClick(prd.id)}
-                  >
-                    <TableCell className="text-gray-600 font-mono text-xs font-semibold pl-4">{prd.code}</TableCell>
-                    <TableCell className="text-gray-900 font-medium">{prd.name}</TableCell>
-                    <TableCell className="text-gray-600">{prd.category}</TableCell>
-                    <TableCell className="text-gray-600">{prd.uom}</TableCell>
-                    <TableCell className="text-gray-600 text-right font-mono">{prd.reorder}</TableCell>
-                    <TableCell className="text-center pr-4">
-                      <Badge variant={getStatusVariant(prd.status) as any} className="px-3 py-1 font-normal">
-                        {prd.status || "DRAFT"}
-                      </Badge>
-                    </TableCell>
+          {/* Main Table Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto w-full">
+              <Table className="min-w-[900px] w-full">
+                <TableHeader>
+                  <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      Product Code
+                    </TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      Product Name
+                    </TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      Category
+                    </TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      Unit
+                    </TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                      Standard Cost
+                    </TableHead>
+                    <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                      Status
+                    </TableHead>
                   </TableRow>
-                ))}
-                {filteredProducts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      No products found matching your search.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {isLoading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-12">
+                        <div className="flex items-center justify-center gap-2 text-[#8898AA] text-sm">
+                          <Loader2 className="h-5 w-5 animate-spin text-[#3B7CED]" />
+                          <span>Loading products...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+
+                  {!isLoading &&
+                    filteredProducts.map((prd: any) => {
+                      const statusStr = prd.is_hidden
+                        ? "HIDDEN"
+                        : prd.is_active !== false
+                        ? "ACTIVE"
+                        : "INACTIVE";
+                      const uomStr =
+                        prd.unit_of_measure_details?.unit_name ||
+                        prd.unit_of_measure_details?.unit_symbol ||
+                        prd.uom ||
+                        String(prd.unit_of_measure || "-");
+
+                      return (
+                        <TableRow
+                          key={prd.id}
+                          className="cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-colors"
+                          onClick={() => handleRowClick(prd.id)}
+                        >
+                          <TableCell className="px-6 py-3.5 font-mono text-sm font-semibold text-[#3B7CED] whitespace-nowrap">
+                            {prd.product_code || prd.code || `PRD-${prd.id}`}
+                          </TableCell>
+                          <TableCell className="px-6 py-3.5 text-sm font-semibold text-[#32325D] whitespace-nowrap">
+                            {prd.product_name || prd.name}
+                          </TableCell>
+                          <TableCell className="px-6 py-3.5 text-sm text-[#525F7F] whitespace-nowrap">
+                            {formatCategoryName(prd.product_category || prd.category)}
+                          </TableCell>
+                          <TableCell className="px-6 py-3.5 text-sm font-medium text-[#525F7F] whitespace-nowrap">
+                            {uomStr}
+                          </TableCell>
+                          <TableCell className="px-6 py-3.5 text-sm text-right font-mono font-bold text-[#32325D] whitespace-nowrap">
+                            {prd.standard_cost !== undefined ? `₦${Number(prd.standard_cost).toLocaleString()}` : "₦0.00"}
+                          </TableCell>
+                          <TableCell className="pr-6 py-3.5 text-center whitespace-nowrap">
+                            <Badge
+                              variant={getStatusVariant(statusStr) as any}
+                              className="px-2.5 py-0.5 font-semibold text-xs shadow-none"
+                            >
+                              {statusStr}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+
+                  {!isLoading && filteredProducts.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center py-12 text-[#8898AA] text-sm"
+                      >
+                        No products found matching your criteria.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
+        </main>
       </div>
     </PageGuard>
   );

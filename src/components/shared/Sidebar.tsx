@@ -16,7 +16,7 @@ import {
   AppIcon,
   SettingsIcon,
 } from "./icons";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Coins } from "lucide-react";
 
 // Navigation items grouped into sections
 const topItems = [{ id: "menu", icon: MenuIcon, label: "Menu", route: "/" }];
@@ -42,6 +42,12 @@ const middleItems = [
     icon: ClipboardList,
     label: "Project Request",
     route: "/project-request",
+  },
+  {
+    id: "project-costing",
+    icon: Coins,
+    label: "Project Costing",
+    route: "/project-costing",
   },
   { id: "contact", icon: ContactIcon, label: "Contact", route: "/contact" },
   // --- Non-Functional Modules (Coming Soon) ---

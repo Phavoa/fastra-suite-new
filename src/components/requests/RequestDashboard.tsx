@@ -19,7 +19,7 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  
+
   const activeStatusQuery = searchParams.get("status") as RequestStatus | null;
   const [activeFilter, setActiveFilter] = useState<RequestStatus | "all">(
     "all",
@@ -27,7 +27,8 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
 
   const filteredRequests = config.mockData.filter((req) => {
     const matchesFilter = activeFilter === "all" || req.status === activeFilter;
-    const matchesStatusQuery = !activeStatusQuery || req.status === activeStatusQuery;
+    const matchesStatusQuery =
+      !activeStatusQuery || req.status === activeStatusQuery;
     return matchesFilter && matchesStatusQuery;
   });
 
@@ -55,19 +56,27 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
           <div className="bg-white p-6 rounded-md flex items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
               {(() => {
-                const summary = config.summaryConfigs.find(s => s.status === activeStatusQuery);
+                const summary = config.summaryConfigs.find(
+                  (s) => s.status === activeStatusQuery,
+                );
                 const dotColor = summary?.colorClass.includes("text-")
                   ? summary.colorClass.replace("text-", "bg-")
                   : "bg-[#3B7CED]";
-                const label = summary?.label || (activeStatusQuery.charAt(0).toUpperCase() + activeStatusQuery.slice(1));
+                const label =
+                  summary?.label ||
+                  activeStatusQuery.charAt(0).toUpperCase() +
+                    activeStatusQuery.slice(1);
                 return (
                   <div className="flex items-center gap-3">
                     <div className={`w-4 h-4 rounded-full ${dotColor}`}></div>
                     <h2 className="text-xl font-semibold">
                       {label} {config.title}s
                     </h2>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${summary?.colorClass || "text-[#3B7CED]"} bg-gray-100`}>
-                      {filteredRequests.length} {filteredRequests.length === 1 ? "request" : "requests"}
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${summary?.colorClass || "text-[#3B7CED]"} bg-gray-100`}
+                    >
+                      {filteredRequests.length}{" "}
+                      {filteredRequests.length === 1 ? "request" : "requests"}
                     </span>
                   </div>
                 );
@@ -83,13 +92,19 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
               {config.summaryConfigs.map((summary) => (
                 <div
                   key={summary.status}
-                  onClick={() => router.push(`${pathname}?status=${summary.status}`)}
+                  onClick={() =>
+                    router.push(`${pathname}?status=${summary.status}`)
+                  }
                   className={`p-4 border rounded-lg cursor-pointer hover:shadow-md transition-shadow ${summary.borderColorClass} ${summary.bgColorClass}`}
                 >
                   <div className="flex flex-col">
                     <div className="flex gap-2 items-center mb-2">
-                      <summary.icon className={`h-4 w-4 ${summary.colorClass}`} />
-                      <p className={`text-sm font-medium ${summary.colorClass}`}>
+                      <summary.icon
+                        className={`h-4 w-4 ${summary.colorClass}`}
+                      />
+                      <p
+                        className={`text-sm font-medium ${summary.colorClass}`}
+                      >
                         {summary.label}
                       </p>
                     </div>

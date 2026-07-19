@@ -10,6 +10,8 @@ import { useCreateSubcontractorRequestMutation } from "@/api/subcontractorReques
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetAvailableBudgetQuery } from "@/api/projectApi";
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store/store";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -20,7 +22,7 @@ const formSchema = z.object({
   contract_value: z.string().min(1, "Contract value is required"),
   payment_terms: z.string().min(2, "Payment terms are required"),
   phase: z.string().min(1, "Please select a phase"),
-  task: z.string().min(1, "Please select a task"),
+  task: z.string().min(1, "Please select an activity"),
   justification_notes: z.string().optional(),
 }).refine((data) => {
   if (data.start_date && data.end_date) {
@@ -38,6 +40,12 @@ export default function NewSubcontractorRequestPage() {
   const router = useRouter();
   const [createRequest, { isLoading: isSubmitting }] = useCreateSubcontractorRequestMutation();
   const { data: vendors = [], isLoading: isLoadingVendors } = useGetVendorsQuery({});
+  const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = React.useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
 
   const [requestId] = React.useState(() => {
     const num = Math.floor(Math.random() * 90000) + 10000;
@@ -54,7 +62,7 @@ export default function NewSubcontractorRequestPage() {
   const config: RequestFormConfig<FormValues> = {
     title: "Subcontractor Request",
     requestId: requestId,
-    requesterName: "Current User",
+    requesterName: loggedInUserName,
     date: new Date().toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
@@ -67,6 +75,14 @@ export default function NewSubcontractorRequestPage() {
           <div className="space-y-2">
             <Label htmlFor="requestId" className="text-sm font-semibold text-gray-900">Request ID</Label>
             <Input id="requestId" value={requestId} readOnly className="bg-white text-gray-900" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="date" className="text-sm font-semibold text-gray-900">Date</Label>
+            <Input id="date" value={new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} readOnly className="bg-white text-gray-900" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="requestedBy" className="text-sm font-semibold text-gray-900">Requested by</Label>
+            <Input id="requestedBy" value={loggedInUserName} readOnly className="bg-white text-gray-900" />
           </div>
         </div>
       </div>
@@ -141,41 +157,13 @@ export default function NewSubcontractorRequestPage() {
           },
           {
             name: "task",
-            label: "Task",
+            label: "Activity",
             type: "select",
-            placeholder: "Select a task",
+            placeholder: "Select an activity",
             dependsOn: "phase",
             options: [],
           },
         ],
-        renderBottom: (data: FormValues) => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const { data: budgetData } = useGetAvailableBudgetQuery(
-            {
-              project_id: Number(data.project),
-              wbs_id: Number(data.task),
-              cost_code: data.project === "2" ? "CC-05" : "CC-04",
-            },
-            { skip: !data.project || !data.task }
-          );
-          const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
-          return (
-            <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-gray-500">Cost Code</span>
-                <span className="text-sm font-semibold text-gray-500">
-                  {data.project === "2" ? "CC-05" : data.project ? "CC-04" : "-"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-                <span className="text-sm font-semibold text-[#3B7CED]">
-                  N{available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          );
-        },
       },
       {
         fields: [
@@ -187,24 +175,8 @@ export default function NewSubcontractorRequestPage() {
           },
         ],
         renderTop: (data: FormValues) => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const { data: budgetData } = useGetAvailableBudgetQuery(
-            {
-              project_id: Number(data.project),
-              wbs_id: Number(data.task),
-              cost_code: data.project === "2" ? "CC-05" : "CC-04",
-            },
-            { skip: !data.project || !data.task }
-          );
-          const available = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
           return (
             <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-gray-900">Available Budget</span>
-                <span className="text-sm font-semibold text-[#3B7CED]">
-                  N{available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-900">Total Cost</span>
                 <span className="text-sm font-semibold text-[#3B7CED]">
@@ -231,6 +203,18 @@ export default function NewSubcontractorRequestPage() {
     },
     onSubmit: async (data) => {
       try {
+        const ensureValidUUID = (val: string): string => {
+          if (!val) return "";
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(val)) return val;
+          const numericVal = parseInt(val, 10);
+          if (!isNaN(numericVal)) {
+            const hexString = numericVal.toString(16).padStart(12, "0");
+            return `00000000-0000-0000-0000-${hexString}`;
+          }
+          return val;
+        };
+
         const payload: any = {
           project: Number(data.project),
           project_request: Number(data.project),
@@ -243,6 +227,8 @@ export default function NewSubcontractorRequestPage() {
           justification_notes: data.justification_notes || "",
           milestones: [],
           vendor: Number(data.vendor),
+          activity: ensureValidUUID(data.task),
+          wbs_element: ensureValidUUID(data.task),
         };
 
         await createRequest(payload).unwrap();

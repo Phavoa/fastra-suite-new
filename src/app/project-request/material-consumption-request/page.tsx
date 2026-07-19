@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
-import { FileText, CheckCircle, Clock, XCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FileText, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { RequestDashboard } from "@/components/requests/RequestDashboard";
 import { RequestDashboardConfig, RequestStatus } from "@/components/requests/types";
+import { useGetMaterialConsumptionsQuery } from "@/api/requests/materialConsumptionRequestApi";
 
 interface MaterialConsumptionRequest {
   id: string;
@@ -14,51 +16,62 @@ interface MaterialConsumptionRequest {
   totalCost: number;
   requester: string;
   status: RequestStatus;
+  realId: number;
 }
 
-const mockRequests: MaterialConsumptionRequest[] = [
-  {
-    id: "MCR00001",
-    project: "Project #1",
-    itemsCount: 3,
-    totalCost: 150000,
-    requester: "Firstname Lastname",
-    status: "approved",
-  },
-  {
-    id: "MCR00002",
-    project: "Project #2",
-    itemsCount: 1,
-    totalCost: 45000,
-    requester: "Firstname Lastname",
-    status: "pending",
-  },
-  {
-    id: "MCR00003",
-    project: "Project #3",
-    itemsCount: 5,
-    totalCost: 320000,
-    requester: "Firstname Lastname",
-    status: "draft",
-  },
-  {
-    id: "MCR00004",
-    project: "Project #4",
-    itemsCount: 2,
-    totalCost: 85000,
-    requester: "Firstname Lastname",
-    status: "rejected",
-  },
-];
-
-const statusCounts: Record<RequestStatus, number> = {
-  draft: 12,
-  approved: 12,
-  pending: 12,
-  rejected: 12,
+const statusMap: Record<string, RequestStatus> = {
+  APPROVED: "approved",
+  PENDING: "pending",
+  DRAFT: "draft",
+  REJECTED: "rejected",
+  CANCELLED: "rejected",
+  approved: "approved",
+  pending: "pending",
+  draft: "draft",
+  rejected: "rejected",
+  cancelled: "rejected",
 };
 
 export default function MaterialConsumptionRequestPage() {
+  const router = useRouter();
+  const { data: apiData = [], isLoading } = useGetMaterialConsumptionsQuery();
+
+  const requests: MaterialConsumptionRequest[] = React.useMemo(() => {
+    const rawList = Array.isArray(apiData)
+      ? apiData
+      : (apiData as any).results ?? [];
+
+    return rawList.map((req: any) => {
+      const totalCost = (req.lines ?? []).reduce(
+        (sum: number, line: any) => sum + (parseFloat(line.total_cost) || 0),
+        0,
+      );
+
+      return {
+        id: req.request_id || `MCR-${req.id}`,
+        project: req.project_request ? `Project #${req.project_request}` : "—",
+        itemsCount: (req.lines ?? []).length,
+        totalCost,
+        requester: "—",
+        status: statusMap[req.status] ?? "pending",
+        realId: req.id,
+      };
+    });
+  }, [apiData]);
+
+  const statusCounts = React.useMemo(() => {
+    const counts: Record<RequestStatus, number> = {
+      draft: 0,
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+    };
+    requests.forEach((r) => {
+      if (r.status in counts) counts[r.status]++;
+    });
+    return counts;
+  }, [requests]);
+
   const getStatusBadgeVariant = (status: RequestStatus) => {
     switch (status) {
       case "approved":
@@ -114,14 +127,23 @@ export default function MaterialConsumptionRequestPage() {
       },
     ],
     renderItem: (request) => (
-      <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+      <Card
+        className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() =>
+          router.push(
+            `/project-request/material-consumption-request/${request.realId}`,
+          )
+        }
+      >
         <div className="flex justify-between items-start">
-          <span className="text-sm font-semibold text-blue-500">{request.id}</span>
+          <span className="text-sm font-semibold text-blue-500">
+            {request.id}
+          </span>
           <Badge variant={getStatusBadgeVariant(request.status) as any}>
             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
           </Badge>
         </div>
-        <p className="text-sm text-gray-600">{request.project}</p>
+        <p className="text-sm text-gray-600 mt-1">{request.project}</p>
 
         <div className="flex justify-between items-center mt-2">
           <div className="flex gap-4">
@@ -148,8 +170,24 @@ export default function MaterialConsumptionRequestPage() {
         </div>
       </Card>
     ),
-    mockData: mockRequests,
+    mockData: requests,
   };
 
-  return <RequestDashboard config={config} backUrl="/project-request/make-request" />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-8 h-8 text-[#3B7CED] animate-spin" />
+        <p className="text-gray-500 text-sm font-medium">
+          Loading requests...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <RequestDashboard
+      config={config}
+      backUrl="/project-request/make-request"
+    />
+  );
 }

@@ -1,9 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { StatusPill } from "./StatusPill";
 import { StockAdjustmentRow as StockAdjustmentRowType } from "../types";
 
@@ -24,74 +23,58 @@ export function StockAdjustmentRow({
     router.push(`/inventory/stocks/adjustment/${request.id}`);
   };
 
-  const handleCheckboxChange = (checked: boolean) => {
+  const handleCheckboxChange = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onToggleSelect(request.id);
   };
 
   return (
-    <motion.div
-      className={cn(
-        "grid grid-cols-[48px_1fr_1fr_1fr_1fr_0.5fr] items-center px-4 py-4 text-sm text-slate-700 border-b hover:bg-gray-50 focus-within:bg-gray-50 cursor-pointer",
-        ""
-      )}
-      role="row"
+    <TableRow
+      className="cursor-pointer hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
       onClick={handleRowClick}
-      whileHover={{
-        backgroundColor: "rgba(249, 250, 251, 1)",
-        transition: { duration: 0.2 },
-      }}
-      whileTap={{ scale: 0.995 }}
     >
-      <div className="flex items-center">
+      <TableCell className="w-12 py-3.5 pl-6 pr-2" onClick={handleCheckboxChange}>
         <Checkbox
           id={`cb-${request.id}`}
           checked={isSelected}
-          onCheckedChange={handleCheckboxChange}
-          className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700 transition-all duration-200"
+          onCheckedChange={() => onToggleSelect(request.id)}
+          className="data-[state=checked]:border-[#3B7CED] data-[state=checked]:bg-[#3B7CED] transition-all duration-200"
         />
-      </div>
+      </TableCell>
 
-      <div className="truncate">
-        <motion.div
-          className="text-sm text-slate-800"
-          whileHover={{ color: "#1e293b" }}
-          transition={{ duration: 0.2 }}
-        >
-          {request.id}
-        </motion.div>
-      </div>
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-sm font-semibold text-[#3B7CED] hover:underline">
+        {request.id}
+      </TableCell>
 
-      <motion.div
-        className="text-slate-600"
-        whileHover={{ color: "#475569" }}
-        transition={{ duration: 0.2 }}
-      >
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-sm text-[#525F7F]">
         {request.adjustmentType}
-      </motion.div>
+      </TableCell>
 
-      <motion.div
-        className="text-slate-600"
-        whileHover={{ color: "#475569" }}
-        transition={{ duration: 0.2 }}
-      >
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-sm text-[#525F7F]">
         {request.location}
-      </motion.div>
+      </TableCell>
 
-      <motion.div
-        className="truncate text-slate-600"
-        whileHover={{ color: "#475569" }}
-        transition={{ duration: 0.2 }}
-      >
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-sm font-medium text-[#32325D]">
+        {request.product || "—"}
+      </TableCell>
+
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-sm font-mono font-bold text-right">
+        {request.quantity !== undefined ? (
+          <span className={request.quantity < 0 ? "text-[#E43D2B]" : "text-[#2BA24D]"}>
+            {request.quantity > 0 ? `+${request.quantity}` : request.quantity}
+          </span>
+        ) : (
+          "—"
+        )}
+      </TableCell>
+
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-sm text-[#525F7F]">
         {request.adjustedDate}
-      </motion.div>
+      </TableCell>
 
-      <motion.div
-        className="flex items-center"
-        whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.2 }}
-      >
+      <TableCell className="py-3.5 px-6 whitespace-nowrap text-center">
         <StatusPill status={request.status} />
-      </motion.div>
-    </motion.div>
+      </TableCell>
+    </TableRow>
   );
 }

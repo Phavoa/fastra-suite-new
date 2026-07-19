@@ -42,8 +42,7 @@ export interface LabourRequestDetail {
   number_of_workers: number;
   role_type: string;
   duration: number;
-  // duration_unit: "days" | "weeks" | "months";
-  duration_unit: "days";
+  duration_unit: "days" | "weeks" | "months" | string;
   estimated_daily_rate: string;
   projected_cost: string;
   justification_notes: string;
@@ -70,8 +69,7 @@ export interface LabourRequestCreateResponse {
   number_of_workers: number;
   role_type: string;
   duration: number;
-  // duration_unit: "days" | "weeks" | "months";
-  duration_unit: "days";
+  duration_unit: "days" | "weeks" | "months" | string;
   estimated_daily_rate: string;
   justification_notes: string;
 }
@@ -93,10 +91,10 @@ export interface CreateLabourRequestRequest {
   number_of_workers: number;
   role_type: string;
   duration: number;
-  // duration_unit: "days" | "weeks" | "months";
-  duration_unit: "days";
+  duration_unit: "days" | "weeks" | "months" | string;
   estimated_daily_rate: string;
   justification_notes?: string;
+  activity?: string;
 }
 
 export interface UpdateLabourRequestRequest {
@@ -105,10 +103,10 @@ export interface UpdateLabourRequestRequest {
   number_of_workers?: number;
   role_type?: string;
   duration?: number;
-  // duration_unit?: "days" | "weeks" | "months";
-  duration_unit?: "days";
+  duration_unit?: "days" | "weeks" | "months" | string;
   estimated_daily_rate?: string;
   justification_notes?: string;
+  activity?: string;
 }
 
 export interface PatchLabourRequestRequest {
@@ -117,10 +115,10 @@ export interface PatchLabourRequestRequest {
   number_of_workers?: number;
   role_type?: string;
   duration?: number;
-  // duration_unit?: "days" | "weeks" | "months";
-  duration_unit?: "days";
+  duration_unit?: "days" | "weeks" | "months" | string;
   estimated_daily_rate?: string;
   justification_notes?: string;
+  activity?: string;
 }
 
 export interface SubmitLabourRequestRequest {

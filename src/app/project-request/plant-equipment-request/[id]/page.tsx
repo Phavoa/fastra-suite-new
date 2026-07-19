@@ -21,6 +21,7 @@ interface PlantEquipmentRequestItem {
 }
 
 import { useGetPlantEquipmentRequestQuery } from "@/api/requests/plantEquipmentRequestApi";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 
 export default function PlantEquipmentRequestDetailPage() {
   const router = useRouter();
@@ -31,43 +32,38 @@ export default function PlantEquipmentRequestDetailPage() {
   const { data: apiRequest, isLoading: apiLoading } = useGetPlantEquipmentRequestQuery(numericId, {
     skip: isNaN(numericId)
   });
+  const { data: projectsData } = useGetProjectCostingProjectsQuery({});
+  const projects = Array.isArray(projectsData)
+    ? projectsData
+    : (projectsData as any)?.results || [];
 
   useEffect(() => {
     if (apiRequest) {
+      const projectId = apiRequest.project_request || (apiRequest as any).project;
+      const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
       setRequest({
         id: String(apiRequest.id),
-        project: apiRequest.project_request === 2 ? "Project Beta - Office Complex" : "Project Alpha - Mall Construction",
+        project: projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
         equipment: apiRequest.equipment_name,
         description: apiRequest.description || "",
         quantity: apiRequest.quantity,
         estimatedCost: parseFloat(apiRequest.estimated_cost) || 0,
         status: ((apiRequest as any).status || "pending") as "draft" | "approved" | "pending" | "rejected",
-        requester: "Firstname Lastname",
+        requester: (apiRequest as any).created_by_name || (apiRequest as any).requester_name || "Current User",
         date: new Date(apiRequest.created_at || Date.now()).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
           year: "numeric"
         }),
         requiredDate: apiRequest.required_date,
-        phase: "Foundation",
-        task: "Concrete Pouring",
+        phase: "-",
+        task: "-",
         notes: apiRequest.justification_notes || ""
       });
     } else {
-      const stored = localStorage.getItem("plant_equipment_requests");
-      if (stored) {
-        try {
-          const list: PlantEquipmentRequestItem[] = JSON.parse(stored);
-          const item = list.find((r) => r.id === id);
-          if (item) {
-            setRequest(item);
-          }
-        } catch (e) {
-          console.error("Failed to parse requests from local storage");
-        }
-      }
+      setRequest(null);
     }
-  }, [apiRequest, id]);
+  }, [apiRequest, id, projects]);
 
   if (!request) {
     return (
@@ -210,13 +206,9 @@ export default function PlantEquipmentRequestDetailPage() {
               <span className="text-gray-500 font-semibold">Phase</span>
               <span className="font-bold text-gray-900">{request.phase}</span>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Task</span>
-              <span className="font-bold text-gray-900">{request.task}</span>
-            </div>
             <div className="flex justify-between py-1.5">
-              <span className="text-gray-500 font-semibold">Cost Code</span>
-              <span className="font-bold text-gray-900">{request.project === "Project Alpha" ? "CC-04" : "-"}</span>
+              <span className="text-gray-500 font-semibold">Activity</span>
+              <span className="font-bold text-gray-900">{request.task}</span>
             </div>
           </div>
         </div>

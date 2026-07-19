@@ -40,6 +40,8 @@ import { internalTransferApi } from "@/api/inventory/internalTransferApi";
 import { stockMoveApi } from "@/api/inventory/stockMoveApi";
 import { incomingProductReturnsApi } from "@/api/inventory/incomingProductReturns";
 import { backOrderApi } from "@/api/inventory/backOrderApi";
+import { inventoryProductsApi } from "@/api/inventory/productsApi";
+import { inventoryUnitOfMeasureApi } from "@/api/inventory/unitOfMeasureApi";
 
 import { subcontractorRequestApi } from "@/api/subcontractorRequestApi";
 import { projectApi } from "@/api/projectApi";
@@ -49,6 +51,7 @@ import { projectPurchaseRequestApi } from "@/api/requests/projectPurchaseRequest
 import { plantEquipmentRequestApi } from "@/api/requests/plantEquipmentRequestApi";
 import { projectRequestApi } from "@/api/requests/projectRequestApi";
 import { pettyCashRequestApi } from "@/api/requests/pettyCashRequestApi";
+import { materialConsumptionRequestApi } from "@/api/requests/materialConsumptionRequestApi";
 
 const authPersistConfig = {
   key: "auth",
@@ -93,6 +96,8 @@ const rootReducer = combineReducers({
   [stockMoveApi.reducerPath]: stockMoveApi.reducer,
   [incomingProductReturnsApi.reducerPath]: incomingProductReturnsApi.reducer,
   [backOrderApi.reducerPath]: backOrderApi.reducer,
+  [inventoryProductsApi.reducerPath]: inventoryProductsApi.reducer,
+  [inventoryUnitOfMeasureApi.reducerPath]: inventoryUnitOfMeasureApi.reducer,
 
   [subcontractorRequestApi.reducerPath]: subcontractorRequestApi.reducer,
 
@@ -104,6 +109,7 @@ const rootReducer = combineReducers({
   [plantEquipmentRequestApi.reducerPath]: plantEquipmentRequestApi.reducer,
   [projectRequestApi.reducerPath]: projectRequestApi.reducer,
   [pettyCashRequestApi.reducerPath]: pettyCashRequestApi.reducer,
+  [materialConsumptionRequestApi.reducerPath]: materialConsumptionRequestApi.reducer,
   [invoiceApi.reducerPath]: invoiceApi.reducer,
   [companyApi.reducerPath]: companyApi.reducer,
 });
@@ -143,6 +149,8 @@ export const store = configureStore({
       stockMoveApi.middleware,
       incomingProductReturnsApi.middleware,
       backOrderApi.middleware,
+      inventoryProductsApi.middleware,
+      inventoryUnitOfMeasureApi.middleware,
 
       subcontractorRequestApi.middleware,
       projectApi.middleware,
@@ -152,6 +160,7 @@ export const store = configureStore({
       plantEquipmentRequestApi.middleware,
       projectRequestApi.middleware,
       pettyCashRequestApi.middleware,
+      materialConsumptionRequestApi.middleware,
 
       invoiceApi.middleware,
       companyApi.middleware,

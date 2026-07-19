@@ -14,7 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGetProjectsQuery, useGetAvailableBudgetQuery } from "@/api/projectApi";
+import { useGetAvailableBudgetQuery } from "@/api/projectApi";
+import {
+  useGetProjectCostingProjectsQuery,
+  useGetProjectCostingProjectQuery,
+} from "@/api/projectCostingApi";
 import { useCreatePlantEquipmentRequestMutation } from "@/api/requests/plantEquipmentRequestApi";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
@@ -24,9 +28,25 @@ import { StatusModal } from "@/components/shared/StatusModal";
 export default function NewPlantEquipmentRequestPage() {
   const router = useRouter();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
+  const loggedInUserName = React.useMemo(() => {
+    if (!loggedInUser) return "Current User";
+    const anyUser = loggedInUser as any;
+    return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
+  }, [loggedInUser]);
 
   // Queries
-  const { data: projects = [] } = useGetProjectsQuery();
+  const { data: rawCostingProjects = [] } = useGetProjectCostingProjectsQuery({});
+
+  // Filter approved/active projects
+  const projects = useMemo(() => {
+    const list = Array.isArray(rawCostingProjects)
+      ? rawCostingProjects
+      : (rawCostingProjects as any)?.results || [];
+    return list.filter((p: any) => {
+      const st = String(p.status || "").toUpperCase();
+      return st === "APPROVED" || st === "ACTIVE" || p.is_approved === true || !p.status;
+    });
+  }, [rawCostingProjects]);
 
   // State values
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -41,7 +61,7 @@ export default function NewPlantEquipmentRequestPage() {
 
   // Modals state: "above_budget" | "unsuccessful" | "submitted" | null
   const [modalType, setModalType] = useState<"above_budget" | "unsuccessful" | "submitted" | null>(null);
-  
+
   // Validation feedback modal state
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -56,7 +76,7 @@ export default function NewPlantEquipmentRequestPage() {
     {
       project_id: Number(selectedProjectId),
       wbs_id: Number(selectedTaskId),
-      cost_code: selectedProjectId === "2" ? "CC-05" : "CC-04",
+      cost_code: "CC-04",
     },
     { skip: !selectedProjectId || !selectedTaskId }
   );
@@ -65,23 +85,51 @@ export default function NewPlantEquipmentRequestPage() {
     ? Number(budgetData.available_budget)
     : 0;
 
-  // Filter Phases
-  const currentProject = useMemo(() => {
-    return projects.find((p) => String(p.id) === selectedProjectId);
-  }, [projects, selectedProjectId]);
+  // Fetch full project detail for WBS cascade
+  const { data: costingProjectDetail } = useGetProjectCostingProjectQuery(
+    Number(selectedProjectId),
+    { skip: !selectedProjectId || isNaN(Number(selectedProjectId)) },
+  );
+
+  // Build a flat WBS list from either .wbs or .phases[].activities structure
+  const wbsList = useMemo(() => {
+    const proj: any = costingProjectDetail || projects.find((p: any) => String(p.id) === selectedProjectId);
+    if (!proj) return [];
+    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) return proj.wbs;
+    const items: any[] = [];
+    const phasesArr = Array.isArray(proj.phases)
+      ? proj.phases
+      : Array.isArray(proj.phase_list) ? proj.phase_list : [];
+    phasesArr.forEach((ph: any, pi: number) => {
+      const phId = ph.id || ph.phase_id || `phase-${pi + 1}`;
+      const phName = ph.name || ph.phase_name || `Phase ${pi + 1}`;
+      items.push({ id: phId, name: phName, is_activity: false });
+      const acts = Array.isArray(ph.activities) ? ph.activities
+        : Array.isArray(ph.activity_list) ? ph.activity_list : [];
+      acts.forEach((act: any, ai: number) => {
+        items.push({
+          ...act,
+          id: act.id || act.activity_id || `act-${phId}-${ai + 1}`,
+          name: act.name || act.activity_name || `Activity ${ai + 1}`,
+          is_activity: true,
+          parent: phId,
+        });
+      });
+    });
+    return items;
+  }, [costingProjectDetail, projects, selectedProjectId]);
 
   const phases = useMemo(() => {
-    if (!currentProject) return [];
-    return currentProject.wbs.filter((w) => !w.is_activity);
-  }, [currentProject]);
+    return wbsList.filter((w: any) => !w.is_activity);
+  }, [wbsList]);
 
   // Filter Tasks
   const tasks = useMemo(() => {
-    if (!currentProject || !selectedPhaseId) return [];
-    return currentProject.wbs.filter(
-      (w) => w.is_activity && w.parent === Number(selectedPhaseId)
+    if (!selectedPhaseId) return [];
+    return wbsList.filter(
+      (w: any) => w.is_activity && String(w.parent) === String(selectedPhaseId)
     );
-  }, [currentProject, selectedPhaseId]);
+  }, [wbsList, selectedPhaseId]);
 
   // Calculations
   const qtyNum = Number(quantity || 0);
@@ -114,7 +162,7 @@ export default function NewPlantEquipmentRequestPage() {
       return;
     }
     if (!selectedTaskId) {
-      setValidationError("Please select a WBS task.");
+      setValidationError("Please select a WBS activity.");
       return;
     }
     if (!estimatedCost || Number(estimatedCost) <= 0) {
@@ -140,8 +188,20 @@ export default function NewPlantEquipmentRequestPage() {
     }
 
     try {
+      const ensureValidUUID = (val: string): string => {
+        if (!val) return "";
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(val)) return val;
+        const numericVal = parseInt(val, 10);
+        if (!isNaN(numericVal)) {
+          const hexString = numericVal.toString(16).padStart(12, "0");
+          return `00000000-0000-0000-0000-${hexString}`;
+        }
+        return val;
+      };
+
       // Build API payload
-      const payload = {
+      const payload: any = {
         reference_id: requestId,
         equipment_name: equipmentName,
         description: description,
@@ -151,86 +211,16 @@ export default function NewPlantEquipmentRequestPage() {
         justification_notes: notes,
         is_hidden: false,
         project_request: Number(selectedProjectId) || 1, // project ID
+        activity: ensureValidUUID(selectedTaskId),
+        wbs_element: ensureValidUUID(selectedTaskId),
       };
 
       // Call API
       await createRequest(payload).unwrap();
-
-      // Fallback local storage saving as well for backup/congruence
-      const newRequest = {
-        id: requestId,
-        project: currentProject?.name || "Project",
-        equipment: equipmentName,
-        description,
-        quantity: Number(quantity),
-        estimatedCost: Number(estimatedCost),
-        status: "pending" as const,
-        requester: loggedInUser?.username || "Firstname Lastname",
-        date: new Date().toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        }),
-        requiredDate,
-        phase: phases.find((p) => String(p.id) === selectedPhaseId)?.name || "Phase",
-        task: tasks.find((t) => String(t.id) === selectedTaskId)?.name || "Task",
-        notes,
-      };
-
-      const stored = localStorage.getItem("plant_equipment_requests");
-      let requestsList = [];
-      if (stored) {
-        try {
-          requestsList = JSON.parse(stored);
-        } catch (e) {
-          requestsList = [];
-        }
-      }
-      requestsList.unshift(newRequest);
-      localStorage.setItem("plant_equipment_requests", JSON.stringify(requestsList));
-
       setModalType("submitted");
     } catch (error) {
-      console.error("API submission failed, falling back to local storage:", error);
-      
-      // Fallback local storage saving
-      try {
-        const newRequest = {
-          id: requestId,
-          project: currentProject?.name || "Project",
-          equipment: equipmentName,
-          description,
-          quantity: Number(quantity),
-          estimatedCost: Number(estimatedCost),
-          status: "pending" as const,
-          requester: loggedInUser?.username || "Firstname Lastname",
-          date: new Date().toLocaleDateString("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          }),
-          requiredDate,
-          phase: phases.find((p) => String(p.id) === selectedPhaseId)?.name || "Phase",
-          task: tasks.find((t) => String(t.id) === selectedTaskId)?.name || "Task",
-          notes,
-        };
-
-        const stored = localStorage.getItem("plant_equipment_requests");
-        let requestsList = [];
-        if (stored) {
-          try {
-            requestsList = JSON.parse(stored);
-          } catch (e) {
-            requestsList = [];
-          }
-        }
-        requestsList.unshift(newRequest);
-        localStorage.setItem("plant_equipment_requests", JSON.stringify(requestsList));
-
-        setModalType("submitted");
-      } catch (fallbackErr) {
-        setModalType("unsuccessful");
-      }
+      console.error("API submission failed:", error);
+      setModalType("unsuccessful");
     }
   };
 
@@ -272,9 +262,19 @@ export default function NewPlantEquipmentRequestPage() {
           <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
             Request Details
           </h2>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-gray-700">Request ID</Label>
-            <Input value={requestId} disabled className="h-11 bg-gray-50 text-gray-500 font-bold border-gray-200 shadow-none" />
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-700">Request ID</Label>
+              <Input value={requestId} disabled className="h-11 bg-gray-50 text-gray-500 font-bold border-gray-200 shadow-none" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-700">Date</Label>
+              <Input value={new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} disabled className="h-11 bg-gray-50 text-gray-500 font-normal border-gray-200 shadow-none" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-700">Requested by</Label>
+              <Input value={loggedInUserName} disabled className="h-11 bg-gray-50 text-gray-500 font-normal border-gray-200 shadow-none" />
+            </div>
           </div>
         </div>
 
@@ -300,7 +300,7 @@ export default function NewPlantEquipmentRequestPage() {
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((p) => (
+                  {projects.map((p: any) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {p.name}
                     </SelectItem>
@@ -383,7 +383,7 @@ export default function NewPlantEquipmentRequestPage() {
                   <SelectValue placeholder="Select a phase" />
                 </SelectTrigger>
                 <SelectContent>
-                  {phases.map((ph) => (
+                  {phases.map((ph: any) => (
                     <SelectItem key={ph.id} value={String(ph.id)}>
                       {ph.name}
                     </SelectItem>
@@ -392,19 +392,19 @@ export default function NewPlantEquipmentRequestPage() {
               </Select>
             </div>
 
-            {/* Task */}
+            {/* Activity */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-gray-700">Task</Label>
+              <Label className="text-xs font-semibold text-gray-700">Activity</Label>
               <Select
                 value={selectedTaskId}
                 onValueChange={setSelectedTaskId}
                 disabled={!selectedPhaseId}
               >
                 <SelectTrigger className="h-11 border-gray-200 bg-white disabled:bg-gray-50 w-full shadow-none">
-                  <SelectValue placeholder="Select a task" />
+                  <SelectValue placeholder="Select an activity" />
                 </SelectTrigger>
                 <SelectContent>
-                  {tasks.map((t) => (
+                  {tasks.map((t: any) => (
                     <SelectItem key={t.id} value={String(t.id)}>
                       {t.name}
                     </SelectItem>
@@ -413,19 +413,8 @@ export default function NewPlantEquipmentRequestPage() {
               </Select>
             </div>
 
-            <div className="flex justify-between items-center py-2 border-t border-gray-100 pt-4 mt-2 text-xs">
-              <span className="font-semibold text-gray-500">Cost Code</span>
-              <span className="font-semibold text-gray-900">
-                {selectedProjectId === "2" ? "CC-05" : selectedProjectId ? "CC-04" : "-"}
-              </span>
-            </div>
 
-            <div className="flex justify-between items-center py-2 border-t border-gray-100 text-xs">
-              <span className="font-bold text-gray-900">Available Budget</span>
-              <span className="font-bold text-[#3B7CED]">
-                N{availableBudget.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+
           </div>
         </div>
 
@@ -452,13 +441,6 @@ export default function NewPlantEquipmentRequestPage() {
 
         {/* Summaries Card */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-3 text-xs">
-          <div className="flex justify-between py-1">
-            <span className="text-gray-500 font-semibold">Available Budget</span>
-            <span className="font-bold text-gray-400">
-              N{availableBudget.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <div className="border-t border-gray-100 my-1"></div>
           <div className="flex justify-between py-1">
             <span className="text-gray-900 font-bold">Total Cost</span>
             <span className="font-extrabold text-[#3B7CED] text-sm">
