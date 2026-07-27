@@ -68,9 +68,15 @@ const transformInvoiceToRow = (invoice: Invoice): InvoiceRow => {
     return statusMapping[status] || "unpaid";
   };
 
+  const vendor =
+    (invoice.vendor_details as any)?.company_name ||
+    (invoice.vendor_details as any)?.companyName ||
+    (invoice.vendor_details as any)?.name ||
+    "Unknown Vendor";
+
   return {
     id: invoice.id,
-    vendor: invoice.vendor_details?.company_name || "Unknown Vendor",
+    vendor,
     dateCreated: formatDateTime(invoice.date_created),
     dueDate: formatDate(invoice.due_date),
     amount: amountPaid.toLocaleString(),

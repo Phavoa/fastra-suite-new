@@ -32,6 +32,7 @@ export interface GetProjectRequestsParams {
   request_type?: string;
   search?: string;
   status?: string;
+  module_destination?: string;
 }
 
 export interface ApproveProjectRequest {
