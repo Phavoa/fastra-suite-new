@@ -13,49 +13,51 @@ interface Props {
   };
   onClose: () => void;
   onReassignComplete: (code: string) => void;
+  onSwitchToReassign: () => void;
 }
 
 export function DeactivateModals({
   state,
   onClose,
   onReassignComplete,
+  onSwitchToReassign,
 }: Props) {
-  const [selectedTarget, setSelectedTarget] = useState("");
+  const [targetAccount, setTargetAccount] = useState("");
 
   if (!state.account) return null;
 
   return (
     <>
-      {/* Confirmation Modal */}
+      {/* Confirm Deactivate */}
       <Dialog.Root
         open={state.isOpen && state.step === "confirm"}
         onOpenChange={onClose}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md z-50">
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md z-50 text-center">
             <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-blue-600" />
               </div>
             </div>
-            <Dialog.Title className="text-xl font-semibold text-center">
+            <Dialog.Title className="text-xl font-semibold">
               Deactivate Account
             </Dialog.Title>
-            <p className="text-center text-gray-600 mt-2">
+            <p className="text-gray-600 mt-2">
               Will you like to deactivate this account?
             </p>
 
             <div className="flex gap-3 mt-8">
               <button
                 onClick={onClose}
-                className="flex-1 border py-3 rounded-lg"
+                className="flex-1 border border-gray-300 py-2.5 rounded-lg text-sm font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={() => onReassignComplete(state.account!.code)}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg"
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium"
               >
                 Deactivate Account
               </button>
@@ -70,31 +72,33 @@ export function DeactivateModals({
         onOpenChange={onClose}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md z-50">
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md z-50 text-center">
             <div className="flex justify-center mb-4">
-              <AlertTriangle className="w-12 h-12 text-amber-500" />
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
-            <Dialog.Title className="text-xl font-semibold text-center">
+            <Dialog.Title className="text-xl font-semibold">
               Cannot Deactivate Account
             </Dialog.Title>
-            <p className="text-center text-gray-600 mt-3">
-              This account has 2 posted transactions. You must reassign all
-              posted transactions before deactivating this account.
+            <p className="text-gray-600 mt-3 text-sm leading-relaxed">
+              This account has{" "}
+              <span className="font-semibold">2 posted transactions</span>. You
+              must reassign all posted transactions before deactivating this
+              account.
             </p>
 
             <div className="flex gap-3 mt-8">
               <button
                 onClick={onClose}
-                className="flex-1 border py-3 rounded-lg"
+                className="flex-1 border border-gray-300 py-2.5 rounded-lg text-sm font-medium"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  /* Switch to reassign step in real impl */
-                }}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg"
+                onClick={onSwitchToReassign}
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium"
               >
                 Reassign Transaction
               </button>
@@ -103,39 +107,48 @@ export function DeactivateModals({
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Reassign Modal */}
+      {/* Reassign */}
       <Dialog.Root
         open={state.isOpen && state.step === "reassign"}
         onOpenChange={onClose}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
           <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md z-50">
             <Dialog.Title className="text-xl font-semibold">
               Reassign Transactions
             </Dialog.Title>
-            <p className="text-gray-500 mt-1">Select the target account:</p>
+            <p className="text-gray-500 text-sm mt-1">
+              Select the target account:
+            </p>
 
-            <select
-              value={selectedTarget}
-              onChange={(e) => setSelectedTarget(e.target.value)}
-              className="w-full mt-4 border border-gray-300 rounded-lg p-3"
-            >
-              <option value="">Select Account</option>
-              {/* Add real options in production */}
-            </select>
+            <div className="mt-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Account
+              </label>
+              <select
+                value={targetAccount}
+                onChange={(e) => setTargetAccount(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Account</option>
+                <option value="1110">1110 – Main Operating Account</option>
+                <option value="1120">1120 – Petty Cash Account</option>
+                <option value="1200">1200 – Accounts Receivable</option>
+              </select>
+            </div>
 
             <div className="flex gap-3 mt-8">
               <button
                 onClick={onClose}
-                className="flex-1 border py-3 rounded-lg"
+                className="flex-1 border border-gray-300 py-2.5 rounded-lg text-sm font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={() => onReassignComplete(state.account!.code)}
-                disabled={!selectedTarget}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg disabled:opacity-50"
+                disabled={!targetAccount}
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
               >
                 Reassign & Deactivate
               </button>

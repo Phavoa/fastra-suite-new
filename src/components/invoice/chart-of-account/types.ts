@@ -4,5 +4,9 @@ export interface Account {
   type: "Assets" | "Liabilities" | "Equity" | "Revenue" | "Expenses";
   balance: number;
   isCategory?: boolean;
-  children?: Omit<Account, "isCategory" | "children">[];
+  bankName?: string;
+  branch?: string;
+  sortCode?: string;
+  currency?: string;
+  children?: Account[];
 }

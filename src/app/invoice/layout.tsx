@@ -7,41 +7,6 @@ export default function InvoiceLayout({
   children: React.ReactNode;
 }>) {
   const navItems = [
-    // {
-    //   label: "Invoices",
-    //   children: [
-    //     {
-    //       label: "Paid Invoices",
-    //       href: "/invoice/paid",
-    //       application: "invoice",
-    //       module: "invoice",
-    //     },
-    //     {
-    //       label: "Partially Paid Invoices",
-    //       href: "/invoice/partially-paid",
-    //       application: "invoice",
-    //       module: "invoice",
-    //     },
-    //     {
-    //       label: "Unpaid Invoices",
-    //       href: "/invoice/unpaid",
-    //       application: "invoice",
-    //       module: "invoice",
-    //     },
-    //     {
-    //       label: "Payment History",
-    //       href: "/invoice/payment-history",
-    //       application: "invoice",
-    //       module: "payment",
-    //     },
-    //   ],
-    // },
-    // {
-    //   label: "Payments",
-    //   href: "/invoice/payments",
-    //   application: "invoice",
-    //   module: "payment",
-    // },
     {
       label: "Approved Requests",
       href: "/invoice/approved-requests",
@@ -66,12 +31,18 @@ export default function InvoiceLayout({
       application: "invoice",
       module: "invoice",
     },
-    // {
-    //   label: "Administrator",
-    //   href: "/invoice/administrator",
-    //   application: "invoice",
-    //   module: "invoice",
-    // },
+    {
+      label: "Vendor",
+      href: "/invoice/vendor",
+      application: "invoice",
+      module: "invoice",
+    },
+    {
+      label: "Account Ledger",
+      href: "/invoice/account-ledger",
+      application: "invoice",
+      module: "invoice",
+    },
   ];
 
   return (
