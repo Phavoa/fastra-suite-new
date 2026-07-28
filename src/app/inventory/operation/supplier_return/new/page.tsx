@@ -50,7 +50,7 @@ export default function NewSupplierReturnPage() {
   const router = useRouter();
   const [items, setItems] = useState<ReturnLine[]>(INITIAL_LINES);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notification, setNotification] = useState({ show: false, message: "", type: "success" as const });
+  const [notification, setNotification] = useState({ show: false, message: "", type: "success" as "success" | "error" });
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },

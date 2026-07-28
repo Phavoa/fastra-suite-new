@@ -54,8 +54,8 @@ export default function NewProductPage() {
   const { data: categoriesData, isLoading: isLoadingCategories } =
     useGetProductCategoriesQuery();
 
-  const unitsList = unitMeasures?.results || (Array.isArray(unitMeasures) ? unitMeasures : []);
-  const categoriesList = categoriesData?.results || (Array.isArray(categoriesData) ? categoriesData : []);
+  const unitsList = (unitMeasures as any)?.results || (Array.isArray(unitMeasures) ? unitMeasures : []);
+  const categoriesList = (categoriesData as any)?.results || (Array.isArray(categoriesData) ? categoriesData : []);
 
   // Helper to extract UOM ID cleanly
   const getUnitId = (uom: any): number => {
@@ -128,7 +128,7 @@ export default function NewProductPage() {
             await createProduct({
               product_name: String(productName),
               description: String(desc),
-              product_category: Number(cat.id),
+              product_category: String(cat.id),
               unit_of_measure: Number(getUnitId(uom)),
               standard_cost: String(stdCost),
               reorder_point: String(reorderPt),

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,8 @@ const INITIAL_LINES: BackorderLine[] = [
   }
 ];
 
-export default function BackorderDetailPage({ params }: { params: { id: string } }) {
+export default function BackorderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const [items, setItems] = useState<BackorderLine[]>(INITIAL_LINES);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +47,7 @@ export default function BackorderDetailPage({ params }: { params: { id: string }
     { label: "Inventory", href: "/inventory" },
     { label: "Operation", href: "/inventory/operation" },
     { label: "Backorders", href: "/inventory/operation/backorder" },
-    { label: params.id, href: "#", current: true },
+    { label: id, href: "#", current: true },
   ];
 
   const updateItemQty = (id: string, val: string) => {
@@ -81,7 +82,7 @@ export default function BackorderDetailPage({ params }: { params: { id: string }
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                  <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Backorder ID</label>
-                  <div className="text-sm font-semibold text-gray-800">{params.id}</div>
+                  <div className="text-sm font-semibold text-gray-800">{id}</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Source Receipt</label>

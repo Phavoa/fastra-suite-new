@@ -134,7 +134,7 @@ export default function ProductDetailsPage() {
   const { data: categoriesData, isLoading: isLoadingCategories } =
     useGetProductCategoriesQuery();
 
-  const categoriesList = categoriesData?.results || (Array.isArray(categoriesData) ? categoriesData : []);
+  const categoriesList = (categoriesData as any)?.results || (Array.isArray(categoriesData) ? categoriesData : []);
 
   // Helper to extract UOM ID
   const getUnitId = (uom: any, index: number): number => {
