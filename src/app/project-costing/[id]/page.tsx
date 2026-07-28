@@ -6,6 +6,13 @@ import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AddBudgetAdjustmentModal } from "@/components/project-costing/modals/AddBudgetAdjustmentModal";
+import { ProjectCostingExportTemplate } from "@/components/project-costing/export/ProjectCostingExportTemplate";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -21,9 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, RefreshCw, Plus, ChevronDown, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Plus, ChevronDown, CheckCircle2, FileText, Image as ImageIcon, Download } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toPng, toJpeg } from "html-to-image";
+import { jsPDF } from "jspdf";
 import { 
   useGetProjectCostingProjectQuery,
   useApproveProjectMutation,
@@ -96,6 +105,79 @@ export default function ProjectDashboardPage() {
   const [rejectProject, { isLoading: isRejecting }] = useRejectProjectMutation();
   const [submitProject, { isLoading: isSubmitting }] = useSubmitProjectMutation();
   const [approveBudgetAdjustment, { isLoading: isApprovingAdjustment }] = useApproveBudgetAdjustmentMutation();
+
+  const exportRef = React.useRef<HTMLDivElement>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingImage, setIsExportingImage] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      const element = exportRef.current;
+      const canvasWidth = element.clientWidth;
+      const canvasHeight = element.clientHeight;
+      
+      const imgData = await toJpeg(element, {
+        cacheBust: true,
+        pixelRatio: 1.5,
+        quality: 0.8,
+        backgroundColor: '#ffffff'
+      });
+      
+      const pdf = new jsPDF("l", "mm", "a4");
+      const margin = 10; // 10mm margin
+      const imgWidth = 297 - (margin * 2); // A4 width in mm (landscape)
+      const pageHeight = 210; // A4 height in mm (landscape)
+      const usableHeight = pageHeight - (margin * 2);
+      
+      const imgHeight = (canvasHeight * imgWidth) / canvasWidth;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, "JPEG", margin, margin, imgWidth, imgHeight, undefined, "FAST");
+      heightLeft -= usableHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight; // This shifts the image up relative to the page
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", margin, position + margin, imgWidth, imgHeight, undefined, "FAST");
+        heightLeft -= usableHeight;
+      }
+
+      pdf.save(`${project?.name || "Project"}_Costing_Details.pdf`);
+      statusModal.showSuccess("Export Successful", "PDF document has been generated.");
+    } catch (err: any) {
+      console.error("PDF export error", err);
+      statusModal.showError("Export Failed", `Failed to generate PDF document: ${err.message || String(err)}`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportImage = async () => {
+    if (!exportRef.current) return;
+    setIsExportingImage(true);
+    try {
+      const element = exportRef.current;
+      const image = await toPng(element, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff'
+      });
+      const link = document.createElement("a");
+      link.href = image;
+      link.download = `${project?.name || "Project"}_Costing_Details.png`;
+      link.click();
+      statusModal.showSuccess("Export Successful", "Full detail image has been downloaded.");
+    } catch (err: any) {
+      console.error("Image export error", err);
+      statusModal.showError("Export Failed", `Failed to generate image: ${err.message || String(err)}`);
+    } finally {
+      setIsExportingImage(false);
+    }
+  };
 
   const handleAction = async (actionFn: any, actionName: string) => {
     try {
@@ -360,11 +442,39 @@ export default function ProjectDashboardPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-9 font-medium flex items-center gap-2 px-4 shadow-sm">
+                  <Download className="w-4 h-4" />
+                  {isExportingPdf || isExportingImage ? "Exporting..." : "Export Report"}
+                  <ChevronDown className="w-4 h-4 opacity-70 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border-gray-100 p-1">
+                <DropdownMenuItem 
+                  onClick={handleExportPdf} 
+                  disabled={isExportingPdf} 
+                  className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 focus:bg-gray-50"
+                >
+                  <FileText className="w-4 h-4 text-red-500" />
+                  <span className="font-medium text-gray-700">Download as PDF</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleExportImage} 
+                  disabled={isExportingImage} 
+                  className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 focus:bg-gray-50 mt-1"
+                >
+                  <ImageIcon className="w-4 h-4 text-blue-500" />
+                  <span className="font-medium text-gray-700">Download as Image</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {(!project.status || project.status === "DRAFT") && (
               <Button 
                 onClick={() => handleAction(submitProject, "submitted")}
                 disabled={isSubmitting}
-                className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+                className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9"
               >
                 {isSubmitting ? "Submitting..." : "Submit Project"}
               </Button>
@@ -376,14 +486,14 @@ export default function ProjectDashboardPage() {
                   onClick={() => handleAction(rejectProject, "rejected")}
                   disabled={isRejecting || isApproving}
                   variant="outline"
-                  className="border-red-500 text-red-500 hover:bg-red-50"
+                  className="border-red-500 text-red-500 hover:bg-red-50 h-9"
                 >
                   {isRejecting ? "Rejecting..." : "Reject"}
                 </Button>
                 <Button 
                   onClick={() => handleAction(approveProject, "approved")}
                   disabled={isApproving || isRejecting}
-                  className="bg-[#2BA24D] hover:bg-[#22853d] text-white"
+                  className="bg-[#2BA24D] hover:bg-[#22853d] text-white h-9"
                 >
                   {isApproving ? "Approving..." : "Approve"}
                 </Button>
@@ -391,6 +501,9 @@ export default function ProjectDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Main Dashboard Container */}
+        <div className="flex flex-col gap-6 bg-gray-50 p-2 rounded-xl">
 
         {/* Filters and Actions */}
         <div className="flex items-end justify-between py-2 border-b border-gray-100 pb-6">
@@ -995,6 +1108,7 @@ export default function ProjectDashboardPage() {
             </TableBody>
           </Table>
         </div>
+        </div>
       </div>
 
       {/* Footer sticky bar */}
@@ -1024,6 +1138,13 @@ export default function ProjectDashboardPage() {
         message={statusModal.message}
         actionText={statusModal.type === "success" ? "Done" : "Try again"}
       />
+
+      {/* Hidden Export Template */}
+      <div className="absolute -left-[9999px] top-0 pointer-events-none">
+        <div ref={exportRef}>
+          <ProjectCostingExportTemplate project={project} />
+        </div>
+      </div>
     </div>
   );
 }

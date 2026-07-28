@@ -62,6 +62,8 @@ export interface LabourRequest {
   updated_at: string;
   detail: LabourRequestDetail;
   project_request: ProjectRequest;
+  project?: number;
+  activity?: string;
 }
 
 export interface LabourRequestCreateResponse {

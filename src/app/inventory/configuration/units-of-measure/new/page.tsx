@@ -17,7 +17,6 @@ export default function NewUnitOfMeasurePage() {
   const [name, setName] = useState("");
   const [abbreviation, setAbbreviation] = useState("");
   const [category, setCategory] = useState("");
-  const [isHidden, setIsHidden] = useState(false);
 
   const statusModal = useStatusModal();
 
@@ -46,7 +45,7 @@ export default function NewUnitOfMeasurePage() {
         unit_name: name.trim(),
         unit_symbol: abbreviation.trim(),
         unit_category: category.trim() || "General",
-        is_hidden: isHidden,
+        is_active: true,
       };
 
       await createUnit(payload).unwrap();
@@ -152,20 +151,7 @@ export default function NewUnitOfMeasurePage() {
               </div>
             </div>
 
-            <div className="bg-gray-50/60 p-6 border-t border-gray-100 flex items-center gap-6">
-              <button
-                type="button"
-                onClick={() => setIsHidden(!isHidden)}
-                className="flex items-center gap-2.5 text-sm font-semibold text-[#32325D] hover:text-[#3B7CED] focus:outline-none cursor-pointer"
-              >
-                {isHidden ? (
-                  <CheckSquare className="h-4 w-4 text-[#3B7CED]" />
-                ) : (
-                  <Square className="h-4 w-4 text-gray-400" />
-                )}
-                Hidden Unit (Archive from selection lists)
-              </button>
-            </div>
+
           </div>
         </main>
 

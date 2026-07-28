@@ -44,7 +44,7 @@ export function StockMoveCards({ moves }: StockMoveCardsProps) {
                     </div>
 
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Quantity:</span>
+                      <span className="text-gray-500">In / Out Qty:</span>
                       <span className={`font-bold ${isPositive ? "text-green-600" : "text-red-600"}`}>
                         {isPositive ? `+${move.quantity}` : move.quantity}
                       </span>

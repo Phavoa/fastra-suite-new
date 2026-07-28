@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   Table,
   TableBody,
@@ -20,8 +20,6 @@ export function StockAdjustmentTable({
   rows: StockAdjustmentRowType[];
   query: string;
 }) {
-  const [selected, setSelected] = React.useState<Record<string, boolean>>({});
-
   const filtered = useMemo(() => {
     if (!query.trim()) return rows;
     return rows.filter(
@@ -34,57 +32,31 @@ export function StockAdjustmentTable({
     );
   }, [rows, query]);
 
-  const allSelected =
-    filtered.length > 0 && filtered.every((r) => selected[r.id]);
-
-  function toggleAll() {
-    if (allSelected) {
-      setSelected({});
-      return;
-    }
-    const map: Record<string, boolean> = {};
-    filtered.forEach((r) => (map[r.id] = true));
-    setSelected(map);
-  }
-
-  function toggleOne(id: string) {
-    setSelected((s) => ({ ...s, [id]: !s[id] }));
-  }
-
   return (
     <div className="w-full">
       <div className="overflow-x-auto">
         <Table className="min-w-[950px] w-full">
           <TableHeader>
-            <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
-              <TableHead className="w-12 py-3.5 pl-6 pr-2">
-                <Checkbox
-                  id="select-all"
-                  aria-label="Select all adjustments"
-                  checked={allSelected}
-                  onCheckedChange={() => toggleAll()}
-                  className="data-[state=checked]:border-[#3B7CED] data-[state=checked]:bg-[#3B7CED] transition-all duration-200"
-                />
-              </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+            <TableRow className="bg-[#F6F7F8] border-b border-gray-100">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap">
                 Stock Adjustment ID
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap">
                 Adjustment Type
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap">
                 Location
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap">
                 Product
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap text-right">
                 Quantity Adjusted
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap">
                 Adjusted Date
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+              <TableHead className="py-3 px-4 font-medium text-gray-600 text-sm whitespace-nowrap text-center">
                 Status
               </TableHead>
             </TableRow>
@@ -94,8 +66,6 @@ export function StockAdjustmentTable({
               <StockAdjustmentRow
                 key={v.id}
                 request={v}
-                isSelected={!!selected[v.id]}
-                onToggleSelect={toggleOne}
               />
             ))}
           </TableBody>

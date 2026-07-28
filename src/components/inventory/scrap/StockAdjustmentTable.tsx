@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Checkbox } from "../../ui/checkbox";
+
 import { motion } from "framer-motion";
 import { StockAdjustmentRow as StockAdjustmentRowType } from "../types";
 import { StockAdjustmentRow } from "./StockAdjustmentRow";
@@ -13,8 +13,6 @@ export function StockAdjustmentTable({
   rows: StockAdjustmentRowType[];
   query: string;
 }) {
-  const [selected, setSelected] = React.useState<Record<string, boolean>>({});
-
   const filtered = useMemo(() => {
     if (!query.trim()) return rows;
     return rows.filter(
@@ -26,23 +24,6 @@ export function StockAdjustmentTable({
     );
   }, [rows, query]);
 
-  const allSelected =
-    filtered.length > 0 && filtered.every((r) => selected[r.id]);
-
-  function toggleAll() {
-    if (allSelected) {
-      setSelected({});
-      return;
-    }
-    const map: Record<string, boolean> = {};
-    filtered.forEach((r) => (map[r.id] = true));
-    setSelected(map);
-  }
-
-  function toggleOne(id: string) {
-    setSelected((s) => ({ ...s, [id]: !s[id] }));
-  }
-
   return (
     <section className="mx-auto mt-6 mr-4">
       <motion.div
@@ -53,20 +34,11 @@ export function StockAdjustmentTable({
       >
         <div className="mt-2 pt-4 bg-white rounded-lg overflow-hidden">
           <motion.div
-            className="hidden md:grid grid-cols-[48px_1fr_1fr_1fr_1fr_0.5fr] items-center bg-gray-100 rounded-md px-4 py-3 text-sm font-medium text-gray-500 border-b border-gray-100"
+            className="hidden md:grid grid-cols-[1fr_1fr_1fr_1fr_0.5fr] items-center bg-gray-100 rounded-md px-4 py-3 text-sm font-medium text-gray-500 border-b border-gray-100"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
           >
-            <div className="flex items-center">
-              <Checkbox
-                id="select-all"
-                aria-label="Select all purchase requests"
-                checked={allSelected}
-                onCheckedChange={() => toggleAll()}
-                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700 transition-all duration-200"
-              />
-            </div>
             <div>Stock Adjustment ID</div>
             <div>Adjustment Type</div>
             <div>Location</div>
@@ -89,8 +61,6 @@ export function StockAdjustmentTable({
               >
                 <StockAdjustmentRow
                   request={v}
-                  isSelected={!!selected[v.id]}
-                  onToggleSelect={toggleOne}
                 />
               </motion.div>
             ))}

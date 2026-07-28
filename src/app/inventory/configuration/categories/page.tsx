@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Filter, Plus } from "lucide-react";
+import { Search, Filter, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,36 +19,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useGetProductCategoriesQuery } from "@/api/inventory/productCategoryApi";
+import { Skeleton } from "@/components/ui/skeleton";
+const getStatusVariant = (isActive: boolean) => {
+  if (isActive) return "validated";
+  return "draft";
+};
 
-const mockCategories = [
-  { id: "1", name: "Cement Products", description: "All types of cement and related binding materials.", status: "ACTIVE" },
-  { id: "2", name: "Steel and Iron", description: "Rebars, meshes, structural steel.", status: "ACTIVE" },
-  { id: "3", name: "Finishing Materials", description: "Paints, tiles, screeding.", status: "INACTIVE" },
-];
-
-const getStatusVariant = (status: string) => {
-  switch (status?.toUpperCase()) {
-    case "ACTIVE":
-      return "validated";
-    case "INACTIVE":
-      return "rejected";
-    default:
-      return "draft";
-  }
+const getStatusText = (isActive: boolean) => {
+  if (isActive) return "ACTIVE";
+  return "INACTIVE";
 };
 
 export default function ProductCategoriesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("all");
+
+  const { data: categoriesData, isLoading, isFetching } = useGetProductCategoriesQuery({ search });
+  const categories = categoriesData || [];
 
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -57,19 +46,20 @@ export default function ProductCategoriesPage() {
     { label: "Categories", href: "/inventory/configuration/categories", current: true },
   ];
 
-  const handleRowClick = (id: string) => {
+  const handleRowClick = (id: string | number) => {
     router.push(`/inventory/configuration/categories/${id}`);
   };
 
-  const filteredCategories = mockCategories.filter((c) => {
-    const matchQuery = c.name.toLowerCase().includes(search.toLowerCase()) || c.description.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = selectedStatus === "all" || c.status.toUpperCase() === selectedStatus.toUpperCase();
-    return matchQuery && matchStatus;
+  const filteredCategories = categories.filter((c) => {
+    const matchStatus = 
+      selectedStatus === "all" || 
+      (selectedStatus === "ACTIVE" && c.is_active) ||
+      (selectedStatus === "INACTIVE" && !c.is_active);
+    return matchStatus;
   });
 
   return (
     <PageGuard application="inventory" module="productcategories">
-      {/* Two-tone: gray page canvas */}
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs
@@ -81,9 +71,7 @@ export default function ProductCategoriesPage() {
             }
           />
 
-          {/* White Header Control Card with Filter Pills */}
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
-            {/* Top Bar: title + search + actions */}
             <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
               <div className="flex items-center gap-4">
                 <h1 className="text-xl font-semibold text-[#32325D] shrink-0">Product Categories</h1>
@@ -91,7 +79,7 @@ export default function ProductCategoriesPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="text"
-                    placeholder="Search category or description..."
+                    placeholder="Search category..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9 bg-white border-gray-200 rounded-lg h-9 text-sm w-full focus:ring-1 focus:ring-[#3B7CED] text-[#32325D]"
@@ -108,7 +96,6 @@ export default function ProductCategoriesPage() {
               </div>
             </div>
 
-            {/* Status Filter Pills */}
             <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
               {[
                 { label: "All Categories", value: "all" },
@@ -134,7 +121,6 @@ export default function ProductCategoriesPage() {
             </div>
           </div>
 
-          {/* Main Table Card */}
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto w-full">
               <Table className="min-w-[700px] w-full">
@@ -152,26 +138,41 @@ export default function ProductCategoriesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCategories.map((cat) => (
-                    <TableRow 
-                      key={cat.id} 
-                      className="cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-colors"
-                      onClick={() => handleRowClick(cat.id)}
-                    >
-                      <TableCell className="px-6 py-3.5 text-sm font-semibold text-[#32325D] whitespace-nowrap">
-                        {cat.name}
-                      </TableCell>
-                      <TableCell className="px-6 py-3.5 text-sm text-[#525F7F]">
-                        {cat.description}
-                      </TableCell>
-                      <TableCell className="pr-6 py-3.5 text-center whitespace-nowrap">
-                        <Badge variant={getStatusVariant(cat.status) as any} className="px-2.5 py-0.5 font-semibold text-xs shadow-none">
-                          {cat.status || "DRAFT"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredCategories.length === 0 && (
+                  {isLoading || isFetching ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i} className="border-b border-gray-100">
+                        <TableCell className="px-6 py-4">
+                          <Skeleton className="h-4 w-[180px] rounded-md bg-gray-200" />
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <Skeleton className="h-4 w-[250px] rounded-md bg-gray-200" />
+                        </TableCell>
+                        <TableCell className="pr-6 py-4">
+                          <Skeleton className="h-5 w-[80px] rounded-full mx-auto bg-gray-200" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredCategories.length > 0 ? (
+                    filteredCategories.map((cat) => (
+                      <TableRow 
+                        key={cat.id} 
+                        className="cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-colors"
+                        onClick={() => handleRowClick(cat.id)}
+                      >
+                        <TableCell className="px-6 py-3.5 text-sm font-semibold text-[#32325D] whitespace-nowrap">
+                          {cat.category_name}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-sm text-[#525F7F]">
+                          {cat.description}
+                        </TableCell>
+                        <TableCell className="pr-6 py-3.5 text-center whitespace-nowrap">
+                          <Badge variant={getStatusVariant(cat.is_active) as any} className="px-2.5 py-0.5 font-semibold text-xs shadow-none">
+                            {getStatusText(cat.is_active)}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center py-12 text-[#8898AA] text-sm">
                         No categories found matching your search criteria.
@@ -187,3 +188,4 @@ export default function ProductCategoriesPage() {
     </PageGuard>
   );
 }
+

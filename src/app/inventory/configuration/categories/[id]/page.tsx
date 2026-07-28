@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, Save, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -17,24 +17,155 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import { 
+  useGetProductCategoryQuery, 
+  useUpdateProductCategoryMutation,
+  useDeleteProductCategoryMutation
+} from "@/api/inventory/productCategoryApi";
+import { StatusModal, useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
+import { Skeleton } from "@/components/ui/skeleton";
 export default function CategoryDetailsPage() {
   const router = useRouter();
-  const [name, setName] = useState("Cement Products");
-  const [description, setDescription] = useState("All types of cement and related binding materials.");
-  const [status, setStatus] = useState("active");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const params = useParams();
+  const id = params?.id as string;
+  
+  const { data: category, isLoading, isFetching } = useGetProductCategoryQuery(id, {
+    skip: !id,
+  });
 
-  const handleSubmit = () => {
-    setIsSubmitting(true);
-    setTimeout(() => {
-      router.push("/inventory/configuration/categories");
-    }, 800);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState<boolean>(true);
+  const statusModal = useStatusModal();
+  
+  const [updateCategory, { isLoading: isUpdating }] = useUpdateProductCategoryMutation();
+  const [deleteCategory, { isLoading: isDeleting }] = useDeleteProductCategoryMutation();
+
+  useEffect(() => {
+    if (category) {
+      setName(category.category_name || "");
+      setDescription(category.description || "");
+      setIsActive(category.is_active);
+    }
+  }, [category]);
+
+  const handleSubmit = async () => {
+    if (!name) {
+      statusModal.showError("Validation Error", "Category name is required.");
+      return;
+    }
+    
+    try {
+      await updateCategory({
+        id,
+        data: {
+          category_name: name,
+          description,
+          is_active: isActive,
+        },
+      }).unwrap();
+      
+      statusModal.showSuccess("Success", "Category updated successfully", "Done");
+    } catch (error: any) {
+      console.error(error);
+      statusModal.showError("Update Failed", extractErrorMessage(error, "Failed to update category"));
+    }
   };
+
+  const handleDelete = async () => {
+    statusModal.showConfirm("Delete Category", "Are you sure you want to delete this category? This action cannot be undone.", async () => {
+      try {
+        await deleteCategory(id).unwrap();
+        statusModal.showSuccess("Deleted", "Category deleted successfully", "Go to Categories", () => {
+          statusModal.close();
+          router.push("/inventory/configuration/categories");
+        });
+      } catch (error: any) {
+        console.error(error);
+        statusModal.showError("Deletion Failed", extractErrorMessage(error, "Failed to delete category"));
+      }
+    });
+  };
+
+  const handleModalClose = () => {
+    statusModal.close();
+    if (statusModal.type === "success" && statusModal.title === "Deleted") {
+      router.push("/inventory/configuration/categories");
+    }
+  };
+
+  const isSubmitting = isUpdating || isDeleting;
+
+  if (isLoading || isFetching) {
+    return (
+      <PageGuard application="inventory" module="productcategories">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
+          <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-md bg-gray-200" />
+              <div>
+                <Skeleton className="h-5 w-40 mb-1.5 bg-gray-200" />
+                <Skeleton className="h-3 w-64 bg-gray-200" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-24 rounded-md bg-gray-200" />
+            </div>
+          </div>
+          <main className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6">
+            <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100">
+                <Skeleton className="h-5 w-40 bg-gray-200" />
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex flex-col gap-2.5 md:col-span-2">
+                  <Skeleton className="h-4 w-28 bg-gray-200" />
+                  <Skeleton className="h-9 w-full bg-gray-200" />
+                </div>
+                <div className="flex flex-col gap-2.5">
+                  <Skeleton className="h-4 w-16 bg-gray-200" />
+                  <Skeleton className="h-9 w-full bg-gray-200" />
+                </div>
+                <div className="flex flex-col gap-2.5 md:col-span-3">
+                  <Skeleton className="h-4 w-24 bg-gray-200" />
+                  <Skeleton className="h-[110px] w-full bg-gray-200" />
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (!category) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#F6F9FC]">
+        <p className="text-gray-500">Category not found</p>
+      </div>
+    );
+  }
+
+  const status = isActive ? "active" : "inactive";
 
   return (
     <PageGuard application="inventory" module="productcategories">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={handleModalClose}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={
+            statusModal.actionText ||
+            (statusModal.type === "success" ? "Done" : "Close")
+          }
+          onAction={statusModal.onAction || handleModalClose}
+          secondaryText={statusModal.secondaryText}
+          onSecondary={statusModal.onSecondary}
+          actionVariant={statusModal.actionVariant}
+        />
         {/* Clean Header Card */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-2xs">
           <div className="flex items-center gap-3">
@@ -45,22 +176,24 @@ export default function CategoryDetailsPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-lg font-semibold text-[#32325D]">{name}</h1>
+                <h1 className="text-lg font-semibold text-[#32325D]">{category.category_name}</h1>
                 <Badge className={`px-2.5 py-0.5 font-semibold text-xs rounded-md shadow-none ${status === "active" ? "bg-green-50 text-green-700 border border-green-200/60" : "bg-red-50 text-red-700 border border-red-200/60"}`}>
                   {status.toUpperCase()}
                 </Badge>
               </div>
-              <p className="text-xs text-[#8898AA] mt-0.5">{description}</p>
+              <p className="text-xs text-[#8898AA] mt-0.5">{category.description}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+
             <Button
               variant="outline"
-              onClick={() => setStatus(status === "active" ? "inactive" : "active")}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm h-9 px-4 font-medium"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 text-sm h-9 px-4 font-medium flex items-center gap-1.5"
             >
-              {status === "active" ? "Deactivate" : "Activate"}
+              <Trash2 className="w-4 h-4" /> Delete
             </Button>
           </div>
         </div>
@@ -73,7 +206,7 @@ export default function CategoryDetailsPage() {
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="flex flex-col gap-2.5 md:col-span-2">
-                <Label className="text-sm font-semibold text-[#32325D]">Category Name</Label>
+                <Label className="text-sm font-semibold text-[#32325D]">Category Name <span className="text-[#E43D2B]">*</span></Label>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -83,13 +216,13 @@ export default function CategoryDetailsPage() {
 
               <div className="flex flex-col gap-2.5">
                 <Label className="text-sm font-semibold text-[#32325D]">Status</Label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select value={isActive ? "true" : "false"} onValueChange={(val) => setIsActive(val === "true")}>
                   <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -119,7 +252,7 @@ export default function CategoryDetailsPage() {
             className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
           >
             <Save className="w-4 h-4" />
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            {isUpdating ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>

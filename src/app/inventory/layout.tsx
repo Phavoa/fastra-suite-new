@@ -40,7 +40,7 @@ export default function InventoryLayout({
           module: "stockadjustment",
         },
         { 
-          label: "Stock Moves", 
+          label: "Inventory Ledger", 
           href: "/inventory/stocks/stock-moves",
           application: "inventory",
           module: "stockmove",

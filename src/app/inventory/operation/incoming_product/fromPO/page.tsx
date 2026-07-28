@@ -290,33 +290,24 @@ export default function CreateIncomingProductFromPOPage() {
               <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Delivery Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Supplier / Vendor <span className="text-red-500">*</span></Label>
-                  <Select value={watch("supplier")} onValueChange={(v) => setValue("supplier", v)}>
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DUMMY_SUPPLIERS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.supplier && <p className="text-xs text-red-500">{errors.supplier.message}</p>}
+                  <Label className="text-gray-700 font-medium">Related PO</Label>
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                    {poId}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Destination Store <span className="text-red-500">*</span></Label>
-                  <Select value={watch("destination_location")} onValueChange={(v) => setValue("destination_location", v)}>
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
-                      <SelectValue placeholder="Select warehouse" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DUMMY_LOCATIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.destination_location && <p className="text-xs text-red-500">{errors.destination_location.message}</p>}
+                  <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                    Julius Berger Steel
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Destination Store</Label>
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                    Main Warehouse - Site A
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -336,97 +327,98 @@ export default function CreateIncomingProductFromPOPage() {
               <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Quality Inspection & Quantity Tracking</h2>
               <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto w-full">
-                  <Table className="min-w-[950px] w-full">
-                    <TableHeader>
-                      <TableRow className="bg-[#F8F9FA] border-b-gray-100">
-                        <TableHead className="w-56 pl-4">Product</TableHead>
-                        <TableHead className="w-48">Description</TableHead>
-                        <TableHead className="w-20 text-center">Unit</TableHead>
-                        <TableHead className="w-24 text-center">PO QTY</TableHead>
-                        <TableHead className="w-28 text-center">Received QTY</TableHead>
-                        <TableHead className="w-28 text-center">Accepted QTY</TableHead>
-                        <TableHead className="w-28 text-center">Rejected QTY</TableHead>
-                        <TableHead className="w-44 pr-2">Reject Reason</TableHead>
-                        <TableHead className="w-12 text-center pr-4"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((it) => (
-                        <TableRow key={it.id} className="border-b-gray-100 hover:bg-gray-50 transition-colors">
-                          <TableCell className="pl-4 py-2 align-middle">
-                            <Select value={it.product} onValueChange={(v) => updateItemProduct(it.id, v)}>
-                              <SelectTrigger className="bg-white border-gray-300 rounded h-9 text-xs">
-                                <SelectValue placeholder="Select product" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {productOptions.map((o) => (
-                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="py-2 text-xs text-gray-600 line-clamp-1">{it.product_description || "—"}</TableCell>
-                          <TableCell className="py-2 text-center text-xs font-medium">{it.unit_symbol || "—"}</TableCell>
-                          <TableCell className="py-2 text-center font-semibold text-gray-700">{it.po_quantity}</TableCell>
-                          <TableCell className="py-2 text-center">
-                            <Input
-                              type="number"
-                              value={it.received_quantity}
-                              onChange={(e) => updateItemQty(it.id, "received_quantity", e.target.value)}
-                              className="w-20 mx-auto text-center h-8 text-xs font-bold"
-                            />
-                          </TableCell>
-                          <TableCell className="py-2 text-center">
-                            <Input
-                              type="number"
-                              value={it.accepted_quantity}
-                              onChange={(e) => updateItemQty(it.id, "accepted_quantity", e.target.value)}
-                              className="w-20 mx-auto text-center h-8 text-xs font-bold text-green-600"
-                            />
-                          </TableCell>
-                          <TableCell className="py-2 text-center font-bold text-red-600">
-                            {it.rejected_quantity}
-                          </TableCell>
-                          <TableCell className="py-2 pr-2">
-                            <Input
-                              value={it.reject_reason}
-                              onChange={(e) => updateReason(it.id, e.target.value)}
-                              placeholder={Number(it.rejected_quantity) > 0 ? "Reason required..." : "None"}
-                              disabled={Number(it.rejected_quantity) <= 0}
-                              className={`h-8 text-xs ${Number(it.rejected_quantity) > 0 && !it.reject_reason ? "border-red-400 bg-red-50/30" : ""}`}
-                            />
-                          </TableCell>
-                          <TableCell className="py-2 text-center pr-4">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeRow(it.id)}
-                              disabled={items.length === 1}
-                              className="h-8 w-8 text-red-500 hover:bg-red-50"
-                              title="Remove line"
-                            >
-                              <Trash className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter className="bg-[#F8F9FA] border-t border-gray-200">
-                      <TableRow>
-                        <TableCell colSpan={9} className="py-2 pl-4">
+                <Table className="min-w-[1100px] table-fixed">
+                  <TableHeader className="bg-[#F6F7F8]">
+                    <TableRow>
+                      <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Product
+                      </TableHead>
+                      <TableHead className="w-80 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Description
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Unit
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Expected Qty (PO)
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Received Qty
+                      </TableHead>
+                      <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="bg-white">
+                    {items.map((it) => (
+                      <TableRow key={it.id} className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150">
+                        <TableCell className="border border-gray-200 align-middle p-0">
+                          <Select value={it.product} onValueChange={(v) => updateItemProduct(it.id, v)}>
+                            <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0 px-4">
+                              <SelectValue placeholder="Select product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {productOptions.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="border border-gray-200 px-4 align-middle">
+                          <div className="text-sm text-gray-600 line-clamp-2">
+                            {it.product_description || "Select a product"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                          <div className="text-sm text-gray-700">
+                            {it.unit_symbol || "N/A"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="border border-gray-200 align-middle text-center">
+                          <div className="text-sm font-semibold text-gray-700">
+                            {it.po_quantity}
+                          </div>
+                        </TableCell>
+                        <TableCell className="border border-gray-200 align-middle text-center p-0">
+                          <Input
+                            type="number"
+                            value={it.received_quantity}
+                            onChange={(e) => updateItemQty(it.id, "received_quantity", e.target.value)}
+                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0 bg-blue-50/30 text-[#3B7CED] font-medium"
+                          />
+                        </TableCell>
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
                           <Button
                             type="button"
                             variant="ghost"
-                            onClick={addRow}
-                            className="text-[#3B7CED] hover:bg-blue-50 text-xs font-medium h-8 px-3"
+                            size="icon"
+                            onClick={() => removeRow(it.id)}
+                            disabled={items.length === 1}
+                            className="h-8 w-8 text-gray-400 hover:text-[#E43D2B] hover:bg-red-50 mx-auto"
+                            title="Remove line"
                           >
-                            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Product Line
+                            <Trash className="w-4 h-4" />
                           </Button>
                         </TableCell>
                       </TableRow>
-                    </TableFooter>
-                  </Table>
+                    ))}
+                  </TableBody>
+                  <TableFooter className="bg-white border-t border-gray-200">
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-3 px-4 border-b border-gray-200">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={addRow}
+                          className="text-[#3B7CED] hover:bg-blue-50 text-sm font-medium h-9 px-4"
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> Add Product Line
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
                 </div>
               </div>
             </section>
@@ -443,19 +435,10 @@ export default function CreateIncomingProductFromPOPage() {
           <Button
             type="button"
             disabled={isSubmitting}
-            onClick={handleSubmit(onSaveDraft)}
-            variant="outline"
-            className="border-blue-400 text-blue-500 hover:bg-blue-50"
-          >
-            {isSubmitting ? "Saving..." : "Save Draft"}
-          </Button>
-          <Button
-            type="button"
-            disabled={isSubmitting}
             onClick={handleSubmit(onValidateGRN)}
             className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
           >
-            {isSubmitting ? "Validating..." : "Validate GRN & Post Stock"}
+            {isSubmitting ? "Validating..." : "Validate"}
           </Button>
         </div>
 

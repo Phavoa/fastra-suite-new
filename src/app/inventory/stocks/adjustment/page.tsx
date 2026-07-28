@@ -62,7 +62,7 @@ export default function StockAdjustmentPage() {
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
-    { label: "Stocks", href: "/inventory/stocks" },
+
     {
       label: `${
         selectedStatus !== "all" ? selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1) : "All"

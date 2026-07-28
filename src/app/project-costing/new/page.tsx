@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Loader2, Plus, Paperclip, Link2, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Paperclip, Link2, Trash2, Download } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BasicInformationForm } from "@/components/project-costing/BasicInformationForm";
@@ -210,6 +210,41 @@ export default function NewProjectPage() {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = ["S/N", "Phase", "Activity", "Quantity", "Rate", "Amount"];
+    const sampleData = [
+      {
+        "S/N": "1.1",
+        "Phase": "Phase 1: Mobilization",
+        "Activity": "Site Clearing and Fencing",
+        "Quantity": 1,
+        "Rate": 500000,
+        "Amount": 500000
+      },
+      {
+        "S/N": "1.2",
+        "Phase": "Phase 1: Mobilization",
+        "Activity": "Equipment Transport",
+        "Quantity": 2,
+        "Rate": 250000,
+        "Amount": 500000
+      },
+      {
+        "S/N": "2.1",
+        "Phase": "Phase 2: Foundation",
+        "Activity": "Excavation work",
+        "Quantity": 1,
+        "Rate": 1200000,
+        "Amount": 1200000
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "WBS Template");
+    XLSX.writeFile(workbook, "wbs_import_template.xlsx");
+  };
+
   const handleSubmit = async () => {
     if (!name || !clientName) {
       statusModal.showError(
@@ -356,6 +391,25 @@ export default function NewProjectPage() {
                     <li>Amount</li>
                   </ol>
                   <p className="mt-1.5 text-[10px] text-gray-400">* Additional columns will be imported as custom text fields.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="flex items-center justify-center gap-2 px-6 py-6 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="text-sm font-medium">Download WBS Template</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-xs border border-gray-800 max-w-xs z-50">
+                  <p className="font-semibold mb-1">Download Excel template</p>
+                  <p className="font-normal text-gray-200">Get a sample Excel file formatted correctly for importing.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

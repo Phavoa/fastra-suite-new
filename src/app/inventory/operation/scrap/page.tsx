@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Search, Trash2, LayoutGrid, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,124 +23,123 @@ import {
 const DUMMY_SCRAPS: any[] = [
   {
     id: "WH-SCRAP-0001",
-    adjustmentType: "Damage / Spoilage",
+    adjustmentType: "Damage",
     location: "Main Warehouse - Site A",
     adjustedDate: "2026-06-28",
     status: "done",
     product: "Dangote Cement (50kg Bag)",
-    quantity: "5 Bags",
+    quantity: "5",
   },
   {
     id: "WH-SCRAP-0002",
-    adjustmentType: "Theft / Unexplained Loss",
+    adjustmentType: "Loss",
     location: "Main Warehouse - Site A",
     adjustedDate: "2026-06-29",
-    status: "draft",
+    status: "done",
     product: "Reinforcement Steel 16mm",
-    quantity: "2 Tonnes",
+    quantity: "2",
   },
   {
     id: "WH-SCRAP-0003",
-    adjustmentType: "Damage / Spoilage",
+    adjustmentType: "Damage",
     location: "Secondary Store - Site B",
     adjustedDate: "2026-06-26",
     status: "done",
     product: "Safety Helmets (Yellow)",
-    quantity: "3 Pcs",
+    quantity: "3",
   },
   {
     id: "WH-SCRAP-0004",
-    adjustmentType: "Expired Material",
+    adjustmentType: "Damage",
     location: "Main Warehouse - Site A",
     adjustedDate: "2026-07-01",
     status: "done",
     product: "Berger Emulsion Paint (20L)",
-    quantity: "4 Buckets",
+    quantity: "4",
   },
   {
     id: "WH-SCRAP-0005",
-    adjustmentType: "Site Mishap / breakage",
+    adjustmentType: "Damage",
     location: "Site C Warehouse",
     adjustedDate: "2026-07-02",
-    status: "draft",
+    status: "done",
     product: "Ceramic Floor Tiles (60x60)",
-    quantity: "12 Boxes",
+    quantity: "12",
   },
   {
     id: "WH-SCRAP-0006",
-    adjustmentType: "Water Damage / Rain",
+    adjustmentType: "Damage",
     location: "Main Warehouse - Site A",
     adjustedDate: "2026-07-03",
     status: "done",
     product: "Gypsum Plasterboard (12mm)",
-    quantity: "8 Sheets",
+    quantity: "8",
   },
   {
     id: "WH-SCRAP-0007",
-    adjustmentType: "Theft / Unexplained Loss",
+    adjustmentType: "Loss",
     location: "Equipment Yard",
     adjustedDate: "2026-07-04",
-    status: "canceled",
+    status: "done",
     product: "Copper Wire Roll 2.5mm",
-    quantity: "1 Roll",
+    quantity: "1",
   },
   {
     id: "WH-SCRAP-0008",
-    adjustmentType: "Damage / Spoilage",
+    adjustmentType: "Damage",
     location: "Main Warehouse - Site A",
     adjustedDate: "2026-07-05",
     status: "done",
     product: "PVC Conduit Pipes 20mm",
-    quantity: "15 Bundles",
+    quantity: "15",
   },
   {
     id: "WH-SCRAP-0009",
-    adjustmentType: "Expired Material",
+    adjustmentType: "Damage",
     location: "Site B Warehouse",
     adjustedDate: "2026-07-06",
-    status: "draft",
+    status: "done",
     product: "Sika Waterproofing Admixture",
-    quantity: "6 Jerrycans",
+    quantity: "6",
   },
   {
     id: "WH-SCRAP-0010",
-    adjustmentType: "Site Mishap / breakage",
+    adjustmentType: "Damage",
     location: "Site D Warehouse",
     adjustedDate: "2026-07-07",
     status: "done",
     product: "Glass Windows Panels",
-    quantity: "4 Panels",
+    quantity: "4",
   },
   {
     id: "WH-SCRAP-0011",
-    adjustmentType: "Water Damage / Rain",
+    adjustmentType: "Damage",
     location: "Main Warehouse - Site A",
     adjustedDate: "2026-07-08",
     status: "done",
     product: "Lafarge Cement (50kg Bag)",
-    quantity: "10 Bags",
+    quantity: "10",
   },
   {
     id: "WH-SCRAP-0012",
-    adjustmentType: "Damage / Spoilage",
+    adjustmentType: "Damage",
     location: "Site B Warehouse",
     adjustedDate: "2026-07-09",
-    status: "draft",
+    status: "done",
     product: "Interlocking Paving Stones",
-    quantity: "25 Sqm",
+    quantity: "25",
   },
 ];
 
 const STATUS_TABS = [
   { label: "All Records", value: "all" },
-  { label: "Validated / Done", value: "done" },
-  { label: "Draft", value: "draft" },
-  { label: "Canceled", value: "canceled" },
+  { label: "Validated", value: "done" },
 ];
 
 const ITEMS_PER_PAGE = 10;
 
 export default function ScrapPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get("status") || "all";
 
@@ -306,10 +305,10 @@ export default function ScrapPage() {
                           QUANTITY
                         </TableHead>
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                          ADJUSTMENT REASON
+                          CAUSE
                         </TableHead>
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                          SOURCE LOCATION
+                          LOCATION
                         </TableHead>
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-center">
                           STATUS
@@ -330,12 +329,14 @@ export default function ScrapPage() {
                         paginatedScraps.map((scrap) => (
                           <TableRow
                             key={scrap.id}
-                            className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors"
+                            className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
+                            onClick={() => router.push(`/inventory/operation/scrap/${scrap.id}`)}
                           >
                             <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
                               <Link
                                 href={`/inventory/operation/scrap/${scrap.id}`}
                                 className="text-[#3B7CED] hover:underline"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 {scrap.id}
                               </Link>

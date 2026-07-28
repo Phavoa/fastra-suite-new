@@ -41,22 +41,25 @@ interface ScrapLineItem {
 }
 
 const scrapSchema = z.object({
-  warehouse_location: z.string().min(1, "Warehouse location is required"),
-  cause: z.string().min(1, "Cause of loss/damage is required per PRD"),
+  project: z.string().min(1, "Project is required"),
+  cause: z.string().min(1, "Cause of loss/damage is required  "),
   notes: z.string().optional(),
 });
 
 type ScrapFormData = z.infer<typeof scrapSchema>;
 
-const DUMMY_LOCATIONS: Option[] = [
-  { value: "WH-MAIN", label: "Main Warehouse - Site A (WH-MAIN)" },
-  { value: "WH-SEC", label: "Secondary Store - Site B (WH-SEC)" },
+const DUMMY_PROJECTS: Option[] = [
+  { value: "PROJ-A", label: "Project Alpha" },
+  { value: "PROJ-B", label: "Project Beta" },
 ];
 
+const getProjectLocation = (project: string) => {
+  return project === "PROJ-A" ? "Main Warehouse - Site A" : "Secondary Store - Site B";
+};
+
 const CAUSE_OPTIONS: Option[] = [
-  { value: "Damage / Spoilage", label: "Damage / Spoilage" },
-  { value: "Theft / Unexplained Loss", label: "Theft / Unexplained Loss" },
-  { value: "Obsolete / Expired", label: "Obsolete / Expired" },
+  { value: "damage", label: "Damage / Spoilage" },
+  { value: "loss", label: "Loss" },
 ];
 
 const DUMMY_PRODUCTS = [
@@ -119,8 +122,8 @@ export default function EditScrapPage() {
   } = useForm<ScrapFormData>({
     resolver: zodResolver(scrapSchema) as Resolver<ScrapFormData>,
     defaultValues: {
-      warehouse_location: "WH-MAIN",
-      cause: "Theft / Unexplained Loss",
+      project: "PROJ-A",
+      cause: "loss",
       notes: "Discovered missing during morning inventory reconciliation.",
     },
   });
@@ -247,30 +250,42 @@ export default function EditScrapPage() {
               <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Scrap Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
-                {/* Warehouse Location */}
+                {/* Project */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">
-                    Warehouse Location <span className="text-red-500">*</span>
+                    Project <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={watch("warehouse_location")}
-                    onValueChange={(value) => setValue("warehouse_location", value)}
+                    value={watch("project")}
+                    onValueChange={(value) => setValue("project", value)}
                   >
                     <SelectTrigger className="bg-white border-gray-300 rounded">
-                      <SelectValue placeholder="Select location" />
+                      <SelectValue placeholder="Select project" />
                     </SelectTrigger>
                     <SelectContent>
-                      {DUMMY_LOCATIONS.map((option) => (
+                      {DUMMY_PROJECTS.map((option) => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.warehouse_location && (
-                    <p className="text-xs text-red-500 mt-1">{errors.warehouse_location.message}</p>
+                  {errors.project && (
+                    <p className="text-xs text-red-500 mt-1">{errors.project.message}</p>
                   )}
                 </div>
 
-                {/* Cause of Loss (Mandatory per PRD) */}
+                {/* Location Auto-fill */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">
+                    Location
+                  </Label>
+                  <Input
+                    readOnly
+                    value={watch("project") ? getProjectLocation(watch("project")!) : ""}
+                    className="bg-gray-50 border-gray-300 rounded text-gray-500"
+                  />
+                </div>
+
+                {/* Cause of Loss */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">
                     Cause of Loss / Damage <span className="text-red-500">*</span>
@@ -296,7 +311,7 @@ export default function EditScrapPage() {
                 {/* Notes */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">
-                    Explanation / Notes
+                    Notes
                   </Label>
                   <Input
                     {...register("notes")}
@@ -312,95 +327,95 @@ export default function EditScrapPage() {
               <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Lines</h2>
               <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto w-full">
-                  <Table className="min-w-[800px] w-full">
-                    <TableHeader>
-                      <TableRow className="bg-[#F8F9FA] hover:bg-[#F8F9FA] border-b-gray-100">
-                        <TableHead className="w-64 font-medium text-gray-500 pl-4">Product</TableHead>
-                        <TableHead className="w-64 font-medium text-gray-500">Description</TableHead>
-                        <TableHead className="w-24 font-medium text-gray-500 text-center">Unit</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Available Stock</TableHead>
-                        <TableHead className="w-32 font-medium text-gray-500 text-center">Scrap QTY</TableHead>
-                        <TableHead className="w-16 font-medium text-gray-500 text-center pr-4">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((it) => (
-                        <TableRow key={it.id} className="group hover:bg-gray-50 border-b-gray-100 transition-colors">
-                          <TableCell className="pl-4 py-2 align-middle">
-                            <Select
-                              value={it.product}
-                              onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
-                            >
-                              <SelectTrigger className="bg-white border-gray-300 rounded h-9 text-xs">
-                                <SelectValue placeholder="Select product" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {productOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
+                <Table className="min-w-[900px] table-fixed">
+                  <TableHeader className="bg-[#F6F7F8]">
+                    <TableRow>
+                      <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">Product</TableHead>
+                      <TableHead className="w-80 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">Description</TableHead>
+                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">Unit</TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">Available Stock</TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">Scrap QTY</TableHead>
+                      <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="bg-white">
+                    {items.map((it) => (
+                      <TableRow key={it.id} className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150">
+                        <TableCell className="border border-gray-200 align-middle p-0">
+                          <Select
+                            value={it.product}
+                            onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
+                          >
+                            <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0 px-4">
+                              <SelectValue placeholder="Select product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {productOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
 
-                          <TableCell className="py-2 align-middle">
-                            <span className="text-xs text-gray-600 line-clamp-1">
-                              {it.product_description || "Select a product"}
-                            </span>
-                          </TableCell>
+                        <TableCell className="border border-gray-200 px-4 align-middle">
+                          <span className="text-sm text-gray-600 line-clamp-2">
+                            {it.product_description || "Select a product"}
+                          </span>
+                        </TableCell>
 
-                          <TableCell className="py-2 align-middle text-center">
-                            <span className="text-xs text-gray-700 font-medium">
-                              {it.unit_of_measure || "N/A"}
-                            </span>
-                          </TableCell>
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                          <span className="text-sm text-gray-700">
+                            {it.unit_of_measure || "N/A"}
+                          </span>
+                        </TableCell>
 
-                          <TableCell className="py-2 align-middle text-center">
-                            <span className="text-xs text-gray-700 font-medium">
-                              {it.current_quantity}
-                            </span>
-                          </TableCell>
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                          <span className="text-sm text-gray-700 font-semibold">
+                            {it.current_quantity}
+                          </span>
+                        </TableCell>
 
-                          <TableCell className="py-2 align-middle text-center">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={it.scrap_quantity}
-                              onChange={(e) => updateScrapQty(it.id, e.target.value)}
-                              placeholder="0"
-                              className="bg-white border-gray-300 rounded h-9 text-xs text-center w-24 mx-auto text-red-600 font-bold"
-                            />
-                          </TableCell>
+                        <TableCell className="border border-gray-200 align-middle text-center p-0">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={it.scrap_quantity}
+                            onChange={(e) => updateScrapQty(it.id, e.target.value)}
+                            placeholder="0"
+                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0 bg-red-50/30 text-[#E43D2B] font-medium"
+                          />
+                        </TableCell>
 
-                          <TableCell className="py-2 align-middle text-center pr-4">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeRow(it.id)}
-                              disabled={items.length === 1}
-                              className="h-8 w-8 text-red-500 hover:bg-red-50"
-                              title="Remove line"
-                            >
-                              <Trash className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter className="bg-[#F8F9FA] border-t border-gray-200">
-                      <TableRow>
-                        <TableCell colSpan={6} className="py-2 pl-4">
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
                           <Button
                             type="button"
                             variant="ghost"
-                            onClick={addRow}
-                            className="text-[#3B7CED] hover:bg-blue-50 text-xs font-medium h-8 px-3"
+                            size="icon"
+                            onClick={() => removeRow(it.id)}
+                            disabled={items.length === 1}
+                            className="h-8 w-8 text-gray-400 hover:text-[#E43D2B] hover:bg-red-50 mx-auto"
+                            title="Remove line"
                           >
-                            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Product Line
+                            <Trash className="w-4 h-4" />
                           </Button>
                         </TableCell>
-                      </TableRow>
-                    </TableFooter>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  <TableFooter className="bg-white border-t border-gray-200">
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-3 px-4 border-b border-gray-200">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={addRow}
+                          className="text-[#3B7CED] hover:bg-blue-50 text-sm font-medium h-9 px-4"
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> Add Product Line
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
                   </Table>
                 </div>
               </div>
@@ -418,19 +433,10 @@ export default function EditScrapPage() {
           <Button
             type="button"
             disabled={isSubmitting}
-            onClick={handleSubmit(onSave)}
-            variant="outline"
-            className="border-blue-400 text-blue-500 hover:bg-blue-50"
-          >
-            {isSubmitting ? "Saving..." : "Save Draft"}
-          </Button>
-          <Button
-            type="button"
-            disabled={isSubmitting}
             onClick={handleSubmit(onValidate)}
             className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
           >
-            {isSubmitting ? "Validating..." : "Validate & Deduct Stock"}
+            {isSubmitting ? "Validating..." : "Validate"}
           </Button>
         </div>
 

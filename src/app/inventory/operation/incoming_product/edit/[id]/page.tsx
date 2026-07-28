@@ -1,27 +1,19 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -29,41 +21,23 @@ import {
 import { z } from "zod";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-type Option = { value: string; label: string };
-
 interface GRNLineItem {
   id: string;
   product: string;
   product_description: string;
   unit_of_measure: string;
-  po_quantity: string;
+  expected_quantity: string;
   received_quantity: string;
-  accepted_quantity: string;
-  rejected_quantity: string;
-  reject_reason: string;
 }
 
 const grnSchema = z.object({
-  supplier: z.string().min(1, "Supplier is required"),
-  destination_location: z.string().min(1, "Destination location is required"),
   notes: z.string().optional(),
 });
 
 type GRNFormData = z.infer<typeof grnSchema>;
 
-const DUMMY_LOCATIONS: Option[] = [
-  { value: "WH-MAIN", label: "Main Warehouse - Site A (WH-MAIN)" },
-  { value: "WH-SEC", label: "Secondary Store - Site B (WH-SEC)" },
-];
-
-const DUMMY_SUPPLIERS: Option[] = [
-  { value: "SUP-1", label: "Dangote Cement Plc" },
-  { value: "SUP-2", label: "BUA Steel Co." },
-];
-
 const DUMMY_PRODUCTS = [
-  { id: "1", product_name: "Cement (50kg Bag)", product_description: "Portland Cement Grade 42.5", unit_symbol: "Bags" },
-  { id: "2", product_name: "Reinforcement Steel 16mm", product_description: "High Yield Deformed Steel Bars", unit_symbol: "Tonnes" },
+  { id: "1", product_name: "Iron Rods 12mm", unit_symbol: "Tonnes" },
 ];
 
 export default function EditIncomingProductPage() {
@@ -76,13 +50,10 @@ export default function EditIncomingProductPage() {
     {
       id: "1",
       product: "1",
-      product_description: "Portland Cement Grade 42.5",
-      unit_of_measure: "Bags",
-      po_quantity: "600",
-      received_quantity: "600",
-      accepted_quantity: "590",
-      rejected_quantity: "10",
-      reject_reason: "Damaged packaging during transit",
+      product_description: "Iron Rods 12mm",
+      unit_of_measure: "Tonnes",
+      expected_quantity: "100",
+      received_quantity: "0",
     },
   ]);
 
@@ -99,40 +70,21 @@ export default function EditIncomingProductPage() {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<GRNFormData>({
     resolver: zodResolver(grnSchema) as Resolver<GRNFormData>,
     defaultValues: {
-      supplier: "SUP-1",
-      destination_location: "WH-MAIN",
-      notes: "Delivery Note DN-9910 verified.",
+      notes: "Delivery note details...",
     },
   });
 
-  const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
-    value: p.id,
-    label: p.product_name,
-  }));
-
-  const updateItemQty = (itemId: string, field: "received_quantity" | "accepted_quantity" | "rejected_quantity", val: string) => {
+  const updateItemQty = (itemId: string, val: string) => {
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== itemId) return it;
-        const updated = { ...it, [field]: val };
-        const rec = Number(updated.received_quantity) || 0;
-        if (field === "received_quantity" || field === "accepted_quantity") {
-          const acc = Number(updated.accepted_quantity) || 0;
-          updated.rejected_quantity = Math.max(0, rec - acc).toString();
-        }
-        return updated;
+        return { ...it, received_quantity: val };
       })
     );
-  };
-
-  const updateReason = (itemId: string, val: string) => {
-    setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, reject_reason: val } : it)));
   };
 
   async function onSave(data: GRNFormData): Promise<void> {
@@ -152,17 +104,30 @@ export default function EditIncomingProductPage() {
 
   async function onValidate(data: GRNFormData): Promise<void> {
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    // Check for backorder if received < expected
+    const hasBackorder = items.some(
+      (it) => Number(it.received_quantity) < Number(it.expected_quantity)
+    );
+
+    if (hasBackorder) {
+       // Ideally we'd show a modal here, but for dummy just notify
+       setNotification({
+        message: "Received less than expected. Backorder created. Validated!",
+        type: "success",
+        show: true,
+      });
+    } else {
       setNotification({
         message: "GRN Validated! Stock received into Inventory Ledger.",
         type: "success",
         show: true,
       });
-      setTimeout(() => {
-        router.push(`/inventory/operation/incoming_product/${id}`);
-      }, 1000);
-    }, 500);
+    }
+
+    setTimeout(() => {
+      setIsSubmitting(false);
+      router.push(`/inventory/operation/incoming_product/${id}`);
+    }, 1500);
   }
 
   function closeNotification() {
@@ -178,7 +143,7 @@ export default function EditIncomingProductPage() {
               <ArrowLeft className="h-5 w-5 text-gray-500" />
             </Button>
           </Link>
-          <h1 className="text-lg font-medium text-gray-800">Edit GRN Draft: {id}</h1>
+          <h1 className="text-lg font-medium text-gray-800">Confirm Quantities for Draft: {id}</h1>
         </div>
 
         <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
@@ -187,70 +152,75 @@ export default function EditIncomingProductPage() {
               <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Receipt Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="flex flex-col gap-2">
+                  <Label className="text-gray-700 font-medium">Related PO</Label>
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                    PO-2026-0094
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
-                  <Select value={watch("supplier")} onValueChange={(v) => setValue("supplier", v)}>
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DUMMY_SUPPLIERS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Pre-filled from PO - not editable */}
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                    Julius Berger Steel
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">Destination Location</Label>
-                  <Select value={watch("destination_location")} onValueChange={(v) => setValue("destination_location", v)}>
-                    <SelectTrigger className="bg-white border-gray-300 rounded">
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DUMMY_LOCATIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Inspection Notes</Label>
-                  <Input {...register("notes")} placeholder="Delivery note details..." className="bg-white border-gray-300 rounded" />
+                  {/* Auto-filled with stockkeeper's assigned location - not editable */}
+                  <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                    Main Warehouse - Site A
+                  </div>
                 </div>
               </div>
             </section>
 
             <section>
-              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Inspection Lines</h2>
-              <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-                <Table className="min-w-[900px] w-full">
-                  <TableHeader>
-                    <TableRow className="bg-[#F8F9FA] border-b-gray-100">
-                      <TableHead className="pl-4">Product</TableHead>
-                      <TableHead className="text-center">Unit</TableHead>
-                      <TableHead className="text-center">PO QTY</TableHead>
-                      <TableHead className="text-center">Received QTY</TableHead>
-                      <TableHead className="text-center">Accepted QTY</TableHead>
-                      <TableHead className="text-center">Rejected QTY</TableHead>
-                      <TableHead className="pr-4">Reject Reason</TableHead>
+              <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Product Lines</h2>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1100px] table-fixed">
+                  <TableHeader className="bg-[#F6F7F8]">
+                    <TableRow>
+                      <TableHead className="w-80 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
+                        Product
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Unit
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Expected Qty (PO)
+                      </TableHead>
+                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
+                        Received Qty
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="bg-white">
                     {items.map((it) => (
-                      <TableRow key={it.id} className="border-b-gray-100 hover:bg-gray-50">
-                        <TableCell className="pl-4 font-medium text-gray-800">{DUMMY_PRODUCTS.find(p => p.id === it.product)?.product_name || "Product"}</TableCell>
-                        <TableCell className="text-center text-xs">{it.unit_of_measure}</TableCell>
-                        <TableCell className="text-center font-medium text-gray-500">{it.po_quantity}</TableCell>
-                        <TableCell className="text-center">
-                          <Input type="number" value={it.received_quantity} onChange={(e) => updateItemQty(it.id, "received_quantity", e.target.value)} className="w-20 mx-auto text-center h-8 text-xs" />
+                      <TableRow key={it.id} className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150">
+                        <TableCell className="border border-gray-200 px-4 align-middle">
+                          <div className="text-sm text-gray-600 line-clamp-2">
+                            {it.product_description}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-center">
-                          <Input type="number" value={it.accepted_quantity} onChange={(e) => updateItemQty(it.id, "accepted_quantity", e.target.value)} className="w-20 mx-auto text-center h-8 text-xs font-bold text-green-600" />
+                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                          <div className="text-sm text-gray-700">
+                            {it.unit_of_measure}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-center font-bold text-red-600">{it.rejected_quantity}</TableCell>
-                        <TableCell className="pr-4">
-                          <Input value={it.reject_reason} onChange={(e) => updateReason(it.id, e.target.value)} placeholder="Reason if rejected..." className="h-8 text-xs" />
+                        <TableCell className="border border-gray-200 align-middle text-center">
+                          <div className="text-sm font-semibold text-gray-700">
+                            {it.expected_quantity}
+                          </div>
+                        </TableCell>
+                        <TableCell className="border border-gray-200 align-middle text-center p-0">
+                          <Input
+                            type="number"
+                            value={it.received_quantity}
+                            onChange={(e) => updateItemQty(it.id, e.target.value)}
+                            className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0 bg-blue-50/30 text-[#3B7CED] font-medium"
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -265,8 +235,7 @@ export default function EditIncomingProductPage() {
           <Link href={`/inventory/operation/incoming_product/${id}`}>
             <Button variant="outline" type="button" className="border-blue-400 text-blue-500 hover:bg-blue-50">Cancel</Button>
           </Link>
-          <Button type="button" disabled={isSubmitting} onClick={handleSubmit(onSave)} variant="outline" className="border-blue-400 text-blue-500 hover:bg-blue-50">Save Draft</Button>
-          <Button type="button" disabled={isSubmitting} onClick={handleSubmit(onValidate)} className="bg-[#3B7CED] hover:bg-[#3065c3] text-white">Validate GRN</Button>
+          <Button type="button" disabled={isSubmitting} onClick={handleSubmit(onValidate)} className="bg-[#3B7CED] hover:bg-[#3065c3] text-white">Validate</Button>
         </div>
 
         <ToastNotification message={notification.message} type={notification.type} show={notification.show} onClose={closeNotification} />

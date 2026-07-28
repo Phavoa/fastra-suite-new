@@ -10,6 +10,13 @@ import { PageGuard } from "@/components/auth/PageGuard";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   useGetInventoryUnitOfMeasureQuery,
   useUpdateInventoryUnitOfMeasureMutation,
   useDeleteInventoryUnitOfMeasureMutation,
@@ -34,14 +41,14 @@ export default function UnitOfMeasureDetailsPage() {
   const [name, setName] = useState("");
   const [abbreviation, setAbbreviation] = useState("");
   const [category, setCategory] = useState("");
-  const [isHidden, setIsHidden] = useState(false);
+  const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
     if (unitData) {
       setName(unitData.unit_name || "");
       setAbbreviation(unitData.unit_symbol || "");
       setCategory(unitData.unit_category || "General");
-      setIsHidden(!!unitData.is_hidden);
+      setIsActive(unitData.is_active !== false);
     }
   }, [unitData]);
 
@@ -69,7 +76,7 @@ export default function UnitOfMeasureDetailsPage() {
           unit_name: name.trim(),
           unit_symbol: abbreviation.trim(),
           unit_category: category.trim() || "General",
-          is_hidden: isHidden,
+          is_active: isActive,
         },
       }).unwrap();
 
@@ -133,7 +140,7 @@ export default function UnitOfMeasureDetailsPage() {
     );
   }
 
-  const statusStr = isHidden ? "HIDDEN" : "ACTIVE";
+  const statusStr = isActive ? "ACTIVE" : "INACTIVE";
 
   return (
     <PageGuard application="inventory" module="unitsofmeasure">
@@ -167,9 +174,9 @@ export default function UnitOfMeasureDetailsPage() {
                 <h1 className="text-lg font-semibold text-[#32325D]">{unitData?.unit_name || name || `Unit #${id}`}</h1>
                 <Badge
                   className={`${
-                    isHidden
-                      ? "bg-red-50 text-red-700 border border-red-200/60"
-                      : "bg-green-50 text-green-700 border border-green-200/60"
+                    isActive
+                      ? "bg-green-50 text-green-700 border border-green-200/60"
+                      : "bg-red-50 text-red-700 border border-red-200/60"
                   } px-2.5 py-0.5 font-semibold text-xs rounded-md shadow-none`}
                 >
                   {statusStr}
@@ -180,13 +187,7 @@ export default function UnitOfMeasureDetailsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsHidden(!isHidden)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm h-9 px-4 font-medium"
-            >
-              {isHidden ? "Activate Unit" : "Hide Unit"}
-            </Button>
+
             <Button
               variant="outline"
               onClick={handleDelete}
@@ -244,6 +245,19 @@ export default function UnitOfMeasureDetailsPage() {
                   <option value="Time" />
                   <option value="Area" />
                 </datalist>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                <Label className="text-sm font-semibold text-[#32325D]">Status</Label>
+                <Select value={isActive ? "true" : "false"} onValueChange={(val) => setIsActive(val === "true")}>
+                  <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

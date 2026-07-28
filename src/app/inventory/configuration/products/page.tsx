@@ -32,7 +32,6 @@ const getStatusVariant = (status: string) => {
   switch (status?.toUpperCase()) {
     case "ACTIVE":
       return "validated";
-    case "HIDDEN":
     case "INACTIVE":
       return "rejected";
     default:
@@ -66,21 +65,16 @@ export default function ProductsPage() {
   }, [rawProducts]);
 
   const categories = useMemo(() => {
-    const cats = new Set<string>(["consumable", "stockable", "service-product"]);
+    const cats = new Map<string, string>();
     productsList.forEach((p: any) => {
-      const cat = p.product_category || p.category;
-      if (cat) cats.add(String(cat));
+      const catId = p.product_category || p.category;
+      const catName = p.product_category_details?.category_name;
+      if (catId) {
+        cats.set(String(catId), catName || `Category ${catId}`);
+      }
     });
-    return Array.from(cats);
+    return Array.from(cats.entries());
   }, [productsList]);
-
-  const formatCategoryName = (cat?: string) => {
-    if (!cat) return "-";
-    if (cat === "consumable") return "Consumable";
-    if (cat === "stockable") return "Stockable";
-    if (cat === "service-product") return "Service Product";
-    return cat;
-  };
 
   const handleRowClick = (id: string | number) => {
     router.push(`/inventory/configuration/products/${id}`);
@@ -98,11 +92,7 @@ export default function ProductsPage() {
       const matchCategory =
         selectedCategory === "all" ||
         String(p.product_category || p.category || "") === selectedCategory;
-      const statusStr = p.is_hidden
-        ? "HIDDEN"
-        : p.is_active !== false
-        ? "ACTIVE"
-        : "INACTIVE";
+      const statusStr = p.is_active !== false ? "ACTIVE" : "INACTIVE";
       const matchStatus =
         selectedStatus === "all" || statusStr === selectedStatus.toUpperCase();
       return matchQuery && matchCategory && matchStatus;
@@ -156,7 +146,6 @@ export default function ProductsPage() {
                 {[
                   { label: "All Products", value: "all" },
                   { label: "Active", value: "ACTIVE" },
-                  { label: "Hidden", value: "HIDDEN" },
                   { label: "Inactive", value: "INACTIVE" },
                 ].map((tab) => {
                   const isSelected = selectedStatus === tab.value;
@@ -185,9 +174,9 @@ export default function ProductsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {formatCategoryName(cat)}
+                    {categories.map(([id, name]) => (
+                      <SelectItem key={id} value={id}>
+                        {name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -236,11 +225,7 @@ export default function ProductsPage() {
 
                   {!isLoading &&
                     filteredProducts.map((prd: any) => {
-                      const statusStr = prd.is_hidden
-                        ? "HIDDEN"
-                        : prd.is_active !== false
-                        ? "ACTIVE"
-                        : "INACTIVE";
+                      const statusStr = prd.is_active !== false ? "ACTIVE" : "INACTIVE";
                       const uomStr =
                         prd.unit_of_measure_details?.unit_name ||
                         prd.unit_of_measure_details?.unit_symbol ||
@@ -260,7 +245,7 @@ export default function ProductsPage() {
                             {prd.product_name || prd.name}
                           </TableCell>
                           <TableCell className="px-6 py-3.5 text-sm text-[#525F7F] whitespace-nowrap">
-                            {formatCategoryName(prd.product_category || prd.category)}
+                            {prd.product_category_details?.category_name || prd.product_category || "-"}
                           </TableCell>
                           <TableCell className="px-6 py-3.5 text-sm font-medium text-[#525F7F] whitespace-nowrap">
                             {uomStr}

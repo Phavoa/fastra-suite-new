@@ -37,24 +37,27 @@ export function StockMoveTable({ moves, query = "" }: StockMoveTableProps) {
       <div className="overflow-x-auto">
         <Table className="w-full">
           <TableHeader>
-            <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                Move ID
+            <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-200">
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                DATE
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                Product Name
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                MOVE ID / REF
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
-                Quantity
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                TYPE
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                Date and Time
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                PRODUCT
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
-                Total Value
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                IN
               </TableHead>
-              <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
-                Type
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                OUT
+              </TableHead>
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                BALANCE
               </TableHead>
             </TableRow>
           </TableHeader>

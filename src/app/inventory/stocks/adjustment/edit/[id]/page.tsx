@@ -42,7 +42,7 @@ interface StockAdjustmentLineItem {
 
 const stockAdjustmentSchema = z.object({
   warehouse_location: z.string().min(1, "Warehouse location is required"),
-  notes: z.string().min(1, "Mandatory reason is required per PRD"),
+  notes: z.string().min(1, "Mandatory reason is required "),
 });
 
 type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>;
@@ -53,10 +53,34 @@ const DUMMY_LOCATIONS: Option[] = [
 ];
 
 const DUMMY_PRODUCTS = [
-  { id: "1", product_name: "Cement (50kg Bag)", product_description: "Portland Cement Grade 42.5", unit_symbol: "Bags", current_stock: "500" },
-  { id: "2", product_name: "Reinforcement Steel 16mm", product_description: "High Yield Deformed Steel Bars", unit_symbol: "Tonnes", current_stock: "150" },
-  { id: "3", product_name: "Sharp Sand", product_description: "Clean river sharp sand for plastering", unit_symbol: "m³", current_stock: "45" },
-  { id: "4", product_name: "Safety Helmets (Yellow)", product_description: "HDPE Hard Hats with adjustable strap", unit_symbol: "Pieces", current_stock: "120" },
+  {
+    id: "1",
+    product_name: "Cement (50kg Bag)",
+    product_description: "Portland Cement Grade 42.5",
+    unit_symbol: "Bags",
+    current_stock: "500",
+  },
+  {
+    id: "2",
+    product_name: "Reinforcement Steel 16mm",
+    product_description: "High Yield Deformed Steel Bars",
+    unit_symbol: "Tonnes",
+    current_stock: "150",
+  },
+  {
+    id: "3",
+    product_name: "Sharp Sand",
+    product_description: "Clean river sharp sand for plastering",
+    unit_symbol: "m³",
+    current_stock: "45",
+  },
+  {
+    id: "4",
+    product_name: "Safety Helmets (Yellow)",
+    product_description: "HDPE Hard Hats with adjustable strap",
+    unit_symbol: "Pieces",
+    current_stock: "120",
+  },
 ];
 
 export default function EditStockAdjustmentPage() {
@@ -110,7 +134,9 @@ export default function EditStockAdjustmentPage() {
     watch,
     formState: { errors },
   } = useForm<StockAdjustmentFormData>({
-    resolver: zodResolver(stockAdjustmentSchema) as Resolver<StockAdjustmentFormData>,
+    resolver: zodResolver(
+      stockAdjustmentSchema,
+    ) as Resolver<StockAdjustmentFormData>,
     defaultValues: {
       warehouse_location: "WH-MAIN",
       notes: "Quarterly spot check adjustment.",
@@ -135,16 +161,16 @@ export default function EditStockAdjustmentPage() {
               current_quantity: p?.current_stock || "0",
               adjusted_quantity: p?.current_stock || "0",
             }
-          : it
-      )
+          : it,
+      ),
     );
   };
 
   const updateAdjustedQty = (itemId: string, val: string) => {
     setItems((prev) =>
       prev.map((it) =>
-        it.id === itemId ? { ...it, adjusted_quantity: val } : it
-      )
+        it.id === itemId ? { ...it, adjusted_quantity: val } : it,
+      ),
     );
   };
 
@@ -166,7 +192,7 @@ export default function EditStockAdjustmentPage() {
 
   function onValidate(data: StockAdjustmentFormData) {
     const validItems = items.filter(
-      (item) => item.product && item.adjusted_quantity !== ""
+      (item) => item.product && item.adjusted_quantity !== "",
     );
 
     if (validItems.length === 0) {
@@ -204,12 +230,18 @@ export default function EditStockAdjustmentPage() {
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-2xs">
           <div className="flex items-center gap-3">
             <Link href={`/inventory/stocks/adjustment/${id}`}>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-[#32325D]">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-[#32325D]"
+              >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
             <div>
-              <h1 className="text-lg font-semibold text-[#32325D]">Edit Stock Adjustment: {id}</h1>
+              <h1 className="text-lg font-semibold text-[#32325D]">
+                Edit Stock Adjustment: {id}
+              </h1>
             </div>
           </div>
         </div>
@@ -217,38 +249,48 @@ export default function EditStockAdjustmentPage() {
         {/* Main Form Container */}
         <main className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6">
           <form ref={formRef} className="flex flex-col gap-6">
-            
             {/* Adjustment Details Card */}
             <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
               <div className="p-5 border-b border-gray-100">
-                <h2 className="text-base font-semibold text-[#32325D]">Adjustment Details & Reason</h2>
+                <h2 className="text-base font-semibold text-[#32325D]">
+                  Adjustment Details & Reason
+                </h2>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2.5">
                   <Label className="text-sm font-semibold text-[#32325D]">
-                    Warehouse / Store Location <span className="text-[#E43D2B]">*</span>
+                    Location{" "}
+                    <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("warehouse_location")}
-                    onValueChange={(val) => setValue("warehouse_location", val, { shouldValidate: true })}
+                    onValueChange={(val) =>
+                      setValue("warehouse_location", val, {
+                        shouldValidate: true,
+                      })
+                    }
                   >
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
                       {DUMMY_LOCATIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {errors.warehouse_location && (
-                    <p className="text-xs text-red-500 mt-1">{errors.warehouse_location.message}</p>
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.warehouse_location.message}
+                    </p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-2.5">
                   <Label className="text-sm font-semibold text-[#32325D]">
-                    Reason / Notes <span className="text-[#E43D2B]">*</span>
+                    Notes <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Input
                     {...register("notes")}
@@ -256,7 +298,9 @@ export default function EditStockAdjustmentPage() {
                     className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
                   />
                   {errors.notes && (
-                    <p className="text-xs text-red-500 mt-1">{errors.notes.message}</p>
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.notes.message}
+                    </p>
                   )}
                 </div>
               </div>
@@ -265,7 +309,9 @@ export default function EditStockAdjustmentPage() {
             {/* Product Lines Card */}
             <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
               <div className="p-5 border-b border-gray-100">
-                <h2 className="text-base font-semibold text-[#32325D]">Count & Variance Table</h2>
+                <h2 className="text-base font-semibold text-[#32325D]">
+                  Count & Variance Table
+                </h2>
               </div>
               <div className="overflow-x-auto w-full">
                 <Table className="min-w-[900px] w-full">
@@ -300,18 +346,28 @@ export default function EditStockAdjustmentPage() {
                       const adjusted = Number(it.adjusted_quantity) || 0;
                       const variance = adjusted - current;
                       return (
-                        <TableRow key={it.id} className="group hover:bg-gray-50 border-b border-gray-100 transition-colors">
+                        <TableRow
+                          key={it.id}
+                          className="group hover:bg-gray-50 border-b border-gray-100 transition-colors"
+                        >
                           <TableCell className="px-6 py-3.5 align-middle whitespace-nowrap">
                             <Select
                               value={it.product}
-                              onValueChange={(value) => updateItemWithProductDetails(it.id, value)}
+                              onValueChange={(value) =>
+                                updateItemWithProductDetails(it.id, value)
+                              }
                             >
                               <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED] min-w-[200px]">
                                 <SelectValue placeholder="Select product" />
                               </SelectTrigger>
                               <SelectContent>
                                 {productOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -338,15 +394,29 @@ export default function EditStockAdjustmentPage() {
                               type="number"
                               step="0.01"
                               value={it.adjusted_quantity}
-                              onChange={(e) => updateAdjustedQty(it.id, e.target.value)}
+                              onChange={(e) =>
+                                updateAdjustedQty(it.id, e.target.value)
+                              }
                               placeholder="0"
                               className="bg-white border-gray-200 rounded-md h-9 font-mono font-bold text-sm text-[#3B7CED] text-center w-28 mx-auto"
                             />
                           </TableCell>
 
                           <TableCell className="px-6 py-3.5 align-middle text-right font-mono font-bold text-sm whitespace-nowrap">
-                            <span className={variance < 0 ? "text-[#E43D2B]" : variance > 0 ? "text-[#2BA24D]" : "text-[#525F7F]"}>
-                              {it.product ? (variance > 0 ? `+${variance.toFixed(2)}` : variance.toFixed(2)) : "—"}
+                            <span
+                              className={
+                                variance < 0
+                                  ? "text-[#E43D2B]"
+                                  : variance > 0
+                                    ? "text-[#2BA24D]"
+                                    : "text-[#525F7F]"
+                              }
+                            >
+                              {it.product
+                                ? variance > 0
+                                  ? `+${variance.toFixed(2)}`
+                                  : variance.toFixed(2)
+                                : "—"}
                             </span>
                           </TableCell>
 

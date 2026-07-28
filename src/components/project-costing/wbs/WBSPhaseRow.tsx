@@ -1,6 +1,7 @@
 import React from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { Activity, Phase } from "../types";
 import { WBSActivityRow } from "./WBSActivityRow";
@@ -30,40 +31,52 @@ export function WBSPhaseRow({
     <React.Fragment>
       {/* Phase Header */}
       <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB]/80 border-b border-white">
-        <TableCell 
-          colSpan={4} 
+        <TableCell
+          colSpan={4}
           className="font-medium p-0 text-sm bg-[#EEF2FB] h-12"
         >
-          <div className="flex items-center px-4 h-full">
-            <Input
-              value={phase.name}
-              onChange={(e) => onUpdatePhaseName(e.target.value)}
-              className="h-8 w-60 bg-transparent border-0 hover:bg-white/50 focus:bg-white transition-all font-semibold text-gray-800 p-1 mr-4 shadow-none rounded"
-            />
-            <button
+          <div className="flex items-center justify-between px-4 h-full">
+            <div className="flex items-center gap-2">
+              <span className="text-[#3B7CED] text-[10px] font-bold uppercase tracking-wider select-none shrink-0 whitespace-nowrap mt-1.5">
+                Phase:
+              </span>
+              <Input
+                value={phase.name}
+                onChange={(e) => onUpdatePhaseName(e.target.value)}
+                className="h-8 w-64 bg-transparent border-0 hover:bg-white/50 focus:bg-white transition-all font-semibold text-gray-800 p-1 shadow-none rounded focus-visible:ring-1 focus-visible:ring-[#3B7CED]/30"
+              />
+            </div>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onAddPhaseActivity}
-              className="ml-4 text-[#3B7CED] text-xs font-normal hover:underline flex items-center"
+              className="bg-white border border-gray-200 text-[#3B7CED] hover:bg-blue-50/50 hover:text-[#3B7CED] hover:border-[#3B7CED] text-xs flex items-center h-8 gap-1.5 px-3 shadow-xs rounded-md"
             >
-              <Plus className="w-3 h-3 mr-1" /> Activity
-            </button>
-            <button
-              type="button"
-              onClick={onRemovePhase}
-              className="ml-4 text-gray-400 hover:text-red-500 flex items-center"
-              title="Delete Phase"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Activity</span>
+            </Button>
           </div>
         </TableCell>
         <TableCell className="font-semibold text-sm py-2 bg-[#EEF2FB] text-gray-800">
           {phaseBudget.toLocaleString()}
         </TableCell>
         {extraColumns.length > 0 && (
-          <TableCell colSpan={extraColumns.length} className="py-2 bg-[#EEF2FB]" />
+          <TableCell
+            colSpan={extraColumns.length}
+            className="py-2 bg-[#EEF2FB]"
+          />
         )}
-        <TableCell className="py-2 bg-[#EEF2FB]"></TableCell>
+        <TableCell className="py-2 bg-[#EEF2FB] text-center">
+          <button
+            type="button"
+            onClick={onRemovePhase}
+            className="text-gray-400 hover:text-red-500 transition-colors p-1"
+            title="Delete Phase"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </TableCell>
       </TableRow>
 
       {/* Phase Activities */}

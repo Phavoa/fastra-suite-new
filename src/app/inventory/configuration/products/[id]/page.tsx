@@ -40,6 +40,7 @@ import {
   useSoftDeleteInventoryProductMutation as useDeleteInventoryProductMutation,
 } from "@/api/inventory/productsApi";
 import { useGetInventoryUnitOfMeasuresQuery } from "@/api/inventory/unitOfMeasureApi";
+import { useGetProductCategoriesQuery } from "@/api/inventory/productCategoryApi";
 import { StatusModal, useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 
 const dummyStockMoves = [
@@ -112,7 +113,6 @@ export default function ProductDetailsPage() {
   const [standardCost, setStandardCost] = useState("0");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [isHidden, setIsHidden] = useState(false);
   const [checkForDuplicates, setCheckForDuplicates] = useState(true);
 
   // Status modal hook
@@ -131,6 +131,10 @@ export default function ProductDetailsPage() {
     useDeleteInventoryProductMutation();
   const { data: unitMeasures, isLoading: isLoadingUnits } =
     useGetInventoryUnitOfMeasuresQuery({});
+  const { data: categoriesData, isLoading: isLoadingCategories } =
+    useGetProductCategoriesQuery();
+
+  const categoriesList = categoriesData?.results || (Array.isArray(categoriesData) ? categoriesData : []);
 
   // Helper to extract UOM ID
   const getUnitId = (uom: any, index: number): number => {
@@ -169,7 +173,6 @@ export default function ProductDetailsPage() {
       );
       setDescription(productData.description || "");
       setIsActive(productData.is_active !== false);
-      setIsHidden(Boolean(productData.is_hidden));
     }
   }, [productData]);
 
@@ -192,16 +195,15 @@ export default function ProductDetailsPage() {
 
     try {
       const payload: any = {
-        name: name.trim(),
+        product_name: name.trim(),
         unit_of_measure: Number(unit),
-        category: category,
+        product_category: Number(category),
         standard_cost: parseFloat(standardCost) || 0,
         description: description.trim(),
         is_active: isActive,
-        is_hidden: isHidden,
       };
 
-      await updateProduct({ id, ...payload }).unwrap();
+      await updateProduct({ id, data: payload }).unwrap();
       statusModal.showSuccess(
         "Product Updated",
         `Product "${name.trim()}" has been updated successfully.`
@@ -261,11 +263,7 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const statusStr = isHidden
-    ? "HIDDEN"
-    : productData?.is_active !== false
-    ? "ACTIVE"
-    : "INACTIVE";
+  const statusStr = isActive ? "ACTIVE" : "INACTIVE";
 
   return (
     <PageGuard application="inventory" module="products">
@@ -317,13 +315,6 @@ export default function ProductDetailsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsHidden(!isHidden)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm h-9 px-4 font-medium"
-            >
-              {isHidden ? "Activate Product" : "Hide Product"}
-            </Button>
             <Button
               variant="outline"
               onClick={handleDelete}
@@ -432,14 +423,16 @@ export default function ProductDetailsPage() {
                   <Label className="text-xs font-semibold text-[#525F7F]">
                     Product Category <span className="text-[#E43D2B]">*</span>
                   </Label>
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select value={String(category)} onValueChange={setCategory} disabled={isLoadingCategories}>
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                      <SelectValue placeholder="Select Category" />
+                      <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="consumable">Consumable</SelectItem>
-                      <SelectItem value="stockable">Stockable</SelectItem>
-                      <SelectItem value="service-product">Service Product</SelectItem>
+                      {categoriesList?.map((cat: any) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>
+                          {cat.category_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -493,19 +486,6 @@ export default function ProductDetailsPage() {
                     <Square className="h-4 w-4 text-gray-400" />
                   )}
                   Check for Duplicates
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsHidden(!isHidden)}
-                  className="flex items-center gap-2.5 text-sm font-semibold text-[#32325D] hover:text-[#3B7CED] focus:outline-none cursor-pointer"
-                >
-                  {isHidden ? (
-                    <CheckSquare className="h-4 w-4 text-[#3B7CED]" />
-                  ) : (
-                    <Square className="h-4 w-4 text-gray-400" />
-                  )}
-                  Hidden Product
                 </button>
               </div>
             </div>

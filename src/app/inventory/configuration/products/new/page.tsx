@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowLeft, Loader2, CheckSquare, Square, Save } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { ArrowLeft, Loader2, CheckSquare, Square, Save, Upload, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,8 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateInventoryProductMutation } from "@/api/inventory/productsApi";
+import {
+  useCreateInventoryProductMutation,
+  useGetInventoryProductsQuery,
+} from "@/api/inventory/productsApi";
 import { useGetInventoryUnitOfMeasuresQuery } from "@/api/inventory/unitOfMeasureApi";
+import { useGetProductCategoriesQuery } from "@/api/inventory/productCategoryApi";
 import { StatusModal, useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 
 export default function NewProductPage() {
@@ -26,12 +31,15 @@ export default function NewProductPage() {
   // Form states
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("");
-  const [category, setCategory] = useState("consumable");
+  const [category, setCategory] = useState("");
   const [standardCost, setStandardCost] = useState("0");
+  const [reorderPoint, setReorderPoint] = useState("");
+  const [isReorderFocused, setIsReorderFocused] = useState(false);
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [isHidden, setIsHidden] = useState(false);
   const [checkForDuplicates, setCheckForDuplicates] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Status modal hook
   const statusModal = useStatusModal();
@@ -41,6 +49,13 @@ export default function NewProductPage() {
     useCreateInventoryProductMutation();
   const { data: unitMeasures, isLoading: isLoadingUnits } =
     useGetInventoryUnitOfMeasuresQuery({});
+  const { data: activeProducts, isLoading: isLoadingProducts } =
+    useGetInventoryProductsQuery({});
+  const { data: categoriesData, isLoading: isLoadingCategories } =
+    useGetProductCategoriesQuery();
+
+  const unitsList = unitMeasures?.results || (Array.isArray(unitMeasures) ? unitMeasures : []);
+  const categoriesList = categoriesData?.results || (Array.isArray(categoriesData) ? categoriesData : []);
 
   // Helper to extract UOM ID cleanly
   const getUnitId = (uom: any): number => {
@@ -55,6 +70,94 @@ export default function NewProductPage() {
       }
     }
     return 0;
+  };
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([{ 
+      "Product Name": "Sample Product",
+      "Description": "Sample notes",
+      "Category Name": categoriesList?.[0]?.category_name || "General",
+      "Unit Symbol": unitsList?.[0]?.unit_symbol || "kg",
+      "Standard Cost": 500,
+      "Reorder Point": 10
+    }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Products_Template.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const row of data as any[]) {
+          const productName = row["Product Name"] || row["product_name"] || row["name"];
+          const desc = row["Description"] || row["description"] || "";
+          const catName = row["Category Name"] || row["category"] || "";
+          const unitSym = row["Unit Symbol"] || row["Unit of Measure"] || row["unit"] || "";
+          const stdCost = row["Standard Cost"] || 0;
+          const reorderPt = row["Reorder Point"] || 0;
+          
+          if (!productName) continue;
+          
+          const cat = categoriesList.find((c: any) => c.category_name.toLowerCase() === String(catName).toLowerCase());
+          const uom = unitsList.find((u: any) => 
+            String(u.unit_symbol || "").toLowerCase() === String(unitSym).toLowerCase() || 
+            String(u.unit_name || "").toLowerCase() === String(unitSym).toLowerCase()
+          );
+
+          if (!cat || !uom) {
+            errorCount++;
+            continue;
+          }
+
+          try {
+            await createProduct({
+              product_name: String(productName),
+              description: String(desc),
+              product_category: Number(cat.id),
+              unit_of_measure: Number(getUnitId(uom)),
+              standard_cost: String(stdCost),
+              reorder_point: String(reorderPt),
+              is_active: true,
+              check_for_duplicates: checkForDuplicates
+            }).unwrap();
+            successCount++;
+          } catch (err) {
+            errorCount++;
+          }
+        }
+        
+        if (errorCount > 0 && successCount === 0) {
+          statusModal.showError("Import Failed", "Failed to import products. Ensure Category and Unit match existing ones.");
+        } else {
+          statusModal.showSuccess(
+            "Import Complete",
+            `${successCount} imported${errorCount > 0 ? `, ${errorCount} failed (Check matching categories/units)` : ''}.`,
+            "Done"
+          );
+        }
+      } catch (error) {
+        statusModal.showError("Import Error", "Failed to parse Excel file.");
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleSubmit = async () => {
@@ -76,13 +179,12 @@ export default function NewProductPage() {
 
     try {
       const payload: any = {
-        name: name.trim(),
-        unit_of_measure: Number(unit),
-        category: category,
-        standard_cost: parseFloat(standardCost) || 0,
+        product_name: name.trim(),
         description: description.trim(),
+        product_category: Number(category),
+        unit_of_measure: Number(unit),
+        standard_cost: standardCost ? String(standardCost) : "0",
         is_active: isActive,
-        is_hidden: isHidden,
       };
 
       await createProduct(payload).unwrap();
@@ -129,11 +231,42 @@ export default function NewProductPage() {
               <p className="text-xs text-[#8898AA] mt-0.5">Create a new item in products.</p>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            {process.env.NODE_ENV === "development" && (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleDownloadTemplate}
+                  className="h-9 px-4 rounded-md font-medium text-sm border-gray-200 hover:bg-gray-50 flex items-center gap-1.5 text-gray-600"
+                >
+                  <Download className="h-4 w-4" /> Template
+                </Button>
+                
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  className="h-9 px-4 rounded-md font-medium text-sm border-gray-200 hover:bg-gray-50 flex items-center gap-1.5 text-gray-600"
+                >
+                  {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {isImporting ? "Importing..." : "Import Excel"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Main Form Container */}
-        <main className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6">
-          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+        {/* Main Layout Container */}
+        <main className="p-6 max-w-[1400px] mx-auto w-full flex items-start overflow-x-hidden">
+          {/* Main Form */}
+          <div className="flex-1 transition-all duration-500 ease-in-out bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
             <div className="p-5 border-b border-gray-100">
               <h2 className="text-base font-semibold text-[#32325D]">
                 Basic Information & Classification
@@ -149,6 +282,7 @@ export default function NewProductPage() {
                   className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onFocus={() => setIsReorderFocused(false)}
                 />
               </div>
 
@@ -161,7 +295,10 @@ export default function NewProductPage() {
                   onValueChange={setUnit}
                   disabled={isLoadingUnits}
                 >
-                  <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                  <SelectTrigger 
+                    className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
+                    onFocus={() => setIsReorderFocused(false)}
+                  >
                     <SelectValue
                       placeholder={
                         isLoadingUnits
@@ -171,7 +308,7 @@ export default function NewProductPage() {
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {unitMeasures?.map((uom, index) => {
+                    {unitsList?.map((uom: any, index: number) => {
                       const uomId = getUnitId(uom) || index + 1;
                       return (
                         <SelectItem key={uomId} value={String(uomId)}>
@@ -188,14 +325,19 @@ export default function NewProductPage() {
                 <Label className="text-xs font-semibold text-[#525F7F]">
                   Product Category <span className="text-[#E43D2B]">*</span>
                 </Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                    <SelectValue placeholder="Select Category" />
+                <Select value={category} onValueChange={setCategory} disabled={isLoadingCategories}>
+                  <SelectTrigger 
+                    className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
+                    onFocus={() => setIsReorderFocused(false)}
+                  >
+                    <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="consumable">Consumable</SelectItem>
-                    <SelectItem value="stockable">Stockable</SelectItem>
-                    <SelectItem value="service-product">Service Product</SelectItem>
+                    {categoriesList?.map((cat: any) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.category_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -210,6 +352,21 @@ export default function NewProductPage() {
                   className="bg-white border-gray-200 rounded-md h-9 font-mono text-sm font-semibold text-[#32325D] focus:ring-[#3B7CED]"
                   value={standardCost}
                   onChange={(e) => setStandardCost(e.target.value)}
+                  onFocus={() => setIsReorderFocused(false)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-[#525F7F]">
+                  Reorder Point
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 50"
+                  className="bg-white border-gray-200 rounded-md h-9 font-mono text-sm font-semibold text-[#32325D] focus:ring-[#3B7CED]"
+                  value={reorderPoint}
+                  onChange={(e) => setReorderPoint(e.target.value)}
+                  onFocus={() => setIsReorderFocused(true)}
                 />
               </div>
 
@@ -220,6 +377,7 @@ export default function NewProductPage() {
                   className="bg-white border-gray-200 rounded-md min-h-[90px] text-sm text-[#32325D] focus:ring-[#3B7CED]"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  onFocus={() => setIsReorderFocused(false)}
                 />
               </div>
             </div>
@@ -228,14 +386,14 @@ export default function NewProductPage() {
               <button
                 type="button"
                 onClick={() => setIsActive(!isActive)}
-                className="flex items-center gap-2.5 text-sm font-semibold text-[#32325D] hover:text-[#3B7CED] focus:outline-none cursor-pointer"
+                className={`flex items-center gap-2.5 text-sm font-semibold focus:outline-none cursor-pointer ${isActive ? 'text-[#32325D] hover:text-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 {isActive ? (
                   <CheckSquare className="h-4 w-4 text-[#3B7CED]" />
                 ) : (
                   <Square className="h-4 w-4 text-gray-400" />
                 )}
-                Active Status
+                {isActive ? "Product is Active" : "Product is Inactive"}
               </button>
 
               <button
@@ -250,20 +408,35 @@ export default function NewProductPage() {
                 )}
                 Check for Duplicates
               </button>
-
-              <button
-                type="button"
-                onClick={() => setIsHidden(!isHidden)}
-                className="flex items-center gap-2.5 text-sm font-semibold text-[#32325D] hover:text-[#3B7CED] focus:outline-none cursor-pointer"
-              >
-                {isHidden ? (
-                  <CheckSquare className="h-4 w-4 text-[#3B7CED]" />
-                ) : (
-                  <Square className="h-4 w-4 text-gray-400" />
-                )}
-                Hidden Product
-              </button>
             </div>
+          </div>
+
+          {/* Side Reference Panel */}
+          <div className={`transition-all duration-500 ease-in-out sticky top-6 overflow-hidden ${isReorderFocused ? 'w-[320px] ml-6 opacity-100' : 'w-0 ml-0 opacity-0'}`}>
+             <div className="w-[320px] bg-white rounded-lg shadow-2xs border border-gray-100 flex flex-col max-h-[calc(100vh-100px)]">
+               <div className="p-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
+                 <h3 className="text-sm font-semibold text-[#32325D]">Reference: Existing Products</h3>
+                 <p className="text-xs text-[#8898AA] mt-1">Typical reorder points for your current inventory.</p>
+               </div>
+               <div className="p-4 overflow-y-auto flex flex-col flex-1">
+                 {isLoadingProducts ? (
+                    <div className="text-xs text-gray-500 py-4 text-center">Loading products...</div>
+                 ) : !activeProducts || activeProducts.length === 0 ? (
+                    <div className="text-xs text-gray-500 py-4 text-center">No products found.</div>
+                 ) : (
+                    activeProducts.map((prod: any) => (
+                      <div key={prod.id} className="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
+                         <span className="text-sm text-[#32325D] font-medium truncate pr-3" title={prod.product_name}>
+                            {prod.product_name}
+                         </span>
+                         <span className="text-xs font-mono bg-[#F6F9FC] border border-gray-100 px-2 py-0.5 rounded text-[#525F7F] whitespace-nowrap">
+                            RP: {prod.reorder_point || 0}
+                         </span>
+                      </div>
+                    ))
+                 )}
+               </div>
+             </div>
           </div>
         </main>
 

@@ -14,6 +14,7 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react";
+import { extractErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import {
@@ -33,6 +34,7 @@ import {
   useApproveLabourRequestMutation,
   useRejectLabourRequestMutation,
 } from "@/api/requests/labourRequestApi";
+import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
 import { usePermissionContext } from "@/contexts/PermissionContext";
 
 export default function LabourRequestDetailPage() {
@@ -66,6 +68,60 @@ export default function LabourRequestDetailPage() {
   const [approvalNotes, setApprovalNotes] = useState("");
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
+  const detail = request?.detail || (request as any) || {};
+  const projectRequest = request?.project_request || (request as any) || {};
+
+  const projectId = request?.project || projectRequest?.project;
+  const activityId = request?.activity;
+
+  const { data: projectCosting, isLoading: isBudgetLoading } = useGetProjectCostingProjectQuery(
+    Number(projectId),
+    { skip: !projectId || isNaN(Number(projectId)) }
+  );
+
+  const availableBudget = React.useMemo(() => {
+    if (!projectCosting) return null;
+
+    if (activityId) {
+      const phasesArr = Array.isArray(projectCosting.phases)
+        ? projectCosting.phases
+        : Array.isArray((projectCosting as any).phase_list)
+        ? (projectCosting as any).phase_list
+        : [];
+
+      for (const ph of phasesArr) {
+        const acts = Array.isArray(ph.activities)
+          ? ph.activities
+          : Array.isArray(ph.activity_list)
+          ? ph.activity_list
+          : [];
+        const act = acts.find((a: any) => String(a.id || a.activity_id) === String(activityId));
+        if (act) {
+          if (act.available_budget !== undefined && act.available_budget !== null)
+            return Number(act.available_budget);
+          if (act.remaining_budget !== undefined && act.remaining_budget !== null)
+            return Number(act.remaining_budget);
+          if (act.amount !== undefined && act.amount !== null) return Number(act.amount);
+        }
+      }
+    }
+
+    if (projectCosting.financials) {
+      if (
+        projectCosting.financials.remaining_budget !== undefined &&
+        projectCosting.financials.remaining_budget !== null
+      )
+        return Number(projectCosting.financials.remaining_budget);
+      if (
+        projectCosting.financials.budget !== undefined &&
+        projectCosting.financials.budget !== null
+      )
+        return Number(projectCosting.financials.budget);
+    }
+
+    return null;
+  }, [projectCosting, activityId]);
+
   const getStatusBadgeClass = (status?: string) => {
     switch (status) {
       case "approved":
@@ -96,7 +152,7 @@ export default function LabourRequestDetailPage() {
       );
     } catch (error) {
       console.error("Failed to delete request:", error);
-      statusModal.showError("Error", "Failed to delete the request. Please try again.");
+      statusModal.showError("Error", extractErrorMessage(error, "Failed to delete the request. Please try again."));
     }
   };
 
@@ -110,7 +166,7 @@ export default function LabourRequestDetailPage() {
       refetch();
     } catch (error) {
       console.error("Failed to submit request:", error);
-      statusModal.showError("Error", "Failed to submit the request. Please try again.");
+      statusModal.showError("Submit Failed", extractErrorMessage(error, "Failed to submit the request. Please try again."));
     }
   };
 
@@ -128,7 +184,7 @@ export default function LabourRequestDetailPage() {
       refetch();
     } catch (error) {
       console.error("Failed to approve request:", error);
-      statusModal.showError("Error", "Failed to approve the request. Please try again.");
+      statusModal.showError("Approval Failed", extractErrorMessage(error, "Failed to approve the request. Please try again."));
     }
   };
 
@@ -146,7 +202,7 @@ export default function LabourRequestDetailPage() {
       );
     } catch (error) {
       console.error("Failed to reject request:", error);
-      statusModal.showError("Error", "Failed to reject the request. Please try again.");
+      statusModal.showError("Rejection Failed", extractErrorMessage(error, "Failed to reject the request. Please try again."));
     }
   };
 
@@ -198,9 +254,6 @@ export default function LabourRequestDetailPage() {
       </div>
     );
   }
-
-  const detail = request?.detail || (request as any) || {};
-  const projectRequest = request?.project_request || (request as any) || {};
 
   const requesterName =
     projectRequest?.created_by_details?.user?.first_name ||
@@ -342,10 +395,22 @@ export default function LabourRequestDetailPage() {
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
           <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            Cost Breakdown
+            Cost & Budget Breakdown
           </h3>
 
           <div className="space-y-3 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Available Budget</span>
+              <span className="font-bold text-[#3B7CED]">
+                {isBudgetLoading ? (
+                  "Loading..."
+                ) : availableBudget !== null && availableBudget !== undefined ? (
+                  `₦${availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+                ) : (
+                  "N/A"
+                )}
+              </span>
+            </div>
             <div className="flex justify-between py-1.5 border-b border-gray-50">
               <span className="text-gray-500 font-semibold">
                 {detail.duration_unit === "weeks"

@@ -107,7 +107,7 @@ export default function StockAdjustmentDetailPage() {
                 <span className="text-sm font-semibold text-[#32325D]">{dummyData.date}</span>
               </div>
               <div className="md:col-span-4 border-t border-gray-100 pt-4 mt-2">
-                <span className="text-xs font-semibold text-[#8898AA] block mb-1">Mandatory Reason / Notes</span>
+                <span className="text-xs font-semibold text-[#8898AA] block mb-1">Notes</span>
                 <span className="text-sm text-[#525F7F]">{dummyData.notes}</span>
               </div>
             </div>

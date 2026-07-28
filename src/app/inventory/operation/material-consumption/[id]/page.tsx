@@ -78,7 +78,7 @@ const mockRequestsData: Record<string, any> = {
       { id: "5", name: "Sharp Sand", description: "Clean river sharp sand", unit: "Cubic Meters", requestedQty: 80, availableStock: 120, unitCost: 19375 }
     ],
     status: "held_overrun",
-    notes: "PRD 10.2: Requisition held by Budget Validation Gate. Exceeds available WBS line budget by ₦2,850,000.",
+    notes: "Requisition held by Budget Validation Gate. Exceeds available WBS line budget by ₦2,850,000.",
   },
 };
 
@@ -239,7 +239,7 @@ export default function MaterialConsumptionDetailPage() {
           <section>
             <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Requisition Summary</h2>
             
-            {/* PRD 10.2 Budget Gate Verification Banner */}
+            {/* Budget Gate Verification Banner */}
             {req.availableBudget !== undefined && (
               <div className={`mb-6 p-4 rounded border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${req.isOverrun ? "bg-red-50 border-red-300" : "bg-green-50/60 border-green-200"}`}>
                 <div className="flex items-center gap-3">
@@ -248,7 +248,7 @@ export default function MaterialConsumptionDetailPage() {
                   </div>
                   <div>
                     <h4 className={`text-sm font-semibold ${req.isOverrun ? "text-red-900" : "text-green-900"}`}>
-                      Budget Validation Gate (PRD 10.2): {req.isOverrun ? "HELD IN OVERRUN QUEUE" : "PASSED (WITHIN BUDGET)"}
+                      Budget Validation Gate: {req.isOverrun ? "HELD IN OVERRUN QUEUE" : "PASSED (WITHIN BUDGET)"}
                     </h4>
                     <p className="text-xs text-gray-600 mt-0.5">
                       Cost Code: <strong className="font-mono">{req.costCode || "CC-1020"}</strong> | Available WBS Budget: <strong className="font-mono">₦{req.availableBudget.toLocaleString()}</strong>
