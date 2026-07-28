@@ -185,12 +185,12 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
                     label={({
                       cx,
                       cy,
-                      midAngle,
+                      midAngle = 0,
                       innerRadius,
                       outerRadius,
-                      percent,
+                      percent = 0,
                       index
-                    }) => {
+                    }: any) => {
                       const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                       const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
                       const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,20 +16,21 @@ import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
-export default function SupplierReturnDetailPage({ params }: { params: { id: string } }) {
+export default function SupplierReturnDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: "", type: "success" as const });
 
-  // In reality, fetch this based on params.id
-  const isDraft = params.id.includes("0002"); // mock condition for draft
+  // In reality, fetch this based on id
+  const isDraft = id.includes("0002"); // mock condition for draft
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
     { label: "Operation", href: "/inventory/operation" },
     { label: "Supplier Returns", href: "/inventory/operation/supplier_return" },
-    { label: params.id, href: "#", current: true },
+    { label: id, href: "#", current: true },
   ];
 
   const handleValidate = async () => {
@@ -58,7 +59,7 @@ export default function SupplierReturnDetailPage({ params }: { params: { id: str
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                  <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Return ID</label>
-                  <div className="text-sm font-semibold text-gray-800">{params.id}</div>
+                  <div className="text-sm font-semibold text-gray-800">{id}</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Receipt ID</label>
