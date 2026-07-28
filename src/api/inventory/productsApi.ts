@@ -22,6 +22,7 @@ export interface InventoryProduct {
   unit_of_measure: number;
   unit_of_measure_details?: InventoryProductUnitOfMeasureDetails;
   standard_cost?: string | number;
+  reorder_point?: string | number;
   is_active?: boolean;
   is_hidden?: boolean;
   check_for_duplicates?: boolean;
@@ -36,6 +37,7 @@ export interface CreateInventoryProductRequest {
   product_category: string;
   unit_of_measure: number;
   standard_cost?: string | number;
+  reorder_point?: string | number;
   is_active?: boolean;
   is_hidden?: boolean;
   check_for_duplicates?: boolean;
@@ -48,6 +50,7 @@ export interface UpdateInventoryProductRequest {
   product_category?: string;
   unit_of_measure?: number;
   standard_cost?: string | number;
+  reorder_point?: string | number;
   is_active?: boolean;
   is_hidden?: boolean;
   check_for_duplicates?: boolean;

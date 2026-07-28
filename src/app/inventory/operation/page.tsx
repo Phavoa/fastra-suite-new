@@ -7,6 +7,8 @@ import {
   Package,
   Hammer,
   Trash2,
+  Undo2,
+  Archive,
   LayoutGrid,
   Menu,
 } from "lucide-react";
@@ -52,8 +54,8 @@ const DUMMY_INCOMING_PRODUCTS: any[] = [
 
 const STATUS_TABS = [
   { label: "All", value: "all" },
-  { label: "Validated", value: "validated" },
   { label: "Draft", value: "draft" },
+  { label: "Validated", value: "validated" },
   { label: "Canceled", value: "canceled" },
 ];
 
@@ -85,11 +87,25 @@ function OperationsNavigationTiles({
       icon: Trash2,
       color: "#E43D2B",
     },
+    {
+      title: "Supplier Returns",
+      href: "/inventory/operation/supplier_return",
+      count: 0,
+      icon: Undo2,
+      color: "#8E44AD",
+    },
+    {
+      title: "Backorders",
+      href: "/inventory/operation/backorder",
+      count: 2,
+      icon: Archive,
+      color: "#27AE60",
+    },
   ];
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg shadow-2xs overflow-hidden">
-      <div className="grid grid-cols-1 sm:grid-cols-3">
+    <div className="bg-white border border-gray-100 rounded-lg shadow-2xs overflow-hidden mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-5">
         {operationModules.map((mod, idx) => (
           <Link
             key={mod.title}
@@ -124,7 +140,10 @@ function OperationsNavigationTiles({
 
 const ITEMS_PER_PAGE = 10;
 
+import { useRouter } from "next/navigation";
+
 export default function OperationPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [currentView, setCurrentView] = useState<"list" | "grid">("list");
@@ -315,16 +334,16 @@ export default function OperationPage() {
                         Receipt ID
                       </TableHead>
                       <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
-                        Receipt Type
+                        Vendor
                       </TableHead>
                       <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
-                        Supplier
+                        Purchase Order
                       </TableHead>
                       <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
-                        Source Location
+                        Destination Location
                       </TableHead>
                       <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
-                        Destination
+                        Date Created
                       </TableHead>
                       <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
                         Status
@@ -336,7 +355,7 @@ export default function OperationPage() {
                       <TableRow
                         key={item.incoming_product_id}
                         className="cursor-pointer hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
-                        onClick={() => {}}
+                        onClick={() => router.push(`/inventory/operation/incoming_product/${item.incoming_product_id}`)}
                       >
                         <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap">
                           <Link
@@ -347,12 +366,6 @@ export default function OperationPage() {
                             {highlightText(item.incoming_product_id, query)}
                           </Link>
                         </TableCell>
-                        <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap capitalize">
-                          {highlightText(
-                            item.receipt_type.replace(/_/g, " "),
-                            query,
-                          )}
-                        </TableCell>
                         <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
                           {highlightText(
                             item.supplier_details?.company_name || "N/A",
@@ -361,8 +374,7 @@ export default function OperationPage() {
                         </TableCell>
                         <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
                           {highlightText(
-                            item.source_location_details?.location_name ||
-                              "N/A",
+                            item.related_po || "N/A",
                             query,
                           )}
                         </TableCell>
@@ -370,6 +382,12 @@ export default function OperationPage() {
                           {highlightText(
                             item.destination_location_details?.location_name ||
                               "N/A",
+                            query,
+                          )}
+                        </TableCell>
+                        <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
+                          {highlightText(
+                            item.created_at || "N/A",
                             query,
                           )}
                         </TableCell>

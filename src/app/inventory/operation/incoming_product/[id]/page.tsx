@@ -18,48 +18,95 @@ import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
 
-export default function IncomingProductDetailPage() {
-  const params = useParams();
-  const id = (params?.id as string) || "WH-IN-0001";
-
-  const dummyData = {
-    incoming_product_id: id,
+const DUMMY_DATA_LIST = [
+  {
+    incoming_product_id: "WH-IN-0001",
     receipt_type: "vendor_receipt",
     status: "validated",
     related_po: "PO-2026-0089",
     created_at: "2026-06-25 10:00 AM",
     supplier_name: "Dangote Cement Plc",
     destination_location: "Main Warehouse - Site A",
-    notes: "Batch delivery verified against delivery note DN-89201.",
     has_backorder: true,
     backorder_id: "WH-IN-0001-BO",
-    three_way_match_status: "FLAGGED_DISCREPANCY",
-    discrepancy_details: "Quantity shortage (100 Bags short) and Unit Invoice Price variance (+₦150/bag vs PO).",
     items: [
       {
         id: "1",
         product_name: "Dangote Portland Cement Grade 42.5",
         unit_symbol: "Bags",
-        po_quantity: 600,
-        po_unit_price: 5500,
+        expected_quantity: 600,
         received_quantity: 500,
-        invoice_unit_price: 5650,
-        accepted_quantity: 500,
-        rejected_quantity: 0,
-        match_status: "Variance Detected",
       },
       {
         id: "2",
         product_name: "Binding Wire 16 Gauge Roll",
         unit_symbol: "Rolls",
-        po_quantity: 50,
-        po_unit_price: 12000,
+        expected_quantity: 50,
         received_quantity: 50,
-        invoice_unit_price: 12000,
-        accepted_quantity: 50,
-        rejected_quantity: 0,
-        match_status: "Verified",
       },
+    ],
+  },
+  {
+    incoming_product_id: "WH-IN-0002",
+    receipt_type: "vendor_receipt",
+    status: "draft",
+    related_po: "PO-2026-0094",
+    created_at: "2026-06-28 09:30 AM",
+    supplier_name: "Julius Berger Steel",
+    destination_location: "Main Warehouse - Site A",
+    has_backorder: false,
+    items: [
+      {
+        id: "1",
+        product_name: "Iron Rods 12mm",
+        unit_symbol: "Tonnes",
+        expected_quantity: 100,
+        received_quantity: 0,
+      },
+    ],
+  },
+  {
+    incoming_product_id: "WH-IN-0007",
+    receipt_type: "returns",
+    status: "canceled",
+    related_po: "PO-2026-0055",
+    created_at: "2026-07-04 11:15 AM",
+    supplier_name: "Stanbic Supplies Ltd",
+    destination_location: "Supplier Location",
+    has_backorder: false,
+    items: [
+      {
+        id: "1",
+        product_name: "Office Chairs",
+        unit_symbol: "Pieces",
+        expected_quantity: 10,
+        received_quantity: 0,
+      },
+    ],
+  },
+];
+
+export default function IncomingProductDetailPage() {
+  const params = useParams();
+  const id = (params?.id as string) || "WH-IN-0001";
+
+  const dummyData = DUMMY_DATA_LIST.find((d) => d.incoming_product_id === id) || {
+    incoming_product_id: id,
+    receipt_type: "vendor_receipt",
+    status: "draft",
+    related_po: "PO-2026-0999",
+    created_at: "2026-07-28 08:00 AM",
+    supplier_name: "Generic Supplier",
+    destination_location: "Main Warehouse - Site A",
+    has_backorder: false,
+    items: [
+      {
+        id: "1",
+        product_name: "Generic Item",
+        unit_symbol: "Units",
+        expected_quantity: 100,
+        received_quantity: 0,
+      }
     ],
   };
 
@@ -72,7 +119,6 @@ export default function IncomingProductDetailPage() {
 
   return (
     <PageGuard application="inventory" module="incomingproduct">
-      {/* Two-tone: gray page canvas */}
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           {/* Breadcrumbs */}
@@ -97,18 +143,20 @@ export default function IncomingProductDetailPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-semibold text-[#32325D]">
-                    Goods Receipt Note: {dummyData.incoming_product_id}
+                    Receipt: {dummyData.incoming_product_id}
                   </h1>
                   <span
                     className={`inline-block px-3 py-1 text-xs rounded-full font-semibold capitalize ${
                       dummyData.status === "validated"
                         ? "bg-[#E2F2E9] text-[#2BA24D]"
+                        : dummyData.status === "canceled"
+                        ? "bg-[#FCE8E6] text-[#C5221F]"
                         : "bg-[#E8F0FE] text-[#1A73E8]"
                     }`}
                   >
                     {dummyData.status}
                   </span>
-                  {dummyData.has_backorder && (
+                  {dummyData.has_backorder && dummyData.backorder_id && (
                     <span className="inline-block px-3 py-1 text-xs rounded-full font-semibold bg-amber-100 text-amber-800">
                       Backorder: {dummyData.backorder_id}
                     </span>
@@ -125,54 +173,40 @@ export default function IncomingProductDetailPage() {
               {dummyData.status === "draft" && (
                 <Link href={`/inventory/operation/incoming_product/edit/${id}`}>
                   <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                    <Edit className="w-4 h-4 mr-1.5" /> Edit GRN Draft
+                    <Edit className="w-4 h-4 mr-1.5" /> Confirm Quantities
                   </Button>
                 </Link>
               )}
               {dummyData.status === "validated" && (
-                <Link href={`/inventory/operation/incoming_product/return/${id}`}>
+                <Link href={`/inventory/operation/supplier_return/new`}>
                   <Button variant="outline" className="border-red-300 text-[#E43D2B] hover:bg-red-50 h-9 px-4 rounded-md font-medium text-sm transition-all">
-                    <RotateCcw className="w-4 h-4 mr-1.5" /> Process Supplier Return
+                    <RotateCcw className="w-4 h-4 mr-1.5" /> Return to Supplier
                   </Button>
                 </Link>
               )}
             </div>
           </div>
 
-          {/* 3-Way Match Audit Banner */}
-          {dummyData.three_way_match_status && (
-            <div className="p-4 rounded-lg border bg-amber-50/80 border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
-              <div className="flex items-center gap-3">
-                <div className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-full font-bold text-[11px] tracking-wide shrink-0">
-                  3-WAY MATCH AUDIT
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-[#32325D]">
-                    Discrepancy Flagged: {dummyData.discrepancy_details}
-                  </h4>
-                  <p className="text-xs text-[#525F7F] mt-0.5">
-                    Automated comparison between Purchase Order ({dummyData.related_po}), Supplier Delivery Note, and Physical Received Stock.
-                  </p>
-                </div>
-              </div>
-              <span className="px-3 py-1 bg-[#FCE8E6] text-[#E43D2B] font-semibold text-xs rounded-full border border-[#E43D2B]/20 capitalize self-start sm:self-auto">
-                {dummyData.three_way_match_status.replace(/_/g, " ").toLowerCase()}
-              </span>
-            </div>
-          )}
-
           {/* Summary Metadata Card */}
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6">
             <h2 className="text-base font-semibold text-[#32325D] mb-4 pb-3 border-b border-gray-100">
-              Receipt Summary Details
+              Receipt Details
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
               <div>
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
                   Receipt ID
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
                   {dummyData.incoming_product_id}
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
+                  Receipt Type
+                </span>
+                <span className="text-[#32325D] font-semibold text-sm capitalize">
+                  {dummyData.receipt_type.replace(/_/g, " ")}
                 </span>
               </div>
               <div>
@@ -199,12 +233,6 @@ export default function IncomingProductDetailPage() {
                   {dummyData.destination_location}
                 </span>
               </div>
-              <div className="sm:col-span-2 lg:col-span-4 border-t border-gray-100 pt-4">
-                <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
-                  Inspection Notes
-                </span>
-                <span className="text-[#525F7F] font-normal text-sm">{dummyData.notes}</span>
-              </div>
             </div>
           </div>
 
@@ -212,7 +240,7 @@ export default function IncomingProductDetailPage() {
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
             <div className="p-5 border-b border-gray-100">
               <h2 className="text-base font-semibold text-[#32325D]">
-                Received Product Lines & 3-Way Match Verification
+                Product Lines
               </h2>
             </div>
             <div className="overflow-x-auto">
@@ -223,25 +251,13 @@ export default function IncomingProductDetailPage() {
                       Product Name
                     </TableHead>
                     <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
-                      Unit
+                      Unit of Measure
                     </TableHead>
                     <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
-                      PO Qty
+                      Expected Quantity
                     </TableHead>
                     <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
-                      Received Qty
-                    </TableHead>
-                    <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-right">
-                      PO Unit Price
-                    </TableHead>
-                    <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-right">
-                      Invoice Unit Price
-                    </TableHead>
-                    <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
-                      Accepted Qty
-                    </TableHead>
-                    <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
-                      3-Way Match Status
+                      Quantity Received
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -258,36 +274,10 @@ export default function IncomingProductDetailPage() {
                         {item.unit_symbol}
                       </TableCell>
                       <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap text-center">
-                        {item.po_quantity}
+                        {item.expected_quantity}
                       </TableCell>
                       <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap text-center">
                         {item.received_quantity}
-                      </TableCell>
-                      <TableCell className="text-[#525F7F] font-mono text-sm py-3.5 px-6 whitespace-nowrap text-right">
-                        ₦{item.po_unit_price.toLocaleString()}
-                      </TableCell>
-                      <TableCell
-                        className={`font-mono font-semibold text-sm py-3.5 px-6 whitespace-nowrap text-right ${
-                          item.invoice_unit_price !== item.po_unit_price
-                            ? "text-[#E43D2B]"
-                            : "text-[#32325D]"
-                        }`}
-                      >
-                        ₦{item.invoice_unit_price.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-[#2BA24D] font-bold text-sm py-3.5 px-6 whitespace-nowrap text-center">
-                        {item.accepted_quantity}
-                      </TableCell>
-                      <TableCell className="py-3.5 px-6 whitespace-nowrap text-center">
-                        <span
-                          className={`inline-block px-3 py-1 text-xs rounded-full font-semibold ${
-                            item.match_status === "Verified"
-                              ? "bg-[#E2F2E9] text-[#2BA24D]"
-                              : "bg-[#FCE8E6] text-[#E43D2B]"
-                          }`}
-                        >
-                          {item.match_status}
-                        </span>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -2,21 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./StatusPill";
 import { StockAdjustmentRow as StockAdjustmentRowType } from "../types";
 
 interface StockAdjustmentRowProps {
   request: StockAdjustmentRowType;
-  isSelected: boolean;
-  onToggleSelect: (id: string) => void;
 }
 
 export function StockAdjustmentRow({
   request,
-  isSelected,
-  onToggleSelect,
 }: StockAdjustmentRowProps) {
   const router = useRouter();
 
@@ -24,14 +20,12 @@ export function StockAdjustmentRow({
     router.push(`/inventory/operation/scrap/${request.id}`);
   };
 
-  const handleCheckboxChange = (checked: boolean) => {
-    onToggleSelect(request.id);
-  };
+
 
   return (
     <motion.div
       className={cn(
-        "grid grid-cols-[48px_1fr_1fr_1fr_1fr_0.5fr] items-center px-4 py-4 text-sm text-slate-700 border-b hover:bg-gray-50 focus-within:bg-gray-50 cursor-pointer",
+        "grid grid-cols-[1fr_1fr_1fr_1fr_0.5fr] items-center px-4 py-4 text-sm text-slate-700 border-b hover:bg-gray-50 focus-within:bg-gray-50 cursor-pointer",
         ""
       )}
       role="row"
@@ -42,14 +36,7 @@ export function StockAdjustmentRow({
       }}
       whileTap={{ scale: 0.995 }}
     >
-      <div className="flex items-center">
-        <Checkbox
-          id={`cb-${request.id}`}
-          checked={isSelected}
-          onCheckedChange={handleCheckboxChange}
-          className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700 transition-all duration-200"
-        />
-      </div>
+
 
       <div className="truncate">
         <motion.div

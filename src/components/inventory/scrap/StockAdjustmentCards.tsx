@@ -20,7 +20,7 @@ function StockAdjustmentCard({ request, index }: StockAdjustmentCardProps) {
   const router = useRouter();
 
   const handleCardClick = () => {
-    router.push(`/inventory/stocks/adjustment/${request.id}`);
+    router.push(`/inventory/operation/scrap/${request.id}`);
   };
 
   return (
@@ -56,9 +56,9 @@ function StockAdjustmentCard({ request, index }: StockAdjustmentCardProps) {
 
         <CardContent>
           <div className="space-y-3">
-            {/* Adjustment Type */}
+            {/* Cause */}
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Type:</span>
+              <span className="text-sm text-gray-600">Cause:</span>
               <span className="text-sm font-medium text-gray-900">
                 {request.adjustmentType}
               </span>

@@ -144,8 +144,8 @@ export default function StockMovesPage() {
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
-    { label: "Stocks", href: "/inventory/stocks" },
-    { label: "Stock Moves", href: "/inventory/stocks/stock-moves", current: true },
+
+    { label: "Inventory Ledger", href: "/inventory/stocks/stock-moves", current: true },
   ];
 
   const transactionTypes = ["ALL", "Receipt", "Consumption", "Scrap", "Adjustment", "Return"];
@@ -174,7 +174,7 @@ export default function StockMovesPage() {
       breadcrumbs={items}
     >
       <InventoryListHeader
-        title="Stock Moves"
+        title="Inventory Ledger"
         query={query}
         onQueryChange={setQuery}
         searchPlaceholder="Search by ID, item, PO/Ref doc, or WBS Phase..."

@@ -1,39 +1,34 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
 
-export interface InventoryUnitOfMeasure {
-  id?: number;
+export interface ProductCategory {
+  id: number;
   url: string;
-  unit_name: string;
-  unit_symbol: string;
-  unit_category: string;
-  created_on?: string;
-  is_active?: boolean;
-  is_hidden?: boolean;
-  [key: string]: any;
+  category_name: string;
+  description: string;
+  is_active: boolean;
+  is_hidden: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface GetInventoryUnitOfMeasureParams {
+export interface GetProductCategoryParams {
   search?: string;
   [key: string]: any;
 }
 
-export interface CreateInventoryUnitOfMeasureRequest {
-  unit_name: string;
-  unit_symbol: string;
-  unit_category: string;
+export interface CreateProductCategoryRequest {
+  category_name: string;
+  description: string;
   is_active?: boolean;
   is_hidden?: boolean;
-  [key: string]: any;
 }
 
-export interface UpdateInventoryUnitOfMeasureRequest {
-  unit_name?: string;
-  unit_symbol?: string;
-  unit_category?: string;
+export interface UpdateProductCategoryRequest {
+  category_name?: string;
+  description?: string;
   is_active?: boolean;
   is_hidden?: boolean;
-  [key: string]: any;
 }
 
 const getTenantBaseUrl = (state: RootState): string => {
@@ -43,9 +38,9 @@ const getTenantBaseUrl = (state: RootState): string => {
   return `https://${tenantSchemaName}.${apiDomain}`;
 };
 
-export const inventoryUnitOfMeasureApi = createApi({
-  reducerPath: "inventoryUnitOfMeasureApi",
-  tagTypes: ["InventoryUnitOfMeasure"],
+export const productCategoryApi = createApi({
+  reducerPath: "productCategoryApi",
+  tagTypes: ["ProductCategory"],
   baseQuery: async (args, api) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -116,79 +111,89 @@ export const inventoryUnitOfMeasureApi = createApi({
     }
   },
   endpoints: (builder) => ({
-    getInventoryUnitOfMeasures: builder.query<
-      InventoryUnitOfMeasure[],
-      GetInventoryUnitOfMeasureParams
+    getProductCategories: builder.query<
+      ProductCategory[],
+      GetProductCategoryParams | void
     >({
       query: (params) => ({
-        url: "/inventory/unit-of-measure/",
-        params,
+        url: "/inventory/product-categories/",
+        params: params || {},
       }),
-      providesTags: ["InventoryUnitOfMeasure"],
+      providesTags: ["ProductCategory"],
     }),
-    getInventoryUnitOfMeasure: builder.query<
-      InventoryUnitOfMeasure,
-      number | string
-    >({
-      query: (id) => `/inventory/unit-of-measure/${id}/`,
-      providesTags: (result, error, id) => [
-        { type: "InventoryUnitOfMeasure", id },
-      ],
+    getProductCategory: builder.query<ProductCategory, number | string>({
+      query: (id) => `/inventory/product-categories/${id}/`,
+      providesTags: (result, error, id) => [{ type: "ProductCategory", id }],
     }),
-    createInventoryUnitOfMeasure: builder.mutation<
-      InventoryUnitOfMeasure,
-      CreateInventoryUnitOfMeasureRequest
+    createProductCategory: builder.mutation<
+      ProductCategory,
+      CreateProductCategoryRequest
     >({
       query: (body) => ({
-        url: "/inventory/unit-of-measure/",
+        url: "/inventory/product-categories/",
         method: "POST",
         body,
       }),
-      invalidatesTags: ["InventoryUnitOfMeasure"],
+      invalidatesTags: ["ProductCategory"],
     }),
-    updateInventoryUnitOfMeasure: builder.mutation<
-      InventoryUnitOfMeasure,
-      { id: number | string; data: UpdateInventoryUnitOfMeasureRequest }
+    updateProductCategory: builder.mutation<
+      ProductCategory,
+      { id: number | string; data: UpdateProductCategoryRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/unit-of-measure/${id}/`,
+        url: `/inventory/product-categories/${id}/`,
         method: "PUT",
         body: data,
       }),
       invalidatesTags: (result, error, { id }) => [
-        { type: "InventoryUnitOfMeasure", id },
-        "InventoryUnitOfMeasure",
+        { type: "ProductCategory", id },
+        "ProductCategory",
       ],
     }),
-    patchInventoryUnitOfMeasure: builder.mutation<
-      InventoryUnitOfMeasure,
-      { id: number | string; data: UpdateInventoryUnitOfMeasureRequest }
+    patchProductCategory: builder.mutation<
+      ProductCategory,
+      { id: number | string; data: UpdateProductCategoryRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/unit-of-measure/${id}/`,
+        url: `/inventory/product-categories/${id}/`,
         method: "PATCH",
         body: data,
       }),
       invalidatesTags: (result, error, { id }) => [
-        { type: "InventoryUnitOfMeasure", id },
-        "InventoryUnitOfMeasure",
+        { type: "ProductCategory", id },
+        "ProductCategory",
       ],
     }),
-    deleteInventoryUnitOfMeasure: builder.mutation<void, number | string>({
+    deleteProductCategory: builder.mutation<void, number | string>({
       query: (id) => ({
-        url: `/inventory/unit-of-measure/${id}/`,
+        url: `/inventory/product-categories/${id}/`,
         method: "DELETE",
       }),
-      invalidatesTags: ["InventoryUnitOfMeasure"],
+      invalidatesTags: ["ProductCategory"],
+    }),
+    toggleHiddenStatus: builder.mutation<
+      ProductCategory,
+      { id: number | string; data: UpdateProductCategoryRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/inventory/product-categories/${id}/toggle_hidden_status/`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProductCategory", id },
+        "ProductCategory",
+      ],
     }),
   }),
 });
 
 export const {
-  useGetInventoryUnitOfMeasuresQuery,
-  useGetInventoryUnitOfMeasureQuery,
-  useCreateInventoryUnitOfMeasureMutation,
-  useUpdateInventoryUnitOfMeasureMutation,
-  usePatchInventoryUnitOfMeasureMutation,
-  useDeleteInventoryUnitOfMeasureMutation,
-} = inventoryUnitOfMeasureApi;
+  useGetProductCategoriesQuery,
+  useGetProductCategoryQuery,
+  useCreateProductCategoryMutation,
+  useUpdateProductCategoryMutation,
+  usePatchProductCategoryMutation,
+  useDeleteProductCategoryMutation,
+  useToggleHiddenStatusMutation,
+} = productCategoryApi;

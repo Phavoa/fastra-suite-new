@@ -17,136 +17,123 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
-
 const DUMMY_CONSUMPTION_REQUESTS = [
   {
-    id: "REQ-2026-0142",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "Superstructure",
+    id: "MC-2026-0142",
     wbsActivity: "First Floor Slab Reinforcement",
     requester: "Eng. John Doe (Site Engineer)",
-    totalCost: 10200000,
+    requestDate: "2026-07-28",
+    numberOfItems: 5,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0143",
-    project: "Project #2 - Site B Infrastructure",
-    wbsPhase: "Substructure / Foundation",
+    id: "MC-2026-0143",
     wbsActivity: "Drainage Trench Concrete",
     requester: "Eng. Jane Smith (Site Supervisor)",
-    totalCost: 1375000,
+    requestDate: "2026-07-27",
+    numberOfItems: 12,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0189",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "Substructure / Foundation",
+    id: "MC-2026-0189",
     wbsActivity: "Retaining Wall Concrete Pour",
     requester: "Eng. Samuel (Site Supervisor)",
-    totalCost: 4850000,
+    requestDate: "2026-07-26",
+    numberOfItems: 8,
     status: "held_overrun",
     queue: "overrun",
     isOverrun: true,
   },
   {
-    id: "REQ-2026-0192",
-    project: "Project #3 - Victoria Island Office Tower",
-    wbsPhase: "MEP / Electrical",
+    id: "MC-2026-0192",
     wbsActivity: "Main Switchboard Cabling",
     requester: "Eng. Chinedu (Electrical Lead)",
-    totalCost: 6200000,
+    requestDate: "2026-07-25",
+    numberOfItems: 3,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0195",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "External Works",
+    id: "MC-2026-0195",
     wbsActivity: "Perimeter Interlocking Paving",
     requester: "Eng. John Doe (Site Engineer)",
-    totalCost: 3800000,
+    requestDate: "2026-07-24",
+    numberOfItems: 25,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0198",
-    project: "Project #2 - Site B Infrastructure",
-    wbsPhase: "Superstructure",
+    id: "MC-2026-0198",
     wbsActivity: "Steel Columns Erection",
     requester: "Eng. David (Structural Engineer)",
-    totalCost: 14500000,
+    requestDate: "2026-07-23",
+    numberOfItems: 2,
     status: "held_overrun",
     queue: "overrun",
     isOverrun: true,
   },
   {
-    id: "REQ-2026-0201",
-    project: "Project #3 - Victoria Island Office Tower",
-    wbsPhase: "Finishing",
+    id: "MC-2026-0201",
     wbsActivity: "Drywall Partitions Level 4",
     requester: "Eng. Tunde (Finishing Lead)",
-    totalCost: 5100000,
+    requestDate: "2026-07-22",
+    numberOfItems: 15,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0205",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "Finishing",
+    id: "MC-2026-0205",
     wbsActivity: "Ground Floor Tiling & Mortar",
     requester: "Eng. Samuel (Site Supervisor)",
-    totalCost: 5300000,
+    requestDate: "2026-07-21",
+    numberOfItems: 10,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0208",
-    project: "Project #2 - Site B Infrastructure",
-    wbsPhase: "MEP / Plumbing",
+    id: "MC-2026-0208",
     wbsActivity: "Underground Soil & Waste Piping",
     requester: "Eng. Jane Smith (Site Supervisor)",
-    totalCost: 3950000,
+    requestDate: "2026-07-20",
+    numberOfItems: 7,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0211",
-    project: "Project #3 - Victoria Island Office Tower",
-    wbsPhase: "Roofing & Waterproofing",
+    id: "MC-2026-0211",
     wbsActivity: "Terrace Waterproofing Membrane",
     requester: "Eng. Chinedu (Electrical Lead)",
-    totalCost: 3450000,
+    requestDate: "2026-07-19",
+    numberOfItems: 4,
     status: "held_overrun",
     queue: "overrun",
     isOverrun: true,
   },
   {
-    id: "REQ-2026-0215",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "External Works",
+    id: "MC-2026-0215",
     wbsActivity: "Site Access Road Asphalt",
     requester: "Eng. John Doe (Site Engineer)",
-    totalCost: 8700000,
+    requestDate: "2026-07-18",
+    numberOfItems: 6,
     status: "pending",
     queue: "normal",
     isOverrun: false,
   },
   {
-    id: "REQ-2026-0218",
-    project: "Project #2 - Site B Infrastructure",
-    wbsPhase: "Substructure / Foundation",
+    id: "MC-2026-0218",
     wbsActivity: "Pile Cap Reinforcement",
     requester: "Eng. David (Structural Engineer)",
-    totalCost: 16800000,
+    requestDate: "2026-07-17",
+    numberOfItems: 14,
     status: "pending",
     queue: "normal",
     isOverrun: false,
@@ -159,9 +146,12 @@ const STATUS_TABS = [
   { label: "Overrun Queue (Action Req.)", value: "overrun" },
 ];
 
+import { useRouter } from "next/navigation";
+
 const ITEMS_PER_PAGE = 10;
 
 export default function MaterialConsumptionApprovalsPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -175,8 +165,6 @@ export default function MaterialConsumptionApprovalsPage() {
       const matchesSearch =
         !query ||
         item.id.toLowerCase().includes(lowerQuery) ||
-        item.project.toLowerCase().includes(lowerQuery) ||
-        item.wbsPhase.toLowerCase().includes(lowerQuery) ||
         item.wbsActivity.toLowerCase().includes(lowerQuery) ||
         item.requester.toLowerCase().includes(lowerQuery);
 
@@ -251,9 +239,6 @@ export default function MaterialConsumptionApprovalsPage() {
               </div>
 
               <div className="flex items-center gap-3 self-end sm:self-auto">
-                <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                  New Consumption Requisition
-                </Button>
               </div>
             </div>
 
@@ -286,22 +271,22 @@ export default function MaterialConsumptionApprovalsPage() {
                 <TableHeader>
                   <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
                     <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                      REQUISITION ID
+                      REQUEST ID
                     </TableHead>
                     <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                      PROJECT
+                      WBS ACTIVITY
                     </TableHead>
                     <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                      WBS ALLOCATION
+                      REQUESTED BY
                     </TableHead>
                     <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                      REQUESTER
-                    </TableHead>
-                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-right">
-                      TOTAL VALUATION
+                      REQUEST DATE
                     </TableHead>
                     <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-center">
-                      STATUS
+                      NUMBER OF ITEMS
+                    </TableHead>
+                    <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-center">
+                      RELEASE STATUS
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -319,24 +304,21 @@ export default function MaterialConsumptionApprovalsPage() {
                     paginatedRequests.map((req) => (
                       <TableRow
                         key={req.id}
-                        className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors"
+                        className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/inventory/operation/material-consumption/${req.id}`)}
                       >
                         <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
                           <Link
                             href={`/inventory/operation/material-consumption/${req.id}`}
                             className="text-[#3B7CED] hover:underline"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {req.id}
                           </Link>
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
                           <span className="text-[#32325D] text-sm font-medium">
-                            {req.project}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-4 py-3.5">
-                          <span className="text-[#525F7F] text-sm">
-                            {req.wbsPhase} → {req.wbsActivity}
+                            {req.wbsActivity}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
@@ -344,8 +326,13 @@ export default function MaterialConsumptionApprovalsPage() {
                             {req.requester}
                           </span>
                         </TableCell>
-                        <TableCell className="px-4 py-3.5 text-right font-semibold text-[#32325D] text-sm">
-                          ₦{req.totalCost.toLocaleString()}
+                        <TableCell className="px-4 py-3.5">
+                          <span className="text-[#525F7F] text-sm">
+                            {req.requestDate}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-center font-semibold text-[#32325D] text-sm">
+                          {req.numberOfItems}
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-center">
                           <span

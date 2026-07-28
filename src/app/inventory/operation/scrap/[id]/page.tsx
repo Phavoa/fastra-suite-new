@@ -22,12 +22,20 @@ export default function ScrapDetailPage() {
   const params = useParams();
   const id = (params?.id as string) || "WH-SCRAP-0001";
 
+  let status = "done";
+  if (id === "WH-SC-0002" || id === "WH-SC-0005" || id === "WH-SC-0009" || id === "WH-SC-0011") {
+    status = "draft";
+  } else if (id === "WH-SC-0003" || id === "WH-SC-0007" || id === "WH-SC-0012") {
+    status = "canceled";
+  }
+
   const dummyData = {
     id: id,
     cause: "Damage / Spoilage",
-    warehouse_location: "Main Warehouse - Site A (WH-MAIN)",
+    project: "Project Alpha",
+    warehouse_location: "Main Warehouse - Site A",
     date: "2026-06-28",
-    status: "done",
+    status: status,
     notes: "Bags punctured by forklift during offloading operations.",
     recorded_by: "Site Storekeeper",
     items: [
@@ -126,6 +134,14 @@ export default function ScrapDetailPage() {
               </div>
               <div>
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
+                  Project
+                </span>
+                <span className="text-[#32325D] font-semibold text-sm">
+                  {dummyData.project}
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
                   Location
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
@@ -142,7 +158,7 @@ export default function ScrapDetailPage() {
               </div>
               <div className="sm:col-span-2 lg:col-span-4 border-t border-gray-100 pt-4">
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
-                  Explanation / Notes
+                  Notes
                 </span>
                 <span className="text-[#525F7F] font-normal text-sm">{dummyData.notes}</span>
               </div>

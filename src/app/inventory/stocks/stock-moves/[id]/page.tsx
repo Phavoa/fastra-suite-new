@@ -63,8 +63,8 @@ export default function StockMoveDetailPage() {
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
-    { label: "Stocks", href: "/inventory/stocks" },
-    { label: "Stock Moves", href: "/inventory/stocks/stock-moves" },
+
+    { label: "Inventory Ledger", href: "/inventory/stocks/stock-moves" },
     { label: `Move ${id}`, href: `/inventory/stocks/stock-moves/${id}`, current: true },
   ];
 

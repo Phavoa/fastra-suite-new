@@ -70,18 +70,6 @@ export default function EditLabourRequestPage() {
   const [patchLabourRequest, { isLoading: isPatching }] =
     usePatchLabourRequestMutation();
 
-  const [statusModal, setStatusModal] = useState<{
-    isOpen: boolean;
-    type: "success" | "error";
-    title: string;
-    description: string;
-  }>({
-    isOpen: false,
-    type: "success",
-    title: "",
-    description: "",
-  });
-
   const handleSubmit = async (data: FormValues) => {
     try {
       const ensureValidUUID = (val: string): string => {
@@ -111,32 +99,16 @@ export default function EditLabourRequestPage() {
         activity: ensureValidUUID(data.task),
       };
 
+      const targetLabourRequestId = request?.detail?.id || id;
+
       // Prefer PATCH for partial updates
-      await patchLabourRequest({ id, data: submitData }).unwrap();
+      await patchLabourRequest({ id: targetLabourRequestId, data: submitData }).unwrap();
 
       const refetchResult = await refetch();
-      const updatedId = refetchResult.data?.detail?.id || refetchResult.data?.id || id;
-
-      setStatusModal({
-        isOpen: true,
-        type: "success",
-        title: "Request Updated",
-        description: "Your labour request has been updated successfully.",
-      });
-
-      setTimeout(() => {
-        router.push(`/project-request/labour-request/${updatedId}`);
-      }, 2000);
+      const updatedId = refetchResult.data?.id || id;
     } catch (error) {
       console.error("Failed to update labour request:", error);
-      const errorMessage = extractErrorMessage(error);
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        title: "Error",
-        description:
-          errorMessage || "Failed to update labour request. Please try again.",
-      });
+      throw error;
     }
   };
 
@@ -312,8 +284,8 @@ export default function EditLabourRequestPage() {
     schema: formSchema,
     defaultValues: {
       project:
+        request?.project?.toString() ||
         request?.project_request?.project?.toString() ||
-        (request as any)?.project?.toString() ||
         "",
       numberOfWorkers:
         request?.detail?.number_of_workers ??
@@ -334,8 +306,8 @@ export default function EditLabourRequestPage() {
         request?.detail?.justification_notes ||
         (request as any)?.justification_notes ||
         "",
-      phase: "1",
-      task: "1",
+      phase: "",
+      task: request?.activity?.toString() || (request as any)?.activity?.toString() || "",
     },
     onSubmit: handleSubmit,
     successMessage: {
@@ -348,17 +320,5 @@ export default function EditLabourRequestPage() {
     },
   };
 
-  return (
-    <>
-      <RequestForm config={config} />
-
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
-        type={statusModal.type}
-        title={statusModal.title}
-        message={statusModal.description}
-      />
-    </>
-  );
+  return <RequestForm config={config} />;
 }

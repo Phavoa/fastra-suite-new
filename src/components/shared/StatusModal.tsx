@@ -135,7 +135,7 @@ export function StatusModal({
               {title}
             </DialogTitle>
 
-            <DialogDescription className="text-sm font-medium text-gray-500 mt-2 leading-relaxed">
+            <DialogDescription className="text-sm font-medium text-gray-500 mt-2 leading-relaxed whitespace-pre-line">
               {message}
             </DialogDescription>
           </div>

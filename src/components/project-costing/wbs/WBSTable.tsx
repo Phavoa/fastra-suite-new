@@ -5,6 +5,7 @@ import { Maximize2, Minimize2, Plus } from "lucide-react";
 import {
   Table,
   TableBody,
+  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -80,20 +81,20 @@ export function WBSTable({
           };
         }
         return p;
-      })
+      }),
     );
   };
 
   const updatePhaseName = (phaseId: string, name: string) => {
     setPhases((prev) =>
-      prev.map((p) => (p.id === phaseId ? { ...p, name } : p))
+      prev.map((p) => (p.id === phaseId ? { ...p, name } : p)),
     );
   };
 
   const updateActivity = (
     phaseId: string,
     activityId: string,
-    updates: Partial<Activity>
+    updates: Partial<Activity>,
   ) => {
     setPhases((prev) =>
       prev.map((p) => {
@@ -101,12 +102,12 @@ export function WBSTable({
           return {
             ...p,
             activities: p.activities.map((a) =>
-              a.id === activityId ? { ...a, ...updates } : a
+              a.id === activityId ? { ...a, ...updates } : a,
             ),
           };
         }
         return p;
-      })
+      }),
     );
   };
 
@@ -120,7 +121,7 @@ export function WBSTable({
           };
         }
         return p;
-      })
+      }),
     );
   };
 
@@ -133,9 +134,16 @@ export function WBSTable({
     if (!clean) return;
     const lowerClean = clean.toLowerCase();
     if (
-      ["sn", "s/n", "phase", "activity", "quantity", "rate", "amount", "budget"].includes(
-        lowerClean
-      )
+      [
+        "sn",
+        "s/n",
+        "phase",
+        "activity",
+        "quantity",
+        "rate",
+        "amount",
+        "budget",
+      ].includes(lowerClean)
     ) {
       alert("Cannot add a mandatory column name.");
       return;
@@ -158,7 +166,7 @@ export function WBSTable({
           delete copy[colName];
           return copy;
         }),
-      }))
+      })),
     );
   };
 
@@ -185,7 +193,7 @@ export function WBSTable({
       <div className="overflow-x-auto w-full">
         <Table className="min-w-[1100px] table-fixed">
           <colgroup>
-            <col className="w-[80px]" />
+            <col className="w-[120px]" />
             <col className="min-w-[300px]" />
             <col className="w-[100px]" />
             <col className="w-[130px]" />
@@ -197,8 +205,8 @@ export function WBSTable({
           </colgroup>
           <TableHeader className="bg-gray-50 border-b border-gray-200 sticky top-0 z-20 shadow-xs">
             <TableRow className="hover:bg-gray-50 border-0 bg-gray-50">
-              <TableHead className="font-semibold text-gray-600 py-3 pl-4 text-center sticky top-0 bg-gray-50 z-20">
-                S/N
+              <TableHead className="font-semibold text-gray-600 py-3 pl-4 text-left sticky top-0 bg-gray-50 z-20">
+                Phase / S/N
               </TableHead>
               <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
                 Activity
@@ -236,23 +244,50 @@ export function WBSTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {phases.map((phase) => (
-              <WBSPhaseRow
-                key={phase.id}
-                phase={phase}
-                phaseBudget={getPhaseBudget(phase)}
-                extraColumns={extraColumns}
-                onUpdatePhaseName={(name) => updatePhaseName(phase.id, name)}
-                onAddPhaseActivity={() => addPhaseActivity(phase.id)}
-                onUpdateActivity={(activityId, updates) =>
-                  updateActivity(phase.id, activityId, updates)
-                }
-                onRemoveActivity={(activityId) =>
-                  removeActivity(phase.id, activityId)
-                }
-                onRemovePhase={() => removePhase(phase.id)}
-              />
-            ))}
+            {phases.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6 + extraColumns.length}
+                  className="text-center py-16 text-gray-400 bg-gray-50/20 border-b border-gray-100"
+                >
+                  <div className="flex flex-col items-center justify-center text-center gap-1.5 py-4 w-full">
+                    <p className="text-sm font-semibold text-gray-500 text-center">
+                      No WBS phases added yet
+                    </p>
+                    <p className="text-xs text-gray-400 max-w-md mx-auto text-center leading-relaxed">
+                      Click{" "}
+                      <strong className="text-[#3B7CED]">Add a Phase</strong>{" "}
+                      below to build the structure manually
+                    </p>
+                    <p className="text-xs text-gray-400 max-w-md mx-auto text-center leading-relaxed -mt-2">
+                      or{" "}
+                      <strong className="text-[#3B7CED]">
+                        Import WBS Excel
+                      </strong>{" "}
+                      button above to populate it from a spreadsheet.
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              phases.map((phase) => (
+                <WBSPhaseRow
+                  key={phase.id}
+                  phase={phase}
+                  phaseBudget={getPhaseBudget(phase)}
+                  extraColumns={extraColumns}
+                  onUpdatePhaseName={(name) => updatePhaseName(phase.id, name)}
+                  onAddPhaseActivity={() => addPhaseActivity(phase.id)}
+                  onUpdateActivity={(activityId, updates) =>
+                    updateActivity(phase.id, activityId, updates)
+                  }
+                  onRemoveActivity={(activityId) =>
+                    removeActivity(phase.id, activityId)
+                  }
+                  onRemovePhase={() => removePhase(phase.id)}
+                />
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

@@ -251,11 +251,18 @@ export function RequestForm<T extends Record<string, any>>({
     formState: { errors, isSubmitting },
     watch,
     reset,
+    setValue,
   } = useForm<T>({
     resolver: zodResolver(config.schema as any),
     defaultValues: config.defaultValues as any,
     mode: "onBlur",
   });
+
+  React.useEffect(() => {
+    if (config.defaultValues) {
+      reset(config.defaultValues as any);
+    }
+  }, [config.defaultValues, reset]);
 
   const currentValues = watch();
   const projectedCost = config.calculateProjectedCost
@@ -312,6 +319,19 @@ export function RequestForm<T extends Record<string, any>>({
   };
 
   const wbsList = activeProject ? buildWbsListHelper(activeProject) : [];
+
+  // Auto-detect phase from selected activity if phase is not set yet
+  React.useEffect(() => {
+    if (taskVal && !phaseVal && wbsList.length > 0) {
+      const matchingAct = wbsList.find(
+        (w: any) => w.is_activity && String(w.id) === String(taskVal)
+      );
+      if (matchingAct && matchingAct.parent) {
+        setValue("phase" as any, String(matchingAct.parent) as any);
+      }
+    }
+  }, [taskVal, phaseVal, wbsList, setValue]);
+
   const selectedActivity = wbsList.find((w: any) => String(w.id) === String(taskVal) && w.is_activity);
 
   let availableBudgetAmount = 0;
@@ -525,6 +545,10 @@ export function RequestForm<T extends Record<string, any>>({
                               if (phaseVal) {
                                 options = wbsList
                                   .filter((w: any) => w.is_activity && String(w.parent) === String(phaseVal))
+                                  .map((w: any) => ({ label: w.name, value: String(w.id) }));
+                              } else {
+                                options = wbsList
+                                  .filter((w: any) => w.is_activity)
                                   .map((w: any) => ({ label: w.name, value: String(w.id) }));
                               }
                             }

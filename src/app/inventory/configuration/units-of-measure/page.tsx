@@ -32,7 +32,6 @@ const getStatusVariant = (status: string) => {
   switch (status?.toUpperCase()) {
     case "ACTIVE":
       return "validated";
-    case "HIDDEN":
     case "INACTIVE":
       return "rejected";
     default:
@@ -96,7 +95,7 @@ export default function UnitsOfMeasurePage() {
         symbolStr.includes(search.toLowerCase()) ||
         catStr.includes(search.toLowerCase());
 
-      const statusStr = u.is_hidden ? "HIDDEN" : "ACTIVE";
+      const statusStr = u.is_active !== false ? "ACTIVE" : "INACTIVE";
       const matchStatus =
         selectedStatus === "all" || statusStr === selectedStatus.toUpperCase();
       return matchQuery && matchStatus;
@@ -149,7 +148,7 @@ export default function UnitsOfMeasurePage() {
               {[
                 { label: "All Units", value: "all" },
                 { label: "Active", value: "ACTIVE" },
-                { label: "Hidden", value: "HIDDEN" },
+                { label: "Inactive", value: "INACTIVE" },
               ].map((tab) => {
                 const isSelected = selectedStatus === tab.value;
                 return (
@@ -205,7 +204,7 @@ export default function UnitsOfMeasurePage() {
                   {!isLoading &&
                     filteredUnits.map((u: any, idx: number) => {
                       const id = getUnitId(u, idx);
-                      const statusStr = u.is_hidden ? "HIDDEN" : "ACTIVE";
+                      const statusStr = u.is_active !== false ? "ACTIVE" : "INACTIVE";
                       return (
                         <TableRow
                           key={id}
