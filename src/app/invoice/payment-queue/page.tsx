@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Search, TriangleAlert, CircleCheck } from "lucide-react";
 
+import { useGetInvoicesQuery } from "@/api/invoice/invoicesApi";
+
 interface PaymentQueueItem {
   id: string;
   invoiceId: string;
@@ -12,106 +14,61 @@ interface PaymentQueueItem {
   dueDate: string;
   daysUntilDue: number;
   amount: string;
-  status: "Awaiting Approved" | "Approved" | "Paid";
+  status: string;
   flag: "check" | "warning";
 }
 
-const paymentQueueData: PaymentQueueItem[] = [
-  {
-    id: "1",
-    invoiceId: "BILL-2024-0041",
-    vendor: "xyz vendor",
-    invoiceDate: "2024-05-15",
-    dueDate: "2024-05-15",
-    daysUntilDue: 1,
-    amount: "N200,000",
-    status: "Awaiting Approved",
-    flag: "check",
-  },
-  {
-    id: "2",
-    invoiceId: "BILL-2024-0041",
-    vendor: "xyz vendor",
-    invoiceDate: "2024-05-15",
-    dueDate: "2024-05-15",
-    daysUntilDue: 1,
-    amount: "N200,000",
-    status: "Awaiting Approved",
-    flag: "warning",
-  },
-  {
-    id: "3",
-    invoiceId: "BILL-2024-0041",
-    vendor: "xyz vendor",
-    invoiceDate: "2024-05-15",
-    dueDate: "2024-05-15",
-    daysUntilDue: 2,
-    amount: "N200,000",
-    status: "Approved",
-    flag: "check",
-  },
-  {
-    id: "4",
-    invoiceId: "BILL-2024-0041",
-    vendor: "xyz vendor",
-    invoiceDate: "2024-05-15",
-    dueDate: "2024-05-15",
-    daysUntilDue: 5,
-    amount: "N200,000",
-    status: "Approved",
-    flag: "warning",
-  },
-  {
-    id: "5",
-    invoiceId: "BILL-2024-0041",
-    vendor: "xyz vendor",
-    invoiceDate: "2024-05-15",
-    dueDate: "2024-05-15",
-    daysUntilDue: 6,
-    amount: "N200,000",
-    status: "Paid",
-    flag: "check",
-  },
-  {
-    id: "6",
-    invoiceId: "BILL-2024-0041",
-    vendor: "xyz vendor",
-    invoiceDate: "2024-05-15",
-    dueDate: "2024-05-15",
-    daysUntilDue: 8,
-    amount: "N200,000",
-    status: "Paid",
-    flag: "check",
-  },
-];
+const getDaysUntilDue = (dueDate: string | null) => {
+  if (!dueDate) return 0;
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffTime = due.getTime() - now.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
-const statusStyles = {
-  "Awaiting Approved": "bg-yellow-100 text-yellow-700",
-  Approved: "bg-blue-100 text-blue-700",
-  Paid: "bg-green-100 text-green-700",
+const statusStyles: Record<string, string> = {
+  unpaid: "bg-yellow-100 text-yellow-700",
+  overdue: "bg-red-100 text-red-700",
+  paid: "bg-green-100 text-green-700",
+  partial: "bg-blue-100 text-blue-700",
+  cancelled: "bg-gray-100 text-gray-700",
 };
 
 export default function PaymentQueuePage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredData, setFilteredData] = useState(paymentQueueData);
+  const { data: invoices = [], isLoading } = useGetInvoicesQuery();
+
+  const paymentQueueData: PaymentQueueItem[] = React.useMemo(() => {
+    return invoices.map((inv) => {
+      const daysUntilDue = getDaysUntilDue(inv.due_date);
+      return {
+        id: inv.id,
+        invoiceId: inv.id,
+        vendor: inv.vendor_details?.vendor_name || "Unknown Vendor",
+        invoiceDate: inv.date_created ? new Date(inv.date_created).toISOString().split('T')[0] : "-",
+        dueDate: inv.due_date || "-",
+        daysUntilDue: daysUntilDue,
+        amount: inv.total_amount,
+        status: inv.status,
+        flag: daysUntilDue < 0 ? "warning" : "check",
+      };
+    });
+  }, [invoices]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value.toLowerCase();
-    setSearchTerm(term);
+    setSearchTerm(e.target.value);
+  };
 
-    if (!term) {
-      setFilteredData(paymentQueueData);
-      return;
-    }
-
-    const filtered = paymentQueueData.filter(
+  const filteredData = React.useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    if (!term) return paymentQueueData;
+    return paymentQueueData.filter(
       (item) =>
         item.invoiceId.toLowerCase().includes(term) ||
         item.vendor.toLowerCase().includes(term) ||
-        item.status.toLowerCase().includes(term),
+        item.status.toLowerCase().includes(term)
     );
-    setFilteredData(filtered);
-  };
+  }, [searchTerm, paymentQueueData]);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -207,7 +164,7 @@ export default function PaymentQueuePage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusStyles[item.status]}`}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${statusStyles[item.status?.toLowerCase()] || "bg-gray-100 text-gray-700"}`}
                     >
                       {item.status}
                     </span>
@@ -234,9 +191,16 @@ export default function PaymentQueuePage() {
         </div>
       </div>
 
-      <div className="mt-4 text-xs text-gray-400 text-center">
-        Showing {filteredData.length} of {paymentQueueData.length} entries
-      </div>
+      {isLoading && (
+        <div className="mt-4 text-center text-sm text-gray-500">
+          Loading invoices...
+        </div>
+      )}
+      {!isLoading && (
+        <div className="mt-4 text-xs text-gray-400 text-center">
+          Showing {filteredData.length} of {paymentQueueData.length} entries
+        </div>
+      )}
     </div>
   );
 }

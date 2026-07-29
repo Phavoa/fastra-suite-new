@@ -1,11 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useCreateVendorMutation } from "@/api/invoice/vendorsApi";
+import { useAddVendorBankAccountMutation } from "@/api/invoice/vendorBankAccountsApi";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 
 const schema = z.object({
   vendorName: z.string().min(1, "Vendor name is required"),
@@ -26,6 +29,14 @@ type FormData = z.infer<typeof schema>;
 
 export default function NewVendorPage() {
   const router = useRouter();
+  const [createVendor, { isLoading: isCreating }] = useCreateVendorMutation();
+  const [addBank, { isLoading: isAddingBank }] = useAddVendorBankAccountMutation();
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({ show: false, message: "", type: "success" });
+
   const {
     register,
     handleSubmit,
@@ -34,14 +45,65 @@ export default function NewVendorPage() {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = (data: FormData) => {
-    console.log("New Vendor:", data);
-    // TODO: API call
-    router.push("/invoice/vendor");
+  const onSubmit = async (data: FormData) => {
+    try {
+      const addressParts = [data.street, data.lga, data.state, data.country].filter(Boolean);
+      const address = addressParts.join(", ");
+
+      const vendorPayload = {
+        vendor_name: data.vendorName,
+        contact_name: data.contactName || "",
+        email: data.email || "",
+        phone_number: data.phone || "",
+        address: address,
+        vendor_type: "supplier",
+        status: "active",
+      };
+
+      const vendorResponse = await createVendor(vendorPayload).unwrap();
+
+      const hasBankDetails = data.bankAccountName || data.bankAccountNumber || data.bankName || data.branch;
+      if (hasBankDetails) {
+        const vendorId = (vendorResponse as any).id;
+        if (vendorId) {
+          const bankPayload = {
+            bank_account_name: data.bankAccountName || "",
+            bank_account_number: data.bankAccountNumber || "",
+            bank_name: data.bankName || "",
+            branch_code: data.branch || "",
+          };
+          await addBank({ id: vendorId, data: bankPayload }).unwrap();
+        }
+      }
+
+      setToast({
+        show: true,
+        message: "Vendor created successfully",
+        type: "success",
+      });
+      setTimeout(() => {
+        router.push("/invoice/vendor");
+      }, 1500);
+    } catch (err: any) {
+      setToast({
+        show: true,
+        message: err?.data?.message || err?.message || "Failed to create vendor",
+        type: "error",
+      });
+    }
   };
+
+  const isSubmitting = isCreating || isAddingBank;
 
   return (
     <div className="p-6 space-y-6">
+      <ToastNotification
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+      />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -79,7 +141,7 @@ export default function NewVendorPage() {
 
             <div className="flex flex-col items-end justify-end">
               <p className="text-sm text-gray-500">Vendor Code</p>
-              <p className="font-medium text-gray-900 mt-1">VEN-2024-0041</p>
+              <p className="font-medium text-gray-900 mt-1">Generated Automatically</p>
             </div>
           </div>
         </div>
@@ -97,7 +159,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("contactName")}
-                placeholder="Enter your company website here"
+                placeholder="Enter contact name here"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -107,7 +169,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("email")}
-                placeholder="Enter your email here"
+                placeholder="Enter email here"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -117,7 +179,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("phone")}
-                placeholder="Enter your company phone number"
+                placeholder="Enter company phone number"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -135,7 +197,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("street")}
-                placeholder="Enter your Street & number"
+                placeholder="Enter Street & number"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -145,7 +207,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("lga")}
-                placeholder="Enter your company phone number"
+                placeholder="Enter local government"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -155,7 +217,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("state")}
-                placeholder="Enter your state"
+                placeholder="Enter state"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -165,7 +227,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("country")}
-                placeholder="Enter your country"
+                placeholder="Enter country"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -185,7 +247,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("bankAccountName")}
-                placeholder="Enter your company website here"
+                placeholder="Enter account name"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -195,7 +257,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("bankAccountNumber")}
-                placeholder="Enter your email here"
+                placeholder="Enter account number"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -205,7 +267,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("bankName")}
-                placeholder="Enter your company phone number"
+                placeholder="Enter bank name"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -215,7 +277,7 @@ export default function NewVendorPage() {
               </label>
               <input
                 {...register("branch")}
-                placeholder="Enter your company website here"
+                placeholder="Enter branch code"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -226,9 +288,10 @@ export default function NewVendorPage() {
         <div className="flex justify-end pt-4">
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            disabled={isSubmitting}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-8 py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
-            Save
+            {isSubmitting ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

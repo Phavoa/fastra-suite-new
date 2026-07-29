@@ -11,14 +11,25 @@ import {
 } from "@/components/ui/select";
 import * as Dialog from "@radix-ui/react-dialog";
 
+import { useGetCompanyBankAccountsQuery } from "@/api/invoice/companyBankAccountsApi";
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (bankAccountId: string) => void;
 }
 
 export default function BankSelectModal({ isOpen, onClose, onConfirm }: Props) {
+  const { data: bankAccounts = [], isLoading } = useGetCompanyBankAccountsQuery(undefined, { skip: !isOpen });
+  const [selectedBank, setSelectedBank] = React.useState<string>("");
+
   if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    if (selectedBank) {
+      onConfirm(selectedBank);
+    }
+  };
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
@@ -48,15 +59,19 @@ export default function BankSelectModal({ isOpen, onClose, onConfirm }: Props) {
                 <label className="block text-sm font-medium mb-2">
                   Bank Account
                 </label>
-                <Select defaultValue="">
+                <Select value={selectedBank} onValueChange={setSelectedBank}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Bank Account" />
+                    <SelectValue placeholder={isLoading ? "Loading banks..." : "Select Bank Account"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gtbank">GTBank - 0123456789</SelectItem>
-                    <SelectItem value="zenith">
-                      Zenith Bank - 9876543210
-                    </SelectItem>
+                    {bankAccounts.map((bank) => (
+                      <SelectItem key={bank.id} value={bank.id.toString()}>
+                        {bank.bank_name} - {bank.account_number_display || bank.account_number}
+                      </SelectItem>
+                    ))}
+                    {bankAccounts.length === 0 && !isLoading && (
+                      <SelectItem value="" disabled>No bank accounts found</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -71,7 +86,8 @@ export default function BankSelectModal({ isOpen, onClose, onConfirm }: Props) {
                 </Button>
                 <Button
                   variant={"contained"}
-                  onClick={onConfirm}
+                  onClick={handleConfirm}
+                  disabled={!selectedBank || isLoading}
                   className="flex-1"
                 >
                   Confirm Payment
