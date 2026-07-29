@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useForm } from "react-hook-form";
 import { Pencil } from "lucide-react";
+import { useUpdateVendorBankAccountMutation, useAddVendorBankAccountMutation } from "@/api/invoice/vendorBankAccountsApi";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 
 interface BankData {
   accountName: string;
@@ -16,16 +18,27 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   initialData: BankData;
+  vendorId: number;
 }
 
 export function UpdateBankDetailsModal({
   isOpen,
   onClose,
   initialData,
+  vendorId,
 }: Props) {
   const { register, handleSubmit, reset } = useForm<BankData>({
     defaultValues: initialData,
   });
+
+  const [updateBank, { isLoading: isUpdating }] = useUpdateVendorBankAccountMutation();
+  const [addBank, { isLoading: isAdding }] = useAddVendorBankAccountMutation();
+  
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({ show: false, message: "", type: "success" });
 
   useEffect(() => {
     if (isOpen) {
@@ -33,29 +46,43 @@ export function UpdateBankDetailsModal({
     }
   }, [isOpen, initialData, reset]);
 
-  const onSubmit = (data: BankData) => {
-    console.log("Updated bank details:", data);
-    // TODO: API call
-    onClose();
+  const onSubmit = async (data: BankData) => {
+    try {
+      const payload = {
+        bank_account_name: data.accountName,
+        bank_account_number: data.accountNumber,
+        bank_name: data.bankName,
+        branch_code: data.branch,
+      };
+
+      // If initial data had no account number, it's probably an add. Otherwise update.
+      if (initialData.accountNumber) {
+        await updateBank({ id: vendorId, data: payload as any }).unwrap();
+      } else {
+        await addBank({ id: vendorId, data: payload as any }).unwrap();
+      }
+
+      setToast({
+        show: true,
+        message: "Bank details updated successfully",
+        type: "success",
+      });
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      setToast({
+        show: true,
+        message: err?.data?.message || err?.message || "Failed to update bank details",
+        type: "error",
+      });
+    }
   };
 
-  const auditLogs = [
-    {
-      action: "Bank Account Details updated",
-      by: "Jane Doe",
-      date: "2026-06-25 19:27",
-    },
-    {
-      action: "Bank Account Details updated",
-      by: "Jane Doe",
-      date: "2026-06-25 19:27",
-    },
-    {
-      action: "Bank Account Details updated",
-      by: "Jane Doe",
-      date: "2026-06-25 19:27",
-    },
-  ];
+  const isSubmitting = isUpdating || isAdding;
+
+  // We can leave the audit log empty or remove it if not needed,
+  // but we will hide it since there is no audit log API yet.
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
@@ -63,6 +90,13 @@ export function UpdateBankDetailsModal({
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-xl z-50">
           <div className="p-8">
+            <ToastNotification
+              show={toast.show}
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+            />
+
             <Dialog.Title className="text-xl font-semibold text-gray-900">
               Update Bank Details
             </Dialog.Title>
@@ -112,48 +146,19 @@ export function UpdateBankDetailsModal({
                   type="button"
                   onClick={onClose}
                   className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium"
+                  disabled={isSubmitting}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
                 >
-                  Update
+                  {isSubmitting ? "Updating..." : "Update"}
                 </button>
               </div>
             </form>
-
-            {/* Audit Log */}
-            <div className="mt-10 border-t border-gray-100 pt-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                Audit log
-              </h3>
-
-              <div className="space-y-3">
-                {auditLogs.map((log, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-3 p-3 rounded-lg border border-gray-100"
-                  >
-                    <div className="mt-0.5">
-                      <Pencil className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {log.action}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        By {log.by}
-                      </p>
-                    </div>
-                    <p className="text-xs text-gray-500 whitespace-nowrap">
-                      {log.date}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

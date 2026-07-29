@@ -4,263 +4,180 @@ import React, { useState } from "react";
 import { ChartOfAccountsTable } from "@/components/invoice/chart-of-account/ChartOfAccountsTable";
 import { AccountFormModal } from "@/components/invoice/chart-of-account/AccountFormModal";
 import { DeactivateModals } from "@/components/invoice/chart-of-account/DeactivateModals";
-import { SuccessModal } from "@/components/invoice/chart-of-account/SuccessModal";
-import { Search, Plus, Grid3X3, List } from "lucide-react";
-import { Account } from "@/components/invoice/chart-of-account/types";
-
-const initialAccounts: Account[] = [
-  {
-    code: "1000",
-    name: "Assets",
-    type: "Assets",
-    balance: 482650,
-    isCategory: true,
-    children: [
-      {
-        code: "1110",
-        name: "Main Operating Account",
-        type: "Assets",
-        balance: 482650,
-        bankName: "GTBank",
-        branch: "Lagos",
-        sortCode: "16271",
-        currency: "Naira",
-      },
-      {
-        code: "1120",
-        name: "Petty Cash Account",
-        type: "Assets",
-        balance: 482650,
-      },
-      {
-        code: "1200",
-        name: "Accounts Receivable",
-        type: "Assets",
-        balance: 482650,
-      },
-      { code: "1300", name: "Inventory", type: "Assets", balance: 482650 },
-    ],
-  },
-  {
-    code: "2000",
-    name: "Liabilities",
-    type: "Liabilities",
-    balance: 178320,
-    isCategory: true,
-    children: [
-      {
-        code: "2100",
-        name: "Accounts Payable",
-        type: "Liabilities",
-        balance: 178320,
-      },
-      {
-        code: "2200",
-        name: "Accrued Expenses",
-        type: "Liabilities",
-        balance: 178320,
-      },
-    ],
-  },
-  {
-    code: "3000",
-    name: "Equity",
-    type: "Equity",
-    balance: 304330,
-    isCategory: true,
-    children: [
-      { code: "3100", name: "Owner Equity", type: "Equity", balance: 304330 },
-      {
-        code: "3200",
-        name: "Retained Earnings",
-        type: "Equity",
-        balance: 304330,
-      },
-    ],
-  },
-  {
-    code: "4000",
-    name: "Revenue",
-    type: "Revenue",
-    balance: 612800,
-    isCategory: true,
-    children: [
-      {
-        code: "4100",
-        name: "Contract Revenue",
-        type: "Revenue",
-        balance: 612800,
-      },
-      { code: "4200", name: "Other Income", type: "Revenue", balance: 612800 },
-    ],
-  },
-  {
-    code: "5000",
-    name: "Expenses",
-    type: "Expenses",
-    balance: 572800,
-    isCategory: true,
-    children: [
-      { code: "5100", name: "Labour Costs", type: "Expenses", balance: 572800 },
-      {
-        code: "5200",
-        name: "Materials Costs",
-        type: "Expenses",
-        balance: 572800,
-      },
-      {
-        code: "5300",
-        name: "Subcontractor Costs",
-        type: "Expenses",
-        balance: 572800,
-      },
-      {
-        code: "5400",
-        name: "Plant and Equipment Costs",
-        type: "Expenses",
-        balance: 572800,
-      },
-      {
-        code: "5500",
-        name: "Petty Cash and Miscellaneous",
-        type: "Expenses",
-        balance: 572800,
-      },
-      {
-        code: "5600",
-        name: "Overhead Costs",
-        type: "Expenses",
-        balance: 572800,
-      },
-    ],
-  },
-];
-
-const summaryData = [
-  { label: "Assets", value: "N482,650", color: "text-blue-600" },
-  { label: "Liabilities", value: "N178,320", color: "text-red-600" },
-  { label: "Equity", value: "N304,330", color: "text-amber-500" },
-  { label: "Revenue", value: "N612,800", color: "text-green-600" },
-  { label: "Expenses", value: "N572,800", color: "text-red-600" },
-];
+import { Search, Plus } from "lucide-react";
+import { useStatusModal, StatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
+import {
+  useGetChartOfAccountsQuery,
+  useCreateChartOfAccountMutation,
+  useUpdateChartOfAccountMutation,
+  useDeleteChartOfAccountMutation,
+  useGetChartOfAccountsSummaryQuery,
+  ChartOfAccountDetail,
+} from "@/api/invoice/chartOfAccountsApi";
 
 export default function ChartOfAccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
+  const { data: flatAccounts = [], isLoading: isTreeLoading } = useGetChartOfAccountsQuery();
+  const [createAccount] = useCreateChartOfAccountMutation();
+  const [updateAccount] = useUpdateChartOfAccountMutation();
+  const [deleteAccount, { isLoading: isDeleting }] = useDeleteChartOfAccountMutation();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [viewMode, setViewMode] = useState<"detailed" | "ledger">("detailed");
 
-  // Modal states
+  // Modals state
   const [formModal, setFormModal] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
-    account?: Account | null;
-    parentCode?: string;
+    accountId?: number | null;
+    parentId?: number | null;
   }>({ isOpen: false, mode: "add" });
 
   const [deactivateState, setDeactivateState] = useState<{
     isOpen: boolean;
-    account: Account | null;
-    step: "confirm" | "cannot" | "reassign";
-  }>({ isOpen: false, account: null, step: "confirm" });
+    accountId: number | null;
+  }>({ isOpen: false, accountId: null });
 
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const statusModal = useStatusModal();
 
+  // Build tree from flat accounts
+  const accounts: ChartOfAccountDetail[] = React.useMemo(() => {
+    const map = new Map<number, ChartOfAccountDetail>();
+    
+    flatAccounts.forEach((acc) => {
+      map.set(acc.id, { ...acc, children: [], created_at: "" });
+    });
+
+    const tree: ChartOfAccountDetail[] = [];
+    
+    flatAccounts.forEach((acc) => {
+      const node = map.get(acc.id)!;
+      if (acc.parent_account) {
+        const parent = map.get(acc.parent_account);
+        if (parent) {
+          parent.children.push(node);
+        } else {
+          tree.push(node);
+        }
+      } else {
+        tree.push(node);
+      }
+    });
+
+    return tree;
+  }, [flatAccounts]);
+  
   const filteredAccounts = accounts
     .map((cat) => ({
       ...cat,
       children: cat.children?.filter(
         (child) =>
-          child.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          child.code.includes(searchTerm),
+          child.account_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          child.account_number.includes(searchTerm),
       ),
     }))
     .filter((cat) => {
       if (activeFilter === "All") return true;
-      return cat.type === activeFilter;
+      if (activeFilter === "Revenue") return cat.account_type === "INCOME";
+      if (activeFilter === "Expenses") return cat.account_type === "EXPENSE";
+      if (activeFilter === "Assets") return cat.account_type === "ASSET";
+      if (activeFilter === "Liabilities") return cat.account_type === "LIABILITY";
+      if (activeFilter === "Equity") return cat.account_type === "EQUITY";
+      return cat.account_type === activeFilter;
     });
 
-  const handleAddAccount = (parentCode?: string) => {
-    setFormModal({ isOpen: true, mode: "add", parentCode });
-  };
+  const { data: summaryApiResponse, isLoading: isSummaryLoading } = useGetChartOfAccountsSummaryQuery();
 
-  const handleEditAccount = (account: Account) => {
-    setFormModal({ isOpen: true, mode: "edit", account });
-  };
-
-  const handleSaveAccount = (data: any) => {
-    if (formModal.mode === "add") {
-      // Add new child under the correct category
-      const updated = accounts.map((cat) => {
-        if (
-          cat.code === formModal.parentCode ||
-          (formModal.parentCode === undefined && cat.type === data.type)
-        ) {
-          return {
-            ...cat,
-            children: [
-              ...(cat.children || []),
-              {
-                code: data.code,
-                name: data.name,
-                type: data.type,
-                balance: 0,
-                bankName: data.bankName,
-                branch: data.branch,
-                sortCode: data.sortCode,
-                currency: data.currency,
-              },
-            ],
-          };
-        }
-        return cat;
-      });
-      setAccounts(updated);
-      setSuccessModalOpen(true);
-    } else {
-      // Edit existing
-      const updated = accounts.map((cat) => ({
-        ...cat,
-        children: cat.children?.map((child) =>
-          child.code === formModal.account?.code
-            ? { ...child, ...data }
-            : child,
-        ),
-      }));
-      setAccounts(updated);
+  // Helper to extract value from the summary API response shape
+  const getSummaryValue = (type: string) => {
+    if (!summaryApiResponse) return 0;
+    
+    const node = summaryApiResponse[type];
+    if (node && typeof node === "object" && node.balance !== undefined) {
+      return parseFloat(node.balance || "0");
     }
-    setFormModal({ isOpen: false, mode: "add" });
+    
+    return 0;
   };
 
-  const handleDeactivateClick = (account: Account) => {
-    // Simulate some accounts having transactions
-    const hasTransactions = ["1110", "1200", "2100"].includes(account.code);
-    setDeactivateState({
-      isOpen: true,
-      account,
-      step: hasTransactions ? "cannot" : "confirm",
-    });
+  const summaryData = [
+    { label: "Assets", value: getSummaryValue("ASSET"), color: "text-blue-600" },
+    { label: "Liabilities", value: getSummaryValue("LIABILITY"), color: "text-red-600" },
+    { label: "Equity", value: getSummaryValue("EQUITY"), color: "text-amber-500" },
+    { label: "Revenue", value: getSummaryValue("INCOME"), color: "text-green-600" },
+    { label: "Expenses", value: getSummaryValue("EXPENSE"), color: "text-red-600" },
+  ];
+
+  const handleAddAccount = (parentId?: number) => {
+    setFormModal({ isOpen: true, mode: "add", parentId });
   };
 
-  const handleReassignComplete = (code: string) => {
-    const updated = accounts.map((cat) => ({
-      ...cat,
-      children: cat.children?.filter((c) => c.code !== code),
-    }));
-    setAccounts(updated);
-    setDeactivateState({ isOpen: false, account: null, step: "confirm" });
+  const handleEditAccount = (accountId: number) => {
+    setFormModal({ isOpen: true, mode: "edit", accountId });
+  };
+
+  const handleSaveAccount = async (data: any, id?: number) => {
+    try {
+      const payload = { ...data, parent_account: formModal.parentId || null };
+      
+      if (formModal.mode === "add") {
+        await createAccount(payload).unwrap();
+        setFormModal({ isOpen: false, mode: "add" });
+        statusModal.showSuccess("Success", "Account has successfully been added");
+      } else if (formModal.mode === "edit" && id) {
+        await updateAccount({ id, data: payload }).unwrap();
+        setFormModal({ isOpen: false, mode: "add" });
+        statusModal.showSuccess("Success", "Account updated successfully");
+      }
+    } catch (err: any) {
+      statusModal.showError("Failed to save account", extractErrorMessage(err, "Failed to save account"));
+    }
+  };
+
+  const handleDeactivateClick = () => {
+    // Open deactivate modal for the currently edited account
+    if (formModal.accountId) {
+      const id = formModal.accountId;
+      setFormModal({ isOpen: false, mode: "add" });
+      setDeactivateState({ isOpen: true, accountId: id });
+    }
+  };
+
+  const handleDeactivateConfirm = async (id: number) => {
+    try {
+      await deleteAccount(id).unwrap();
+      setDeactivateState({ isOpen: false, accountId: null });
+      statusModal.showSuccess("Deleted", "Account deleted successfully");
+    } catch (err: any) {
+      statusModal.showError("Failed to delete account", extractErrorMessage(err, "Failed to delete account"));
+    }
   };
 
   return (
     <div className="p-6 space-y-4">
+      {/* Status Modal Component */}
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={statusModal.close}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        actionText={statusModal.actionText}
+        onAction={statusModal.onAction}
+        secondaryText={statusModal.secondaryText}
+        onSecondary={statusModal.onSecondary}
+        actionVariant={statusModal.actionVariant}
+      />
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-500">
         <span>Home</span>
         <span className="text-gray-400">›</span>
         <span>Invoice</span>
         <span className="text-gray-400">›</span>
-        <span className="text-gray-700 font-medium">Payment Queue</span>
+        <span className="text-gray-700 font-medium">Chart of Accounts</span>
       </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-semibold text-gray-900">
@@ -298,52 +215,46 @@ export default function ChartOfAccountsPage() {
           >
             <p className="text-sm text-gray-500">{item.label}</p>
             <p className={`text-2xl font-semibold mt-1 ${item.color}`}>
-              {item.value}
+              N{item.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <ChartOfAccountsTable
-        accounts={filteredAccounts}
-        viewMode={viewMode}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        onAddAccount={handleAddAccount}
-        onEditAccount={handleEditAccount}
-      />
+      {isTreeLoading ? (
+        <div className="bg-white rounded border border-gray-100 p-12 text-center text-gray-500">
+          Loading accounts...
+        </div>
+      ) : (
+        <ChartOfAccountsTable
+          accounts={filteredAccounts}
+          viewMode={viewMode}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          onAddAccount={handleAddAccount}
+          onEditAccount={handleEditAccount}
+        />
+      )}
 
       {/* Modals */}
       <AccountFormModal
         isOpen={formModal.isOpen}
         mode={formModal.mode}
-        account={formModal.account}
+        accountId={formModal.accountId}
+        parentId={formModal.parentId}
         onClose={() => setFormModal({ isOpen: false, mode: "add" })}
         onSave={handleSaveAccount}
-        onDeactivate={() => {
-          if (formModal.account) {
-            setFormModal({ isOpen: false, mode: "add" });
-            handleDeactivateClick(formModal.account);
-          }
-        }}
+        onDeactivate={handleDeactivateClick}
       />
 
       <DeactivateModals
         state={deactivateState}
+        isDeactivating={isDeleting}
         onClose={() =>
-          setDeactivateState({ isOpen: false, account: null, step: "confirm" })
+          setDeactivateState({ isOpen: false, accountId: null })
         }
-        onReassignComplete={handleReassignComplete}
-        onSwitchToReassign={() =>
-          setDeactivateState((prev) => ({ ...prev, step: "reassign" }))
-        }
-      />
-
-      <SuccessModal
-        isOpen={successModalOpen}
-        onClose={() => setSuccessModalOpen(false)}
-        message="Account has successfully been added"
+        onDeactivateConfirm={handleDeactivateConfirm}
       />
     </div>
   );

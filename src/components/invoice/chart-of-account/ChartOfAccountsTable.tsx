@@ -2,32 +2,32 @@
 
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Account } from "./types";
+import type { ChartOfAccountDetail } from "@/api/invoice/chartOfAccountsApi";
 
 interface Props {
-  accounts: Account[];
+  accounts: ChartOfAccountDetail[];
   viewMode: "detailed" | "ledger";
   activeFilter: string;
   onFilterChange: (filter: string) => void;
-  onAddAccount: (parentCode?: string) => void;
-  onEditAccount: (account: Account) => void;
+  onAddAccount: (parentId?: number) => void;
+  onEditAccount: (accountId: number) => void;
 }
 
 const filters = [
   "All",
-  "Assets",
-  "Liabilities",
-  "Equity",
-  "Revenue",
-  "Expenses",
+  "ASSET",
+  "LIABILITY",
+  "EQUITY",
+  "INCOME",
+  "EXPENSE",
 ];
 
 const typeBadgeStyles: Record<string, string> = {
-  Assets: "bg-blue-100 text-blue-700",
-  Liabilities: "bg-red-100 text-red-700",
-  Equity: "bg-amber-100 text-amber-700",
-  Revenue: "bg-green-100 text-green-700",
-  Expenses: "bg-orange-100 text-orange-700",
+  ASSET: "bg-blue-100 text-blue-700",
+  LIABILITY: "bg-red-100 text-red-700",
+  EQUITY: "bg-amber-100 text-amber-700",
+  INCOME: "bg-green-100 text-green-700",
+  EXPENSE: "bg-orange-100 text-orange-700",
 };
 
 export function ChartOfAccountsTable({
@@ -38,17 +38,11 @@ export function ChartOfAccountsTable({
   onAddAccount,
   onEditAccount,
 }: Props) {
-  const [expanded, setExpanded] = useState<string[]>([
-    "1000",
-    "2000",
-    "3000",
-    "4000",
-    "5000",
-  ]);
+  const [expanded, setExpanded] = useState<number[]>([]);
 
-  const toggle = (code: string) => {
+  const toggle = (id: number) => {
     setExpanded((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -60,7 +54,7 @@ export function ChartOfAccountsTable({
           {viewMode === "detailed" ? "Accounts" : "Account Ledger"}
         </h2>
 
-        <div className="flex gap-1 bg-gray-100 p-1 rounded">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded overflow-x-auto">
           {filters.map((f) => (
             <button
               key={f}
@@ -82,7 +76,7 @@ export function ChartOfAccountsTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="text-left py-3.5 px-6 text-sm font-medium text-gray-500 w-28">
+              <th className="text-left py-3.5 px-6 text-sm font-medium text-gray-500 w-32">
                 Code
               </th>
               <th className="text-left py-3.5 px-6 text-sm font-medium text-gray-500">
@@ -99,76 +93,79 @@ export function ChartOfAccountsTable({
           </thead>
           <tbody>
             {accounts.map((cat) => (
-              <React.Fragment key={cat.code}>
+              <React.Fragment key={cat.id}>
                 {/* Category Row */}
                 <tr className="border-b border-gray-100 hover:bg-gray-50/50">
                   <td className="py-4 px-6">
                     <button
-                      onClick={() => toggle(cat.code)}
+                      onClick={() => toggle(cat.id)}
                       className="flex items-center gap-2 font-medium text-gray-900"
                     >
-                      {expanded.includes(cat.code) ? (
+                      {expanded.includes(cat.id) ? (
                         <ChevronDown className="w-4 h-4 text-gray-500" />
                       ) : (
                         <ChevronRight className="w-4 h-4 text-gray-500" />
                       )}
-                      {cat.code}
+                      {cat.account_number}
                     </button>
                   </td>
                   <td className="py-4 px-6 font-semibold text-gray-900">
-                    {cat.name}
+                    {cat.account_name}
                   </td>
                   <td className="py-4 px-6">
                     <span
                       className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${
-                        typeBadgeStyles[cat.type]
+                        typeBadgeStyles[cat.account_type] || "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {cat.type}
+                      {cat.account_type}
                     </span>
                   </td>
                   <td className="py-4 px-6 text-right font-medium text-gray-900">
-                    N{cat.balance.toLocaleString()}
+                    N{parseFloat(cat.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-4 px-6 text-right">
-                    <button
-                      onClick={() => onAddAccount(cat.code)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-1.5 rounded transition-colors"
-                    >
-                      Add account
-                    </button>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={() => onEditAccount(cat.id)}
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onAddAccount(cat.id)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-1.5 rounded transition-colors"
+                      >
+                        Add Sub-account
+                      </button>
+                    </div>
                   </td>
                 </tr>
 
                 {/* Children (only in detailed view) */}
                 {viewMode === "detailed" &&
-                  expanded.includes(cat.code) &&
+                  expanded.includes(cat.id) &&
                   cat.children?.map((child) => (
                     <tr
-                      key={child.code}
+                      key={child.id}
                       className="border-b border-gray-100 hover:bg-gray-50/50"
                     >
                       <td className="py-3.5 px-6 pl-14 text-gray-600">
-                        {child.code}
+                        {child.account_number}
                       </td>
                       <td className="py-3.5 px-6 text-gray-800">
-                        {child.name}
+                        {child.account_name}
                       </td>
                       <td className="py-3.5 px-6">
-                        <span
-                          className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${
-                            typeBadgeStyles[child.type]
-                          }`}
-                        >
-                          {child.type}
-                        </span>
+                        {/* Sub accounts have the same type logically, but API doesn't return it in child array. We can infer or just leave blank */}
+                        <span className="text-gray-400 text-xs">-</span>
                       </td>
                       <td className="py-3.5 px-6 text-right font-medium text-gray-800">
-                        N{child.balance.toLocaleString()}
+                        N{parseFloat(child.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3.5 px-6 text-right">
                         <button
-                          onClick={() => onEditAccount(child)}
+                          onClick={() => onEditAccount(child.id)}
                           className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                         >
                           Edit
@@ -178,6 +175,13 @@ export function ChartOfAccountsTable({
                   ))}
               </React.Fragment>
             ))}
+            {accounts.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-gray-500">
+                  No accounts found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

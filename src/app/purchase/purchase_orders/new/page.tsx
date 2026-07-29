@@ -16,7 +16,7 @@ import {
   RfqItem,
 } from "@/api/purchase/requestForQuotationApi";
 import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
-import { useGetPaymentTermsQuery } from "@/api/invoice/invoiceApi";
+import { useGetPaymentTermsQuery } from "@/api/invoice/paymentTermsApi";
 import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import type { Resolver } from "react-hook-form";

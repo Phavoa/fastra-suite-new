@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ViewToggle } from "@/components/invoice/ViewToggle";
-import { useGetInvoicesQuery, Invoice } from "@/api/invoice/invoiceApi";
+import { useGetInvoicesQuery, Invoice } from "@/api/invoice/invoicesApi";
 import { BreadcrumbItem } from "../../purchase/products/types";
 import { motion } from "framer-motion";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";

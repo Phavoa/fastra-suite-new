@@ -28,7 +28,19 @@ import { locationApi } from "../../api/inventory/locationApi";
 import { multilocationApi } from "../../api/inventory/multilocationApi";
 import { stockAdjustmentApi } from "../../api/inventory/stockAdjustmentApi";
 import { scrapApi } from "../../api/inventory/scrapApi";
-import { invoiceApi } from "../../api/invoice/invoiceApi";
+import { accountingSettingsApi } from "../../api/invoice/accountingSettingsApi";
+import { chartOfAccountsApi } from "../../api/invoice/chartOfAccountsApi";
+import { companyBankAccountsApi } from "../../api/invoice/companyBankAccountsApi";
+import { invoiceCurrencyApi } from "../../api/invoice/invoiceCurrencyApi";
+import { invoicesApi } from "../../api/invoice/invoicesApi";
+import { invoicingPreferencesApi } from "../../api/invoice/invoicingPreferencesApi";
+import { paymentsApi } from "../../api/invoice/paymentsApi";
+import { paymentTermsApi } from "../../api/invoice/paymentTermsApi";
+import { projectPurchaseOrdersApi } from "../../api/invoice/projectPurchaseOrdersApi";
+import { requestAccountMappingsApi } from "../../api/invoice/requestAccountMappingsApi";
+import { vendorsApi as invoiceVendorsApi } from "../../api/invoice/vendorsApi";
+import { vendorBankAccountsApi } from "../../api/invoice/vendorBankAccountsApi";
+import { vendorImportApi } from "../../api/invoice/vendorImportApi";
 
 import authReducer from "./authSlice";
 import viewModeReducer from "../../components/Settings/viewModeSlice";
@@ -112,7 +124,19 @@ const rootReducer = combineReducers({
   [projectRequestApi.reducerPath]: projectRequestApi.reducer,
   [pettyCashRequestApi.reducerPath]: pettyCashRequestApi.reducer,
   [materialConsumptionRequestApi.reducerPath]: materialConsumptionRequestApi.reducer,
-  [invoiceApi.reducerPath]: invoiceApi.reducer,
+  [accountingSettingsApi.reducerPath]: accountingSettingsApi.reducer,
+  [chartOfAccountsApi.reducerPath]: chartOfAccountsApi.reducer,
+  [companyBankAccountsApi.reducerPath]: companyBankAccountsApi.reducer,
+  [invoiceCurrencyApi.reducerPath]: invoiceCurrencyApi.reducer,
+  [invoicesApi.reducerPath]: invoicesApi.reducer,
+  [invoicingPreferencesApi.reducerPath]: invoicingPreferencesApi.reducer,
+  [paymentsApi.reducerPath]: paymentsApi.reducer,
+  [paymentTermsApi.reducerPath]: paymentTermsApi.reducer,
+  [projectPurchaseOrdersApi.reducerPath]: projectPurchaseOrdersApi.reducer,
+  [requestAccountMappingsApi.reducerPath]: requestAccountMappingsApi.reducer,
+  [invoiceVendorsApi.reducerPath]: invoiceVendorsApi.reducer,
+  [vendorBankAccountsApi.reducerPath]: vendorBankAccountsApi.reducer,
+  [vendorImportApi.reducerPath]: vendorImportApi.reducer,
   [companyApi.reducerPath]: companyApi.reducer,
 });
 
@@ -165,7 +189,19 @@ export const store = configureStore({
       pettyCashRequestApi.middleware,
       materialConsumptionRequestApi.middleware,
 
-      invoiceApi.middleware,
+      accountingSettingsApi.middleware,
+      chartOfAccountsApi.middleware,
+      companyBankAccountsApi.middleware,
+      invoiceCurrencyApi.middleware,
+      invoicesApi.middleware,
+      invoicingPreferencesApi.middleware,
+      paymentsApi.middleware,
+      paymentTermsApi.middleware,
+      projectPurchaseOrdersApi.middleware,
+      requestAccountMappingsApi.middleware,
+      invoiceVendorsApi.middleware,
+      vendorBankAccountsApi.middleware,
+      vendorImportApi.middleware,
       companyApi.middleware,
     ),
 });

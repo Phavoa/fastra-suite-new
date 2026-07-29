@@ -2,19 +2,19 @@
 
 import React, { useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Account } from "./types";
+import { useGetChartOfAccountByIdQuery } from "@/api/invoice/chartOfAccountsApi";
 
 const schema = z.object({
-  type: z.string().min(1, "Required"),
-  name: z.string().min(1, "Account name is required"),
-  bankName: z.string().optional(),
-  branch: z.string().optional(),
-  sortCode: z.string().optional(),
-  currency: z.string().optional(),
-  code: z.string().min(1),
+  account_type: z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]),
+  account_name: z.string().min(1, "Account name is required"),
+  account_number: z.string().min(1, "Account number is required"),
+  subtype: z.string().min(1, "Subtype is required"),
+  is_active: z.boolean(),
+  is_control_account: z.boolean(),
+  control_type: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -22,64 +22,78 @@ type FormData = z.infer<typeof schema>;
 interface Props {
   isOpen: boolean;
   mode: "add" | "edit";
-  account?: Account | null;
+  accountId?: number | null;
+  parentId?: number | null;
   onClose: () => void;
-  onSave: (data: FormData) => void;
+  onSave: (data: FormData, id?: number) => void;
   onDeactivate?: () => void;
 }
 
 export function AccountFormModal({
   isOpen,
   mode,
-  account,
+  accountId,
+  parentId,
   onClose,
   onSave,
   onDeactivate,
 }: Props) {
+  const { data: account, isLoading } = useGetChartOfAccountByIdQuery(accountId as number, {
+    skip: mode !== "edit" || !accountId,
+  });
+
+  const { data: parentAccount, isLoading: isParentLoading } = useGetChartOfAccountByIdQuery(parentId as number, {
+    skip: !parentId,
+  });
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      code: "1001",
-      type: "",
-      name: "",
-      bankName: "",
-      branch: "",
-      sortCode: "",
-      currency: "",
+      account_number: "",
+      account_type: "ASSET",
+      account_name: "",
+      subtype: "bank",
+      is_active: true,
+      is_control_account: false,
+      control_type: "",
     },
   });
+
+  const isControlAccount = watch("is_control_account");
 
   useEffect(() => {
     if (mode === "edit" && account) {
       reset({
-        type: account.type,
-        name: account.name,
-        bankName: account.bankName || "",
-        branch: account.branch || "",
-        sortCode: account.sortCode || "",
-        currency: account.currency || "",
-        code: account.code,
+        account_type: account.account_type,
+        account_name: account.account_name,
+        account_number: account.account_number,
+        subtype: account.subtype || "",
+        is_active: account.is_active,
+        is_control_account: account.is_control_account,
+        control_type: account.control_type || "",
       });
-    } else {
+    } else if (mode === "add" && isOpen) {
+      if (parentId && !parentAccount) return; // Wait for parent to load
       reset({
-        code: "1001",
-        type: "",
-        name: "",
-        bankName: "",
-        branch: "",
-        sortCode: "",
-        currency: "",
+        account_number: "",
+        account_type: parentAccount ? parentAccount.account_type : "ASSET",
+        account_name: "",
+        subtype: parentAccount ? parentAccount.subtype : "bank",
+        is_active: true,
+        is_control_account: false,
+        control_type: "",
       });
     }
-  }, [mode, account, isOpen, reset]);
+  }, [mode, account, isOpen, reset, parentId, parentAccount]);
 
   const onSubmit = (data: FormData) => {
-    onSave(data);
+    onSave(data, mode === "edit" ? (accountId as number) : undefined);
   };
 
   return (
@@ -88,145 +102,156 @@ export function AccountFormModal({
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md shadow-xl z-50 max-h-[90vh] overflow-y-auto">
           <Dialog.Title className="text-xl font-semibold text-gray-900">
-            {mode === "add" ? "Add Account" : "Edit Account"}
+            {mode === "add" ? (parentId ? "Add Sub-Account" : "Add Account") : "Edit Account"}
           </Dialog.Title>
           <Dialog.Description className="text-sm text-gray-500 mt-1">
-            Add a new account to an account type
+            {mode === "add" ? "Create a new account" : "Modify an existing account"}
           </Dialog.Description>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-5">
-            {/* Account Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Account Type
-              </label>
-              <select
-                {...register("type")}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Account Type</option>
-                <option value="Assets">Assets</option>
-                <option value="Liabilities">Liabilities</option>
-                <option value="Equity">Equity</option>
-                <option value="Revenue">Revenue</option>
-                <option value="Expenses">Expenses</option>
-              </select>
-            </div>
+          {(mode === "edit" && isLoading) || (mode === "add" && parentId && isParentLoading) ? (
+            <div className="mt-6 text-center text-gray-500 py-8">Loading...</div>
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-5">
+              {/* Account Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Account Type
+                </label>
+                <select
+                  {...register("account_type")}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  disabled={!!parentId}
+                >
+                  <option value="ASSET" disabled={!!parentId && parentAccount?.account_type !== "ASSET"}>Assets</option>
+                  <option value="LIABILITY" disabled={!!parentId && parentAccount?.account_type !== "LIABILITY"}>Liabilities</option>
+                  <option value="EQUITY" disabled={!!parentId && parentAccount?.account_type !== "EQUITY"}>Equity</option>
+                  <option value="INCOME" disabled={!!parentId && parentAccount?.account_type !== "INCOME"}>Income/Revenue</option>
+                  <option value="EXPENSE" disabled={!!parentId && parentAccount?.account_type !== "EXPENSE"}>Expenses</option>
+                </select>
+              </div>
 
-            {/* Account Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Account Name
-              </label>
-              <input
-                {...register("name")}
-                placeholder="Enter account name"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+              {/* Account Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Account Name
+                </label>
+                <input
+                  {...register("account_name")}
+                  placeholder="Enter account name"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.account_name && <p className="text-red-500 text-xs mt-1">{errors.account_name.message}</p>}
+              </div>
 
-            {/* Bank Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Bank Name
-              </label>
-              <input
-                {...register("bankName")}
-                placeholder="Enter account name"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+              {/* Account Number */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Account Number
+                </label>
+                <input
+                  {...register("account_number")}
+                  placeholder="Enter account number"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.account_number && <p className="text-red-500 text-xs mt-1">{errors.account_number.message}</p>}
+              </div>
 
-            {/* Branch */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Branch
-              </label>
-              <select
-                {...register("branch")}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Branch</option>
-                <option value="Lagos">Lagos</option>
-                <option value="Abuja">Abuja</option>
-                <option value="Port Harcourt">Port Harcourt</option>
-              </select>
-            </div>
+              {/* Subtype */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Subtype
+                </label>
+                <input
+                  {...register("subtype")}
+                  placeholder="e.g. bank, inventory"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.subtype && <p className="text-red-500 text-xs mt-1">{errors.subtype.message}</p>}
+              </div>
 
-            {/* Sort Code */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Sort Code
-              </label>
-              <input
-                {...register("sortCode")}
-                placeholder="Enter account name"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+              {/* Is Control Account */}
+              <div className="flex items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  id="is_control_account"
+                  {...register("is_control_account")}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                />
+                <label htmlFor="is_control_account" className="text-sm font-medium text-gray-700">
+                  Is Control Account
+                </label>
+              </div>
 
-            {/* Currency */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Currency
-              </label>
-              <select
-                {...register("currency")}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Currency</option>
-                <option value="Naira">Naira</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </div>
-
-            {/* Account Number (read-only looking) */}
-            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
-              <span className="text-sm text-gray-600">Account Number</span>
-              <input
-                {...register("code")}
-                className="bg-transparent text-right text-sm font-medium text-gray-900 outline-none w-24"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              {mode === "edit" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onDeactivate}
-                    className="flex-1 border border-red-500 text-red-600 hover:bg-red-50 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              {/* Control Type */}
+              {isControlAccount && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Control Type
+                  </label>
+                  <select
+                    {...register("control_type")}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    Deactivate
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Save
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Add Account
-                  </button>
-                </>
+                    <option value="">Select Control Type</option>
+                    <option value="accounts_payable">Accounts Payable</option>
+                    <option value="accounts_receivable">Accounts Receivable</option>
+                    <option value="bank">Bank</option>
+                    <option value="inventory">Inventory</option>
+                  </select>
+                </div>
               )}
-            </div>
-          </form>
+
+              {/* Is Active */}
+              <div className="flex items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  {...register("is_active")}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                />
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+                  Is Active
+                </label>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                {mode === "edit" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onDeactivate}
+                      className="flex-1 border border-red-500 text-red-600 hover:bg-red-50 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Deactivate
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Save
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Add Account
+                    </button>
+                  </>
+                )}
+              </div>
+            </form>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
