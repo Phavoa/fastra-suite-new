@@ -81,7 +81,7 @@ export default function PaymentQueueDetailPage() {
         ) : !invoice ? (
           <div className="text-center py-12 text-gray-500">Invoice not found.</div>
         ) : (
-
+          <>
         <div className="bg-white rounded border p-4 space-y-4">
           {/* Info Sections */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -206,6 +206,7 @@ export default function PaymentQueueDetailPage() {
             {isPaying ? "Processing..." : "Pay Bill"}
           </Button>
         </div>
+          </>
         )}
       </div>
 
