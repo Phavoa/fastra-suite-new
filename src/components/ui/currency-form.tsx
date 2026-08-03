@@ -245,12 +245,7 @@ export function CurrencyForm({
         </div>
 
         {/* Submit Button */}
-        <div className="flex items-center justify-between">
-          <Link href="/purchase/configurations/currencies">
-            <Button type="button" disabled={isLoading}>
-              View Currency List
-            </Button>
-          </Link>
+        <div className="flex items-center justify-end">
 
           <Button
             type="submit"

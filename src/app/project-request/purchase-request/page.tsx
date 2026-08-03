@@ -121,6 +121,7 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
       : null) ||
     String(req.id || "PR-REQ");
   const statusVal =
+    req.request_status ||
     req.status ||
     (typeof req.project_request === "object"
       ? req.project_request?.status

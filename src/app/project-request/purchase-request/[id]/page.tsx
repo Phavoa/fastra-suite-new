@@ -12,6 +12,7 @@ import {
   useDeleteProjectPurchaseRequestMutation,
   usePatchProjectPurchaseRequestMutation,
 } from "@/api/requests/projectPurchaseRequestApi";
+import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
 
 interface PurchaseRequestLineItemUi {
   id?: string | number;
@@ -94,7 +95,7 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   });
 
   const refId = req.reference_id || (typeof req.project_request === "object" ? req.project_request?.reference_id : null) || String(req.id || "PR-REQ");
-  const statusVal = req.status || (typeof req.project_request === "object" ? req.project_request?.status : null) || "pending";
+  const statusVal = req.request_status || req.status || (typeof req.project_request === "object" ? req.project_request?.status : null) || "pending";
   const locationVal = req.site_location || req.requesting_location_details?.location_name || req.requesting_location || req.location || "Lagos Site";
   const reqDateVal = req.required_by_date || req.requiredDate || (req.date_updated ? new Date(req.date_updated).toISOString().split("T")[0] : "");
 
@@ -132,6 +133,7 @@ export default function PurchaseRequestDetailPage() {
 
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteProjectPurchaseRequestMutation();
   const [patchRequest, { isLoading: isUpdating }] = usePatchProjectPurchaseRequestMutation();
+  const [submitProjectRequest] = useSubmitProjectRequestMutation();
 
   const handleDelete = async () => {
     try {
@@ -142,13 +144,28 @@ export default function PurchaseRequestDetailPage() {
     }
   };
 
-  const handleStatusChange = async (newStatus: "approved" | "rejected") => {
+  const handleStatusChange = async (newStatus: "approved" | "rejected" | "pending") => {
     try {
+      if (newStatus === "pending" && apiData) {
+        const parentId = typeof apiData.project_request === "object" 
+          ? (apiData.project_request as any)?.id 
+          : apiData.project_request;
+          
+        if (parentId) {
+          await submitProjectRequest({ id: parentId as number }).unwrap();
+          if (request) {
+            setRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
+          }
+          return;
+        }
+      }
+
       if (request) {
         setRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
       await patchRequest({ id: id as string, data: { status: newStatus } }).unwrap();
     } catch (error) {
+      console.error(error);
       alert("Failed to update status on server.");
     }
   };
@@ -433,32 +450,34 @@ export default function PurchaseRequestDetailPage() {
             </div>
           ) : (
             <>
-              <Button
-                variant="outline"
-                onClick={() => setIsConfirmingDelete(true)}
-                className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-              >
-                <Trash2 size={16} /> Delete
-              </Button>
-
-              <div className="flex items-center gap-2 flex-1 justify-end">
-                {request.status !== "rejected" && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                >
+                  <Trash2 size={16} /> Delete
+                </Button>
+                
+                {request.status === "draft" && (
                   <Button
                     variant="outline"
-                    disabled={isUpdating}
-                    onClick={() => handleStatusChange("rejected")}
+                    onClick={() => router.push(`/project-request/purchase-request/${request.id}/edit`)}
                     className="h-11 px-4 text-xs font-bold border-gray-200 text-gray-700 hover:bg-gray-50 gap-1.5"
                   >
-                    <X size={16} className="text-red-500" /> Reject
+                    <Edit3 size={16} /> Edit
                   </Button>
                 )}
-                {request.status !== "approved" && (
+              </div>
+
+              <div className="flex items-center gap-2 flex-1 justify-end">
+                {request.status === "draft" && (
                   <Button
                     disabled={isUpdating}
-                    onClick={() => handleStatusChange("approved")}
-                    className="h-11 px-5 text-xs font-bold bg-[#2BA24D] hover:bg-[#238a41] text-white gap-1.5"
+                    onClick={() => handleStatusChange("pending")}
+                    className="h-11 px-5 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white gap-1.5"
                   >
-                    <Check size={16} /> Approve
+                    <Check size={16} /> Submit
                   </Button>
                 )}
               </div>

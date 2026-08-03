@@ -40,6 +40,7 @@ export interface CreateProjectCostingProjectRequest {
   start_date: string;
   expected_end_date: string;
   description: string;
+  site_location: string;
   phases?: Phase[];
 }
 

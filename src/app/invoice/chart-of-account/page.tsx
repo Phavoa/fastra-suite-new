@@ -12,6 +12,7 @@ import {
   useUpdateChartOfAccountMutation,
   useDeleteChartOfAccountMutation,
   useGetChartOfAccountsSummaryQuery,
+  usePatchChartOfAccountMutation,
   ChartOfAccountDetail,
 } from "@/api/invoice/chartOfAccountsApi";
 
@@ -19,6 +20,7 @@ export default function ChartOfAccountsPage() {
   const { data: flatAccounts = [], isLoading: isTreeLoading } = useGetChartOfAccountsQuery();
   const [createAccount] = useCreateChartOfAccountMutation();
   const [updateAccount] = useUpdateChartOfAccountMutation();
+  const [patchAccount] = usePatchChartOfAccountMutation();
   const [deleteAccount, { isLoading: isDeleting }] = useDeleteChartOfAccountMutation();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -130,7 +132,11 @@ export default function ChartOfAccountsPage() {
         statusModal.showSuccess("Success", "Account updated successfully");
       }
     } catch (err: any) {
-      statusModal.showError("Failed to save account", extractErrorMessage(err, "Failed to save account"));
+      if (err?.status === 400 && err?.data && typeof err.data === 'object' && !err.data.detail) {
+        throw err; // Let AccountFormModal handle field errors
+      } else {
+        statusModal.showError("Failed to save account", extractErrorMessage(err, "Failed to save account"));
+      }
     }
   };
 
@@ -149,7 +155,26 @@ export default function ChartOfAccountsPage() {
       setDeactivateState({ isOpen: false, accountId: null });
       statusModal.showSuccess("Deleted", "Account deleted successfully");
     } catch (err: any) {
-      statusModal.showError("Failed to delete account", extractErrorMessage(err, "Failed to delete account"));
+      if (err?.status === 400) {
+        statusModal.showWarning(
+          "Cannot Delete",
+          "This account is associated with existing transactions.",
+          "Deactivate Instead",
+          async () => {
+            try {
+              await patchAccount({ id, data: { is_active: false } }).unwrap();
+              statusModal.showSuccess("Deactivated", "Account has been deactivated successfully.");
+              setDeactivateState({ isOpen: false, accountId: null });
+            } catch (patchErr) {
+              statusModal.showError("Failed", "Could not deactivate account.");
+            }
+          },
+          "Cancel",
+          () => statusModal.close()
+        );
+      } else {
+        statusModal.showError("Failed to delete account", extractErrorMessage(err, "Failed to delete account"));
+      }
     }
   };
 

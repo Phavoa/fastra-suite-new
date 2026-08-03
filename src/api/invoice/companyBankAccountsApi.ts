@@ -42,6 +42,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const companyBankAccountsApi = createApi({
   reducerPath: "companyBankAccountsApi",
+  tagTypes: ["CompanyBankAccount"],
   baseQuery: async (args, api, _extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -114,6 +115,7 @@ export const companyBankAccountsApi = createApi({
         url: "/invoicing/company-bank-accounts/",
         params,
       }),
+      providesTags: ["CompanyBankAccount"],
     }),
     createCompanyBankAccount: builder.mutation<
       CompanyBankAccount,
@@ -124,9 +126,11 @@ export const companyBankAccountsApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["CompanyBankAccount"],
     }),
     getCompanyBankAccountById: builder.query<CompanyBankAccount, number>({
       query: (id) => `/invoicing/company-bank-accounts/${id}/`,
+      providesTags: ["CompanyBankAccount"],
     }),
     updateCompanyBankAccount: builder.mutation<
       CompanyBankAccount,
@@ -137,6 +141,7 @@ export const companyBankAccountsApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: ["CompanyBankAccount"],
     }),
     patchCompanyBankAccount: builder.mutation<
       CompanyBankAccount,
@@ -147,12 +152,14 @@ export const companyBankAccountsApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: ["CompanyBankAccount"],
     }),
     deleteCompanyBankAccount: builder.mutation<void, number>({
       query: (id) => ({
         url: `/invoicing/company-bank-accounts/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: ["CompanyBankAccount"],
     }),
   }),
 });

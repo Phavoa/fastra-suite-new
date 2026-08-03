@@ -17,6 +17,7 @@ export interface ChartOfAccountSummary {
   parent_account: number | null;
   parent_account_name?: string;
   balance: string;
+  children?: any[];
 }
 
 export interface ChartOfAccountDetail extends ChartOfAccountSummary {

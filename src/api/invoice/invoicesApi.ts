@@ -2,7 +2,7 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
 import { EmbeddedUserDetails } from "./paymentsApi";
 
-export type InvoiceStatus = "paid" | "partial" | "unpaid" | "overdue" | "cancelled";
+export type InvoiceStatus = "paid" | "partial" | "pending" | "draft" | "cancelled";
 export type InvoicingMethod = "ordered_quantity" | "delivered_quantity";
 
 export interface VendorBankAccount {

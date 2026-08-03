@@ -19,9 +19,13 @@ export default function ApproveRequestPage() {
   const user = useSelector((state: RootState) => state.auth?.user);
   const statusModal = useStatusModal();
 
-  const { data: apiRequests, isLoading: isRequestsLoading, refetch } = useGetProjectRequestsQuery({
+  const { data: rawApiRequests, isLoading: isRequestsLoading, refetch } = useGetProjectRequestsQuery({
     status: "pending"
   });
+  
+  const apiRequests = React.useMemo(() => {
+    return Array.isArray(rawApiRequests) ? rawApiRequests : (rawApiRequests as any)?.results || [];
+  }, [rawApiRequests]);
   const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
   const projects = React.useMemo(() => {
     const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];

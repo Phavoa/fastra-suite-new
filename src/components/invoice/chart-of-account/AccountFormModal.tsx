@@ -6,12 +6,13 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useGetChartOfAccountByIdQuery } from "@/api/invoice/chartOfAccountsApi";
+import { useStatusModal, StatusModal } from "@/components/shared/StatusModal";
 
 const schema = z.object({
   account_type: z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]),
   account_name: z.string().min(1, "Account name is required"),
   account_number: z.string().min(1, "Account number is required"),
-  subtype: z.string().min(1, "Subtype is required"),
+  subtype: z.string().optional(),
   is_active: z.boolean(),
   is_control_account: z.boolean(),
   control_type: z.string().optional(),
@@ -25,7 +26,7 @@ interface Props {
   accountId?: number | null;
   parentId?: number | null;
   onClose: () => void;
-  onSave: (data: FormData, id?: number) => void;
+  onSave: (data: FormData, id?: number) => Promise<void>;
   onDeactivate?: () => void;
 }
 
@@ -46,19 +47,22 @@ export function AccountFormModal({
     skip: !parentId,
   });
 
+  const statusModal = useStatusModal();
+
   const {
     register,
     handleSubmit,
     reset,
     watch,
     formState: { errors },
+    setError,
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       account_number: "",
       account_type: "ASSET",
       account_name: "",
-      subtype: "bank",
+      subtype: "",
       is_active: true,
       is_control_account: false,
       control_type: "",
@@ -84,7 +88,7 @@ export function AccountFormModal({
         account_number: "",
         account_type: parentAccount ? parentAccount.account_type : "ASSET",
         account_name: "",
-        subtype: parentAccount ? parentAccount.subtype : "bank",
+        subtype: "",
         is_active: true,
         is_control_account: false,
         control_type: "",
@@ -92,8 +96,74 @@ export function AccountFormModal({
     }
   }, [mode, account, isOpen, reset, parentId, parentAccount]);
 
-  const onSubmit = (data: FormData) => {
-    onSave(data, mode === "edit" ? (accountId as number) : undefined);
+  const onSubmit = async (data: FormData) => {
+    try {
+      const submitData = { ...data };
+      if (!submitData.is_control_account || !submitData.control_type) {
+        delete submitData.control_type;
+      }
+
+      // Auto-assign subtype based on control_type so the user doesn't have to think about it
+      if (submitData.control_type === "bank") {
+        submitData.subtype = "bank";
+      } else if (submitData.control_type === "inventory") {
+        submitData.subtype = "inventory";
+      } else {
+        delete submitData.subtype;
+      }
+
+      await onSave(submitData, mode === "edit" ? (accountId as number) : undefined);
+    } catch (error: any) {
+      if (error?.data && typeof error.data === 'object') {
+        let hasFieldErrors = false;
+        const formFields = ["account_type", "account_name", "account_number", "subtype", "is_active", "is_control_account", "control_type"];
+        
+        // Handle {"error": [{"field": "message"}]} structure
+        let errorObj = error.data;
+        if (errorObj.error && Array.isArray(errorObj.error) && errorObj.error.length > 0) {
+          if (typeof errorObj.error[0] === 'object') {
+            errorObj = errorObj.error[0];
+          } else {
+            statusModal.showError("Validation Error", errorObj.error.join(", "));
+            return;
+          }
+        }
+
+        // Handle specific API error formats like Token Expiry or generic 'detail'
+        if (errorObj.code === "token_not_valid") {
+          statusModal.showError("Session Expired", "Your session has expired or your token is invalid. Please log in again.");
+          return;
+        }
+
+        if (errorObj.detail && typeof errorObj.detail === "string") {
+          statusModal.showError("Error", errorObj.detail);
+          return;
+        }
+
+        Object.keys(errorObj).forEach((key) => {
+          if (formFields.includes(key)) {
+            hasFieldErrors = true;
+            if (Array.isArray(errorObj[key])) {
+              setError(key as any, { type: 'server', message: errorObj[key][0] });
+            } else if (typeof errorObj[key] === 'string') {
+              setError(key as any, { type: 'server', message: errorObj[key] });
+            }
+          } else if (key !== "code" && key !== "messages") {
+            // It's a non-field error like "non_field_errors". We skip "code" and "messages" to avoid messy JSON strings.
+            const msg = Array.isArray(errorObj[key]) ? errorObj[key][0] : errorObj[key];
+            if (typeof msg !== 'object') {
+              statusModal.showError("Error", String(msg));
+            }
+          }
+        });
+        
+        if (!hasFieldErrors && !statusModal.isOpen) {
+           statusModal.showError("Error", "An error occurred while saving. Please try again.");
+        }
+      } else {
+        statusModal.showError("Error", "A network or server error occurred.");
+      }
+    }
   };
 
   return (
@@ -101,6 +171,18 @@ export function AccountFormModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl p-8 w-full max-w-md shadow-xl z-50 max-h-[90vh] overflow-y-auto">
+          <StatusModal
+            isOpen={statusModal.isOpen}
+            onClose={statusModal.close}
+            type={statusModal.type}
+            title={statusModal.title}
+            message={statusModal.message}
+            actionText={statusModal.actionText}
+            onAction={statusModal.onAction}
+            secondaryText={statusModal.secondaryText}
+            onSecondary={statusModal.onSecondary}
+            actionVariant={statusModal.actionVariant}
+          />
           <Dialog.Title className="text-xl font-semibold text-gray-900">
             {mode === "add" ? (parentId ? "Add Sub-Account" : "Add Account") : "Edit Account"}
           </Dialog.Title>
@@ -156,18 +238,7 @@ export function AccountFormModal({
                 {errors.account_number && <p className="text-red-500 text-xs mt-1">{errors.account_number.message}</p>}
               </div>
 
-              {/* Subtype */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Subtype
-                </label>
-                <input
-                  {...register("subtype")}
-                  placeholder="e.g. bank, inventory"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {errors.subtype && <p className="text-red-500 text-xs mt-1">{errors.subtype.message}</p>}
-              </div>
+
 
               {/* Is Control Account */}
               <div className="flex items-center gap-3 py-2">
@@ -198,6 +269,7 @@ export function AccountFormModal({
                     <option value="bank">Bank</option>
                     <option value="inventory">Inventory</option>
                   </select>
+                  {errors.control_type && <p className="text-red-500 text-xs mt-1">{errors.control_type.message}</p>}
                 </div>
               )}
 

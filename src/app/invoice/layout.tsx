@@ -1,5 +1,6 @@
 import React from "react";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
+import { SettingsEnforcer } from "@/components/invoice/SettingsEnforcer";
 
 export default function InvoiceLayout({
   children,
@@ -43,12 +44,22 @@ export default function InvoiceLayout({
       application: "invoice",
       module: "invoice",
     },
+    {
+      label: "Settings",
+      href: "/invoice/settings",
+      application: "invoice",
+      module: "invoice",
+    },
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
       <NavBar title="Invoices" items={navItems} />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <SettingsEnforcer>
+          {children}
+        </SettingsEnforcer>
+      </main>
     </div>
   );
 }

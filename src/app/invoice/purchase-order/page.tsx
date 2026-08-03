@@ -4,38 +4,10 @@ import { useState } from "react";
 import { Search, ChevronDown, Eye, FileText, MoreVertical } from "lucide-react";
 import Link from "next/link";
 
-// Mock data for purchase orders
-const mockPurchaseOrders = [
-  {
-    id: "PO-2024-0018",
-    requestType: "Purchase",
-    vendor: "xyz Vendor",
-    wbs: "WBS-1.3 - Concrete Works",
-    requestedAmount: 200000,
-    status: "Issued",
-    statusColor: "bg-blue-100 text-blue-700",
-  },
-  {
-    id: "PO-2024-0018",
-    requestType: "Subcontractor",
-    vendor: "xyz Vendor",
-    wbs: "WBS-1.3.1 - Concrete Works",
-    requestedAmount: 200000,
-    status: "Paid",
-    statusColor: "bg-green-100 text-green-700",
-  },
-  {
-    id: "PO-2024-0018",
-    requestType: "Plant and Equipment",
-    vendor: "xyz Vendor",
-    wbs: "WBS-1.3.1 - Concrete Works",
-    requestedAmount: 200000,
-    status: "Cancelled",
-    statusColor: "bg-red-100 text-red-700",
-  },
-];
+import { useGetPurchaseOrdersQuery } from "@/api/invoice/projectPurchaseOrdersApi";
 
-const getTypeColor = (type: string) => {
+const getTypeColor = (type: string | undefined | null) => {
+  if (!type) return "bg-gray-50 text-gray-700";
   const colors: Record<string, string> = {
     Purchase: "bg-blue-50 text-blue-700",
     Subcontractor: "bg-purple-50 text-purple-700",
@@ -44,24 +16,38 @@ const getTypeColor = (type: string) => {
   return colors[type] || "bg-gray-50 text-gray-700";
 };
 
-const getStatusBadge = (status: string, color: string) => {
+const getStatusBadge = (status: string) => {
+  const normalizedStatus = status?.toLowerCase() || "";
+  let color = "bg-gray-100 text-gray-700";
+  
+  if (normalizedStatus === "issued") color = "bg-blue-100 text-blue-700";
+  else if (normalizedStatus === "fully_received") color = "bg-green-100 text-green-700";
+  else if (normalizedStatus === "cancelled") color = "bg-red-100 text-red-700";
+  else if (normalizedStatus === "draft") color = "bg-yellow-100 text-yellow-700";
+  
+  const formattedStatus = status ? status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Unknown";
   return (
     <span
       className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${color}`}
     >
-      {status}
+      {formattedStatus}
     </span>
   );
 };
 
 export default function PurchaseOrderPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const { data: purchaseOrders = [], isLoading } = useGetPurchaseOrdersQuery({});
 
-  const filteredOrders = mockPurchaseOrders.filter(
-    (order) =>
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.wbs.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Ensure it handles paginated results { results: [...] } if applicable
+  const orders = Array.isArray(purchaseOrders) ? purchaseOrders : (purchaseOrders as any)?.results || [];
+
+  const filteredOrders = orders.filter(
+    (order: any) =>
+      order.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.wbs_element?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const formatCurrency = (amount: number) => {
@@ -133,47 +119,61 @@ export default function PurchaseOrderPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredOrders.map((order, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-blue-600">
-                    <Link
-                      href={`/invoice/purchase-order/${order.id}`}
-                      className="hover:underline"
-                    >
-                      {order.id}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getTypeColor(order.requestType)}`}
-                    >
-                      {order.requestType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {order.vendor}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {order.wbs}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-left font-semibold text-gray-900">
-                    {formatCurrency(order.requestedAmount)}
-                  </td>
-                  <td className="px-4 py-3 text-left">
-                    {getStatusBadge(order.status, order.statusColor)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <Link
-                        href={`/invoice/purchase-order/${order.id}`}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        View
-                      </Link>
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-gray-500">
+                    Loading Purchase Orders...
                   </td>
                 </tr>
-              ))}
+              ) : filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-gray-500">
+                    No Purchase Orders found.
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.map((order: any) => (
+                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm font-medium text-blue-600">
+                      <Link
+                        href={`/invoice/purchase-order/${order.id}`}
+                        className="hover:underline"
+                      >
+                        {order.po_number}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getTypeColor(order.source_request_type)}`}
+                      >
+                        {order.source_request_type || "N/A"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {order.vendor_name || "Unknown"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {order.wbs_element || "N/A"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-left font-semibold text-gray-900">
+                      {formatCurrency(Number(order.total_amount || 0))}
+                    </td>
+                    <td className="px-4 py-3 text-left">
+                      {getStatusBadge(order.status)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <Link
+                          href={`/invoice/purchase-order/${order.id}`}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -37,6 +37,13 @@ export interface MakePaymentResponse {
   notes: string;
 }
 
+export interface DisbursementRequest {
+  source_type: "PETTY_CASH" | string;
+  petty_cash_request: number;
+  company_bank_account: number;
+  notes?: string;
+}
+
 export interface PaymentHistory {
   created_by: number;
   updated_by: number;
@@ -143,6 +150,13 @@ export const paymentsApi = createApi({
         body,
       }),
     }),
+    makeDisbursement: builder.mutation<any, DisbursementRequest>({
+      query: (body) => ({
+        url: "/invoicing/disbursement/",
+        method: "POST",
+        body,
+      }),
+    }),
     getPaymentHistory: builder.query<
       PaymentHistory[],
       GetPaymentHistoryParams | void
@@ -160,6 +174,7 @@ export const paymentsApi = createApi({
 
 export const {
   useMakePaymentMutation,
+  useMakeDisbursementMutation,
   useGetPaymentHistoryQuery,
   useGetPaymentHistoryByIdQuery,
 } = paymentsApi;
