@@ -584,7 +584,7 @@ export default function ApprovedRequestsPage() {
         currentStep={currentStep}
         onNextStep={handleNextStep}
         onBackStep={handleBackStep}
-        onIssuePO={handleIssuePO}
+        onIssuePO={() => handleIssuePO({ vendor: 0, payment_term: null, expected_delivery_date: "", currency: 0 })}
         formatCurrency={formatCurrency}
       />
 

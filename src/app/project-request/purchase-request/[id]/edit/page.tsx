@@ -663,7 +663,6 @@ export default function EditPurchaseRequestPage() {
       setStatusModal({
         isOpen: true,
         type: "error",
-        title: "Submission Unsuccessful",
         title: "Update Unsuccessful",
         description: err.data?.message || err.message || "There was an error updating your request. Please check your connection and try again.",
       });
@@ -788,8 +787,8 @@ export default function EditPurchaseRequestPage() {
                       (l: any) => String(l.id) === String(selectedProj.site_location)
                     );
                     setLocation(
-                      locObj 
-                        ? (locObj.location_name || locObj.name || String(locObj.id)) 
+                      (locObj as any) 
+                        ? ((locObj as any).location_name || (locObj as any).name || String((locObj as any).id)) 
                         : selectedProj.site_location
                     );
                   } else {
