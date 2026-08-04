@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { Input } from "../ui/input";
 import PaymentTermsSelect from "../shared/PaymentTermsSelect";
+import { useGetVendorsQuery } from "@/api/invoice/vendorsApi";
+import { useGetActiveCurrenciesQuery } from "@/api/invoice/invoiceCurrencyApi";
+import { useGetPaymentTermsQuery } from "@/api/invoice/paymentTermsApi";
 
 interface Product {
   productName: string;
@@ -37,7 +40,7 @@ interface ConvertToPOModalProps {
   currentStep: number;
   onNextStep: () => void;
   onBackStep: () => void;
-  onIssuePO: () => void;
+  onIssuePO: (payload: { vendor: number; payment_term: number | null; expected_delivery_date: string; currency: number }) => void;
   formatCurrency: (amount: number) => string;
 }
 
@@ -51,9 +54,17 @@ export default function ConvertToPOModal({
   onIssuePO,
   formatCurrency,
 }: ConvertToPOModalProps) {
-  const [selectedVendor, setSelectedVendor] = useState("xyz Vendor");
-  const [selectedPaymentTerms, setSelectedPaymentTerms] =
-    useState("Immediate Payment");
+  const { data: vendorsResponse } = useGetVendorsQuery({});
+  const vendors = Array.isArray(vendorsResponse) ? vendorsResponse : (vendorsResponse as any)?.results || [];
+  const { data: activeCurrenciesResponse } = useGetActiveCurrenciesQuery();
+  const activeCurrencies = Array.isArray(activeCurrenciesResponse) ? activeCurrenciesResponse : (activeCurrenciesResponse as any)?.results || [];
+  const defaultCurrencyId = activeCurrencies.length > 0 ? activeCurrencies[0].id : 1; // Fallback to 1 if empty
+  
+  const { data: paymentTermsResponse } = useGetPaymentTermsQuery({});
+  const paymentTermsList = Array.isArray(paymentTermsResponse) ? paymentTermsResponse : (paymentTermsResponse as any)?.results || [];
+
+  const [selectedVendor, setSelectedVendor] = useState("");
+  const [selectedPaymentTerms, setSelectedPaymentTerms] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,6 +84,12 @@ export default function ConvertToPOModal({
   const totalAmount =
     request?.products.reduce((sum, product) => sum + product.total, 0) || 0;
 
+  const vendorObj = vendors.find((v: any) => v.id.toString() === selectedVendor);
+  const displayVendorName = vendorObj ? vendorObj.vendor_name : selectedVendor || "Not selected";
+
+  const paymentTermObj = paymentTermsList.find((t: any) => t.id.toString() === selectedPaymentTerms);
+  const displayPaymentTermName = paymentTermObj ? paymentTermObj.name : selectedPaymentTerms || "Not specified";
+
   const handleNext = () => {
     if (!selectedVendor || !selectedPaymentTerms) {
       alert("Please select both vendor and payment terms");
@@ -91,9 +108,18 @@ export default function ConvertToPOModal({
 
   const handleIssue = () => {
     setIsSubmitting(true);
+    
+    // Construct payload
+    const payload = {
+      vendor: Number(selectedVendor),
+      payment_term: selectedPaymentTerms ? Number(selectedPaymentTerms) : null,
+      expected_delivery_date: deliveryDate,
+      currency: defaultCurrencyId
+    };
+
     setTimeout(() => {
       setIsSubmitting(false);
-      onIssuePO();
+      onIssuePO(payload);
     }, 1500);
   };
 
@@ -230,10 +256,12 @@ export default function ConvertToPOModal({
               onChange={(e) => setSelectedVendor(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
             >
-              <option value="Select Vendor">Select Vendor</option>
-              <option value="xyz Vendor">xyz Vendor</option>
-              <option value="ABC Construction">ABC Construction</option>
-              <option value="DEF Supplies">DEF Supplies</option>
+              <option value="">Select Vendor</option>
+              {vendors.map((vendor: any) => (
+                <option key={vendor.id} value={vendor.id.toString()}>
+                  {vendor.vendor_name}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -306,7 +334,7 @@ export default function ConvertToPOModal({
           <InfoIcon className="w-4 h-4 text-amber-800 mt-0.5 shrink-0" />
           <p className="text-sm text-amber-800">
             Once issued, this Purchase Order will be sent to{" "}
-            <strong>{selectedVendor}</strong>. The Committed Amount of{" "}
+            <strong>{displayVendorName}</strong>. The Committed Amount of{" "}
             <strong>N{totalAmount.toLocaleString()}</strong> will be locked
             against <strong>{request?.wbs}</strong> until payment is confirmed
             or the PO is cancelled.
@@ -320,7 +348,7 @@ export default function ConvertToPOModal({
               Vendor
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {selectedVendor}
+              {displayVendorName}
             </p>
           </div>
           <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
@@ -346,7 +374,7 @@ export default function ConvertToPOModal({
               Payment Terms
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {selectedPaymentTerms}
+              {displayPaymentTermName}
             </p>
           </div>
           <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">

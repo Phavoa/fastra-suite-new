@@ -15,39 +15,18 @@ import {
 } from "lucide-react";
 import CreateVendorBillModal from "@/components/invoice/CreateVendorBillModal";
 
-// Mock data for PO detail
-const mockPODetail = {
-  id: "PO0018",
-  vendor: "xyz Vendor",
-  wbs: "WBS-1.3.1 - Concrete Works",
-  costCategory: "LAB-001",
-  paymentTerms: "Credit Card",
-  issuedDate: "2024-05-15",
-  issuedBy: "John Doe",
-  requestType: "Purchase",
-  isPrepaid: false,
-  products: [
-    {
-      description: "Product 1",
-      unit: "KG",
-      qty: 4,
-      unitPrice: 600000,
-      total: 2400000,
-    },
-    {
-      description: "Product 2",
-      unit: "KG",
-      qty: 4,
-      unitPrice: 600000,
-      total: 2400000,
-    },
-  ],
-};
+import { useGetPurchaseOrderByIdQuery } from "@/api/invoice/projectPurchaseOrdersApi";
+import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const poId = Number(params?.id);
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
+
+  const { data: poDetail, isLoading, error } = useGetPurchaseOrderByIdQuery(poId, {
+    skip: !poId || isNaN(poId),
+  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -58,10 +37,23 @@ export default function PurchaseOrderDetailPage() {
     }).format(amount);
   };
 
-  const totalAmount = mockPODetail.products.reduce(
-    (sum, p) => sum + p.total,
-    0,
-  );
+  const totalAmount = Number(poDetail?.total_amount || 0);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!poDetail || error) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Error loading Purchase Order or it does not exist.
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -88,17 +80,17 @@ export default function PurchaseOrderDetailPage() {
           Purchase Order
         </Link>
         <span className="text-gray-400">/</span>
-        <span className="text-gray-900 font-medium">{mockPODetail.id}</span>
+        <span className="text-gray-900 font-medium">{poDetail.po_number}</span>
       </div>
 
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">
-            Purchase Order - {mockPODetail.id}
+            Purchase Order - {poDetail.po_number}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700">
             <Mail className="w-4 h-4" />
             Send Via Email
@@ -124,7 +116,7 @@ export default function PurchaseOrderDetailPage() {
               Vendor
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {mockPODetail.vendor}
+              {poDetail.vendor_name || "N/A"}
             </p>
           </div>
           <div>
@@ -132,23 +124,23 @@ export default function PurchaseOrderDetailPage() {
               WBS Element
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {mockPODetail.wbs}
+              {poDetail.wbs_element || "N/A"}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-              Cost Category
+              Status
             </p>
-            <p className="text-sm font-medium text-gray-900">
-              {mockPODetail.costCategory}
+            <p className="text-sm font-medium text-gray-900 capitalize">
+              {poDetail.status?.replace(/_/g, ' ') || "N/A"}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-              Payment Terms
+              Expected Delivery
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {mockPODetail.paymentTerms}
+              {poDetail.expected_delivery_date ? new Date(poDetail.expected_delivery_date).toLocaleDateString() : "N/A"}
             </p>
           </div>
           <div>
@@ -156,15 +148,15 @@ export default function PurchaseOrderDetailPage() {
               Issued Date
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {mockPODetail.issuedDate}
+              {poDetail.issued_at ? new Date(poDetail.issued_at).toLocaleDateString() : "Not Issued"}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-              Issued By
+              Created Date
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {mockPODetail.issuedBy}
+              {poDetail.created_at ? new Date(poDetail.created_at).toLocaleDateString() : "N/A"}
             </p>
           </div>
         </div>
@@ -175,13 +167,8 @@ export default function PurchaseOrderDetailPage() {
         <h2 className="text-sm font-medium text-gray-700 mb-4">Request type</h2>
         <div className="flex items-center gap-4">
           <span className="inline-flex px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
-            {mockPODetail.requestType}
+            {poDetail.source_request_type || "Purchase Order"}
           </span>
-          {mockPODetail.isPrepaid && (
-            <span className="inline-flex px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium">
-              Prepaid
-            </span>
-          )}
         </div>
       </div>
 
@@ -209,22 +196,22 @@ export default function PurchaseOrderDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {mockPODetail.products.map((product, index) => (
+              {poDetail.lines?.map((line: PurchaseOrderLine, index: number) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {product.description}
+                    {line.item_name || line.description}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {product.unit}
+                    - 
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-600">
-                    {product.qty}
+                    {line.qty}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-600">
-                    {formatCurrency(product.unitPrice)}
+                    {formatCurrency(Number(line.unit_price || 0))}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                    {formatCurrency(product.total)}
+                    {formatCurrency(Number(line.line_total || 0))}
                   </td>
                 </tr>
               ))}
@@ -250,8 +237,9 @@ export default function PurchaseOrderDetailPage() {
       <CreateVendorBillModal
         isOpen={isBillModalOpen}
         onClose={() => setIsBillModalOpen(false)}
-        poId={mockPODetail.id}
-        products={mockPODetail.products}
+        poId={poDetail.po_number}
+        vendorId={poDetail.vendor}
+        products={poDetail.lines || []}
         formatCurrency={formatCurrency}
       />
     </div>

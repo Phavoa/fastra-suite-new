@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, Loader2 } from "lucide-react";
 import { useGetProjectRequestsQuery } from "@/api/requests/projectRequestApi";
+import { useConvertRequestToPurchaseOrderMutation } from "@/api/invoice/projectPurchaseOrdersApi";
 import ConvertToPOModal from "@/components/invoice/ConvertToPOModal";
 import ConvertToPOSubcontractorModal from "@/components/invoice/subcontractor/ConvertToPOSubcontractorModal";
 import ConvertToInvoiceLabourModal from "@/components/invoice/labour-request/ConvertToInvoiceLabourReqModal";
@@ -201,10 +202,13 @@ export default function ApprovedRequestsPage() {
     isLoading,
     isError,
     error,
+    refetch,
   } = useGetProjectRequestsQuery({
     status: "approved",
     module_destination: "invoice",
   });
+
+  const [convertRequestToPurchaseOrder] = useConvertRequestToPurchaseOrderMutation();
 
   const handleConvertToPO = (request: any) => {
     setSelectedRequest(request);
@@ -268,9 +272,31 @@ export default function ApprovedRequestsPage() {
     setCurrentStep(1);
   };
 
-  const handleIssuePO = () => {
-    alert("Purchase Order Issued Successfully!");
-    handleCloseModal();
+  const handleIssuePO = async (payload: { vendor: number; payment_term: number | null; expected_delivery_date: string; currency: number }) => {
+    if (!selectedRequest || !selectedRequest.backendId) {
+      alert("Invalid request selected.");
+      return;
+    }
+    
+    try {
+      const result = await convertRequestToPurchaseOrder({
+        requestId: selectedRequest.backendId,
+        data: {
+          vendor: payload.vendor,
+          currency: payload.currency,
+          wbs_element: selectedRequest.wbs,
+          payment_term: payload.payment_term,
+          expected_delivery_date: payload.expected_delivery_date,
+        },
+      }).unwrap();
+      
+      alert("Purchase Order Issued Successfully!");
+      handleCloseModal();
+      refetch(); // Refresh the list
+    } catch (err: any) {
+      alert(err?.data?.error || err?.data?.detail || "Failed to issue Purchase Order. Please check your settings.");
+      console.error(err);
+    }
   };
 
   const handleLabourCreateBill = () => {
@@ -318,6 +344,7 @@ export default function ApprovedRequestsPage() {
     };
     return {
       id: req.reference_id || `REQ-${req.id}`,
+      backendId: req.id,
       type: typeMap[req.request_type] || req.request_type,
       wbs:
         req.project_details?.name ||
@@ -328,6 +355,7 @@ export default function ApprovedRequestsPage() {
         detail?.amount_requested ||
         detail?.amountRequested ||
         detail?.amount ||
+        detail?.total_amount ||
         0,
       supplierName:
         detail?.supplier_name ||
@@ -336,7 +364,13 @@ export default function ApprovedRequestsPage() {
         "",
       projectName: req.project_details?.name || "General Project",
       paymentTerms: detail?.payment_terms || detail?.paymentTerms || "N/A",
-      products: detail?.products || [],
+      products: (detail?.products || detail?.lines || []).map((p: any) => ({
+        productName: p.productName || p.description || p.item_name || `Product #${p.product || 'Unknown'}`,
+        unit: p.unit || p.unit_of_measure || "Unit",
+        qty: Number(p.qty || p.quantity || 0),
+        unitPrice: Number(p.unitPrice || p.estimated_unit_cost || p.unit_cost || 0),
+        total: Number(p.total || p.line_total || 0),
+      })),
       pettyCashId: detail?.petty_cash_id || detail?.pettyCashId || "",
       requesterName: req.created_by_details
         ? `${req.created_by_details.first_name} ${req.created_by_details.last_name}`
@@ -550,7 +584,7 @@ export default function ApprovedRequestsPage() {
         currentStep={currentStep}
         onNextStep={handleNextStep}
         onBackStep={handleBackStep}
-        onIssuePO={handleIssuePO}
+        onIssuePO={() => handleIssuePO({ vendor: 0, payment_term: null, expected_delivery_date: "", currency: 0 })}
         formatCurrency={formatCurrency}
       />
 

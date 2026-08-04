@@ -25,6 +25,7 @@ export default function NewProjectPage() {
   const [startDate, setStartDate] = useState("");
   const [expectedEndDate, setExpectedEndDate] = useState("");
   const [description, setDescription] = useState("");
+  const [siteLocation, setSiteLocation] = useState("");
 
   // WBS Table States
   const [phases, setPhases] = useState<Phase[]>([]);
@@ -41,6 +42,7 @@ export default function NewProjectPage() {
 
   const wbsFileInputRef = useRef<HTMLInputElement>(null);
   const [importedFileName, setImportedFileName] = useState("");
+  const [isDraggingWbs, setIsDraggingWbs] = useState(false);
 
   // Handler for adding a URL Link
   const handleAddLink = () => {
@@ -75,10 +77,7 @@ export default function NewProjectPage() {
   };
 
   // Handler for importing WBS Excel sheet
-  const handleWBSImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processWBSFile = (file: File) => {
     setImportedFileName(file.name);
 
     const reader = new FileReader();
@@ -204,9 +203,39 @@ export default function NewProjectPage() {
       }
     };
     reader.readAsBinaryString(file);
+  };
 
+  const handleWBSImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processWBSFile(file);
     if (wbsFileInputRef.current) {
       wbsFileInputRef.current.value = "";
+    }
+  };
+
+  const handleDragOverWbs = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingWbs(true);
+  };
+
+  const handleDragLeaveWbs = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingWbs(false);
+  };
+
+  const handleDropWbs = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingWbs(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+      processWBSFile(file);
+    } else if (file) {
+      statusModal.showError("Invalid File", "Please drop a valid Excel file (.xlsx or .xls)");
     }
   };
 
@@ -285,12 +314,8 @@ export default function NewProjectPage() {
         start_date: startDate || new Date().toISOString().split("T")[0],
         expected_end_date: expectedEndDate || new Date().toISOString().split("T")[0],
         description,
+        site_location: siteLocation,
         phases: phasesPayload,
-        // Include documents URL/labels if the backend is ready for them
-        documents: documents.map((d) => ({
-          name: d.name,
-          url: d.url || "",
-        })),
       } as any).unwrap();
 
       statusModal.showSuccess(
@@ -353,6 +378,8 @@ export default function NewProjectPage() {
           setExpectedEndDate={setExpectedEndDate}
           description={description}
           setDescription={setDescription}
+          siteLocation={siteLocation}
+          setSiteLocation={setSiteLocation}
         />
 
         {/* WBS Excel Import Section */}
@@ -374,10 +401,19 @@ export default function NewProjectPage() {
                   <button
                     type="button"
                     onClick={() => wbsFileInputRef.current?.click()}
-                    className="flex items-center justify-center gap-2 px-6 py-6 border-2 border-dashed border-[#3B7CED] opacity-80 rounded text-[#3B7CED] hover:bg-blue-50 transition-colors"
+                    onDragOver={handleDragOverWbs}
+                    onDragLeave={handleDragLeaveWbs}
+                    onDrop={handleDropWbs}
+                    className={`flex items-center justify-center gap-2 px-6 py-6 border-2 border-dashed rounded transition-colors ${
+                      isDraggingWbs 
+                        ? "border-blue-500 bg-blue-50 text-blue-600 scale-[1.02]" 
+                        : "border-[#3B7CED] opacity-80 text-[#3B7CED] hover:bg-blue-50"
+                    }`}
                   >
                     <Plus className="w-4 h-4" />
-                    <span className="text-sm font-medium">Import WBS Excel</span>
+                    <span className="text-sm font-medium">
+                      {isDraggingWbs ? "Drop Excel File Here" : "Import WBS Excel (Drag & Drop)"}
+                    </span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-xs border border-gray-800 max-w-xs z-50">

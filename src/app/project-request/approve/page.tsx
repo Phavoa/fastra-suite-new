@@ -19,9 +19,13 @@ export default function ApproveRequestPage() {
   const user = useSelector((state: RootState) => state.auth?.user);
   const statusModal = useStatusModal();
 
-  const { data: apiRequests, isLoading: isRequestsLoading, refetch } = useGetProjectRequestsQuery({
+  const { data: rawApiRequests, isLoading: isRequestsLoading, refetch } = useGetProjectRequestsQuery({
     status: "pending"
   });
+  
+  const apiRequests = React.useMemo(() => {
+    return Array.isArray(rawApiRequests) ? rawApiRequests : (rawApiRequests as any)?.results || [];
+  }, [rawApiRequests]);
   const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
   const projects = React.useMemo(() => {
     const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];
@@ -127,7 +131,7 @@ export default function ApproveRequestPage() {
               <p className="text-gray-500 font-medium text-sm">Loading pending requests...</p>
             </div>
           ) : apiRequests && apiRequests.length > 0 ? (
-            apiRequests.map((request) => (
+            apiRequests.map((request: any) => (
               <div
                 key={request.id}
                 className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-[#3B7CED] transition-colors"

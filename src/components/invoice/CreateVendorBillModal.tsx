@@ -10,19 +10,15 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-interface Product {
-  description: string;
-  unit: string;
-  qty: number;
-  unitPrice: number;
-  total: number;
-}
+import { useCreateInvoiceMutation } from "@/api/invoice/invoicesApi";
+import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 
 interface CreateVendorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
   poId: string;
-  products: Product[];
+  vendorId: number;
+  products: PurchaseOrderLine[];
   formatCurrency: (amount: number) => string;
 }
 
@@ -30,6 +26,7 @@ export default function CreateVendorBillModal({
   isOpen,
   onClose,
   poId,
+  vendorId,
   products,
   formatCurrency,
 }: CreateVendorBillModalProps) {
@@ -42,6 +39,8 @@ export default function CreateVendorBillModal({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [createInvoice, { isLoading: isSubmitting }] = useCreateInvoiceMutation();
 
   if (!isOpen) return null;
 
@@ -87,15 +86,15 @@ export default function CreateVendorBillModal({
   };
 
   const getTotalPOAmount = () => {
-    return products.reduce((sum, product) => sum + product.total, 0);
+    return products.reduce((sum, product) => sum + Number(product.line_total || 0), 0);
   };
 
-  const handleSubmit = () => {
-    // Validate file upload
-    if (!uploadedFile) {
-      alert("Please upload the vendor invoice document");
-      return;
-    }
+  const handleSubmit = async () => {
+    // We ignore the file upload check for now since API doesn't accept it in the JSON payload
+    // if (!uploadedFile) {
+    //   alert("Please upload the vendor invoice document");
+    //   return;
+    // }
 
     // Validate all invoice quantities and prices are filled
     const hasEmptyFields = products.some(
@@ -107,8 +106,29 @@ export default function CreateVendorBillModal({
       return;
     }
 
-    alert("Vendor bill submitted successfully!");
-    onClose();
+    try {
+      const invoice_items = products.map((product, index) => ({
+        product: product.product,
+        quantity: invoiceQuantities[index],
+        unit_price: invoiceUnitPrices[index].toString(),
+      }));
+
+      // Default due date to 30 days from now
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30);
+
+      await createInvoice({
+        vendor: vendorId,
+        purchase_order: poId,
+        due_date: dueDate.toISOString().split("T")[0],
+        invoice_items,
+      }).unwrap();
+
+      alert("Vendor bill submitted successfully!");
+      onClose();
+    } catch (err: any) {
+      alert(err?.data?.error || "Failed to create vendor bill.");
+    }
   };
 
   return (
@@ -257,7 +277,7 @@ export default function CreateVendorBillModal({
                           className="hover:bg-gray-50 transition-colors"
                         >
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {product.description}
+                            {product.item_name || product.description}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">
                             {product.qty}
@@ -276,7 +296,7 @@ export default function CreateVendorBillModal({
                             />
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">
-                            {formatCurrency(product.unitPrice)}
+                            {formatCurrency(Number(product.unit_price || 0))}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <input
@@ -292,7 +312,7 @@ export default function CreateVendorBillModal({
                             />
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                            {formatCurrency(product.total)}
+                            {formatCurrency(Number(product.line_total || 0))}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                             {formatCurrency(getInvoiceTotal(index))}
@@ -332,10 +352,11 @@ export default function CreateVendorBillModal({
             </button>
             <button
               onClick={handleSubmit}
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              Submit Vendor Bill
-              <ChevronRight className="w-4 h-4" />
+              {isSubmitting ? "Submitting..." : "Submit Vendor Bill"}
+              {!isSubmitting && <ChevronRight className="w-4 h-4" />}
             </button>
           </div>
         </div>

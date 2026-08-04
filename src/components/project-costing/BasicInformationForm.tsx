@@ -8,6 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
+import { Loader2 } from "lucide-react";
 
 interface BasicInformationFormProps {
   name: string;
@@ -22,6 +24,8 @@ interface BasicInformationFormProps {
   setExpectedEndDate: (val: string) => void;
   description: string;
   setDescription: (val: string) => void;
+  siteLocation: string;
+  setSiteLocation: (val: string) => void;
 }
 
 export function BasicInformationForm({
@@ -37,7 +41,11 @@ export function BasicInformationForm({
   setExpectedEndDate,
   description,
   setDescription,
+  siteLocation,
+  setSiteLocation,
 }: BasicInformationFormProps) {
+  const { data: activeLocations, isLoading: isLoadingLocations } = useGetActiveLocationsFilteredQuery();
+
   return (
     <section>
       <h2 className="text-[#3B7CED] text-xl mb-6">Basic Information</h2>
@@ -98,7 +106,30 @@ export function BasicInformationForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2 md:col-span-3">
+        <div className="flex flex-col gap-2">
+          <Label className="text-gray-700 font-medium">Site Location</Label>
+          <Select value={siteLocation} onValueChange={setSiteLocation}>
+            <SelectTrigger className="bg-white border-gray-300 rounded text-gray-700 h-10">
+              {isLoadingLocations ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  <span className="text-gray-400">Loading...</span>
+                </div>
+              ) : (
+                <SelectValue placeholder="Select Site Location" />
+              )}
+            </SelectTrigger>
+            <SelectContent>
+              {activeLocations?.map((loc: any) => (
+                <SelectItem key={loc.id} value={loc.id}>
+                  {loc.location_name || loc.name || loc.id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2 md:col-span-2">
           <Label className="text-gray-700 font-medium">Description</Label>
           <Input
             placeholder="Enter descriptions"

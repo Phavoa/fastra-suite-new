@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Bell, Pencil, Trash, X, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 import { useGetCurrenciesQuery } from "@/api/purchase/currencyApi";
 import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
 import { useGetTenantUsersQuery } from "@/api/settings/tenantUserApi";
-import { useCreateProjectPurchaseRequestMutation } from "@/api/requests/projectPurchaseRequestApi";
+import { usePatchProjectPurchaseRequestMutation, useGetProjectPurchaseRequestQuery } from "@/api/requests/projectPurchaseRequestApi";
 import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { useSelector } from "react-redux";
@@ -45,8 +45,9 @@ interface ItemState {
   error?: string;
 }
 
-export default function NewPurchaseRequestPage() {
+export default function EditPurchaseRequestPage() {
   const router = useRouter();
+  const { id } = useParams();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserName = useMemo(() => {
     if (!loggedInUser) return "Current User";
@@ -55,6 +56,7 @@ export default function NewPurchaseRequestPage() {
   }, [loggedInUser]);
 
   // API queries
+  const { data: requestData, isLoading: isRequestLoading } = useGetProjectPurchaseRequestQuery(id as string, { skip: !id });
   const { data: rawCostingProjects = [] } = useGetProjectCostingProjectsQuery({});
   const { data: rawInventoryProducts = [] } = useGetInventoryProductsQuery({});
   const { data: dbProducts = [] } = useGetProductsQuery({});
@@ -62,8 +64,7 @@ export default function NewPurchaseRequestPage() {
   const { data: vendors } = useGetVendorsQuery({});
   const { data: tenantUsers } = useGetTenantUsersQuery({});
   const { data: activeLocations, isLoading: isLoadingLocations } = useGetActiveLocationsFilteredQuery();
-  const [createProjectPurchaseRequest, { isLoading: isCreating }] =
-    useCreateProjectPurchaseRequestMutation();
+  const [patchProjectPurchaseRequest, { isLoading: isUpdating }] = usePatchProjectPurchaseRequestMutation();
 
   // Local state for dropdown options
   const [customProducts, setCustomProducts] = useState<
@@ -126,6 +127,48 @@ export default function NewPurchaseRequestPage() {
     },
     { skip: !selectedProjectId || !selectedTaskId },
   );
+
+  useEffect(() => {
+    if (requestData) {
+      if (requestData.project) setSelectedProjectId(String(requestData.project));
+      
+      let parsedPhase = "";
+      let parsedTask = "";
+      let parsedNotes = requestData.notes || requestData.purpose || "";
+      if (parsedNotes && typeof parsedNotes === "string" && parsedNotes.includes(" | ")) {
+        const parts = parsedNotes.split(" | ");
+        parts.forEach((part: string) => {
+          if (part.startsWith("Phase: ")) parsedPhase = part.replace("Phase: ", "");
+          if (part.startsWith("Activity: ")) parsedTask = part.replace("Activity: ", "");
+          if (part.startsWith("Notes: ")) parsedNotes = part.replace("Notes: ", "");
+        });
+      }
+      setNotes(parsedNotes);
+
+      if (requestData.activity) {
+        setSelectedTaskId(String(requestData.activity));
+      }
+      
+      if (requestData.site_location) {
+        setLocation(requestData.site_location);
+      }
+      
+      const reqDate = requestData.required_by_date || requestData.requiredDate;
+      if (reqDate) setRequiredDate(reqDate);
+
+      if (requestData.lines && requestData.lines.length > 0) {
+        setItems(requestData.lines.map((line: any) => ({
+          id: String(line.id || Math.random()),
+          isEditing: false,
+          productName: line.product_details?.product_name || line.description || "",
+          productId: String(line.product || ""),
+          quantity: Number(line.quantity || line.qty || 1),
+          unitCost: Number(line.estimated_unit_cost || line.estimated_unit_price || 0),
+          description: line.description || "",
+        })));
+      }
+    }
+  }, [requestData]);
 
   // Filter Phases (parent WBS) from Project Costing
   const approvedProjects = useMemo(() => {
@@ -530,7 +573,7 @@ export default function NewPurchaseRequestPage() {
           dbProducts[0]?.id ||
           1);
 
-      return {
+      const payloadLine: any = {
         product: productDbId,
         description: item.description || item.productName || "",
         quantity: String(item.quantity || 1),
@@ -538,6 +581,13 @@ export default function NewPurchaseRequestPage() {
         qty: item.quantity || 1,
         estimated_unit_price: String(item.unitCost || 0),
       };
+      
+      // Pass the ID back if it's an existing numeric ID, allowing Django to update the line instead of crash
+      if (item.id && !isNaN(parseInt(item.id)) && !item.id.includes(".")) {
+        payloadLine.id = parseInt(item.id);
+      }
+      
+      return payloadLine;
     });
 
     const purposeStr = `Project: ${projectName} | Phase: ${phaseName} | Activity: ${taskName} | Notes: ${notes}`;
@@ -562,8 +612,6 @@ export default function NewPurchaseRequestPage() {
       required_by_date: requiredDate,
       notes: purposeStr,
       lines: linesPayload,
-
-      status: "pending" as const,
       currency: currencies?.[0]?.id || 1,
       requester: requesterId,
       requesting_location: location || String(activeLocations?.[0]?.id || 1),
@@ -573,7 +621,7 @@ export default function NewPurchaseRequestPage() {
     };
 
     try {
-      const result = await createProjectPurchaseRequest(payload).unwrap();
+      const result = await patchProjectPurchaseRequest({ id: id as string, data: payload }).unwrap();
 
       const newRequest = {
         id: result?.id || `pr-${Date.now()}`,
@@ -615,8 +663,8 @@ export default function NewPurchaseRequestPage() {
       setStatusModal({
         isOpen: true,
         type: "error",
-        title: "Submission Unsuccessful",
-        description: err.data?.message || err.message || "There was an error submitting your request. Please check your connection and try again.",
+        title: "Update Unsuccessful",
+        description: err.data?.message || err.message || "There was an error updating your request. Please check your connection and try again.",
       });
     }
   };
@@ -624,9 +672,17 @@ export default function NewPurchaseRequestPage() {
   const handleModalClose = () => {
     setStatusModal((prev) => ({ ...prev, isOpen: false }));
     if (statusModal.type === "success") {
-      router.push("/project-request/purchase-request");
+      router.push(`/project-request/purchase-request/${id}`);
     }
   };
+
+  if (isRequestLoading) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-[#3B7CED] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-28">
@@ -642,7 +698,7 @@ export default function NewPurchaseRequestPage() {
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
             <h1 className="text-lg font-bold text-gray-800">
-              Purchase Request
+              Edit Purchase Request
             </h1>
           </div>
 
@@ -1002,10 +1058,11 @@ export default function NewPurchaseRequestPage() {
       <div className="fixed bottom-0 left-16 right-0 bg-white border-t border-gray-100 p-4 z-20">
         <div className="max-w-2xl mx-auto">
           <Button
-            onClick={handleSubmit}
             className="w-full h-12 text-sm font-bold flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-sm"
+            onClick={handleSubmit}
+            disabled={isUpdating}
           >
-            Submit request
+            {isUpdating ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>

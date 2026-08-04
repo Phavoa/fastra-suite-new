@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { CustomMessage } from "@/components/shared/CustomMessage";
+import { format } from "date-fns";
 
 const STATUS_TABS = [
   { label: "All", value: "all" },
@@ -26,12 +27,22 @@ const STATUS_TABS = [
 ];
 
 const getProjectManager = (project: any) => {
-  return (
-    project.project_manager ||
-    project.manager ||
-    project.client_name ||
-    "John Doe"
-  );
+  if (project.project_manager_details) {
+    const { first_name, last_name } = project.project_manager_details;
+    if (first_name || last_name) {
+      return `${first_name || ""} ${last_name || ""}`.trim();
+    }
+  }
+  return project.client_name || "Unknown";
+};
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return "N/A";
+  try {
+    return format(new Date(dateStr), "MMM-dd-yyyy");
+  } catch (e) {
+    return dateStr;
+  }
 };
 
 const getProjectBudget = (project: any) => {
@@ -261,6 +272,9 @@ export default function ProjectCostingListPage() {
                     Start Date
                   </TableHead>
                   <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
+                    End Date
+                  </TableHead>
+                  <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
                     Project Budget
                   </TableHead>
                   <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
@@ -272,7 +286,7 @@ export default function ProjectCostingListPage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center py-12 text-gray-500"
                     >
                       <div className="flex items-center justify-center gap-2">
@@ -283,7 +297,7 @@ export default function ProjectCostingListPage() {
                   </TableRow>
                 ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8">
+                    <TableCell colSpan={8} className="py-8">
                       <CustomMessage
                         variant="error"
                         title="We couldn't load your projects right now"
@@ -296,7 +310,7 @@ export default function ProjectCostingListPage() {
                   </TableRow>
                 ) : filteredProjects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8">
+                    <TableCell colSpan={8} className="py-8">
                       <CustomMessage
                         variant="empty"
                         title={
@@ -332,7 +346,10 @@ export default function ProjectCostingListPage() {
                         {project.project_type || "Fixed Price"}
                       </TableCell>
                       <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
-                        {project.start_date || "N/A"}
+                        {formatDate(project.start_date)}
+                      </TableCell>
+                      <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
+                        {formatDate(project.expected_end_date)}
                       </TableCell>
                       <TableCell className="text-[#32325D] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
                         {getProjectBudget(project)}
@@ -410,7 +427,7 @@ export default function ProjectCostingListPage() {
                         Start Date
                       </span>
                       <span className="font-medium text-gray-700 mt-0.5 block">
-                        {project.start_date || "N/A"}
+                        {formatDate(project.start_date)}
                       </span>
                     </div>
                     <div>

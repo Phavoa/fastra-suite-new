@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Search, ChevronDown, X } from "lucide-react";
-import { paymentTermsList } from "@/utils/paymentTerms";
-
+import { useGetPaymentTermsQuery, PaymentTerm } from "@/api/invoice/paymentTermsApi";
 interface PaymentTermsSelectProps {
   value: string;
   onChange: (value: string) => void;
@@ -19,7 +18,9 @@ export default function PaymentTermsSelect({
 }: PaymentTermsSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredTerms, setFilteredTerms] = useState(paymentTermsList);
+  const { data: apiData } = useGetPaymentTermsQuery({});
+  const paymentTermsList: PaymentTerm[] = Array.isArray(apiData) ? apiData : (apiData as any)?.results || [];
+  const [filteredTerms, setFilteredTerms] = useState<PaymentTerm[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -30,11 +31,11 @@ export default function PaymentTermsSelect({
       setFilteredTerms(paymentTermsList);
     } else {
       const filtered = paymentTermsList.filter((term) =>
-        term.toLowerCase().includes(searchTerm.toLowerCase()),
+        term.name.toLowerCase().includes(searchTerm.toLowerCase()),
       );
       setFilteredTerms(filtered);
     }
-  }, [searchTerm]);
+  }, [searchTerm, paymentTermsList]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -66,8 +67,8 @@ export default function PaymentTermsSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isModalOpen]);
 
-  const handleSelect = (term: string) => {
-    onChange(term);
+  const handleSelect = (termId: string) => {
+    onChange(termId);
     setIsOpen(false);
     setIsModalOpen(false);
     setSearchTerm("");
@@ -81,6 +82,9 @@ export default function PaymentTermsSelect({
 
   const displayedTerms = isOpen ? filteredTerms : [];
 
+  const selectedTermObj = paymentTermsList.find((t) => t.id.toString() === value);
+  const displayValue = selectedTermObj ? selectedTermObj.name : value;
+
   return (
     <>
       {/* Dropdown */}
@@ -91,10 +95,10 @@ export default function PaymentTermsSelect({
         >
           <span
             className={
-              value === placeholder ? "text-gray-400" : "text-gray-900"
+              !selectedTermObj ? "text-gray-400" : "text-gray-900"
             }
           >
-            {value || placeholder}
+            {displayValue || placeholder}
           </span>
           <ChevronDown
             className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
@@ -124,18 +128,18 @@ export default function PaymentTermsSelect({
             {/* Terms List */}
             <div className="overflow-y-auto max-h-48">
               {displayedTerms.length > 0 ? (
-                displayedTerms.map((term, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSelect(term)}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 transition-colors ${
-                      value === term
+                displayedTerms.map((term) => (
+                  <div
+                    key={term.id}
+                    onClick={() => handleSelect(term.id.toString())}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 cursor-pointer transition-colors ${
+                      value === term.id.toString()
                         ? "bg-blue-50 text-blue-600 font-medium"
                         : "text-gray-700"
                     }`}
                   >
-                    {term}
-                  </button>
+                    {term.name}
+                  </div>
                 ))
               ) : (
                 <div className="px-4 py-3 text-sm text-gray-500 text-center">
@@ -205,18 +209,18 @@ export default function PaymentTermsSelect({
               {/* Modal Terms List */}
               <div className="flex-1 overflow-y-auto p-2">
                 {filteredTerms.length > 0 ? (
-                  filteredTerms.map((term, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSelect(term)}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-blue-50 rounded-lg transition-colors ${
-                        value === term
-                          ? "bg-blue-50 text-blue-600 font-medium"
-                          : "text-gray-700"
+                  filteredTerms.map((term) => (
+                    <div
+                      key={term.id}
+                      onClick={() => handleSelect(term.id.toString())}
+                      className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors flex items-center justify-between group rounded-lg ${
+                        value === term.id.toString() ? "bg-blue-50" : ""
                       }`}
                     >
-                      {term}
-                    </button>
+                      <span className={`text-sm font-medium ${value === term.id.toString() ? "text-blue-600" : "text-gray-700"}`}>
+                        {term.name}
+                      </span>
+                    </div>
                   ))
                 ) : (
                   <div className="px-4 py-8 text-sm text-gray-500 text-center">
