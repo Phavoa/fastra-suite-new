@@ -55,12 +55,16 @@ export interface ProductDetails {
 }
 
 export interface IncomingProductItem {
-  id: string;
-  incoming_product: string;
+  id?: number | string;
+  incoming_product?: string;
   product: number;
-  product_details: ProductDetails;
+  product_name?: string;
+  product_details?: ProductDetails;
   expected_quantity: string;
   quantity_received: string;
+  po_line?: number;
+  ppo_line?: number;
+  unit_of_measure?: number;
 }
 
 export interface SupplierDetails {
@@ -77,7 +81,8 @@ export interface SupplierDetails {
 export interface IncomingProduct {
   incoming_product_id: string;
   receipt_type: string;
-  related_po: string;
+  related_po: string | null;
+  related_ppo?: number | null;
   supplier: number;
   source_location: string;
   source_location_details: LocationDetails;
@@ -86,15 +91,22 @@ export interface IncomingProduct {
   destination_location: string;
   destination_location_details: LocationDetails;
   status: string;
-  is_validated: boolean;
-  can_edit: boolean;
+  is_validated?: boolean;
+  can_edit?: string | boolean;
   is_hidden: boolean;
-  notes: string;
+  notes?: string;
+  is_backorder?: boolean;
   backorder_of: string | null;
   backorder_of_details?: {
     id: string;
     incoming_product_id: string;
   };
+  validated_by?: number;
+  validated_by_details?: UserDetails;
+  validated_at?: string;
+  waybill_photo?: string | null;
+  date_created?: string;
+  date_updated?: string;
 }
 
 // Request/Response types for different endpoints
@@ -107,41 +119,49 @@ export interface GetIncomingProductsParams {
 }
 
 export interface CreateIncomingProductRequest {
-  incoming_product_id?: string;
   receipt_type: string;
-  related_po: string | null;
+  related_po?: string | null;
+  related_ppo?: number | null;
   supplier: number;
   source_location: string;
+  destination_location: string;
   incoming_product_items: Array<{
     product: number;
     expected_quantity: string;
     quantity_received: string;
+    po_line?: number;
+    ppo_line?: number;
+    unit_of_measure?: number;
   }>;
-  destination_location: string;
-  status: string;
-  is_validated: boolean;
-  can_edit: boolean;
-  is_hidden: boolean;
+  is_backorder?: boolean;
+  backorder_of?: string | null;
+  status?: string;
+  waybill_photo?: string | null;
+  is_hidden?: boolean;
   notes?: string | null;
 }
 
 export interface UpdateIncomingProductRequest {
-  incoming_product_id: string;
-  receipt_type: string;
-  related_po: string | null;
-  supplier: number;
-  source_location: string;
-  incoming_product_items: Array<{
-    id: string;
-    product: number;
-    expected_quantity: string;
-    quantity_received: string;
+  receipt_type?: string;
+  related_po?: string | null;
+  related_ppo?: number | null;
+  supplier?: number;
+  source_location?: string;
+  destination_location?: string;
+  incoming_product_items?: Array<{
+    id?: number | string;
+    product?: number;
+    expected_quantity?: string;
+    quantity_received?: string;
+    po_line?: number;
+    ppo_line?: number;
+    unit_of_measure?: number;
   }>;
-  destination_location: string;
-  status: string;
-  is_validated: boolean;
-  can_edit: boolean;
-  is_hidden: boolean;
+  is_backorder?: boolean;
+  backorder_of?: string | null;
+  status?: string;
+  waybill_photo?: string | null;
+  is_hidden?: boolean;
   notes?: string | null;
 }
 

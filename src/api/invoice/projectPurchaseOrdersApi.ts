@@ -56,6 +56,8 @@ export interface UpdatePurchaseOrderRequest extends CreatePurchaseOrderRequest {
 export interface PatchPurchaseOrderRequest extends Partial<CreatePurchaseOrderRequest> {}
 
 export interface ConvertRequestToPurchaseOrderRequest {
+  source_type: string;
+  source_id: number;
   vendor: number;
   currency: number;
   wbs_element: string;
@@ -144,26 +146,26 @@ export const projectPurchaseOrdersApi = createApi({
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query<ProjectPurchaseOrder[], GetPurchaseOrdersParams | void>({
       query: (params) => ({
-        url: "/invoicing/purchase-order/",
+        url: "/invoicing/project-purchase-orders/",
         params,
       }),
     }),
     createPurchaseOrder: builder.mutation<ProjectPurchaseOrder, CreatePurchaseOrderRequest>({
       query: (body) => ({
-        url: "/invoicing/purchase-order/",
+        url: "/invoicing/project-purchase-orders/",
         method: "POST",
         body,
       }),
     }),
     getPurchaseOrderById: builder.query<ProjectPurchaseOrder, number>({
-      query: (id) => `/invoicing/purchase-order/${id}/`,
+      query: (id) => `/invoicing/project-purchase-orders/${id}/`,
     }),
     updatePurchaseOrder: builder.mutation<
       ProjectPurchaseOrder,
       { id: number; data: UpdatePurchaseOrderRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/invoicing/purchase-order/${id}/`,
+        url: `/invoicing/project-purchase-orders/${id}/`,
         method: "PUT",
         body: data,
       }),
@@ -173,53 +175,53 @@ export const projectPurchaseOrdersApi = createApi({
       { id: number; data: PatchPurchaseOrderRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/invoicing/purchase-order/${id}/`,
+        url: `/invoicing/project-purchase-orders/${id}/`,
         method: "PATCH",
         body: data,
       }),
     }),
     deletePurchaseOrder: builder.mutation<void, number>({
       query: (id) => ({
-        url: `/invoicing/purchase-order/${id}/`,
+        url: `/invoicing/project-purchase-orders/${id}/`,
         method: "DELETE",
       }),
     }),
     cancelPurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/purchase-order/${id}/cancel/`,
+        url: `/invoicing/project-purchase-orders/${id}/cancel/`,
         method: "POST",
       }),
     }),
     closePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/purchase-order/${id}/close/`,
+        url: `/invoicing/project-purchase-orders/${id}/close/`,
         method: "POST",
       }),
     }),
     fullyReceivePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/purchase-order/${id}/fully-receive/`,
+        url: `/invoicing/project-purchase-orders/${id}/fully-receive/`,
         method: "POST",
       }),
     }),
     issuePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/purchase-order/${id}/issue/`,
+        url: `/invoicing/project-purchase-orders/${id}/issue/`,
         method: "POST",
       }),
     }),
     partiallyReceivePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/purchase-order/${id}/partially-receive/`,
+        url: `/invoicing/project-purchase-orders/${id}/partially-receive/`,
         method: "POST",
       }),
     }),
     convertRequestToPurchaseOrder: builder.mutation<
       ProjectPurchaseOrder,
-      { requestId: number; data: ConvertRequestToPurchaseOrderRequest }
+      { data: ConvertRequestToPurchaseOrderRequest }
     >({
-      query: ({ requestId, data }) => ({
-        url: `/invoicing/purchase-order/${requestId}/convert-to-po/`,
+      query: ({ data }) => ({
+        url: `/invoicing/project-purchase-orders/convert/`,
         method: "POST",
         body: data,
       }),

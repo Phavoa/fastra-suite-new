@@ -17,137 +17,91 @@ import {
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-const mockRequestsData: Record<string, any> = {
-  "REQ-2026-0142": {
-    id: "REQ-2026-0142",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "Superstructure",
-    wbsActivity: "First Floor Slab Reinforcement",
-    costCode: "CC-2040 (Structural Reinforcement)",
-    availableBudget: 15000000,
-    isOverrun: false,
-    equipmentId: "Tower Crane TC-01 (EQ-102)",
-    requester: "Eng. John Doe (Site Engineer)",
-    gateReceiver: "Mr. Abubakar (Site Foreman - 08031234567)",
-    requisitionDate: "2026-06-27",
-    issueDate: "2026-06-28",
-    totalCost: 10200000,
-    itemsList: [
-      { id: "1", name: "Reinforcement Steel 16mm", description: "High yield deformed rebar BS4449", unit: "Tonnes", requestedQty: 12, availableStock: 150, unitCost: 850000 },
-      { id: "2", name: "Binding Wire", description: "16-gauge annealed steel tie wire", unit: "Rolls", requestedQty: 5, availableStock: 40, unitCost: 15000 }
-    ],
-    status: "pending",
-    notes: "Urgent material consumption required before concrete pouring tomorrow morning at 07:00 AM.",
-  },
-  "REQ-2026-0143": {
-    id: "REQ-2026-0143",
-    project: "Project #2 - Site B Infrastructure",
-    wbsPhase: "Substructure / Foundation",
-    wbsActivity: "Drainage Trench Concrete",
-    costCode: "CC-1020 (Concrete Materials)",
-    availableBudget: 3500000,
-    isOverrun: false,
-    equipmentId: "Concrete Mixer CM-04 (EQ-088)",
-    requester: "Eng. Jane Smith (Site Supervisor)",
-    gateReceiver: "Engr. Kenneth (Project Supervisor - 08029876543)",
-    requisitionDate: "2026-06-28",
-    issueDate: "2026-06-29",
-    totalCost: 1375000,
-    itemsList: [
-      { id: "3", name: "Cement (50kg Bag)", description: "Portland Cement Grade 42.5", unit: "Bags", requestedQty: 250, availableStock: 500, unitCost: 5500 }
-    ],
-    status: "pending",
-    notes: "Batch 1 concrete preparation for perimeter drainage channels.",
-  },
-  "REQ-2026-0189": {
-    id: "REQ-2026-0189",
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "Substructure / Foundation",
-    wbsActivity: "Retaining Wall Concrete Pour",
-    costCode: "CC-1020 (Concrete Materials)",
-    availableBudget: 2000000,
-    isOverrun: true,
-    equipmentId: "Batching Plant BP-01",
-    requester: "Eng. Samuel (Site Supervisor)",
-    gateReceiver: "Mr. Abubakar (Site Foreman - 08031234567)",
-    requisitionDate: "2026-06-29",
-    issueDate: "2026-06-30",
-    totalCost: 4850000,
-    itemsList: [
-      { id: "4", name: "Cement (50kg Bag)", description: "Portland Cement Grade 42.5", unit: "Bags", requestedQty: 600, availableStock: 850, unitCost: 5500 },
-      { id: "5", name: "Sharp Sand", description: "Clean river sharp sand", unit: "Cubic Meters", requestedQty: 80, availableStock: 120, unitCost: 19375 }
-    ],
-    status: "held_overrun",
-    notes: "Requisition held by Budget Validation Gate. Exceeds available WBS line budget by ₦2,850,000.",
-  },
-};
+import { useGetMaterialConsumptionQuery, useUpdateMaterialConsumptionMutation } from "@/api/requests/materialConsumptionRequestApi";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MaterialConsumptionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const reqId = (params?.id as string) || "REQ-2026-0142";
+  const reqId = (params?.id as string) || "";
   
-  const req = mockRequestsData[reqId] || {
-    id: reqId,
-    project: "Project #1 - Site A Construction",
-    wbsPhase: "Superstructure",
-    wbsActivity: "General Site Operations",
-    equipmentId: "General Asset / N/A",
-    requester: "Eng. John Doe (Site Engineer)",
-    gateReceiver: "Site Foreman - 08031234567",
-    requisitionDate: "2026-06-27",
-    issueDate: "2026-06-28",
-    totalCost: 1500000,
-    itemsList: [
-      { id: "1", name: "Standard Site Consumables", description: "General structural supplies", unit: "Units", requestedQty: 10, availableStock: 100, unitCost: 150000 }
-    ],
-    status: "pending",
-    notes: "Standard requisition submitted from field operations team.",
-  };
+  const { data: apiData, isLoading, isError } = useGetMaterialConsumptionQuery(Number(reqId), {
+    skip: !reqId || isNaN(Number(reqId)),
+  });
 
-  const [status, setStatus] = useState<string>(req.status);
+  const [updateStatus] = useUpdateMaterialConsumptionMutation();
+
+  const req: any = React.useMemo(() => {
+    if (!apiData) return null;
+    
+    // Map missing backend fields gracefully to avoid runtime crashes
+    return {
+      id: apiData.request_id || `MCR-${apiData.id}`,
+      project: (apiData as any).project_details?.name || `Project #${apiData.project_request || 'Unknown'}`,
+      wbsPhase: (apiData as any).phase_details?.name || "Unknown Phase",
+      wbsActivity: (apiData as any).activity_details?.name || "Unknown Activity",
+      equipmentId: (apiData as any).equipment_details?.name || "-",
+      requester: (apiData as any).requester_details?.name || "-",
+      gateReceiver: (apiData as any).gate_receiver_details?.name || "-",
+      requisitionDate: apiData.date_consumed || new Date(apiData.created_at || Date.now()).toISOString().split('T')[0],
+      issueDate: (apiData as any).issue_date || "-",
+      totalCost: apiData.lines?.reduce((sum: number, line: any) => sum + (parseFloat(line.total_cost) || 0), 0) || 0,
+      itemsList: apiData.lines?.map((line: any) => ({
+        id: line.id || Math.random().toString(),
+        name: line.product_details?.product_name || `Product ID: ${line.product || 'Unknown'}`,
+        description: line.product_details?.description || "-",
+        unit: line.unit_of_measure_details?.unit_symbol || "Units",
+        requestedQty: line.quantity || 0,
+        availableStock: line.product_details?.available_stock || 0,
+        unitCost: parseFloat(line.unit_cost) || 0,
+      })) || [],
+      status: apiData.status || "pending",
+      notes: apiData.notes || "",
+      isOverrun: apiData.status === "held_overrun",
+      availableBudget: (apiData as any).available_budget,
+      costCode: (apiData as any).cost_code || "-",
+    };
+  }, [apiData]);
+
   const [reason, setReason] = useState<string>("");
-  const [showReasonBox, setShowReasonBox] = useState<"reject" | "clarify" | null>(null);
 
   const statusModal = useStatusModal();
 
-  const handleAction = (action: "approve" | "reject" | "clarify") => {
-    if (action === "reject" || action === "clarify") {
-      if (showReasonBox !== action) {
-        setShowReasonBox(action);
-        return;
-      }
-      if (!reason.trim()) {
-        statusModal.showError("Reason Required", `Please enter notes explaining why this requisition requires ${action}.`);
-        return;
-      }
-    }
+  const handleAction = async (action: "release") => {
+    if (!req) return;
 
-    if (action === "approve") {
-      setStatus("approved");
+    try {
+      // Assuming a release status for now until the backend implements the release endpoint
+      await updateStatus({
+        id: Number(reqId),
+        body: { status: "released" }
+      }).unwrap();
+
       statusModal.showSuccess(
-        "Requisition Approved",
-        `Requisition ${req.id} approved successfully. Actual project costing and warehouse stock deduction have been posted to the Inventory Ledger.`
+        "Material Released",
+        `Material Consumption ${req.id} released successfully.`
       );
-    } else if (action === "reject") {
-      setStatus("rejected");
-      statusModal.showSuccess(
-        "Requisition Rejected",
-        `Requisition ${req.id} has been rejected. The submitter has been notified with your feedback.`
-      );
-    } else {
-      setStatus("clarification_requested");
-      statusModal.showSuccess(
-        "Clarification Requested",
-        `Requisition ${req.id} has been sent back to the submitter for clarification.`
+      router.refresh();
+    } catch (err: any) {
+      statusModal.showError(
+        "Action Failed",
+        err.data?.message || err.error || "An error occurred while releasing the material."
       );
     }
-    setShowReasonBox(null);
   };
 
   return (
     <PageGuard application="inventory" module="materialconsumption">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+        {isLoading ? (
+          <div className="p-8 space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : isError || !req ? (
+          <div className="p-12 text-center text-red-500 font-medium">Failed to load material consumption details.</div>
+        ) : (
+          <>
         {/* FastraSuite Standard Clean Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
           <div className="flex items-center">
@@ -163,43 +117,29 @@ export default function MaterialConsumptionDetailPage() {
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className={`inline-block px-2 py-0.5 text-[11px] rounded font-medium uppercase ${
-                    status === "approved"
+                    req.status === "approved"
                       ? "bg-green-100 text-green-700"
-                      : status === "rejected"
+                      : req.status === "rejected"
                       ? "bg-red-100 text-red-700"
-                      : status === "clarification_requested"
+                      : req.status === "clarification_requested"
                       ? "bg-amber-100 text-amber-800"
                       : "bg-amber-100 text-amber-800"
                   }`}
                 >
-                  {status.replace("_", " ")}
+                  {String(req.status).replace("_", " ")}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {status === "pending" && (
+            {req.status === "pending" && (
               <>
                 <Button
-                  variant="outline"
-                  className="border-amber-300 text-amber-700 hover:bg-amber-50 text-xs h-9"
-                  onClick={() => handleAction("clarify")}
+                  className="bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs h-9 shadow-sm"
+                  onClick={() => handleAction("release")}
                 >
-                  Request Clarification
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-red-400 text-red-600 hover:bg-red-50 text-xs h-9"
-                  onClick={() => handleAction("reject")}
-                >
-                  Reject Requisition
-                </Button>
-                <Button
-                  className="bg-[#2BA24D] hover:bg-[#238A40] text-white text-xs h-9 shadow-sm"
-                  onClick={() => handleAction("approve")}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Approve & Deduct Stock
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Release Material
                 </Button>
               </>
             )}
@@ -208,32 +148,7 @@ export default function MaterialConsumptionDetailPage() {
 
         {/* Details Content matching rest of FastraSuite */}
         <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
-          {/* Action Notes Box if Rejection or Clarification triggered */}
-          {showReasonBox && (
-            <div className="bg-amber-50/60 p-5 rounded border border-amber-200">
-              <h3 className="text-xs font-semibold text-gray-800 mb-2 uppercase">
-                Enter Feedback Notes for {showReasonBox === "reject" ? "Rejection" : "Clarification"}:
-              </h3>
-              <Textarea
-                placeholder={`Type detailed reason for ${showReasonBox}...`}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="w-full min-h-[80px] mb-3 text-sm bg-white"
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => setShowReasonBox(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className={`text-xs h-8 text-white ${showReasonBox === "reject" ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"}`}
-                  onClick={() => handleAction(showReasonBox)}
-                >
-                  Confirm {showReasonBox === "reject" ? "Rejection" : "Clarification"}
-                </Button>
-              </div>
-            </div>
-          )}
+
 
           {/* Requisition Summary Section */}
           <section>
@@ -347,14 +262,37 @@ export default function MaterialConsumptionDetailPage() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell className="px-6 py-3 text-right">
+                          <span className="font-mono text-sm text-[#525F7F]">
+                            ₦{(item.requestedQty * item.unitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
+              
+              {/* Totals Summary */}
+              <div className="border-t border-gray-100 bg-gray-50/50 p-4 flex justify-end">
+                <div className="w-full max-w-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-500">Number of Items</span>
+                    <span className="text-sm font-semibold text-gray-800">{req.itemsList.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3">
+                    <span className="text-sm font-bold text-gray-700">Total Approved Cost</span>
+                    <span className="text-lg font-bold text-[#32325D] font-mono">
+                      ₦{req.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         </div>
+        </>
+        )}
 
         <StatusModal
           isOpen={statusModal.isOpen}

@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit } from "lucide-react";
+import { ArrowLeft, Edit, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { useGetStockAdjustmentQuery, useValidateStockAdjustmentMutation } from "@/api/inventory/stockAdjustmentApi";
+import StatusModal, { extractErrorMessage } from "@/components/shared/StatusModal";
 import {
   Table,
   TableBody,
@@ -17,42 +19,74 @@ import {
 
 export default function StockAdjustmentDetailPage() {
   const params = useParams();
-  const id = (params?.id as string) || "WH-MAIN-ADJ-0001";
+  const id = (params?.id as string) || "";
 
-  const dummyData = {
-    id: id,
-    adjustment_type: "Stock Level Update",
-    warehouse_location: "Main Warehouse - Site A (WH-MAIN)",
-    date: "2026-06-28",
-    status: "done",
-    notes: "Annual physical inventory audit discrepancy resolution.",
-    created_by: "Administrator",
-    items: [
-      {
-        id: "1",
-        product_name: "Cement (50kg Bag)",
-        product_description: "Portland Cement Grade 42.5",
-        unit_symbol: "Bags",
-        current_quantity: 505,
-        adjusted_quantity: 500,
-        variance: -5,
-      },
-      {
-        id: "2",
-        product_name: "Reinforcement Steel 16mm",
-        product_description: "High Yield Deformed Steel Bars",
-        unit_symbol: "Tonnes",
-        current_quantity: 138,
-        adjusted_quantity: 150,
-        variance: 12,
-      },
-    ],
+  const { data: adjData, isLoading, error } = useGetStockAdjustmentQuery(id, { skip: !id });
+  const [validateAdj, { isLoading: isValidating }] = useValidateStockAdjustmentMutation();
+
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  const handleValidate = async () => {
+    try {
+      await validateAdj({ id }).unwrap();
+      setModalState({
+        isOpen: true,
+        type: "success",
+        title: "Success",
+        message: "Stock adjustment validated & inventory ledger updated successfully.",
+      });
+    } catch (error: any) {
+      setModalState({
+        isOpen: true,
+        type: "error",
+        title: "Error",
+        message: extractErrorMessage(error, "Failed to validate stock adjustment."),
+      });
+    }
   };
+
+  const handleModalClose = () => {
+    setModalState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const record = adjData ? {
+    id: adjData.id,
+    adjustment_type: adjData.adjustment_type || "Stock Level Update",
+    warehouse_location: adjData.warehouse_location_details?.location_name || adjData.warehouse_location,
+    date: (adjData as any).date_created ? new Date((adjData as any).date_created).toLocaleDateString() : "N/A",
+    status: adjData.status?.toLowerCase(),
+    notes: adjData.notes || adjData.reason,
+    created_by: "N/A",
+    items: adjData.stock_adjustment_items || [],
+  } : null;
 
   return (
     <PageGuard application="inventory" module="stockadjustment">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         {/* Clean Header Card */}
+        {isLoading && <div className="p-6 text-center text-gray-500">Loading record details...</div>}
+        {!isLoading && error && (
+          <div className="p-6 text-center text-red-500">
+            <h3 className="text-lg font-bold">Failed to load record</h3>
+            <p className="mt-2 text-sm">{(error as any)?.data?.detail || JSON.stringify(error)}</p>
+          </div>
+        )}
+        {!isLoading && !error && !record && (
+          <div className="p-6 text-center text-gray-500">Record not found.</div>
+        )}
+        
+        {!isLoading && !error && record && (
+          <>
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-2xs">
           <div className="flex items-center gap-3">
             <Link href="/inventory/stocks/adjustment">
@@ -62,21 +96,30 @@ export default function StockAdjustmentDetailPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-lg font-semibold text-[#32325D]">Stock Adjustment: {dummyData.id}</h1>
-                <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-md font-semibold ${dummyData.status === "done" ? "bg-green-50 text-green-700 border border-green-200/60" : "bg-blue-50 text-blue-700 border border-blue-200/60"}`}>
-                  {dummyData.status === "done" ? "Done" : "Draft"}
+                <h1 className="text-lg font-semibold text-[#32325D]">Stock Adjustment: {record.id}</h1>
+                <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-md font-semibold ${record.status === "done" || record.status === "validated" ? "bg-green-50 text-green-700 border border-green-200/60" : "bg-blue-50 text-blue-700 border border-blue-200/60"}`}>
+                  {record.status === "done" || record.status === "validated" ? "Done" : "Draft"}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {dummyData.status === "draft" && (
-              <Link href={`/inventory/stocks/adjustment/edit/${id}`}>
-                <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm font-semibold h-9 px-4 shadow-2xs">
-                  <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit Draft
+            {record.status === "draft" && (
+              <>
+                <Button 
+                  onClick={handleValidate} 
+                  disabled={isValidating}
+                  className="bg-[#2BA24D] hover:bg-[#238a40] text-white text-sm font-semibold h-9 px-4 shadow-2xs"
+                >
+                  <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> {isValidating ? "Validating..." : "Validate"}
                 </Button>
-              </Link>
+                <Link href={`/inventory/stocks/adjustment/edit/${id}`}>
+                  <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm font-semibold h-9 px-4 shadow-2xs">
+                    <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit Draft
+                  </Button>
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -92,23 +135,23 @@ export default function StockAdjustmentDetailPage() {
             <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
                 <span className="text-xs font-semibold text-[#8898AA] block mb-1">Adjustment ID</span>
-                <span className="text-sm font-semibold text-[#32325D]">{dummyData.id}</span>
+                <span className="text-sm font-semibold text-[#32325D]">{record.id}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-[#8898AA] block mb-1">Adjustment Type</span>
-                <span className="text-sm font-semibold text-[#32325D]">{dummyData.adjustment_type}</span>
+                <span className="text-sm font-semibold text-[#32325D]">{record.adjustment_type}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-[#8898AA] block mb-1">Location</span>
-                <span className="text-sm font-semibold text-[#32325D]">{dummyData.warehouse_location}</span>
+                <span className="text-sm font-semibold text-[#32325D]">{record.warehouse_location}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-[#8898AA] block mb-1">Date</span>
-                <span className="text-sm font-semibold text-[#32325D]">{dummyData.date}</span>
+                <span className="text-sm font-semibold text-[#32325D]">{record.date}</span>
               </div>
               <div className="md:col-span-4 border-t border-gray-100 pt-4 mt-2">
                 <span className="text-xs font-semibold text-[#8898AA] block mb-1">Notes</span>
-                <span className="text-sm text-[#525F7F]">{dummyData.notes}</span>
+                <span className="text-sm text-[#525F7F]">{record.notes}</span>
               </div>
             </div>
           </div>
@@ -125,30 +168,47 @@ export default function StockAdjustmentDetailPage() {
                     <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap w-64">Product Name</TableHead>
                     <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">Description</TableHead>
                     <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-24">Unit</TableHead>
-                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-36">Previous System Qty</TableHead>
-                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-36">New Actual Count</TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-36">Previous Quantity</TableHead>
+                    <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center w-36">New Quantity</TableHead>
                     <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right w-32">Variance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dummyData.items.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-gray-50 border-b border-gray-100 transition-colors">
-                      <TableCell className="px-6 py-3.5 font-semibold text-sm text-[#32325D]">{item.product_name}</TableCell>
-                      <TableCell className="px-6 py-3.5 text-sm text-[#525F7F]">{item.product_description}</TableCell>
-                      <TableCell className="px-6 py-3.5 text-center text-sm font-medium text-[#525F7F]">{item.unit_symbol}</TableCell>
-                      <TableCell className="px-6 py-3.5 text-center font-mono font-semibold text-sm text-[#32325D]">{item.current_quantity}</TableCell>
-                      <TableCell className="px-6 py-3.5 text-center font-mono font-bold text-sm text-[#3B7CED]">{item.adjusted_quantity}</TableCell>
-                      <TableCell className={`pr-6 py-3.5 text-right font-mono font-bold text-sm ${item.variance < 0 ? "text-[#E43D2B]" : item.variance > 0 ? "text-[#2BA24D]" : "text-[#525F7F]"}`}>
-                        {item.variance > 0 ? `+${item.variance}` : item.variance}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {record.items.map((item: any, idx: number) => {
+                    const currentQuantity = Number(item.current_quantity) || 0;
+                    const adjustedQuantity = Number(item.new_quantity) || 0;
+                    const variance = adjustedQuantity - currentQuantity;
+                    
+                    return (
+                      <TableRow key={item.id || idx} className="hover:bg-gray-50 border-b border-gray-100 transition-colors">
+                        <TableCell className="px-6 py-3.5 font-semibold text-sm text-[#32325D]">{item.product_details?.product_name || `Product #${item.product}`}</TableCell>
+                        <TableCell className="px-6 py-3.5 text-sm text-[#525F7F]">{item.product_details?.description || "-"}</TableCell>
+                        <TableCell className="px-6 py-3.5 text-center text-sm font-medium text-[#525F7F]">{item.unit_of_measure?.unit_symbol || (typeof item.unit_of_measure === "string" ? item.unit_of_measure : null) || item.product_details?.unit_of_measure_details?.unit_symbol || "-"}</TableCell>
+                        <TableCell className="px-6 py-3.5 text-center font-mono font-semibold text-sm text-[#32325D]">{currentQuantity}</TableCell>
+                        <TableCell className="px-6 py-3.5 text-center font-mono font-bold text-sm text-[#3B7CED]">{adjustedQuantity}</TableCell>
+                        <TableCell className={`pr-6 py-3.5 text-right font-mono font-bold text-sm ${variance < 0 ? "text-[#E43D2B]" : variance > 0 ? "text-[#2BA24D]" : "text-[#525F7F]"}`}>
+                          {variance > 0 ? `+${variance}` : variance}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           </div>
 
         </main>
+        </>
+        )}
+
+        <StatusModal
+          isOpen={modalState.isOpen}
+          onClose={handleModalClose}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+          onAction={handleModalClose}
+        />
       </div>
     </PageGuard>
   );

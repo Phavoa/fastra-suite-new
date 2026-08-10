@@ -2,23 +2,25 @@ import { ProductDetails } from "./stockAdjustment";
 
 export interface StockMove {
   id: number | string;
-  product: any;
-  quantity: number;
+  reference: string;
+  product: number;
+  product_details: any;
+  quantity: string;
+  unit_of_measure: number;
+  unit_of_measure_details: any;
+  running_balance: string;
+  move_type: string;
   source_document_id: string;
+  source_document_type: string;
   source_location: string;
   destination_location: string;
-  date_created: string;
+  project: string;
+  wbs_phase: string;
+  wbs_activity: string;
+  moved_by: number;
+  moved_by_details: any;
   date_moved: string;
-  // PRD Section 10.7 Ledger specific fields
-  transaction_type?: "Receipt" | "Return" | "Transfer" | "Consumption" | "Scrap" | "Adjustment";
-  reference_document?: string;
-  unit_cost?: number;
-  total_value?: number;
-  wbs_phase?: string;
-  wbs_activity?: string;
-  user?: string;
-  running_balance?: number;
-  cost_code?: string;
+  date_created: string;
 }
 
 export interface GetStockMovesParams {

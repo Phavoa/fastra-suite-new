@@ -12,10 +12,12 @@ import {
   Calendar,
   User,
   CreditCard,
+  CheckCircle,
+  Package,
 } from "lucide-react";
 import CreateVendorBillModal from "@/components/invoice/CreateVendorBillModal";
 
-import { useGetPurchaseOrderByIdQuery } from "@/api/invoice/projectPurchaseOrdersApi";
+import { useGetPurchaseOrderByIdQuery, useIssuePurchaseOrderMutation, useFullyReceivePurchaseOrderMutation } from "@/api/invoice/projectPurchaseOrdersApi";
 import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 
 export default function PurchaseOrderDetailPage() {
@@ -24,9 +26,36 @@ export default function PurchaseOrderDetailPage() {
   const poId = Number(params?.id);
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
 
-  const { data: poDetail, isLoading, error } = useGetPurchaseOrderByIdQuery(poId, {
+  const { data: poDetail, isLoading, error, refetch } = useGetPurchaseOrderByIdQuery(poId, {
     skip: !poId || isNaN(poId),
   });
+  
+  const [issuePurchaseOrder, { isLoading: isIssuing }] = useIssuePurchaseOrderMutation();
+  const [fullyReceivePurchaseOrder, { isLoading: isReceiving }] = useFullyReceivePurchaseOrderMutation();
+
+  const handleIssuePO = async () => {
+    try {
+      await issuePurchaseOrder(poId).unwrap();
+      alert("Purchase Order Issued Successfully!");
+      refetch();
+    } catch (err: any) {
+      alert(err?.data?.error || err?.data?.detail || "Failed to issue Purchase Order.");
+      console.error(err);
+    }
+  };
+
+  const handleReceiveGoods = async () => {
+    if (!confirm("Are you sure you want to fully receive all goods for this Purchase Order?")) return;
+    
+    try {
+      await fullyReceivePurchaseOrder(poId).unwrap();
+      alert("Goods Received Successfully!");
+      refetch();
+    } catch (err: any) {
+      alert(err?.data?.error || err?.data?.detail || "Failed to receive goods.");
+      console.error(err);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -95,13 +124,38 @@ export default function PurchaseOrderDetailPage() {
             <Mail className="w-4 h-4" />
             Send Via Email
           </button>
-          <button
-            onClick={() => setIsBillModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            <FileText className="w-4 h-4" />
-            Create Bill
-          </button>
+          
+          {poDetail.status?.toLowerCase() === "draft" && (
+            <button
+              onClick={handleIssuePO}
+              disabled={isIssuing}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              <CheckCircle className="w-4 h-4" />
+              {isIssuing ? "Issuing..." : "Issue PO"}
+            </button>
+          )}
+
+          {(poDetail.status?.toLowerCase() === "issued" || poDetail.status?.toLowerCase() === "partially_received") && (
+            <button
+              onClick={handleReceiveGoods}
+              disabled={isReceiving}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              <Package className="w-4 h-4" />
+              {isReceiving ? "Receiving..." : "Receive Goods"}
+            </button>
+          )}
+
+          {poDetail.status?.toLowerCase() !== "draft" && (
+            <button
+              onClick={() => setIsBillModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              <FileText className="w-4 h-4" />
+              Create Bill
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,7 +291,8 @@ export default function PurchaseOrderDetailPage() {
       <CreateVendorBillModal
         isOpen={isBillModalOpen}
         onClose={() => setIsBillModalOpen(false)}
-        poId={poDetail.po_number}
+        poId={poDetail.id}
+        poNumber={poDetail.po_number}
         vendorId={poDetail.vendor}
         products={poDetail.lines || []}
         formatCurrency={formatCurrency}

@@ -96,6 +96,10 @@ export const scrapApi = createApi({
       query: (id) => `/inventory/scrap/${id}/`,
     }),
 
+    getScrapEditable: builder.query<Scrap, string>({
+      query: (id) => `/inventory/scrap/${id}/check_editable/`,
+    }),
+
     getActiveScraps: builder.query<Scrap[], void>({
       query: () => "/inventory/scrap/active_list/",
     }),
@@ -142,6 +146,17 @@ export const scrapApi = createApi({
       }),
     }),
 
+    validateScrap: builder.mutation<
+      Scrap,
+      { id: string; data?: UpdateScrapRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/inventory/scrap/${id}/validate/`,
+        method: "POST",
+        body: data || {},
+      }),
+    }),
+
     toggleScrapHiddenStatus: builder.mutation<
       Scrap,
       { id: string; data?: ToggleHiddenStatusRequest }
@@ -170,6 +185,7 @@ export const {
   // Query hooks
   useGetScrapsQuery,
   useGetScrapQuery,
+  useGetScrapEditableQuery,
   useGetActiveScrapsQuery,
   useGetHiddenScrapsQuery,
 
@@ -178,6 +194,7 @@ export const {
   useUpdateScrapMutation,
   usePatchScrapMutation,
   useDeleteScrapMutation,
+  useValidateScrapMutation,
   useToggleScrapHiddenStatusMutation,
   usePatchToggleScrapHiddenStatusMutation,
 } = scrapApi;

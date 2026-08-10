@@ -18,6 +18,7 @@ import { BreadcrumbItem } from "@/types/purchase";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { IncomingProductCards } from "@/components/inventory/operation/IncomingProductCards";
+import { useGetIncomingProductsQuery } from "@/api/inventory/incomingProductApi";
 import {
   Table,
   TableBody,
@@ -27,29 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
-
-const DUMMY_INCOMING_PRODUCTS: any[] = [
-  { incoming_product_id: "WH-IN-0001", receipt_type: "vendor_receipt", status: "validated", related_po: "PO-2026-0089", created_at: "2026-06-25", supplier_details: { company_name: "Dangote Cement Plc" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Main Warehouse - Site A" } },
-  { incoming_product_id: "WH-IN-0002", receipt_type: "vendor_receipt", status: "draft", related_po: "PO-2026-0094", created_at: "2026-06-28", supplier_details: { company_name: "Julius Berger Steel" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Main Warehouse - Site A" } },
-  { incoming_product_id: "WH-IN-0003", receipt_type: "returns", status: "validated", related_po: "PO-2026-0042", created_at: "2026-06-27", supplier_details: { company_name: "Lafarge Africa Plc" }, source_location_details: { location_name: "Main Warehouse - Site A" }, destination_location_details: { location_name: "Supplier Location" } },
-  { incoming_product_id: "WH-IN-0004", receipt_type: "vendor_receipt", status: "draft", related_po: "PO-2026-0101", created_at: "2026-07-01", supplier_details: { company_name: "BUA Cement Plc" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Site B Warehouse" } },
-  { incoming_product_id: "WH-IN-0005", receipt_type: "vendor_receipt", status: "validated", related_po: "PO-2026-0107", created_at: "2026-07-02", supplier_details: { company_name: "Coscharis Motors" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Equipment Yard" } },
-  { incoming_product_id: "WH-IN-0006", receipt_type: "internal_transfer", status: "draft", related_po: "PO-2026-0112", created_at: "2026-07-03", supplier_details: { company_name: "Cutix Plc" }, source_location_details: { location_name: "Site A Warehouse" }, destination_location_details: { location_name: "Site C Warehouse" } },
-  { incoming_product_id: "WH-IN-0007", receipt_type: "returns", status: "canceled", related_po: "PO-2026-0055", created_at: "2026-07-04", supplier_details: { company_name: "Stanbic Supplies Ltd" }, source_location_details: { location_name: "Site B Warehouse" }, destination_location_details: { location_name: "Supplier Location" } },
-  { incoming_product_id: "WH-IN-0008", receipt_type: "vendor_receipt", status: "validated", related_po: "PO-2026-0119", created_at: "2026-07-05", supplier_details: { company_name: "Nestle Nigeria Plc" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Cold Storage - Site A" } },
-  { incoming_product_id: "WH-IN-0009", receipt_type: "vendor_receipt", status: "draft", related_po: "PO-2026-0123", created_at: "2026-07-06", supplier_details: { company_name: "WAPCO Nigeria" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Main Warehouse - Site A" } },
-  { incoming_product_id: "WH-IN-0010", receipt_type: "internal_transfer", status: "validated", related_po: "PO-2026-0128", created_at: "2026-07-07", supplier_details: { company_name: "Nigerian Breweries" }, source_location_details: { location_name: "Main Warehouse - Site A" }, destination_location_details: { location_name: "Site D Warehouse" } },
-  { incoming_product_id: "WH-IN-0011", receipt_type: "vendor_receipt", status: "validated", related_po: "PO-2026-0133", created_at: "2026-07-08", supplier_details: { company_name: "Total Energies Nigeria" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Fuel Depot - Site A" } },
-  { incoming_product_id: "WH-IN-0012", receipt_type: "returns", status: "draft", related_po: "PO-2026-0078", created_at: "2026-07-09", supplier_details: { company_name: "Flour Mills Nigeria" }, source_location_details: { location_name: "Site C Warehouse" }, destination_location_details: { location_name: "Supplier Location" } },
-  { incoming_product_id: "WH-IN-0013", receipt_type: "vendor_receipt", status: "validated", related_po: "PO-2026-0141", created_at: "2026-07-10", supplier_details: { company_name: "IPMAN Petroleum" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Fuel Depot - Site B" } },
-  { incoming_product_id: "WH-IN-0014", receipt_type: "vendor_receipt", status: "canceled", related_po: "PO-2026-0144", created_at: "2026-07-11", supplier_details: { company_name: "Guinness Nigeria Plc" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Site B Warehouse" } },
-  { incoming_product_id: "WH-IN-0015", receipt_type: "internal_transfer", status: "validated", related_po: "PO-2026-0150", created_at: "2026-07-12", supplier_details: { company_name: "Zenon Petroleum" }, source_location_details: { location_name: "Site A Warehouse" }, destination_location_details: { location_name: "Main Warehouse - Site A" } },
-  { incoming_product_id: "WH-IN-0016", receipt_type: "vendor_receipt", status: "draft", related_po: "PO-2026-0157", created_at: "2026-07-13", supplier_details: { company_name: "Unilever Nigeria" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Site C Warehouse" } },
-  { incoming_product_id: "WH-IN-0017", receipt_type: "returns", status: "validated", related_po: "PO-2026-0061", created_at: "2026-07-14", supplier_details: { company_name: "Seplat Energy" }, source_location_details: { location_name: "Site D Warehouse" }, destination_location_details: { location_name: "Supplier Location" } },
-  { incoming_product_id: "WH-IN-0018", receipt_type: "vendor_receipt", status: "draft", related_po: "PO-2026-0163", created_at: "2026-07-14", supplier_details: { company_name: "Oando Plc" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Fuel Depot - Site A" } },
-  { incoming_product_id: "WH-IN-0019", receipt_type: "internal_transfer", status: "validated", related_po: "PO-2026-0169", created_at: "2026-07-15", supplier_details: { company_name: "Transcorp Hilton" }, source_location_details: { location_name: "Main Warehouse - Site A" }, destination_location_details: { location_name: "Site B Warehouse" } },
-  { incoming_product_id: "WH-IN-0020", receipt_type: "vendor_receipt", status: "canceled", related_po: "PO-2026-0174", created_at: "2026-07-16", supplier_details: { company_name: "Access Bank Plc" }, source_location_details: { location_name: "Supplier Location" }, destination_location_details: { location_name: "Main Warehouse - Site A" } },
-];
 
 
 const STATUS_TABS = [
@@ -149,33 +127,16 @@ export default function OperationPage() {
   const [currentView, setCurrentView] = useState<"list" | "grid">("list");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const allIncomingProducts = DUMMY_INCOMING_PRODUCTS;
+  const { data: incomingProductsData = [], isLoading } = useGetIncomingProductsQuery({
+    search: query || undefined,
+    status: selectedStatus !== "all" ? (selectedStatus as any) : undefined,
+  });
 
-  const filteredProducts = useMemo(() => {
-    return allIncomingProducts.filter((item) => {
-      const matchesStatus =
-        selectedStatus === "all" || item.status === selectedStatus;
-
-      const lowerQuery = query.toLowerCase();
-      const matchesSearch =
-        !query ||
-        item.incoming_product_id.toLowerCase().includes(lowerQuery) ||
-        item.receipt_type.toLowerCase().includes(lowerQuery) ||
-        item.status.toLowerCase().includes(lowerQuery) ||
-        item.supplier_details?.company_name?.toLowerCase().includes(lowerQuery) ||
-        item.source_location_details?.location_name?.toLowerCase().includes(lowerQuery) ||
-        item.destination_location_details?.location_name?.toLowerCase().includes(lowerQuery) ||
-        item.related_po?.toLowerCase().includes(lowerQuery);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [allIncomingProducts, query, selectedStatus]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(incomingProductsData.length / ITEMS_PER_PAGE));
   const incomingProducts = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredProducts, currentPage]);
+    return incomingProductsData.slice(start, start + ITEMS_PER_PAGE);
+  }, [incomingProductsData, currentPage]);
 
   // Reset to page 1 when filters change
   const handleStatusChange = (status: string) => {
@@ -241,7 +202,7 @@ export default function OperationPage() {
 
           {/* StatusCards-style tiles */}
           <OperationsNavigationTiles
-            incomingCount={allIncomingProducts.length}
+            incomingCount={incomingProductsData.length}
           />
 
           {/* White section 1: top bar + status pills */}
@@ -441,17 +402,17 @@ export default function OperationPage() {
               <span>
                 Showing{" "}
                 <span className="font-semibold text-[#32325D]">
-                  {filteredProducts.length === 0
+                  {incomingProductsData.length === 0
                     ? 0
                     : (currentPage - 1) * ITEMS_PER_PAGE + 1}
                 </span>{" "}
                 –{" "}
                 <span className="font-semibold text-[#32325D]">
-                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)}
+                  {Math.min(currentPage * ITEMS_PER_PAGE, incomingProductsData.length)}
                 </span>{" "}
                 of{" "}
                 <span className="font-semibold text-[#32325D]">
-                  {filteredProducts.length}
+                  {incomingProductsData.length}
                 </span>{" "}
                 results
               </span>

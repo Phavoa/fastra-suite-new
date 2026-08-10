@@ -22,11 +22,11 @@ export function StockMoveTable({ moves, query = "" }: StockMoveTableProps) {
     const q = query.toLowerCase();
     return moves.filter((move) => {
       const idStr = String(move.id).toLowerCase();
-      const prodStr = move.product?.product_name
-        ? move.product.product_name.toLowerCase()
+      const prodStr = move.product_details?.product_name
+        ? move.product_details.product_name.toLowerCase()
         : "";
-      const refStr = move.reference_document
-        ? move.reference_document.toLowerCase()
+      const refStr = move.reference
+        ? move.reference.toLowerCase()
         : "";
       return idStr.includes(q) || prodStr.includes(q) || refStr.includes(q);
     });

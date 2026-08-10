@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash, ArrowLeft } from "lucide-react";
+import { Plus, Trash, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,12 @@ import {
 } from "@/components/ui/table";
 import { z } from "zod";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { useGetPurchaseOrderQuery } from "@/api/purchase/purchaseOrderApi";
+import {
+  useCreateIncomingProductMutation,
+  useValidateIncomingProductReceiptMutation,
+  useCreateIncomingProductBackorderMutation,
+} from "@/api/inventory/incomingProductApi";
 
 type Option = { value: string; label: string };
 
@@ -73,35 +79,34 @@ const DUMMY_PRODUCTS = [
 export default function CreateIncomingProductFromPOPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const poId = searchParams.get("poId") || "PO-2026-0089";
+  const poId = searchParams.get("poId") || "";
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [items, setItems] = useState<GRNLineItem[]>([
-    {
-      id: "1",
-      product: "1",
-      product_name: "Cement (50kg Bag)",
-      product_description: "Portland Cement Grade 42.5",
-      unit_symbol: "Bags",
-      po_quantity: "500",
-      received_quantity: "500",
-      accepted_quantity: "500",
-      rejected_quantity: "0",
-      reject_reason: "",
-    },
-    {
-      id: "2",
-      product: "2",
-      product_name: "Reinforcement Steel 16mm",
-      product_description: "High Yield Deformed Steel Bars",
-      unit_symbol: "Tonnes",
-      po_quantity: "20",
-      received_quantity: "18",
-      accepted_quantity: "18",
-      rejected_quantity: "0",
-      reject_reason: "",
-    },
-  ]);
+  const { data: purchaseOrder, isLoading, error } = useGetPurchaseOrderQuery(poId, { skip: !poId });
+  const [createIncomingProduct] = useCreateIncomingProductMutation();
+  const [validateIncomingProduct] = useValidateIncomingProductReceiptMutation();
+  const [createIncomingProductBackorder] = useCreateIncomingProductBackorderMutation();
+
+  const [items, setItems] = useState<GRNLineItem[]>([]);
+
+  React.useEffect(() => {
+    if (purchaseOrder && purchaseOrder.items) {
+      setItems(
+        purchaseOrder.items.map((it: any) => ({
+          id: it.id?.toString() || Date.now().toString() + Math.random(),
+          product: it.product?.toString(),
+          product_name: it.product_details?.product_name || `Product ${it.product}`,
+          product_description: it.product_details?.product_description || "",
+          unit_symbol: it.product_details?.unit_of_measure_details?.unit_symbol || "Units",
+          po_quantity: it.qty?.toString() || "0",
+          received_quantity: it.qty?.toString() || "0",
+          accepted_quantity: it.qty?.toString() || "0",
+          rejected_quantity: "0",
+          reject_reason: "",
+        }))
+      );
+    }
+  }, [purchaseOrder]);
 
   const [discrepancyState, setDiscrepancyState] = useState<{
     isOpen: boolean;
@@ -152,12 +157,19 @@ export default function CreateIncomingProductFromPOPage() {
   } = useForm<GRNFormData>({
     resolver: zodResolver(grnSchema) as Resolver<GRNFormData>,
     defaultValues: {
-      supplier: "SUP-1",
-      destination_location: "WH-MAIN",
-      delivery_note: `DN-${Math.floor(10000 + Math.random() * 90000)}`,
+      supplier: "",
+      destination_location: "",
+      delivery_note: "",
       notes: `Received against Purchase Order ${poId}`,
     },
   });
+
+  React.useEffect(() => {
+    if (purchaseOrder) {
+      if (purchaseOrder.vendor) setValue("supplier", purchaseOrder.vendor.toString());
+      if (purchaseOrder.destination_location) setValue("destination_location", purchaseOrder.destination_location.toString());
+    }
+  }, [purchaseOrder, setValue]);
 
   const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
     value: p.id,
@@ -205,69 +217,139 @@ export default function CreateIncomingProductFromPOPage() {
   };
 
   async function onSaveDraft(data: GRNFormData) {
+    const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
+    if (validItems.length === 0) {
+      setNotification({ message: "Please enter at least one valid product line with received quantity > 0", type: "error", show: true });
+      return;
+    }
+    
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      const payload = {
+        receipt_type: "vendor_receipt",
+        supplier: Number(data.supplier),
+        related_po: poId,
+        source_location: "",
+        destination_location: data.destination_location,
+        notes: data.notes || data.delivery_note,
+        status: "draft",
+        incoming_product_items: validItems.map((it) => ({
+          product: Number(it.product),
+          expected_quantity: it.po_quantity,
+          quantity_received: it.received_quantity,
+        })),
+      };
+
+      await createIncomingProduct(payload).unwrap();
+      
+      setNotification({ message: "Goods Receipt Note (GRN) draft saved successfully!", type: "success", show: true });
+      setTimeout(() => router.push("/inventory/operation"), 1000);
+    } catch (err: any) {
+      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to save draft.", type: "error", show: true });
+    } finally {
       setIsSubmitting(false);
-      setNotification({
-        message: "Goods Receipt Note (GRN) draft saved successfully!",
-        type: "success",
-        show: true,
-      });
-      setTimeout(() => {
-        router.push("/inventory/operation");
-      }, 1000);
-    }, 500);
+    }
   }
 
   async function onValidateGRN(data: GRNFormData) {
-    // Check if any accepted quantity < po quantity
-    const hasBackorder = items.some((it) => Number(it.accepted_quantity) < Number(it.po_quantity));
+    const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
+    if (validItems.length === 0) {
+      setNotification({ message: "Please enter at least one valid product line with received quantity > 0", type: "error", show: true });
+      return;
+    }
+
+    const hasBackorder = validItems.some((it) => Number(it.received_quantity) < Number(it.po_quantity));
     
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      if (hasBackorder) {
-        setDiscrepancyState({
-          isOpen: true,
-          type: "backorder",
-          ipId: "WH-IN-0003",
-        });
-      } else {
-        setNotification({
-          message: "GRN Validated! Warehouse inventory stock and project costing ledger updated.",
-          type: "success",
-          show: true,
-        });
-        setTimeout(() => {
-          router.push("/inventory/operation");
-        }, 1200);
+    try {
+      const payload = {
+        receipt_type: "vendor_receipt",
+        supplier: Number(data.supplier),
+        related_po: poId,
+        source_location: "",
+        destination_location: data.destination_location,
+        notes: data.notes || data.delivery_note,
+        status: "draft",
+        incoming_product_items: validItems.map((it) => ({
+          product: Number(it.product),
+          expected_quantity: it.po_quantity,
+          quantity_received: it.received_quantity,
+        })),
+      };
+
+      const res = await createIncomingProduct(payload).unwrap();
+      
+      if (res && res.incoming_product_id) {
+        if (hasBackorder) {
+          setIsSubmitting(false);
+          setDiscrepancyState({ isOpen: true, type: "backorder", ipId: res.incoming_product_id });
+          return;
+        } else {
+          await validateIncomingProduct({ id: res.incoming_product_id }).unwrap();
+          setNotification({ message: "GRN Validated! Warehouse inventory stock and project costing ledger updated.", type: "success", show: true });
+          setTimeout(() => router.push("/inventory/operation"), 1200);
+        }
       }
-    }, 500);
+    } catch (error: any) {
+      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to validate GRN.", type: "error", show: true });
+      setIsSubmitting(false);
+    }
   }
 
-  const handleCreateBackorder = () => {
-    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-    setNotification({
-      message: "GRN Validated & Backorder created for remaining balance!",
-      type: "success",
-      show: true,
-    });
-    setTimeout(() => {
-      router.push("/inventory/operation");
-    }, 1200);
+  const handleCreateBackorder = async () => {
+    if (!discrepancyState.ipId) return;
+    setIsSubmitting(true);
+    try {
+      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
+      await createIncomingProductBackorder({ response: true, incoming_product: discrepancyState.ipId }).unwrap();
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      setNotification({ message: "GRN Validated & Backorder created for remaining balance!", type: "success", show: true });
+      setTimeout(() => router.push("/inventory/operation"), 1200);
+    } catch (error: any) {
+      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to create backorder.", type: "error", show: true });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCloseWithoutBackorder = () => {
-    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-    setNotification({
-      message: "GRN Validated! PO closed without backorder.",
-      type: "success",
-      show: true,
-    });
-    setTimeout(() => {
-      router.push("/inventory/operation");
-    }, 1200);
+  const handleCloseWithoutBackorder = async () => {
+    if (!discrepancyState.ipId) return;
+    setIsSubmitting(true);
+    try {
+      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
+      await createIncomingProductBackorder({ response: false, incoming_product: discrepancyState.ipId }).unwrap();
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      setNotification({ message: "GRN Validated! PO closed without backorder.", type: "success", show: true });
+      setTimeout(() => router.push("/inventory/operation"), 1200);
+    } catch (error: any) {
+      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to close delivery.", type: "error", show: true });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (error || !purchaseOrder) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white items-center justify-center gap-4">
+          <p className="text-[#525F7F]">Failed to load Purchase Order or it was not found.</p>
+          <Link href="/inventory/operation">
+            <Button variant="outline" className="border-gray-200 text-gray-600">Back to Operations</Button>
+          </Link>
+        </div>
+      </PageGuard>
+    );
+  }
 
   return (
     <PageGuard application="inventory" module="incomingproduct">
@@ -299,14 +381,14 @@ export default function CreateIncomingProductFromPOPage() {
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    Julius Berger Steel
+                    {purchaseOrder?.vendor_details?.company_name || "N/A"}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">Destination Store</Label>
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    Main Warehouse - Site A
+                    {purchaseOrder?.destination_location_details?.location_name || purchaseOrder?.destination_location || "N/A"}
                   </div>
                 </div>
 

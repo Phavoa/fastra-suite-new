@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -9,9 +9,20 @@ import {
   User,
   Loader2,
   XCircle,
+  Trash2,
+  Edit3,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useGetMaterialConsumptionQuery } from "@/api/requests/materialConsumptionRequestApi";
+import { 
+  useGetMaterialConsumptionQuery,
+  useDeleteMaterialConsumptionMutation,
+  usePatchMaterialConsumptionMutation,
+} from "@/api/requests/materialConsumptionRequestApi";
+import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
+import { StatusModal } from "@/components/shared/StatusModal";
+import { extractErrorMessage } from "@/lib/utils";
 
 export default function MaterialConsumptionRequestDetailPage() {
   const params = useParams();
@@ -21,6 +32,84 @@ export default function MaterialConsumptionRequestDetailPage() {
   const { data: request, isLoading, error } = useGetMaterialConsumptionQuery(id, {
     skip: isNaN(id),
   });
+
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [deleteRequest, { isLoading: isDeleting }] = useDeleteMaterialConsumptionMutation();
+  const [patchRequest, { isLoading: isUpdating }] = usePatchMaterialConsumptionMutation();
+  const [submitProjectRequest] = useSubmitProjectRequestMutation();
+
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  const handleDelete = async () => {
+    try {
+      await deleteRequest(id).unwrap();
+      setModalState({
+        isOpen: true,
+        type: "success",
+        title: "Deleted",
+        message: "Material consumption request deleted successfully.",
+      });
+    } catch (error: any) {
+      setModalState({
+        isOpen: true,
+        type: "error",
+        title: "Delete Failed",
+        message: extractErrorMessage(error, "Failed to delete request. Please try again."),
+      });
+    }
+  };
+
+  const handleStatusChange = async (newStatus: "approved" | "rejected" | "pending") => {
+    try {
+      if (newStatus === "pending" && request) {
+        const parentId = request.project_request;
+        if (parentId) {
+          await submitProjectRequest({ id: parentId as number }).unwrap();
+          setModalState({
+            isOpen: true,
+            type: "success",
+            title: "Submitted",
+            message: "Material consumption request submitted successfully.",
+          });
+          return;
+        }
+      }
+      await patchRequest({ id: id, body: { status: newStatus } }).unwrap();
+      setModalState({
+        isOpen: true,
+        type: "success",
+        title: "Status Updated",
+        message: `Request status updated to ${newStatus} successfully.`,
+      });
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = extractErrorMessage(error, "Failed to update status on server.");
+      const isBudgetError = errMsg.toLowerCase().includes("insufficient budget");
+      setModalState({
+        isOpen: true,
+        type: "error",
+        title: isBudgetError ? "Insufficient Budget" : "Action Failed",
+        message: errMsg,
+      });
+    }
+  };
+
+  const handleModalClose = () => {
+    setModalState((prev) => ({ ...prev, isOpen: false }));
+    if (modalState.type === "success" && modalState.title === "Deleted") {
+      router.push("/project-request/material-consumption-request");
+    }
+  };
 
   const getStatusBadgeClass = (status?: string) => {
     switch (status?.toLowerCase()) {
@@ -238,6 +327,80 @@ export default function MaterialConsumptionRequestDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Action Bottom Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20 shadow-sm">
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+          {isConfirmingDelete ? (
+            <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-lg border border-red-100">
+              <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
+                <AlertCircle size={16} className="text-red-600" /> Confirm delete?
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsConfirmingDelete(false)}
+                  className="h-8 text-xs bg-white border-gray-200 text-gray-700"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                >
+                  <Trash2 size={16} /> Delete
+                </Button>
+                
+                {request.status?.toLowerCase() === "draft" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/project-request/material-consumption-request/${request.id}/edit`)}
+                    className="h-11 px-4 text-xs font-bold border-gray-200 text-gray-700 hover:bg-gray-50 gap-1.5"
+                  >
+                    <Edit3 size={16} /> Edit
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-1 justify-end">
+                {request.status?.toLowerCase() === "draft" && (
+                  <Button
+                    disabled={isUpdating}
+                    onClick={() => handleStatusChange("pending")}
+                    className="h-11 px-5 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white gap-1.5"
+                  >
+                    <Check size={16} /> Submit
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <StatusModal
+        isOpen={modalState.isOpen}
+        onClose={handleModalClose}
+        type={modalState.type}
+        title={modalState.title}
+        message={modalState.message}
+        onAction={handleModalClose}
+      />
     </div>
   );
 }

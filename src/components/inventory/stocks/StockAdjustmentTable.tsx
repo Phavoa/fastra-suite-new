@@ -16,9 +16,11 @@ import { StockAdjustmentRow } from "./StockAdjustmentRow";
 export function StockAdjustmentTable({
   rows,
   query,
+  isLoading,
 }: {
   rows: StockAdjustmentRowType[];
   query: string;
+  isLoading?: boolean;
 }) {
   const filtered = useMemo(() => {
     if (!query.trim()) return rows;
@@ -62,21 +64,29 @@ export function StockAdjustmentTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((v) => (
-              <StockAdjustmentRow
-                key={v.id}
-                request={v}
-              />
-            ))}
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-12 text-center text-[#8898AA] text-sm">
+                  Loading stock adjustments...
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-12 text-center text-[#8898AA] text-sm">
+                  No stock adjustments found matching your query.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((v) => (
+                <StockAdjustmentRow
+                  key={v.id}
+                  request={v}
+                />
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
-
-      {filtered.length === 0 && (
-        <div className="p-12 text-center text-[#8898AA] text-sm">
-          No stock adjustments found matching your query.
-        </div>
-      )}
 
       <div className="px-6 py-4 flex items-center justify-between text-sm text-[#525F7F] bg-[#F6F9FC] border-t border-gray-100">
         <div>Showing {filtered.length} entries</div>

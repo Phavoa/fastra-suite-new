@@ -77,7 +77,7 @@ export interface StockAdjustmentItem {
   id: string;
   product: number;
   unit_of_measure: string;
-  adjusted_quantity: string;
+  new_quantity: string;
   stock_adjustment: string;
   effective_quantity: string;
   current_quantity: string;
@@ -108,7 +108,7 @@ export interface CreateStockAdjustmentRequest {
   is_hidden?: boolean;
   stock_adjustment_items: {
     product: number;
-    adjusted_quantity: string;
+    new_quantity: string;
   }[];
 }
 
@@ -120,7 +120,7 @@ export interface UpdateStockAdjustmentRequest {
   stock_adjustment_items?: {
     id?: string;
     product: number;
-    adjusted_quantity: string;
+    new_quantity: string;
   }[];
 }
 
@@ -132,7 +132,7 @@ export interface PatchStockAdjustmentRequest {
   stock_adjustment_items?: {
     id?: string;
     product: number;
-    adjusted_quantity: string;
+    new_quantity: string;
   }[];
 }
 
@@ -152,6 +152,6 @@ export interface ToggleHiddenStatusRequest {
   is_hidden?: boolean;
   stock_adjustment_items?: {
     product: number;
-    adjusted_quantity: string;
+    new_quantity: string;
   }[];
 }

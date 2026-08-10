@@ -5,8 +5,9 @@ import { useRouter, useParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,12 @@ import {
 } from "@/components/ui/table";
 import { z } from "zod";
 import { PageGuard } from "@/components/auth/PageGuard";
+import {
+  useGetIncomingProductQuery,
+  useUpdateIncomingProductMutation,
+  useValidateIncomingProductReceiptMutation,
+  useCreateIncomingProductBackorderMutation,
+} from "@/api/inventory/incomingProductApi";
 
 interface GRNLineItem {
   id: string;
@@ -42,20 +49,41 @@ const DUMMY_PRODUCTS = [
 
 export default function EditIncomingProductPage() {
   const params = useParams();
-  const id = (params?.id as string) || "WH-IN-0002";
+  const id = (params?.id as string) || "";
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [items, setItems] = useState<GRNLineItem[]>([
-    {
-      id: "1",
-      product: "1",
-      product_description: "Iron Rods 12mm",
-      unit_of_measure: "Tonnes",
-      expected_quantity: "100",
-      received_quantity: "0",
-    },
-  ]);
+  const { data: incomingProduct, isLoading, error } = useGetIncomingProductQuery(id, { skip: !id });
+  const [updateIncomingProduct] = useUpdateIncomingProductMutation();
+  const [validateIncomingProduct] = useValidateIncomingProductReceiptMutation();
+  const [createIncomingProductBackorder] = useCreateIncomingProductBackorderMutation();
+
+  const [items, setItems] = useState<GRNLineItem[]>([]);
+
+  React.useEffect(() => {
+    if (incomingProduct && incomingProduct.incoming_product_items) {
+      setItems(
+        incomingProduct.incoming_product_items.map((it: any) => ({
+          id: it.id?.toString() || "",
+          product: it.product?.toString(),
+          product_description: it.product_details?.product_name || `Product ${it.product}`,
+          unit_of_measure: it.product_details?.unit_of_measure_details?.unit_symbol || "Units",
+          expected_quantity: it.expected_quantity,
+          received_quantity: it.quantity_received,
+        }))
+      );
+    }
+  }, [incomingProduct]);
+
+  const [discrepancyState, setDiscrepancyState] = useState<{
+    isOpen: boolean;
+    type: DiscrepancyType | null;
+    ipId: string | null;
+  }>({
+    isOpen: false,
+    type: null,
+    ipId: null,
+  });
 
   const [notification, setNotification] = React.useState<{
     message: string;
@@ -88,50 +116,121 @@ export default function EditIncomingProductPage() {
   };
 
   async function onSave(data: GRNFormData): Promise<void> {
+    if (!incomingProduct) return;
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      await updateIncomingProduct({
+        id,
+        data: {
+          incoming_product_items: items.map((it) => ({
+            id: it.id,
+            product: Number(it.product),
+            expected_quantity: it.expected_quantity,
+            quantity_received: it.received_quantity,
+          })),
+        },
+      }).unwrap();
+      
+      setNotification({ message: "GRN Draft updated successfully!", type: "success", show: true });
+      setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1000);
+    } catch (err: any) {
+      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to update draft.", type: "error", show: true });
+    } finally {
       setIsSubmitting(false);
-      setNotification({
-        message: "GRN Draft updated successfully!",
-        type: "success",
-        show: true,
-      });
-      setTimeout(() => {
-        router.push(`/inventory/operation/incoming_product/${id}`);
-      }, 1000);
-    }, 500);
+    }
   }
 
   async function onValidate(data: GRNFormData): Promise<void> {
+    if (!incomingProduct) return;
     setIsSubmitting(true);
-    // Check for backorder if received < expected
-    const hasBackorder = items.some(
-      (it) => Number(it.received_quantity) < Number(it.expected_quantity)
-    );
+    try {
+      await updateIncomingProduct({
+        id,
+        data: {
+          incoming_product_items: items.map((it) => ({
+            id: it.id,
+            product: Number(it.product),
+            expected_quantity: it.expected_quantity,
+            quantity_received: it.received_quantity,
+          })),
+        },
+      }).unwrap();
 
-    if (hasBackorder) {
-       // Ideally we'd show a modal here, but for dummy just notify
-       setNotification({
-        message: "Received less than expected. Backorder created. Validated!",
-        type: "success",
-        show: true,
-      });
-    } else {
-      setNotification({
-        message: "GRN Validated! Stock received into Inventory Ledger.",
-        type: "success",
-        show: true,
-      });
-    }
+      const hasBackorder = items.some((it) => Number(it.received_quantity) < Number(it.expected_quantity));
 
-    setTimeout(() => {
+      if (hasBackorder) {
+        setIsSubmitting(false);
+        setDiscrepancyState({ isOpen: true, type: "backorder", ipId: id });
+        return;
+      } else {
+        await validateIncomingProduct({ id }).unwrap();
+        setNotification({ message: "GRN Validated! Stock received into Inventory Ledger.", type: "success", show: true });
+        setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1200);
+      }
+    } catch (err: any) {
+      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to validate GRN.", type: "error", show: true });
+    } finally {
       setIsSubmitting(false);
-      router.push(`/inventory/operation/incoming_product/${id}`);
-    }, 1500);
+    }
   }
+
+  const handleCreateBackorder = async () => {
+    if (!discrepancyState.ipId) return;
+    setIsSubmitting(true);
+    try {
+      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
+      await createIncomingProductBackorder({ response: true, incoming_product: discrepancyState.ipId }).unwrap();
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      setNotification({ message: "GRN Validated & Backorder created for remaining pending balance!", type: "success", show: true });
+      setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1200);
+    } catch (error: any) {
+      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to create backorder.", type: "error", show: true });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseWithoutBackorder = async () => {
+    if (!discrepancyState.ipId) return;
+    setIsSubmitting(true);
+    try {
+      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
+      await createIncomingProductBackorder({ response: false, incoming_product: discrepancyState.ipId }).unwrap();
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      setNotification({ message: "GRN Validated! Delivery closed without backorder.", type: "success", show: true });
+      setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1200);
+    } catch (error: any) {
+      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to close delivery.", type: "error", show: true });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   function closeNotification() {
     setNotification((prev) => ({ ...prev, show: false }));
+  }
+
+  if (isLoading) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (error || !incomingProduct) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white items-center justify-center gap-4">
+          <p className="text-[#525F7F]">Failed to load GRN or it was not found.</p>
+          <Link href="/inventory/operation">
+            <Button variant="outline" className="border-gray-200 text-gray-600">Back to Operations</Button>
+          </Link>
+        </div>
+      </PageGuard>
+    );
   }
 
   return (
@@ -154,7 +253,7 @@ export default function EditIncomingProductPage() {
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">Related PO</Label>
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    PO-2026-0094
+                    {incomingProduct?.related_po || "N/A"}
                   </div>
                 </div>
 
@@ -162,7 +261,7 @@ export default function EditIncomingProductPage() {
                   <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
                   {/* Pre-filled from PO - not editable */}
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    Julius Berger Steel
+                    {incomingProduct?.supplier_details?.company_name || "N/A"}
                   </div>
                 </div>
 
@@ -170,7 +269,7 @@ export default function EditIncomingProductPage() {
                   <Label className="text-gray-700 font-medium">Destination Location</Label>
                   {/* Auto-filled with stockkeeper's assigned location - not editable */}
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    Main Warehouse - Site A
+                    {incomingProduct?.destination_location_details?.location_name || incomingProduct?.destination_location || "N/A"}
                   </div>
                 </div>
               </div>
@@ -237,6 +336,14 @@ export default function EditIncomingProductPage() {
           </Link>
           <Button type="button" disabled={isSubmitting} onClick={handleSubmit(onValidate)} className="bg-[#3B7CED] hover:bg-[#3065c3] text-white">Validate</Button>
         </div>
+
+        <DiscrepancyDialog
+          isOpen={discrepancyState.isOpen}
+          onClose={() => setDiscrepancyState({ isOpen: false, type: null, ipId: null })}
+          type={discrepancyState.type || "backorder"}
+          onConfirm={handleCreateBackorder}
+          onDecline={handleCloseWithoutBackorder}
+        />
 
         <ToastNotification message={notification.message} type={notification.type} show={notification.show} onClose={closeNotification} />
       </div>

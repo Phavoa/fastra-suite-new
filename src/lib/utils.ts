@@ -19,7 +19,35 @@ export function extractErrorMessage(
     if (typeof data === "string") return data.trim();
 
     // Handle direct error key (e.g. { "error": "Insufficient budget..." })
-    if (typeof data.error === "string") return data.error.trim();
+    if (typeof data.error === "string") {
+      const errStr = data.error.trim();
+      if (errStr.startsWith("{") && errStr.endsWith("}")) {
+        try {
+          const jsonStr = errStr.replace(/'/g, '"');
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && typeof parsed === "object") {
+            const lines: string[] = [];
+            if (parsed.error) lines.push(parsed.error);
+            if (parsed.activity_budget) {
+              const val = parseFloat(parsed.activity_budget);
+              lines.push(`Activity Budget: ₦${isNaN(val) ? parsed.activity_budget : val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`);
+            }
+            if (parsed.available) {
+              const val = parseFloat(parsed.available);
+              lines.push(`Available: ₦${isNaN(val) ? parsed.available : val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`);
+            }
+            if (parsed.requested) {
+              const val = parseFloat(parsed.requested);
+              lines.push(`Requested: ₦${isNaN(val) ? parsed.requested : val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`);
+            }
+            return lines.join("\n");
+          }
+        } catch (e) {
+          // Fallback to raw string if parsing fails
+        }
+      }
+      return errStr;
+    }
 
     // Handle string detail or message
     if (typeof data.detail === "string") return data.detail.trim();
