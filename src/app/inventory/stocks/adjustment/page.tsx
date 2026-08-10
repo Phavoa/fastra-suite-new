@@ -15,35 +15,7 @@ import { StockAdjustmentCards } from "@/components/inventory/stocks/StockAdjustm
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-const DUMMY_ADJUSTMENTS: StockAdjustmentRow[] = [
-  {
-    id: "WH-MAIN-ADJ-0001",
-    adjustmentType: "Stock Level Update",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-06-28",
-    status: "done" as StockAdjustmentStatus,
-    product: "Cement (50kg Bag)",
-    quantity: -5,
-  },
-  {
-    id: "WH-MAIN-ADJ-0002",
-    adjustmentType: "Stock Level Update",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-06-29",
-    status: "draft" as StockAdjustmentStatus,
-    product: "Reinforcement Steel 16mm",
-    quantity: 12,
-  },
-  {
-    id: "WH-SEC-ADJ-0001",
-    adjustmentType: "Stock Level Update",
-    location: "Secondary Store - Site B",
-    adjustedDate: "2026-06-25",
-    status: "done" as StockAdjustmentStatus,
-    product: "Safety Helmets (Yellow)",
-    quantity: -2,
-  },
-];
+import { useGetStockAdjustmentsQuery } from "@/api/inventory/stockAdjustmentApi";
 
 export default function StockAdjustmentPage() {
   const searchParams = useSearchParams();
@@ -72,18 +44,23 @@ export default function StockAdjustmentPage() {
     },
   ];
 
+  const { data: adjustmentsData, isLoading } = useGetStockAdjustmentsQuery({
+    search: query || undefined,
+    status: selectedStatus === "all" ? undefined : (selectedStatus.toUpperCase() as any),
+  });
+
   const rows = useMemo(() => {
-    return DUMMY_ADJUSTMENTS.filter((adj) => {
-      if (selectedStatus !== "all" && adj.status !== selectedStatus) return false;
-      if (!query.trim()) return true;
-      const q = query.toLowerCase();
-      return (
-        adj.id.toLowerCase().includes(q) ||
-        adj.location.toLowerCase().includes(q) ||
-        (adj.product && adj.product.toLowerCase().includes(q))
-      );
-    });
-  }, [selectedStatus, query]);
+    if (!adjustmentsData) return [];
+    return adjustmentsData.map((adj: any) => ({
+      id: adj.id,
+      adjustmentType: adj.adjustment_type || "Stock Level Update",
+      location: adj.warehouse_location_details?.location_name || adj.warehouse_location || "N/A",
+      adjustedDate: adj.date_created ? new Date(adj.date_created).toISOString().split("T")[0] : "N/A",
+      status: adj.status?.toLowerCase() as StockAdjustmentStatus,
+      product: adj.stock_adjustment_items?.[0]?.product_details?.product_name || "Multiple Products",
+      quantity: adj.stock_adjustment_items?.[0]?.new_quantity || 0,
+    }));
+  }, [adjustmentsData]);
 
   const handleViewChange = (view: "grid" | "list") => {
     setCurrentView(view);
@@ -171,10 +148,10 @@ export default function StockAdjustmentPage() {
           {/* White Section Card 2: Table or Grid */}
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
             {currentView === "list" ? (
-              <StockAdjustmentTable rows={rows} query={query} />
+              <StockAdjustmentTable rows={rows} query={query} isLoading={isLoading} />
             ) : (
               <div className="p-6">
-                <StockAdjustmentCards stockAdjustments={rows} />
+                <StockAdjustmentCards stockAdjustments={rows} isLoading={isLoading} />
               </div>
             )}
           </div>

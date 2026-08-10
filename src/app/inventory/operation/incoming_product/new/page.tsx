@@ -8,12 +8,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowLeft, Plus, Trash, PackagePlus } from "lucide-react";
 
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import StatusModal, { useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
+import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetVendorsQuery } from "@/api/invoice/vendorsApi";
+import { useGetPurchaseOrdersQuery } from "@/api/invoice/projectPurchaseOrdersApi";
+import {
+  useCreateIncomingProductMutation,
+  useValidateIncomingProductReceiptMutation,
+  useCreateIncomingProductBackorderMutation,
+} from "@/api/inventory/incomingProductApi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +52,7 @@ interface GRNLineItem {
   product_name: string;
   product_description: string;
   unit_symbol: string;
+  unit_of_measure_id: number;
   expected_quantity: string;
   received_quantity: string;
   accepted_quantity: string;
@@ -54,7 +64,9 @@ const receiptTypes = ["vendor_receipt", "returns", "scrap"] as const;
 
 const incomingProductSchema = z.object({
   receipt_type: z.enum(receiptTypes),
+  related_po: z.string().optional(),
   supplier: z.string().min(1, "Supplier is required"),
+  source_location: z.string().min(1, "Source location is required"),
   destination_location: z.string().min(1, "Destination location is required"),
   delivery_note: z.string().min(1, "Delivery note / Waybill number is required"),
   notes: z.string().optional(),
@@ -62,38 +74,37 @@ const incomingProductSchema = z.object({
 
 type IncomingProductFormData = z.infer<typeof incomingProductSchema>;
 
-const DUMMY_LOCATIONS: Option[] = [
-  { value: "WH-MAIN", label: "Main Warehouse - Site A (WH-MAIN)" },
-  { value: "WH-SEC", label: "Secondary Store - Site B (WH-SEC)" },
-];
-
-const DUMMY_SUPPLIERS: Option[] = [
-  { value: "SUP-1", label: "Dangote Cement Plc" },
-  { value: "SUP-2", label: "Julius Berger Steel Co." },
-  { value: "SUP-3", label: "Lafarge Africa Plc" },
-];
-
-const DUMMY_PRODUCTS = [
-  { id: "1", product_name: "Cement (50kg Bag)", product_description: "Portland Cement Grade 42.5", unit_symbol: "Bags" },
-  { id: "2", product_name: "Reinforcement Steel 16mm", product_description: "High Yield Deformed Steel Bars", unit_symbol: "Tonnes" },
-  { id: "3", product_name: "Sharp Sand", product_description: "Clean river sharp sand for plastering", unit_symbol: "m³" },
-  { id: "4", product_name: "Safety Helmets (Yellow)", product_description: "HDPE Hard Hats with adjustable strap", unit_symbol: "Pcs" },
-];
-
 export default function NewIncomingProductPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { data: productsResponse = [] } = useGetInventoryProductsQuery({});
+  const productsData = Array.isArray(productsResponse) ? productsResponse : (productsResponse as any)?.results || [];
+
+  const { data: locationsResponse = [] } = useGetLocationsQuery({});
+  const locationsData = Array.isArray(locationsResponse) ? locationsResponse : (locationsResponse as any)?.results || [];
+
+  const { data: suppliersResponse = [] } = useGetVendorsQuery({ vendor_type: "supplier" });
+  const suppliersData = Array.isArray(suppliersResponse) ? suppliersResponse : (suppliersResponse as any)?.results || [];
+
+  const { data: poResponse = [] } = useGetPurchaseOrdersQuery({});
+  const purchaseOrdersData = Array.isArray(poResponse) ? poResponse : (poResponse as any)?.results || [];
+
+  const [createIncomingProduct] = useCreateIncomingProductMutation();
+  const [validateIncomingProduct] = useValidateIncomingProductReceiptMutation();
+  const [createIncomingProductBackorder] = useCreateIncomingProductBackorderMutation();
+
   const [items, setItems] = useState<GRNLineItem[]>([
     {
       id: "1",
-      product: "1",
-      product_name: "Cement (50kg Bag)",
-      product_description: "Portland Cement Grade 42.5",
-      unit_symbol: "Bags",
-      expected_quantity: "100",
-      received_quantity: "100",
-      accepted_quantity: "100",
+      product: "",
+      product_name: "",
+      product_description: "",
+      unit_symbol: "",
+      unit_of_measure_id: 0,
+      expected_quantity: "0",
+      received_quantity: "0",
+      accepted_quantity: "0",
       rejected_quantity: "0",
       reject_reason: "",
     },
@@ -109,15 +120,7 @@ export default function NewIncomingProductPage() {
     ipId: null,
   });
 
-  const [notification, setNotification] = React.useState<{
-    message: string;
-    type: "success" | "error";
-    show: boolean;
-  }>({
-    message: "",
-    type: "success",
-    show: false,
-  });
+  const statusModal = useStatusModal();
 
   const addRow = () =>
     setItems((prev) => [
@@ -128,6 +131,7 @@ export default function NewIncomingProductPage() {
         product_name: "",
         product_description: "",
         unit_symbol: "",
+        unit_of_measure_id: 0,
         expected_quantity: "0",
         received_quantity: "0",
         accepted_quantity: "0",
@@ -149,20 +153,53 @@ export default function NewIncomingProductPage() {
     resolver: zodResolver(incomingProductSchema) as Resolver<IncomingProductFormData>,
     defaultValues: {
       receipt_type: "vendor_receipt",
-      supplier: "SUP-1",
-      destination_location: "WH-MAIN",
-      delivery_note: `DN-${Math.floor(10000 + Math.random() * 90000)}`,
+      related_po: "",
+      supplier: "",
+      source_location: "",
+      destination_location: "",
+      delivery_note: "",
       notes: "Direct site procurement delivery inspection.",
     },
   });
 
-  const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
-    value: p.id,
+  const relatedPoValue = watch("related_po");
+  
+  React.useEffect(() => {
+    if (relatedPoValue && purchaseOrdersData.length > 0) {
+      const selectedPo = purchaseOrdersData.find((po: any) => po.id.toString() === relatedPoValue);
+      if (selectedPo && selectedPo.lines && selectedPo.lines.length > 0) {
+        const newItems: GRNLineItem[] = selectedPo.lines.map((line: any, index: number) => {
+          const p = productsData.find((prod: any) => prod.id.toString() === line.product.toString());
+          return {
+            id: `po-line-${line.id}-${index}`,
+            product: line.product.toString(),
+            product_name: line.item_name || p?.product_name || "",
+            product_description: line.description || p?.description || "",
+            unit_symbol: p?.unit_of_measure_details?.unit_symbol || "",
+            unit_of_measure_id: p?.unit_of_measure || 0,
+            expected_quantity: line.qty || "0",
+            received_quantity: "0",
+            accepted_quantity: "0",
+            rejected_quantity: "0",
+            reject_reason: "",
+          };
+        });
+        setItems(newItems);
+        
+        if (selectedPo.vendor) {
+          setValue("supplier", selectedPo.vendor.toString());
+        }
+      }
+    }
+  }, [relatedPoValue, purchaseOrdersData, productsData, setValue]);
+
+  const productOptions: Option[] = productsData.map((p: any) => ({
+    value: p.id.toString(),
     label: p.product_name,
   }));
 
   const updateItemProduct = (itemId: string, productId: string) => {
-    const p = DUMMY_PRODUCTS.find((item) => item.id === productId);
+    const p = productsData.find((item: any) => item.id.toString() === productId);
     setItems((prev) =>
       prev.map((it) =>
         it.id === itemId
@@ -170,8 +207,9 @@ export default function NewIncomingProductPage() {
               ...it,
               product: productId,
               product_name: p?.product_name || "",
-              product_description: p?.product_description || "",
-              unit_symbol: p?.unit_symbol || "",
+              product_description: p?.description || "",
+              unit_symbol: p?.unit_of_measure_details?.unit_symbol || "",
+              unit_of_measure_id: p?.unit_of_measure || 0,
             }
           : it
       )
@@ -203,79 +241,212 @@ export default function NewIncomingProductPage() {
 
   async function onSaveDraft(data: IncomingProductFormData) {
     setIsSubmitting(true);
-    setTimeout(() => {
+    statusModal.showInfo("Saving Draft...", "Please wait while your draft is being saved.");
+    try {
+      const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
+      if (validItems.length === 0) {
+        statusModal.showError(
+          "Validation Error",
+          "Please enter at least one valid product line with received quantity > 0"
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const selectedPoId = data.related_po ? Number(data.related_po) : null;
+      let selectedPo: any = null;
+      if (selectedPoId) {
+        selectedPo = purchaseOrdersData.find((po: any) => po.id === selectedPoId);
+      }
+
+      const payload: any = {
+        receipt_type: data.receipt_type,
+        supplier: Number(data.supplier),
+        source_location: data.source_location, 
+        destination_location: data.destination_location,
+        notes: data.notes || data.delivery_note,
+        status: "draft",
+        incoming_product_items: validItems.map((it) => {
+          let ppo_line: number | undefined = undefined;
+          if (selectedPo && selectedPo.lines) {
+            const matchedLine = selectedPo.lines.find((l: any) => l.product === Number(it.product));
+            if (matchedLine) {
+              ppo_line = matchedLine.id;
+            } else {
+              throw new Error(`Product ${it.product_name || it.product} is not part of the selected Project Purchase Order.`);
+            }
+          }
+          return {
+            product: Number(it.product),
+            expected_quantity: it.expected_quantity,
+            quantity_received: it.received_quantity,
+            unit_of_measure: it.unit_of_measure_id,
+            ...(ppo_line ? { ppo_line } : {})
+          };
+        }),
+      };
+
+      if (selectedPoId) {
+        payload.related_ppo = selectedPoId;
+      }
+
+      await createIncomingProduct(payload).unwrap();
+
+      statusModal.showSuccess(
+        "Draft Saved",
+        "Direct Goods Receipt Note (GRN) draft saved successfully!",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
+    } catch (error: any) {
+      statusModal.showError(
+        "Failed to save draft",
+        extractErrorMessage(error, "Failed to save draft.")
+      );
+    } finally {
       setIsSubmitting(false);
-      setNotification({
-        message: "Direct Goods Receipt Note (GRN) draft saved successfully!",
-        type: "success",
-        show: true,
-      });
-      setTimeout(() => {
-        router.push("/inventory/operation");
-      }, 1000);
-    }, 500);
+    }
   }
 
   async function onValidateGRN(data: IncomingProductFormData) {
     const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
     if (validItems.length === 0) {
-      setNotification({ message: "Please enter at least one valid product line with received quantity > 0", type: "error", show: true });
+      statusModal.showError(
+        "Validation Error",
+        "Please enter at least one valid product line with received quantity > 0"
+      );
       return;
     }
 
-    for (const item of validItems) {
-      if (Number(item.rejected_quantity) > 0 && !item.reject_reason.trim()) {
-        setNotification({ message: `Please provide a reject reason for ${item.product_name || "rejected item"}`, type: "error", show: true });
-        return;
-      }
-    }
-
-    const hasBackorder = validItems.some((it) => Number(it.accepted_quantity) < Number(it.expected_quantity));
+    const hasDiscrepancy = validItems.some(
+      (it) => Number(it.received_quantity) < Number(it.expected_quantity)
+    );
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      if (hasBackorder) {
-        setDiscrepancyState({
-          isOpen: true,
-          type: "backorder",
-          ipId: "WH-IN-0004",
-        });
-      } else {
-        setNotification({
-          message: "GRN Validated! Accepted quantities added to active warehouse stock.",
-          type: "success",
-          show: true,
-        });
-        setTimeout(() => {
-          router.push("/inventory/operation");
-        }, 1200);
+    statusModal.showInfo("Validating...", "Please wait while we validate the GRN.");
+    try {
+      const selectedPoId = data.related_po ? Number(data.related_po) : null;
+      let selectedPo: any = null;
+      if (selectedPoId) {
+        selectedPo = purchaseOrdersData.find((po: any) => po.id === selectedPoId);
       }
-    }, 500);
+
+      const payload: any = {
+        receipt_type: data.receipt_type,
+        supplier: Number(data.supplier),
+        source_location: data.source_location,
+        destination_location: data.destination_location,
+        notes: data.notes || data.delivery_note,
+        status: "draft",
+        incoming_product_items: validItems.map((it) => {
+          let ppo_line: number | undefined = undefined;
+          if (selectedPo && selectedPo.lines) {
+            const matchedLine = selectedPo.lines.find((l: any) => l.product === Number(it.product));
+            if (matchedLine) {
+              ppo_line = matchedLine.id;
+            } else {
+              throw new Error(`Product ${it.product_name || it.product} is not part of the selected Project Purchase Order.`);
+            }
+          }
+          return {
+            product: Number(it.product),
+            expected_quantity: it.expected_quantity,
+            quantity_received: it.received_quantity,
+            unit_of_measure: it.unit_of_measure_id,
+            ...(ppo_line ? { ppo_line } : {})
+          };
+        }),
+      };
+
+      if (selectedPoId) {
+        payload.related_ppo = selectedPoId;
+      }
+
+      const res = await createIncomingProduct(payload).unwrap();
+      
+      // Attempt validation immediately after creation if no discrepancy
+      if (res && res.incoming_product_id) {
+        if (hasDiscrepancy) {
+          setIsSubmitting(false);
+          setDiscrepancyState({
+            isOpen: true,
+            type: "backorder",
+            ipId: res.incoming_product_id,
+          });
+          return;
+        } else {
+          await validateIncomingProduct({ id: res.incoming_product_id }).unwrap();
+          statusModal.showSuccess(
+            "GRN Validated",
+            "Accepted quantities added to active warehouse stock.",
+            "Go to Operations",
+            () => router.push("/inventory/operation")
+          );
+        }
+      }
+    } catch (error: any) {
+      statusModal.showError(
+        "Validation Failed",
+        extractErrorMessage(error, "Failed to validate GRN.")
+      );
+      setIsSubmitting(false);
+    }
   }
 
-  const handleCreateBackorder = () => {
-    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-    setNotification({
-      message: "GRN Validated & Backorder created for remaining pending balance!",
-      type: "success",
-      show: true,
-    });
-    setTimeout(() => {
-      router.push("/inventory/operation");
-    }, 1200);
+  const handleCreateBackorder = async () => {
+    if (!discrepancyState.ipId) return;
+    setIsSubmitting(true);
+    statusModal.showInfo("Processing Backorder...", "Please wait while the backorder is created.");
+    try {
+      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
+      await createIncomingProductBackorder({
+        response: true,
+        incoming_product: discrepancyState.ipId,
+      }).unwrap();
+
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      statusModal.showSuccess(
+        "Backorder Created",
+        "GRN Validated & Backorder created for remaining pending balance!",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
+    } catch (error: any) {
+      statusModal.showError(
+        "Action Failed",
+        extractErrorMessage(error, "Failed to create backorder.")
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCloseWithoutBackorder = () => {
-    setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-    setNotification({
-      message: "GRN Validated! Delivery closed without backorder.",
-      type: "success",
-      show: true,
-    });
-    setTimeout(() => {
-      router.push("/inventory/operation");
-    }, 1200);
+  const handleCloseWithoutBackorder = async () => {
+    if (!discrepancyState.ipId) return;
+    setIsSubmitting(true);
+    statusModal.showInfo("Closing Delivery...", "Please wait while we close the delivery.");
+    try {
+      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
+      await createIncomingProductBackorder({
+        response: false,
+        incoming_product: discrepancyState.ipId,
+      }).unwrap();
+
+      setDiscrepancyState({ isOpen: false, type: null, ipId: null });
+      statusModal.showSuccess(
+        "Delivery Closed",
+        "GRN Validated! Delivery closed without backorder.",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
+    } catch (error: any) {
+      statusModal.showError(
+        "Action Failed",
+        extractErrorMessage(error, "Failed to close delivery.")
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const breadcrumbsItem: BreadcrumbItem[] = [
@@ -335,27 +506,103 @@ export default function NewIncomingProductPage() {
                   <Label className="text-xs font-semibold text-[#525F7F]">
                     Related PO
                   </Label>
-                  <div className="p-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-[#32325D]">
-                    PO-2026-0105
-                  </div>
+                  <Select
+                    value={watch("related_po")}
+                    onValueChange={(val) => setValue("related_po", val)}
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder="Select PO" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {purchaseOrdersData.length === 0 ? (
+                        <SelectItem value="no-data" disabled>No POs found</SelectItem>
+                      ) : (
+                        purchaseOrdersData.map((po: any) => (
+                          <SelectItem key={po.id} value={po.id.toString()}>
+                            {po.po_number || po.id}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Supplier / Vendor
+                    Supplier / Vendor <span className="text-[#E43D2B]">*</span>
                   </Label>
-                  <div className="p-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-[#32325D]">
-                    Julius Berger Steel
-                  </div>
+                  <Select
+                    value={watch("supplier")}
+                    onValueChange={(val) => setValue("supplier", val)}
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder="Select Supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliersData.length === 0 ? (
+                        <SelectItem value="no-data" disabled>No suppliers found</SelectItem>
+                      ) : (
+                        suppliersData.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>
+                            {s.vendor_name || s.company_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {errors.supplier && <p className="text-[11px] text-[#E43D2B]">{errors.supplier.message}</p>}
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Destination Store
+                    Source Store/Vendor <span className="text-[#E43D2B]">*</span>
                   </Label>
-                  <div className="p-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-[#32325D]">
-                    Main Warehouse - Site A
-                  </div>
+                  <Select
+                    value={watch("source_location")}
+                    onValueChange={(val) => setValue("source_location", val)}
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder="Select Source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationsData.length === 0 ? (
+                        <SelectItem value="no-data" disabled>No locations found</SelectItem>
+                      ) : (
+                        locationsData.map((loc: any) => (
+                          <SelectItem key={loc.id} value={loc.id.toString()}>
+                            {loc.location_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {errors.source_location && <p className="text-[11px] text-[#E43D2B]">{errors.source_location.message}</p>}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Destination Store <span className="text-[#E43D2B]">*</span>
+                  </Label>
+                  <Select
+                    value={watch("destination_location")}
+                    onValueChange={(val) => setValue("destination_location", val)}
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder="Select Destination" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationsData.length === 0 ? (
+                        <SelectItem value="no-data" disabled>No locations found</SelectItem>
+                      ) : (
+                        locationsData.map((loc: any) => (
+                          <SelectItem key={loc.id} value={loc.id.toString()}>
+                            {loc.location_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {errors.destination_location && <p className="text-[11px] text-[#E43D2B]">{errors.destination_location.message}</p>}
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -412,9 +659,13 @@ export default function NewIncomingProductPage() {
                               <SelectValue placeholder="Select product" />
                             </SelectTrigger>
                             <SelectContent>
-                              {productOptions.map((o) => (
-                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                              ))}
+                              {productOptions.length === 0 ? (
+                                <SelectItem value="no-data" disabled>No products found</SelectItem>
+                              ) : (
+                                productOptions.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -505,11 +756,14 @@ export default function NewIncomingProductPage() {
           onDecline={handleCloseWithoutBackorder}
         />
 
-        <ToastNotification
-          message={notification.message}
-          type={notification.type}
-          show={notification.show}
-          onClose={() => setNotification((p) => ({ ...p, show: false }))}
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          onClose={statusModal.close}
         />
       </div>
     </PageGuard>

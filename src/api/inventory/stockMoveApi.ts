@@ -83,7 +83,10 @@ export const stockMoveApi = createApi({
         params,
       }),
     }),
+    getStockMove: builder.query<StockMove, string | number>({
+      query: (id) => `/inventory/stock-move/${id}/`,
+    }),
   }),
 });
 
-export const { useGetStockMovesQuery } = stockMoveApi;
+export const { useGetStockMovesQuery, useGetStockMoveQuery } = stockMoveApi;

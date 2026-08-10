@@ -17,128 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
-const DUMMY_CONSUMPTION_REQUESTS = [
-  {
-    id: "MC-2026-0142",
-    wbsActivity: "First Floor Slab Reinforcement",
-    requester: "Eng. John Doe (Site Engineer)",
-    requestDate: "2026-07-28",
-    numberOfItems: 5,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0143",
-    wbsActivity: "Drainage Trench Concrete",
-    requester: "Eng. Jane Smith (Site Supervisor)",
-    requestDate: "2026-07-27",
-    numberOfItems: 12,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0189",
-    wbsActivity: "Retaining Wall Concrete Pour",
-    requester: "Eng. Samuel (Site Supervisor)",
-    requestDate: "2026-07-26",
-    numberOfItems: 8,
-    status: "held_overrun",
-    queue: "overrun",
-    isOverrun: true,
-  },
-  {
-    id: "MC-2026-0192",
-    wbsActivity: "Main Switchboard Cabling",
-    requester: "Eng. Chinedu (Electrical Lead)",
-    requestDate: "2026-07-25",
-    numberOfItems: 3,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0195",
-    wbsActivity: "Perimeter Interlocking Paving",
-    requester: "Eng. John Doe (Site Engineer)",
-    requestDate: "2026-07-24",
-    numberOfItems: 25,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0198",
-    wbsActivity: "Steel Columns Erection",
-    requester: "Eng. David (Structural Engineer)",
-    requestDate: "2026-07-23",
-    numberOfItems: 2,
-    status: "held_overrun",
-    queue: "overrun",
-    isOverrun: true,
-  },
-  {
-    id: "MC-2026-0201",
-    wbsActivity: "Drywall Partitions Level 4",
-    requester: "Eng. Tunde (Finishing Lead)",
-    requestDate: "2026-07-22",
-    numberOfItems: 15,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0205",
-    wbsActivity: "Ground Floor Tiling & Mortar",
-    requester: "Eng. Samuel (Site Supervisor)",
-    requestDate: "2026-07-21",
-    numberOfItems: 10,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0208",
-    wbsActivity: "Underground Soil & Waste Piping",
-    requester: "Eng. Jane Smith (Site Supervisor)",
-    requestDate: "2026-07-20",
-    numberOfItems: 7,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0211",
-    wbsActivity: "Terrace Waterproofing Membrane",
-    requester: "Eng. Chinedu (Electrical Lead)",
-    requestDate: "2026-07-19",
-    numberOfItems: 4,
-    status: "held_overrun",
-    queue: "overrun",
-    isOverrun: true,
-  },
-  {
-    id: "MC-2026-0215",
-    wbsActivity: "Site Access Road Asphalt",
-    requester: "Eng. John Doe (Site Engineer)",
-    requestDate: "2026-07-18",
-    numberOfItems: 6,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-  {
-    id: "MC-2026-0218",
-    wbsActivity: "Pile Cap Reinforcement",
-    requester: "Eng. David (Structural Engineer)",
-    requestDate: "2026-07-17",
-    numberOfItems: 14,
-    status: "pending",
-    queue: "normal",
-    isOverrun: false,
-  },
-];
+import { useGetMaterialConsumptionsQuery } from "@/api/requests/materialConsumptionRequestApi";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const STATUS_TABS = [
   { label: "All Requisitions", value: "all" },
@@ -156,8 +36,28 @@ export default function MaterialConsumptionApprovalsPage() {
   const [selectedTab, setSelectedTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { data: apiData = [], isLoading, isError } = useGetMaterialConsumptionsQuery();
+
   const filteredRequests = useMemo(() => {
-    return DUMMY_CONSUMPTION_REQUESTS.filter((item) => {
+    const rawList = Array.isArray(apiData) ? apiData : (apiData as any).results ?? [];
+    
+    // Map API data to UI structure
+    const mapped = rawList.map((req: any) => {
+      const isOverrun = req.status === "held_overrun" || req.status === "rejected";
+      return {
+        id: req.request_id || `MCR-${req.id}`,
+        realId: req.id,
+        wbsActivity: req.activity_details?.name || `Project #${req.project_request || 'N/A'}`, // Fallback since WBS info is missing from types
+        requester: req.requester_details?.name || "System Request", // Fallback
+        requestDate: req.date_consumed || new Date(req.created_at).toISOString().split('T')[0],
+        numberOfItems: (req.lines ?? []).length,
+        status: req.status || "pending",
+        queue: isOverrun ? "overrun" : "normal",
+        isOverrun: isOverrun,
+      };
+    });
+
+    return mapped.filter((item: any) => {
       const matchesTab =
         selectedTab === "all" || item.queue === selectedTab;
 
@@ -165,12 +65,12 @@ export default function MaterialConsumptionApprovalsPage() {
       const matchesSearch =
         !query ||
         item.id.toLowerCase().includes(lowerQuery) ||
-        item.wbsActivity.toLowerCase().includes(lowerQuery) ||
-        item.requester.toLowerCase().includes(lowerQuery);
+        String(item.wbsActivity).toLowerCase().includes(lowerQuery) ||
+        String(item.requester).toLowerCase().includes(lowerQuery);
 
       return matchesTab && matchesSearch;
     });
-  }, [query, selectedTab]);
+  }, [apiData, query, selectedTab]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / ITEMS_PER_PAGE));
   const paginatedRequests = useMemo(() => {
@@ -291,7 +191,21 @@ export default function MaterialConsumptionApprovalsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedRequests.length === 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="p-4 space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  ) : isError ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="px-6 py-12 text-center text-red-500 text-sm">
+                        Failed to load material consumption requests.
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedRequests.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={6}
@@ -305,11 +219,11 @@ export default function MaterialConsumptionApprovalsPage() {
                       <TableRow
                         key={req.id}
                         className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/inventory/operation/material-consumption/${req.id}`)}
+                        onClick={() => router.push(`/inventory/operation/material-consumption/${req.realId}`)}
                       >
                         <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
                           <Link
-                            href={`/inventory/operation/material-consumption/${req.id}`}
+                            href={`/inventory/operation/material-consumption/${req.realId}`}
                             className="text-[#3B7CED] hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >

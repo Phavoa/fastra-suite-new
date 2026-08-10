@@ -3,12 +3,13 @@
 import React from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
+import { useGetScrapQuery, useGetScrapEditableQuery, useValidateScrapMutation } from "@/api/inventory/scrapApi";
 import {
   Table,
   TableBody,
@@ -20,34 +21,31 @@ import {
 
 export default function ScrapDetailPage() {
   const params = useParams();
-  const id = (params?.id as string) || "WH-SCRAP-0001";
+  const id = (params?.id as string) || "";
 
-  let status = "done";
-  if (id === "WH-SC-0002" || id === "WH-SC-0005" || id === "WH-SC-0009" || id === "WH-SC-0011") {
-    status = "draft";
-  } else if (id === "WH-SC-0003" || id === "WH-SC-0007" || id === "WH-SC-0012") {
-    status = "canceled";
-  }
+  const { data: scrapData, isLoading } = useGetScrapQuery(id, { skip: !id });
+  const { data: editableData } = useGetScrapEditableQuery(id, { skip: !id });
+  const [validateScrap, { isLoading: isValidating }] = useValidateScrapMutation();
 
-  const dummyData = {
-    id: id,
-    cause: "Damage / Spoilage",
-    project: "Project Alpha",
-    warehouse_location: "Main Warehouse - Site A",
-    date: "2026-06-28",
-    status: status,
-    notes: "Bags punctured by forklift during offloading operations.",
-    recorded_by: "Site Storekeeper",
-    items: [
-      {
-        id: "1",
-        product_name: "Dangote Cement (50kg Bag)",
-        product_description: "Portland Cement Grade 42.5",
-        unit_symbol: "Bags",
-        quantity: 5,
-      },
-    ],
+  const handleValidate = async () => {
+    try {
+      await validateScrap({ id }).unwrap();
+    } catch (error) {
+      console.error("Failed to validate scrap:", error);
+    }
   };
+
+  const record = scrapData ? {
+    id: scrapData.id,
+    cause: (scrapData as any).cause || scrapData.adjustment_type || "N/A",
+    project: "N/A",
+    warehouse_location: scrapData.warehouse_location_details?.location_name || scrapData.warehouse_location,
+    date: (scrapData as any).date_created ? new Date((scrapData as any).date_created).toLocaleDateString() : "N/A",
+    status: scrapData.status?.toLowerCase(),
+    notes: scrapData.notes,
+    recorded_by: "N/A",
+    items: (scrapData as any).items || scrapData.scrap_items || [],
+  } : null;
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -74,6 +72,10 @@ export default function ScrapDetailPage() {
             }
           />
 
+          {isLoading && <div className="p-6 text-center text-gray-500">Loading record details...</div>}
+
+          {!isLoading && record && (
+            <>
           {/* Top Bar Card */}
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -83,31 +85,42 @@ export default function ScrapDetailPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-semibold text-[#32325D]">
-                    Scrap Record Details: {dummyData.id}
+                    Scrap Record Details: {record.id}
                   </h1>
                   <span
                     className={`inline-block px-3 py-1 text-xs rounded-full font-semibold capitalize ${
-                      dummyData.status === "done"
+                      record.status === "done" || record.status === "validated"
                         ? "bg-[#E2F2E9] text-[#2BA24D]"
                         : "bg-[#E8F0FE] text-[#1A73E8]"
                     }`}
                   >
-                    {dummyData.status === "done" ? "Validated" : dummyData.status}
+                    {record.status === "done" || record.status === "validated" ? "Validated" : record.status}
                   </span>
                 </div>
                 <p className="text-xs text-[#8898AA] mt-1">
-                  Recorded on {dummyData.date} by <strong className="text-[#32325D]">{dummyData.recorded_by}</strong>
+                  Recorded on {record.date} by <strong className="text-[#32325D]">{record.recorded_by}</strong>
                 </p>
               </div>
             </div>
 
-            {dummyData.status === "draft" && (
-              <Link href={`/inventory/operation/scrap/edit/${id}`}>
-                <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                  <Edit className="w-4 h-4 mr-1.5" /> Edit Draft
-                </Button>
-              </Link>
-            )}
+            <div className="flex items-center gap-3">
+              {record.status === "draft" && (
+                <>
+                  <Button 
+                    onClick={handleValidate} 
+                    disabled={isValidating}
+                    className="bg-[#2BA24D] hover:bg-[#238a40] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1.5" /> {isValidating ? "Validating..." : "Validate"}
+                  </Button>
+                  <Link href={`/inventory/operation/scrap/edit/${id}`}>
+                    <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                      <Edit className="w-4 h-4 mr-1.5" /> Edit Draft
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Summary Metadata Card */}
@@ -121,7 +134,7 @@ export default function ScrapDetailPage() {
                   Scrap ID
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
-                  {dummyData.id}
+                  {record.id}
                 </span>
               </div>
               <div>
@@ -129,7 +142,7 @@ export default function ScrapDetailPage() {
                   Cause of Loss
                 </span>
                 <span className="text-[#E43D2B] font-semibold text-sm">
-                  {dummyData.cause}
+                  {record.cause}
                 </span>
               </div>
               <div>
@@ -137,7 +150,7 @@ export default function ScrapDetailPage() {
                   Project
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
-                  {dummyData.project}
+                  {record.project}
                 </span>
               </div>
               <div>
@@ -145,7 +158,7 @@ export default function ScrapDetailPage() {
                   Location
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
-                  {dummyData.warehouse_location}
+                  {record.warehouse_location}
                 </span>
               </div>
               <div>
@@ -153,14 +166,14 @@ export default function ScrapDetailPage() {
                   Date Recorded
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
-                  {dummyData.date}
+                  {record.date}
                 </span>
               </div>
               <div className="sm:col-span-2 lg:col-span-4 border-t border-gray-100 pt-4">
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
                   Notes
                 </span>
-                <span className="text-[#525F7F] font-normal text-sm">{dummyData.notes}</span>
+                <span className="text-[#525F7F] font-normal text-sm">{record.notes}</span>
               </div>
             </div>
           </div>
@@ -191,22 +204,22 @@ export default function ScrapDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dummyData.items.map((item) => (
+                  {record.items.map((item: any, idx: number) => (
                     <TableRow
-                      key={item.id}
+                      key={item.id || idx}
                       className="hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
                     >
                       <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap">
-                        {item.product_name}
+                        {item.product_name || item.product_details?.product_name || `Product #${item.product}`}
                       </TableCell>
                       <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
-                        {item.product_description}
+                        {item.product_description || item.product_details?.description || "-"}
                       </TableCell>
                       <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap text-center">
-                        {item.unit_symbol}
+                        {item.unit_symbol || item.unit_of_measure || item.product_details?.unit_of_measure_details?.unit_symbol || "-"}
                       </TableCell>
                       <TableCell className="text-[#E43D2B] font-mono font-bold text-sm py-3.5 px-6 whitespace-nowrap text-right">
-                        -{item.quantity}
+                        -{item.quantity || item.scrap_quantity || 0}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -214,6 +227,8 @@ export default function ScrapDetailPage() {
               </Table>
             </div>
           </div>
+          </>
+          )}
         </main>
       </div>
     </PageGuard>

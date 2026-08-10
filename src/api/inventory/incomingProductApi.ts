@@ -186,6 +186,17 @@ export const incomingProductApi = createApi({
         body,
       }),
     }),
+
+    validateIncomingProductReceipt: builder.mutation<
+      IncomingProduct,
+      { id: string; data?: any }
+    >({
+      query: ({ id, data }) => ({
+        url: `/inventory/incoming-product/${id}/validate_receipt/`,
+        method: "POST",
+        body: data || {},
+      }),
+    }),
   }),
 });
 
@@ -206,4 +217,5 @@ export const {
   useToggleIncomingProductHiddenStatusMutation,
   usePatchToggleIncomingProductHiddenStatusMutation,
   useCreateIncomingProductBackorderMutation,
+  useValidateIncomingProductReceiptMutation,
 } = incomingProductApi;

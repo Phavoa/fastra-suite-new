@@ -83,7 +83,7 @@ export interface ScrapItem {
 }
 
 export type ScrapStatus = "draft" | "done";
-export type AdjustmentType = "damage" | "loss";
+export type AdjustmentType = "DAMAGE" | "LOSS";
 
 export interface Scrap {
   url: string;
@@ -101,24 +101,25 @@ export interface Scrap {
 
 // Request/Response types for mutations
 export interface CreateScrapRequest {
-  adjustment_type: AdjustmentType;
+  cause: AdjustmentType;
   warehouse_location: string;
+  project?: string | number;
   notes?: string;
   status?: ScrapStatus;
   is_hidden?: boolean;
-  scrap_items: {
+  items: {
     product: number;
     scrap_quantity: string;
   }[];
 }
 
 export interface UpdateScrapRequest {
-  adjustment_type?: AdjustmentType;
+  cause?: AdjustmentType;
   warehouse_location?: string;
   notes?: string;
   status?: ScrapStatus;
   is_hidden?: boolean;
-  scrap_items?: {
+  items?: {
     id?: string;
     product: number;
     scrap_quantity: string;

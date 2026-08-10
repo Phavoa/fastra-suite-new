@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { z } from "zod";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { useGetIncomingProductQuery, useCreateIncomingProductMutation } from "@/api/inventory/incomingProductApi";
 
 const returnSchema = z.object({
   reason_for_return: z.string().min(1, "Reason for return is required"),
@@ -39,19 +40,29 @@ interface ReturnItem {
 
 export default function ProcessReturnPage() {
   const params = useParams();
-  const id = (params?.id as string) || "WH-IN-0001";
+  const id = (params?.id as string) || "";
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [items, setItems] = useState<ReturnItem[]>([
-    {
-      id: "1",
-      product_name: "Cement (50kg Bag)",
-      unit: "Bags",
-      received_qty: 500,
-      return_qty: "10",
-    },
-  ]);
+  const { data: incomingProduct, isLoading, error } = useGetIncomingProductQuery(id, { skip: !id });
+  const [createIncomingProduct] = useCreateIncomingProductMutation();
+
+  const [items, setItems] = useState<ReturnItem[]>([]);
+
+  React.useEffect(() => {
+    if (incomingProduct && incomingProduct.incoming_product_items) {
+      setItems(
+        incomingProduct.incoming_product_items.map((it: any) => ({
+          id: it.id?.toString() || Date.now().toString() + Math.random(),
+          product_name: it.product_details?.product_name || `Product ${it.product}`,
+          product: it.product,
+          unit: it.product_details?.unit_of_measure_details?.unit_symbol || "Units",
+          received_qty: Number(it.quantity_received) || 0,
+          return_qty: "0",
+        }))
+      );
+    }
+  }, [incomingProduct]);
 
   const [notification, setNotification] = useState<{
     message: string;
@@ -80,6 +91,8 @@ export default function ProcessReturnPage() {
   };
 
   async function onSubmit(data: ReturnFormData) {
+    if (!incomingProduct) return;
+
     const valid = items.filter((it) => Number(it.return_qty) > 0);
     if (valid.length === 0) {
       setNotification({ message: "Please enter a return quantity greater than 0", type: "error", show: true });
@@ -94,13 +107,56 @@ export default function ProcessReturnPage() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const payload = {
+        receipt_type: "returns",
+        supplier: incomingProduct.supplier,
+        related_po: incomingProduct.related_po || "",
+        source_location: incomingProduct.destination_location,
+        destination_location: "",
+        notes: data.notes || data.reason_for_return,
+        status: "draft", // Assume it goes through validation again
+        incoming_product_items: valid.map((it: any) => ({
+          product: it.product,
+          expected_quantity: it.return_qty,
+          quantity_received: it.return_qty,
+        })),
+      };
+
+      await createIncomingProduct(payload).unwrap();
+      
       setNotification({ message: "Return processed! Supplier debit note generated and stock deducted.", type: "success", show: true });
       setTimeout(() => {
         router.push(`/inventory/operation/incoming_product/${id}`);
       }, 1000);
-    }, 500);
+    } catch (err: any) {
+      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to process return.", type: "error", show: true });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (error || !incomingProduct) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white items-center justify-center gap-4">
+          <p className="text-[#525F7F]">Failed to load GRN or it was not found.</p>
+          <Link href="/inventory/operation">
+            <Button variant="outline" className="border-gray-200 text-gray-600">Back to Operations</Button>
+          </Link>
+        </div>
+      </PageGuard>
+    );
   }
 
   return (

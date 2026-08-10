@@ -96,7 +96,8 @@ function StockAdjustmentCard({ request, index }: StockAdjustmentCardProps) {
 
 export function StockAdjustmentCards({
   stockAdjustments,
-}: StockAdjustmentCardsProps) {
+  isLoading,
+}: StockAdjustmentCardsProps & { isLoading?: boolean }) {
   return (
     <motion.div
       className="px-6 bg-white h-full mt-6 rounded-md"
@@ -105,7 +106,15 @@ export function StockAdjustmentCards({
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
       {/* Stock Adjustment Cards Grid */}
-      {stockAdjustments.length > 0 ? (
+      {isLoading ? (
+        <motion.div
+          className="flex items-center justify-center h-64 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <div className="text-gray-400 text-sm">Loading stock adjustments...</div>
+        </motion.div>
+      ) : stockAdjustments.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 py-6">
           {stockAdjustments.map((stockAdjustment, index) => (
             <StockAdjustmentCard

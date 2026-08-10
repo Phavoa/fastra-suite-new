@@ -16,7 +16,8 @@ import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 interface CreateVendorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
-  poId: string;
+  poId: number;
+  poNumber: string;
   vendorId: number;
   products: PurchaseOrderLine[];
   formatCurrency: (amount: number) => string;
@@ -26,6 +27,7 @@ export default function CreateVendorBillModal({
   isOpen,
   onClose,
   poId,
+  poNumber,
   vendorId,
   products,
   formatCurrency,
@@ -119,7 +121,7 @@ export default function CreateVendorBillModal({
 
       await createInvoice({
         vendor: vendorId,
-        purchase_order: poId,
+        purchase_order: poNumber as any,
         due_date: dueDate.toISOString().split("T")[0],
         invoice_items,
       }).unwrap();
@@ -146,7 +148,7 @@ export default function CreateVendorBillModal({
                 Create Vendor Bill
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                PO-{poId} • Originating Request: REQ-2024-0041
+                PO-{poNumber} • Originating Request: REQ-2024-0041
               </p>
             </div>
             <button

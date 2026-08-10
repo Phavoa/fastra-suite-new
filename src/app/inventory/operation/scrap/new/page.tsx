@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import StatusModal, { extractErrorMessage } from "@/components/shared/StatusModal";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
@@ -13,6 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Plus, Trash, ArrowLeft, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
+import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
+import { useCreateScrapMutation } from "@/api/inventory/scrapApi";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -44,54 +49,17 @@ interface ScrapLineItem {
 }
 
 const scrapSchema = z.object({
-  adjustment_type: z.enum(["damage", "loss"], {
+  adjustment_type: z.enum(["DAMAGE", "LOSS"], {
     message: "Cause is required",
   }),
   project: z.string().min(1, "Project is required"),
+  location: z.string().min(1, "Location is required"),
   notes: z.string().optional(),
 });
 
 type ScrapFormData = z.infer<typeof scrapSchema>;
 
-const DUMMY_PROJECTS: Option[] = [
-  { value: "PROJ-A", label: "Project Alpha" },
-  { value: "PROJ-B", label: "Project Beta" },
-];
 
-const getProjectLocation = (project: string) => {
-  return project === "PROJ-A" ? "Main Warehouse - Site A" : "Secondary Store - Site B";
-};
-
-const DUMMY_PRODUCTS = [
-  {
-    id: "1",
-    product_name: "Cement (50kg Bag)",
-    product_description: "Portland Cement Grade 42.5",
-    unit_symbol: "Bags",
-    current_stock: "500",
-  },
-  {
-    id: "2",
-    product_name: "Reinforcement Steel 16mm",
-    product_description: "High Yield Deformed Steel Bars",
-    unit_symbol: "Tonnes",
-    current_stock: "150",
-  },
-  {
-    id: "3",
-    product_name: "Sharp Sand",
-    product_description: "Clean river sharp sand for plastering",
-    unit_symbol: "m³",
-    current_stock: "45",
-  },
-  {
-    id: "4",
-    product_name: "Safety Helmets (Yellow)",
-    product_description: "HDPE Hard Hats with adjustable strap",
-    unit_symbol: "Pieces",
-    current_stock: "120",
-  },
-];
 
 export default function CreateScrapPage() {
   const router = useRouter();
@@ -109,14 +77,26 @@ export default function CreateScrapPage() {
     },
   ]);
 
-  const [notification, setNotification] = React.useState<{
+  const [modalState, setModalState] = React.useState<{
+    isOpen: boolean;
+    type: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  const [toastState, setToastState] = React.useState<{
+    show: boolean;
     message: string;
     type: "success" | "error";
-    show: boolean;
   }>({
-    message: "",
-    type: "success",
     show: false,
+    message: "",
+    type: "error",
   });
 
   const addRow = () =>
@@ -135,6 +115,11 @@ export default function CreateScrapPage() {
   const removeRow = (id: string) =>
     setItems((prev) => prev.filter((p) => p.id !== id));
 
+  const [createScrap] = useCreateScrapMutation();
+  const { data: projects = [], isLoading: isLoadingProjects } = useGetProjectCostingProjectsQuery({ status: "ACTIVE" });
+  const { data: locations = [], isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
+  const { data: products = [], isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+
   const {
     register,
     handleSubmit,
@@ -144,27 +129,42 @@ export default function CreateScrapPage() {
   } = useForm<ScrapFormData>({
     resolver: zodResolver(scrapSchema) as Resolver<ScrapFormData>,
     defaultValues: {
-      project: "PROJ-A",
+      project: "",
+      location: "",
       notes: "",
     },
   });
 
-  const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
-    value: p.id,
-    label: p.product_name,
+  const productOptions: Option[] = products.map((p) => ({
+    value: String(p.id),
+    label: `${p.product_name} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
+  }));
+
+  const projectOptions: Option[] = projects.map((p: any) => ({
+    value: String(p.id),
+    label: p.name || p.project_code || `Project #${p.id}`,
+  }));
+
+  const locationOptions: Option[] = locations.map((l: any) => ({
+    value: String(l.id),
+    label: l.location_name || l.location_code || `Location #${l.id}`,
   }));
 
   const updateItemWithProductDetails = (id: string, productId: string) => {
-    const p = DUMMY_PRODUCTS.find((item) => item.id === productId);
+    if (items.some((it) => it.id !== id && it.product === productId)) {
+      setToastState({ show: true, message: "Product already selected.", type: "error" });
+      return;
+    }
+    const p = products.find((item) => String(item.id) === productId);
     setItems((prev) =>
       prev.map((it) =>
         it.id === id
           ? {
               ...it,
               product: productId,
-              product_description: p?.product_description || "",
-              unit_of_measure: p?.unit_symbol || "",
-              current_quantity: p?.current_stock || "0",
+              product_description: p?.description || "",
+              unit_of_measure: p?.unit_of_measure_details?.unit_symbol || "",
+              current_quantity: "0",
             }
           : it,
       ),
@@ -172,6 +172,10 @@ export default function CreateScrapPage() {
   };
 
   const updateScrapQty = (id: string, qty: string) => {
+    if (qty.startsWith('-') || Number(qty) < 0) {
+      setToastState({ show: true, message: "Quantity cannot be negative.", type: "error" });
+      return;
+    }
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, scrap_quantity: qty } : it)),
     );
@@ -194,68 +198,48 @@ export default function CreateScrapPage() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setNotification({
-        message: "Scrap order saved as draft!",
+    try {
+      await createScrap({
+        cause: data.adjustment_type as any,
+        warehouse_location: data.location,
+        project: data.project,
+        notes: data.notes,
+        items: validItems.map(item => ({
+          product: Number(item.product) || 1, // backend requires number
+          scrap_quantity: item.scrap_quantity,
+        })),
+      }).unwrap();
+      
+      setModalState({
+        isOpen: true,
         type: "success",
-        show: true,
+        title: "Success",
+        message: "Scrap order saved successfully!",
       });
 
       setTimeout(() => {
         router.push("/inventory/operation/scrap");
       }, 1000);
-    }, 500);
-  }
-
-  async function onValidate(data: ScrapFormData): Promise<void> {
-    const validItems = items.filter(
-      (item) =>
-        item.product && item.scrap_quantity && Number(item.scrap_quantity) > 0,
-    );
-
-    if (validItems.length === 0) {
-      setNotification({
-        message:
-          "Please add at least one valid item with product and scrap quantity greater than 0",
+    } catch (error: any) {
+      setModalState({
+        isOpen: true,
         type: "error",
-        show: true,
+        title: "Error",
+        message: extractErrorMessage(error, "Failed to record scrap."),
       });
-      return;
-    }
-
-    const exceedsStock = validItems.some(
-      (it) => Number(it.scrap_quantity) > Number(it.current_quantity),
-    );
-
-    if (exceedsStock) {
-      setNotification({
-        message: "Cannot scrap more stock than currently available on hand!",
-        type: "error",
-        show: true,
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setTimeout(() => {
+    } finally {
       setIsSubmitting(false);
-      setNotification({
-        message:
-          "Scrap order validated! Deducted scrapped quantity from stock on hand.",
-        type: "success",
-        show: true,
-      });
-
-      setTimeout(() => {
-        router.push("/inventory/operation/scrap");
-      }, 1000);
-    }, 500);
+    }
   }
 
-  function closeNotification() {
-    setNotification((prev) => ({ ...prev, show: false }));
-  }
+  const handleModalClose = () => {
+    setModalState((prev) => ({ ...prev, isOpen: false }));
+    if (modalState.type === "success") {
+      router.push("/inventory/operation/scrap");
+    }
+  };
+
+  const closeToast = () => setToastState((prev) => ({ ...prev, show: false }));
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -304,14 +288,6 @@ export default function CreateScrapPage() {
                 </p>
               </div>
             </div>
-            <Link href="/inventory/operation/scrap">
-              <Button
-                variant="outline"
-                className="border-gray-200 text-gray-600 hover:bg-gray-50 text-sm h-9 px-3"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1.5" /> Cancel
-              </Button>
-            </Link>
           </div>
 
           <form ref={formRef} className="flex flex-col gap-6">
@@ -335,8 +311,8 @@ export default function CreateScrapPage() {
                       <SelectValue placeholder="Select cause" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="damage">Damage / Spoilage</SelectItem>
-                      <SelectItem value="loss">Loss</SelectItem>
+                      <SelectItem value="DAMAGE">Damage / Spoilage</SelectItem>
+                      <SelectItem value="LOSS">Loss</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.adjustment_type && (
@@ -357,10 +333,10 @@ export default function CreateScrapPage() {
                     }
                   >
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                      <SelectValue placeholder="Select project" />
+                      <SelectValue placeholder={isLoadingProjects ? "Loading..." : "Select project"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {DUMMY_PROJECTS.map((option) => (
+                      {projectOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -376,13 +352,30 @@ export default function CreateScrapPage() {
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Location
+                    Location <span className="text-[#E43D2B]">*</span>
                   </Label>
-                  <Input
-                    readOnly
-                    value={watch("project") ? getProjectLocation(watch("project")!) : ""}
-                    className="bg-gray-50 border-gray-200 rounded-md h-9 text-sm text-[#525F7F]"
-                  />
+                  <Select
+                    value={watch("location")}
+                    onValueChange={(value) =>
+                      setValue("location", value)
+                    }
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder={isLoadingLocations ? "Loading..." : "Select location"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.location && (
+                    <p className="text-[11px] text-[#E43D2B]">
+                      {errors.location.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2 sm:col-span-1">
@@ -447,7 +440,7 @@ export default function CreateScrapPage() {
                               }
                             >
                               <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0 px-4">
-                                <SelectValue placeholder="Select product" />
+                                <SelectValue placeholder={isLoadingProducts ? "Loading..." : "Select product"} />
                               </SelectTrigger>
                               <SelectContent>
                                 {productOptions.map((option) => (
@@ -473,6 +466,7 @@ export default function CreateScrapPage() {
                           <TableCell className="border border-gray-200 align-middle text-center p-0">
                             <Input
                               type="number"
+                              min="0"
                               step="0.01"
                               value={it.scrap_quantity}
                               onChange={(e) =>
@@ -528,11 +522,42 @@ export default function CreateScrapPage() {
           </form>
         </main>
 
+        {/* Signature Sticky Footer Bar */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
+          <Link href="/inventory/operation/scrap">
+            <Button
+              variant="outline"
+              type="button"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm h-9 px-4"
+            >
+              Cancel
+            </Button>
+          </Link>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit(onSave)}
+            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm h-9 px-4 font-semibold shadow-2xs"
+          >
+            {isSubmitting ? "Saving..." : "Save Scrap"}
+          </Button>
+        </div>
+
+        {/* Status Modal */}
+        <StatusModal
+          isOpen={modalState.isOpen}
+          onClose={handleModalClose}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+          onAction={handleModalClose}
+        />
+
         <ToastNotification
-          message={notification.message}
-          type={notification.type}
-          show={notification.show}
-          onClose={closeNotification}
+          show={toastState.show}
+          message={toastState.message}
+          type={toastState.type}
+          onClose={closeToast}
         />
       </div>
     </PageGuard>

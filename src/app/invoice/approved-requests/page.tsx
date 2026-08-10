@@ -279,12 +279,18 @@ export default function ApprovedRequestsPage() {
     }
     
     try {
+      // Map to the backend expected source_type
+      let mappedSourceType = selectedRequest.originalType;
+      if (mappedSourceType === "purchase") mappedSourceType = "project_purchase_request";
+      if (mappedSourceType === "plant_equipment") mappedSourceType = "plant_equipment_request";
+
       const result = await convertRequestToPurchaseOrder({
-        requestId: selectedRequest.backendId,
         data: {
+          source_type: mappedSourceType,
+          source_id: selectedRequest.sourceId,
           vendor: payload.vendor,
           currency: payload.currency,
-          wbs_element: selectedRequest.wbs,
+          wbs_element: selectedRequest.wbsId,
           payment_term: payload.payment_term,
           expected_delivery_date: payload.expected_delivery_date,
         },
@@ -345,11 +351,14 @@ export default function ApprovedRequestsPage() {
     return {
       id: req.reference_id || `REQ-${req.id}`,
       backendId: req.id,
+      sourceId: detail?.id || req.id, // The ID of the specific underlying request
+      originalType: req.request_type,
       type: typeMap[req.request_type] || req.request_type,
       wbs:
         req.project_details?.name ||
         req.project_details?.code ||
         `Project #${req.project}`,
+      wbsId: detail?.wbs_element || detail?.task || req.project || "",
       approvalDate: req.created_at?.split("T")[0] || "N/A",
       requestedAmount:
         detail?.amount_requested ||

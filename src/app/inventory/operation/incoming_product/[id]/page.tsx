@@ -18,97 +18,14 @@ import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
 
-const DUMMY_DATA_LIST = [
-  {
-    incoming_product_id: "WH-IN-0001",
-    receipt_type: "vendor_receipt",
-    status: "validated",
-    related_po: "PO-2026-0089",
-    created_at: "2026-06-25 10:00 AM",
-    supplier_name: "Dangote Cement Plc",
-    destination_location: "Main Warehouse - Site A",
-    has_backorder: true,
-    backorder_id: "WH-IN-0001-BO",
-    items: [
-      {
-        id: "1",
-        product_name: "Dangote Portland Cement Grade 42.5",
-        unit_symbol: "Bags",
-        expected_quantity: 600,
-        received_quantity: 500,
-      },
-      {
-        id: "2",
-        product_name: "Binding Wire 16 Gauge Roll",
-        unit_symbol: "Rolls",
-        expected_quantity: 50,
-        received_quantity: 50,
-      },
-    ],
-  },
-  {
-    incoming_product_id: "WH-IN-0002",
-    receipt_type: "vendor_receipt",
-    status: "draft",
-    related_po: "PO-2026-0094",
-    created_at: "2026-06-28 09:30 AM",
-    supplier_name: "Julius Berger Steel",
-    destination_location: "Main Warehouse - Site A",
-    has_backorder: false,
-    items: [
-      {
-        id: "1",
-        product_name: "Iron Rods 12mm",
-        unit_symbol: "Tonnes",
-        expected_quantity: 100,
-        received_quantity: 0,
-      },
-    ],
-  },
-  {
-    incoming_product_id: "WH-IN-0007",
-    receipt_type: "returns",
-    status: "canceled",
-    related_po: "PO-2026-0055",
-    created_at: "2026-07-04 11:15 AM",
-    supplier_name: "Stanbic Supplies Ltd",
-    destination_location: "Supplier Location",
-    has_backorder: false,
-    items: [
-      {
-        id: "1",
-        product_name: "Office Chairs",
-        unit_symbol: "Pieces",
-        expected_quantity: 10,
-        received_quantity: 0,
-      },
-    ],
-  },
-];
+import { useGetIncomingProductQuery } from "@/api/inventory/incomingProductApi";
+import { Loader2 } from "lucide-react";
 
 export default function IncomingProductDetailPage() {
   const params = useParams();
-  const id = (params?.id as string) || "WH-IN-0001";
+  const id = (params?.id as string) || "";
 
-  const dummyData = DUMMY_DATA_LIST.find((d) => d.incoming_product_id === id) || {
-    incoming_product_id: id,
-    receipt_type: "vendor_receipt",
-    status: "draft",
-    related_po: "PO-2026-0999",
-    created_at: "2026-07-28 08:00 AM",
-    supplier_name: "Generic Supplier",
-    destination_location: "Main Warehouse - Site A",
-    has_backorder: false,
-    items: [
-      {
-        id: "1",
-        product_name: "Generic Item",
-        unit_symbol: "Units",
-        expected_quantity: 100,
-        received_quantity: 0,
-      }
-    ],
-  };
+  const { data: incomingProduct, isLoading, error } = useGetIncomingProductQuery(id, { skip: !id });
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -116,6 +33,48 @@ export default function IncomingProductDetailPage() {
     { label: "Operation", href: "/inventory/operation" },
     { label: `Receipt ${id}`, href: `/inventory/operation/incoming_product/${id}`, current: true },
   ];
+
+  if (isLoading) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex h-screen items-center justify-center bg-[#F6F9FC]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (error || !incomingProduct) {
+    return (
+      <PageGuard application="inventory" module="incomingproduct">
+        <div className="flex flex-col h-screen items-center justify-center bg-[#F6F9FC] gap-4">
+          <p className="text-[#525F7F]">Failed to load GRN or it was not found.</p>
+          <Link href="/inventory/operation">
+            <Button variant="outline" className="border-gray-200 text-gray-600">Back to Operations</Button>
+          </Link>
+        </div>
+      </PageGuard>
+    );
+  }
+
+  const dummyData = {
+    incoming_product_id: incomingProduct.incoming_product_id,
+    receipt_type: incomingProduct.receipt_type || "vendor_receipt",
+    status: incomingProduct.status || "draft",
+    related_po: incomingProduct.related_po || "N/A",
+    created_at: incomingProduct.date_created ? new Date(incomingProduct.date_created).toLocaleString() : "N/A",
+    supplier_name: incomingProduct.supplier_details?.company_name || "Unknown Supplier",
+    destination_location: incomingProduct.destination_location_details?.location_name || incomingProduct.destination_location || "Unknown Location",
+    has_backorder: incomingProduct.is_backorder || !!incomingProduct.backorder_of,
+    backorder_id: incomingProduct.backorder_of_details?.incoming_product_id || incomingProduct.backorder_of,
+    items: incomingProduct.incoming_product_items.map((item, index) => ({
+      id: item.id?.toString() || index.toString(),
+      product_name: item.product_details?.product_name || `Product ${item.product}`,
+      unit_symbol: item.product_details?.unit_of_measure_details?.unit_symbol || "Units",
+      expected_quantity: item.expected_quantity,
+      received_quantity: item.quantity_received,
+    })),
+  };
 
   return (
     <PageGuard application="inventory" module="incomingproduct">

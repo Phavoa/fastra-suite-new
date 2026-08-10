@@ -19,117 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useGetScrapsQuery } from "@/api/inventory/scrapApi";
+import { ScrapStatus } from "@/types/scrap";
 
-const DUMMY_SCRAPS: any[] = [
-  {
-    id: "WH-SCRAP-0001",
-    adjustmentType: "Damage",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-06-28",
-    status: "done",
-    product: "Dangote Cement (50kg Bag)",
-    quantity: "5",
-  },
-  {
-    id: "WH-SCRAP-0002",
-    adjustmentType: "Loss",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-06-29",
-    status: "done",
-    product: "Reinforcement Steel 16mm",
-    quantity: "2",
-  },
-  {
-    id: "WH-SCRAP-0003",
-    adjustmentType: "Damage",
-    location: "Secondary Store - Site B",
-    adjustedDate: "2026-06-26",
-    status: "done",
-    product: "Safety Helmets (Yellow)",
-    quantity: "3",
-  },
-  {
-    id: "WH-SCRAP-0004",
-    adjustmentType: "Damage",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-07-01",
-    status: "done",
-    product: "Berger Emulsion Paint (20L)",
-    quantity: "4",
-  },
-  {
-    id: "WH-SCRAP-0005",
-    adjustmentType: "Damage",
-    location: "Site C Warehouse",
-    adjustedDate: "2026-07-02",
-    status: "done",
-    product: "Ceramic Floor Tiles (60x60)",
-    quantity: "12",
-  },
-  {
-    id: "WH-SCRAP-0006",
-    adjustmentType: "Damage",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-07-03",
-    status: "done",
-    product: "Gypsum Plasterboard (12mm)",
-    quantity: "8",
-  },
-  {
-    id: "WH-SCRAP-0007",
-    adjustmentType: "Loss",
-    location: "Equipment Yard",
-    adjustedDate: "2026-07-04",
-    status: "done",
-    product: "Copper Wire Roll 2.5mm",
-    quantity: "1",
-  },
-  {
-    id: "WH-SCRAP-0008",
-    adjustmentType: "Damage",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-07-05",
-    status: "done",
-    product: "PVC Conduit Pipes 20mm",
-    quantity: "15",
-  },
-  {
-    id: "WH-SCRAP-0009",
-    adjustmentType: "Damage",
-    location: "Site B Warehouse",
-    adjustedDate: "2026-07-06",
-    status: "done",
-    product: "Sika Waterproofing Admixture",
-    quantity: "6",
-  },
-  {
-    id: "WH-SCRAP-0010",
-    adjustmentType: "Damage",
-    location: "Site D Warehouse",
-    adjustedDate: "2026-07-07",
-    status: "done",
-    product: "Glass Windows Panels",
-    quantity: "4",
-  },
-  {
-    id: "WH-SCRAP-0011",
-    adjustmentType: "Damage",
-    location: "Main Warehouse - Site A",
-    adjustedDate: "2026-07-08",
-    status: "done",
-    product: "Lafarge Cement (50kg Bag)",
-    quantity: "10",
-  },
-  {
-    id: "WH-SCRAP-0012",
-    adjustmentType: "Damage",
-    location: "Site B Warehouse",
-    adjustedDate: "2026-07-09",
-    status: "done",
-    product: "Interlocking Paving Stones",
-    quantity: "25",
-  },
-];
 
 const STATUS_TABS = [
   { label: "All Records", value: "all" },
@@ -159,22 +51,23 @@ export default function ScrapPage() {
     },
   ];
 
+  const { data: scrapsResponse, isLoading } = useGetScrapsQuery({
+    search: query || undefined,
+    status: selectedStatus === "all" ? undefined : (selectedStatus as ScrapStatus),
+  });
+
   const filteredScraps = useMemo(() => {
-    return DUMMY_SCRAPS.filter((scrap) => {
-      const matchesStatus =
-        selectedStatus === "all" || scrap.status === selectedStatus;
-
-      const lowerQuery = query.toLowerCase();
-      const matchesSearch =
-        !query ||
-        scrap.id.toLowerCase().includes(lowerQuery) ||
-        scrap.product.toLowerCase().includes(lowerQuery) ||
-        scrap.location.toLowerCase().includes(lowerQuery) ||
-        scrap.adjustmentType.toLowerCase().includes(lowerQuery);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [selectedStatus, query]);
+    if (!scrapsResponse) return [];
+    return scrapsResponse.map((scrap: any) => ({
+      id: scrap.id,
+      adjustmentType: scrap.cause || scrap.adjustment_type || "N/A",
+      location: scrap.warehouse_location_details?.location_name || scrap.warehouse_location || "N/A",
+      adjustedDate: scrap.date_created ? new Date(scrap.date_created).toISOString().split("T")[0] : "N/A",
+      status: scrap.status?.toLowerCase(),
+      product: scrap.items?.[0]?.product_details?.product_name || scrap.scrap_items?.[0]?.product_details?.product_name || "Multiple Products",
+      quantity: scrap.items?.[0]?.scrap_quantity || scrap.scrap_items?.[0]?.scrap_quantity || 0,
+    }));
+  }, [scrapsResponse]);
 
   const totalPages = Math.max(1, Math.ceil(filteredScraps.length / ITEMS_PER_PAGE));
   const paginatedScraps = useMemo(() => {
@@ -316,7 +209,16 @@ export default function ScrapPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedScraps.length === 0 ? (
+                      {isLoading ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="px-6 py-12 text-center text-[#8898AA] text-sm"
+                          >
+                            Loading scrap records...
+                          </TableCell>
+                        </TableRow>
+                      ) : paginatedScraps.length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={6}

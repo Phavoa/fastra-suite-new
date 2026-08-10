@@ -160,6 +160,17 @@ export const stockAdjustmentApi = createApi({
       }),
     }),
 
+    validateStockAdjustment: builder.mutation<
+      StockAdjustment,
+      { id: string; data?: UpdateStockAdjustmentRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/inventory/stock-adjustment/${id}/validate/`,
+        method: "POST",
+        body: data || {},
+      }),
+    }),
+
     toggleStockAdjustmentHiddenStatus: builder.mutation<
       StockAdjustment,
       { id: string; data?: ToggleHiddenStatusRequest }
@@ -199,6 +210,7 @@ export const {
   useUpdateStockAdjustmentMutation,
   usePatchStockAdjustmentMutation,
   useDeleteStockAdjustmentMutation,
+  useValidateStockAdjustmentMutation,
   useToggleStockAdjustmentHiddenStatusMutation,
   usePatchToggleStockAdjustmentHiddenStatusMutation,
 } = stockAdjustmentApi;

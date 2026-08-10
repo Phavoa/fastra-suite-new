@@ -3,6 +3,7 @@ import type { RootState } from "../../lib/store/store";
 
 export interface MaterialConsumptionLine {
   id?: number;
+  product?: number;
   quantity: number;
   unit_cost: string; // decimal string
   total_cost: string; // decimal string

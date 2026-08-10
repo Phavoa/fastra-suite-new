@@ -1,13 +1,21 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import StatusModal, { extractErrorMessage } from "@/components/shared/StatusModal";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash, ArrowLeft, Save, CheckCircle } from "lucide-react";
+import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
+import { 
+  useGetStockAdjustmentQuery, 
+  useUpdateStockAdjustmentMutation, 
+  useValidateStockAdjustmentMutation 
+} from "@/api/inventory/stockAdjustmentApi";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +45,7 @@ interface StockAdjustmentLineItem {
   product_description: string;
   unit_of_measure: string;
   current_quantity: string;
-  adjusted_quantity: string;
+  new_quantity: string;
 }
 
 const stockAdjustmentSchema = z.object({
@@ -47,41 +55,7 @@ const stockAdjustmentSchema = z.object({
 
 type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>;
 
-const DUMMY_LOCATIONS: Option[] = [
-  { value: "WH-MAIN", label: "Main Warehouse - Site A (WH-MAIN)" },
-  { value: "WH-SEC", label: "Secondary Store - Site B (WH-SEC)" },
-];
 
-const DUMMY_PRODUCTS = [
-  {
-    id: "1",
-    product_name: "Cement (50kg Bag)",
-    product_description: "Portland Cement Grade 42.5",
-    unit_symbol: "Bags",
-    current_stock: "500",
-  },
-  {
-    id: "2",
-    product_name: "Reinforcement Steel 16mm",
-    product_description: "High Yield Deformed Steel Bars",
-    unit_symbol: "Tonnes",
-    current_stock: "150",
-  },
-  {
-    id: "3",
-    product_name: "Sharp Sand",
-    product_description: "Clean river sharp sand for plastering",
-    unit_symbol: "m³",
-    current_stock: "45",
-  },
-  {
-    id: "4",
-    product_name: "Safety Helmets (Yellow)",
-    product_description: "HDPE Hard Hats with adjustable strap",
-    unit_symbol: "Pieces",
-    current_stock: "120",
-  },
-];
 
 export default function EditStockAdjustmentPage() {
   const params = useParams();
@@ -90,25 +64,35 @@ export default function EditStockAdjustmentPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [items, setItems] = useState<StockAdjustmentLineItem[]>([
-    {
-      id: "1",
-      product: "2",
-      product_description: "High Yield Deformed Steel Bars",
-      unit_of_measure: "Tonnes",
-      current_quantity: "150",
-      adjusted_quantity: "162",
-    },
-  ]);
+  const [items, setItems] = useState<StockAdjustmentLineItem[]>([]);
 
-  const [notification, setNotification] = React.useState<{
+  const { data: record, isLoading: isLoadingRecord } = useGetStockAdjustmentQuery(id);
+  const { data: locations = [], isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
+  const { data: products = [], isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+  
+  const [updateStockAdjustment] = useUpdateStockAdjustmentMutation();
+  const [validateStockAdjustment] = useValidateStockAdjustmentMutation();
+
+  const [modalState, setModalState] = React.useState<{
+    isOpen: boolean;
+    type: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  const [toastState, setToastState] = React.useState<{
+    show: boolean;
     message: string;
     type: "success" | "error";
-    show: boolean;
   }>({
-    message: "",
-    type: "success",
     show: false,
+    message: "",
+    type: "error",
   });
 
   const addRow = () =>
@@ -120,7 +104,7 @@ export default function EditStockAdjustmentPage() {
         product_description: "",
         unit_of_measure: "",
         current_quantity: "0",
-        adjusted_quantity: "",
+        new_quantity: "",
       },
     ]);
 
@@ -137,29 +121,59 @@ export default function EditStockAdjustmentPage() {
     resolver: zodResolver(
       stockAdjustmentSchema,
     ) as Resolver<StockAdjustmentFormData>,
-    defaultValues: {
-      warehouse_location: "WH-MAIN",
-      notes: "Quarterly spot check adjustment.",
+    values: record ? {
+      warehouse_location: String(record.warehouse_location?.id || record.warehouse_location || ""),
+      notes: record.notes || record.reason || "",
+    } : {
+      warehouse_location: "",
+      notes: "",
     },
   });
 
-  const productOptions: Option[] = DUMMY_PRODUCTS.map((p) => ({
-    value: p.id,
-    label: p.product_name,
+  useEffect(() => {
+    if (record) {
+      const apiItems = record.stock_adjustment_items || record.items || [];
+      if (apiItems.length > 0) {
+        setItems(
+          apiItems.map((item: any) => ({
+            id: String(item.id),
+            product: String(item.product?.id || item.product),
+            product_description: item.product_details?.description || item.product_description || "",
+            unit_of_measure: item.unit_of_measure?.unit_symbol || item.product_details?.unit_of_measure_details?.unit_symbol || (typeof item.unit_of_measure === "string" ? item.unit_of_measure : ""),
+            current_quantity: String(item.current_quantity || "0"),
+            new_quantity: String(item.new_quantity || "0"),
+          }))
+        );
+      }
+    }
+  }, [record]);
+
+  const productOptions: Option[] = products.map((p) => ({
+    value: String(p.id),
+    label: `${p.product_name} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
+  }));
+
+  const locationOptions: Option[] = locations.map((l: any) => ({
+    value: String(l.id),
+    label: l.location_name || l.location_code || `Location #${l.id}`,
   }));
 
   const updateItemWithProductDetails = (itemId: string, productId: string) => {
-    const p = DUMMY_PRODUCTS.find((item) => item.id === productId);
+    if (items.some((it) => it.id !== itemId && it.product === productId)) {
+      setToastState({ show: true, message: "Product already selected.", type: "error" });
+      return;
+    }
+    const foundProduct = products.find((p) => String(p.id) === productId);
     setItems((prev) =>
       prev.map((it) =>
         it.id === itemId
           ? {
               ...it,
               product: productId,
-              product_description: p?.product_description || "",
-              unit_of_measure: p?.unit_symbol || "",
-              current_quantity: p?.current_stock || "0",
-              adjusted_quantity: p?.current_stock || "0",
+              product_description: foundProduct?.description || "",
+              unit_of_measure: foundProduct?.unit_of_measure_details?.unit_symbol || "",
+              current_quantity: "0",
+              new_quantity: "0",
             }
           : it,
       ),
@@ -167,61 +181,95 @@ export default function EditStockAdjustmentPage() {
   };
 
   const updateAdjustedQty = (itemId: string, val: string) => {
+    if (val.startsWith('-') || Number(val) < 0) {
+      setToastState({ show: true, message: "Quantity cannot be negative.", type: "error" });
+      return;
+    }
     setItems((prev) =>
-      prev.map((it) =>
-        it.id === itemId ? { ...it, adjusted_quantity: val } : it,
-      ),
+      prev.map((it) => (it.id === itemId ? { ...it, new_quantity: val } : it)),
     );
   };
 
-  function onSave(data: StockAdjustmentFormData) {
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setNotification({
-        message: "Stock adjustment draft updated successfully!",
-        type: "success",
-        show: true,
-      });
-
-      setTimeout(() => {
-        router.push(`/inventory/stocks/adjustment/${id}`);
-      }, 1000);
-    }, 400);
-  }
-
-  function onValidate(data: StockAdjustmentFormData) {
+  async function submitForm(data: StockAdjustmentFormData, isValidate: boolean) {
     const validItems = items.filter(
-      (item) => item.product && item.adjusted_quantity !== "",
+      (item) => item.product && item.new_quantity !== ""
     );
 
     if (validItems.length === 0) {
-      setNotification({
-        message: "Please add at least one valid product line to adjust",
+      setModalState({
+        isOpen: true,
         type: "error",
-        show: true,
+        title: "Validation Error",
+        message: "Please add at least one valid item.",
       });
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setNotification({
-        message: "Stock adjustment validated! Inventory ledger updated.",
+    try {
+      const payload = {
+        warehouse_location: data.warehouse_location,
+        notes: data.notes,
+        reason: data.notes,
+        stock_adjustment_items: validItems.map((item) => ({
+          product: Number(item.product) || 1,
+          new_quantity: item.new_quantity,
+        })),
+      };
+
+      if (isValidate) {
+        await validateStockAdjustment({ id, data: payload }).unwrap();
+      } else {
+        await updateStockAdjustment({ id, data: payload }).unwrap();
+      }
+
+      setModalState({
+        isOpen: true,
         type: "success",
-        show: true,
+        title: "Success",
+        message: isValidate 
+          ? "Stock adjustment validated & inventory ledger updated."
+          : "Stock adjustment draft updated successfully.",
       });
-
-      setTimeout(() => {
-        router.push(`/inventory/stocks/adjustment/${id}`);
-      }, 1000);
-    }, 500);
+    } catch (error: any) {
+      setModalState({
+        isOpen: true,
+        type: "error",
+        title: "Error",
+        message: extractErrorMessage(error, "Failed to update stock adjustment."),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function closeNotification() {
-    setNotification((prev) => ({ ...prev, show: false }));
+  async function onSave(data: StockAdjustmentFormData) {
+    await submitForm(data, false);
   }
+
+  async function onValidate(data: StockAdjustmentFormData) {
+    for (const it of items) {
+      if (!it.product || it.new_quantity === "") {
+        setModalState({
+          isOpen: true,
+          type: "error",
+          title: "Validation Error",
+          message: "Please select a product and provide a new physical count for all lines.",
+        });
+        return;
+      }
+    }
+    await submitForm(data, true);
+  }
+
+  const handleModalClose = () => {
+    setModalState((prev) => ({ ...prev, isOpen: false }));
+    if (modalState.type === "success") {
+      router.push(`/inventory/stocks/adjustment/${id}`);
+    }
+  };
+
+  const closeToast = () => setToastState((prev) => ({ ...prev, show: false }));
 
   return (
     <PageGuard application="inventory" module="adjustment">
@@ -274,9 +322,9 @@ export default function EditStockAdjustmentPage() {
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
-                      {DUMMY_LOCATIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      {locationOptions.map((loc) => (
+                        <SelectItem key={loc.value} value={loc.value}>
+                          {loc.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -343,7 +391,7 @@ export default function EditStockAdjustmentPage() {
                   <TableBody>
                     {items.map((it) => {
                       const current = Number(it.current_quantity) || 0;
-                      const adjusted = Number(it.adjusted_quantity) || 0;
+                      const adjusted = Number(it.new_quantity) || 0;
                       const variance = adjusted - current;
                       return (
                         <TableRow
@@ -392,8 +440,9 @@ export default function EditStockAdjustmentPage() {
                           <TableCell className="px-6 py-3.5 align-middle text-center whitespace-nowrap">
                             <Input
                               type="number"
+                              min="0"
                               step="0.01"
-                              value={it.adjusted_quantity}
+                              value={it.new_quantity}
                               onChange={(e) =>
                                 updateAdjustedQty(it.id, e.target.value)
                               }
@@ -472,28 +521,28 @@ export default function EditStockAdjustmentPage() {
             type="button"
             disabled={isSubmitting}
             onClick={handleSubmit(onSave)}
-            variant="outline"
-            className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50/50 h-9 px-4 text-sm font-semibold flex items-center gap-1.5"
+            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
           >
             <Save className="w-4 h-4" />
             {isSubmitting ? "Saving..." : "Save Draft"}
           </Button>
-          <Button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubmit(onValidate)}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
-          >
-            <CheckCircle className="w-4 h-4" />
-            {isSubmitting ? "Validating..." : "Validate & Update Stock"}
-          </Button>
         </div>
 
+        {/* Status Modal */}
+        <StatusModal
+          isOpen={modalState.isOpen}
+          onClose={handleModalClose}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+          onAction={handleModalClose}
+        />
+
         <ToastNotification
-          message={notification.message}
-          type={notification.type}
-          show={notification.show}
-          onClose={closeNotification}
+          show={toastState.show}
+          message={toastState.message}
+          type={toastState.type}
+          onClose={closeToast}
         />
       </div>
     </PageGuard>

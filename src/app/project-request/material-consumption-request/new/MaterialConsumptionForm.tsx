@@ -12,6 +12,9 @@ import {
   AlertCircle,
   Bell,
   Loader2,
+  ChevronDown,
+  Pencil,
+  Trash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,8 +38,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 
-// API hooks
-import { useCreateMaterialConsumptionMutation } from "@/api/requests/materialConsumptionRequestApi";
+import { 
+  useCreateMaterialConsumptionMutation, 
+  useGetMaterialConsumptionQuery,
+  usePatchMaterialConsumptionMutation,
+} from "@/api/requests/materialConsumptionRequestApi";
 import {
   useGetProjectCostingProjectsQuery,
   useGetProjectCostingProjectQuery,
@@ -55,6 +61,7 @@ const productLineSchema = z.object({
   ),
   unitCost: z.number(),
   totalCost: z.number(),
+  isEditing: z.boolean().optional().default(true),
 });
 
 const formSchema = z.object({
@@ -74,6 +81,7 @@ interface ProductLine {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  isEditing?: boolean;
 }
 
 interface FormValues {
@@ -99,8 +107,9 @@ const toUUID = (val: string): string => {
   return "00000000-0000-0000-0000-000000000000";
 };
 
-export default function MaterialConsumptionForm() {
+export default function MaterialConsumptionForm({ requestId }: { requestId?: number }) {
   const router = useRouter();
+  const [isProductLinesCollapsed, setIsProductLinesCollapsed] = useState(false);
   const statusModal = useStatusModal();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserName = React.useMemo(() => {
@@ -129,10 +138,18 @@ export default function MaterialConsumptionForm() {
   const { data: inventoryProducts = [], isLoading: isLoadingProducts } =
     useGetInventoryProductsQuery({});
 
-
-  // --- Mutation ---
-  const [createMaterialConsumption, { isLoading: isSubmitting }] =
+  // --- Mutations & Async Data ---
+  const [createMaterialConsumption, { isLoading: isCreating }] =
     useCreateMaterialConsumptionMutation();
+  const [patchMaterialConsumption, { isLoading: isUpdating }] =
+    usePatchMaterialConsumptionMutation();
+
+  const { data: requestData, isLoading: isRequestLoading } = useGetMaterialConsumptionQuery(
+    Number(requestId),
+    { skip: !requestId }
+  );
+
+  const isSubmitting = isCreating || isUpdating;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as any,
@@ -143,10 +160,31 @@ export default function MaterialConsumptionForm() {
       dateConsumed: new Date().toISOString().split("T")[0],
       warehouse: "",
       notes: "",
-      productLines: [{ productId: "", quantity: 0, unitCost: 0, totalCost: 0 }],
+      productLines: [{ productId: "", quantity: 0, unitCost: 0, totalCost: 0, isEditing: true }],
     },
     mode: "onBlur",
   });
+
+  useEffect(() => {
+    if (requestData) {
+      const req = requestData as any;
+      form.reset({
+        project: String(req.project_request || ""),
+        phase: String(req.phase || ""),
+        wbsElement: String(req.activity || ""),
+        dateConsumed: req.date_consumed || new Date().toISOString().split("T")[0],
+        warehouse: String(req.location || ""),
+        notes: req.notes || "",
+        productLines: req.lines.map((l: any) => ({
+          productId: String(l.product || ""),
+          quantity: Number(l.quantity || 0),
+          unitCost: parseFloat(l.unit_cost || "0") || 0,
+          totalCost: parseFloat(l.total_cost || "0") || 0,
+          isEditing: false,
+        })),
+      });
+    }
+  }, [requestData, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -164,8 +202,7 @@ export default function MaterialConsumptionForm() {
     { skip: !projectId || isNaN(Number(projectId)) },
   );
 
-  // Budget is not yet wired to a real endpoint; show null so indicator is hidden
-  const availableBudget = useMemo<number | null>(() => null, [projectId, wbsElement]);
+
 
   // --- Derived WBS options (from project-costing data) ---
   const buildWbsList = (proj: any): any[] => {
@@ -182,7 +219,22 @@ export default function MaterialConsumptionForm() {
       const acts = Array.isArray(ph.activities) ? ph.activities
         : Array.isArray(ph.activity_list) ? ph.activity_list : [];
       acts.forEach((act: any, ai: number) => {
-        items.push({ ...act, id: act.id || `act-${phId}-${ai + 1}`, name: act.name || `Activity ${ai + 1}`, is_activity: true, parent: phId });
+        items.push({ 
+          ...act, 
+          id: act.id || `act-${phId}-${ai + 1}`, 
+          name: act.name || `Activity ${ai + 1}`, 
+          is_activity: true, 
+          parent: phId,
+          amount: Number(
+            act.available_budget ??
+            act.budget ??
+            act.amount ??
+            act.budgeted_amount ??
+            act.total_amount ??
+            act.cost ??
+            0
+          )
+        });
       });
     });
     return items;
@@ -199,11 +251,25 @@ export default function MaterialConsumptionForm() {
     return wbsList.filter((w: any) => w.is_activity && String(w.parent) === String(phaseId));
   }, [wbsList, phaseId]);
 
-  // Reset dependent fields when project changes
+  const availableBudget = useMemo(() => {
+    if (!wbsElement) return 0;
+    const task = wbsList.find((w: any) => String(w.id) === String(wbsElement));
+    return task?.amount || 0;
+  }, [wbsElement, wbsList]);
+
   useEffect(() => {
     form.setValue("phase", "");
     form.setValue("wbsElement", "");
-  }, [projectId, form]);
+    
+    if (projectId && selectedProjectDetail) {
+      const proj = selectedProjectDetail as any;
+      if (proj.site_location) {
+        form.setValue("warehouse", String(proj.site_location));
+      } else {
+        form.setValue("warehouse", "");
+      }
+    }
+  }, [projectId, form, selectedProjectDetail]);
 
   // Reset activity when phase changes
   useEffect(() => {
@@ -213,27 +279,17 @@ export default function MaterialConsumptionForm() {
   // --- Calculate totals when product lines change ---
   useEffect(() => {
     productLines.forEach((line, index) => {
-      if (!line.productId || line.quantity <= 0) return;
-      const product = inventoryProducts.find(
-        (p) => String(p.id) === line.productId,
-      );
-      if (!product) return;
+      if (!line.productId) return;
+      
+      const totalCost = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
 
-      const unitCost = Number(product.standard_cost) || 0;
-      const totalCost = line.quantity * unitCost;
-
-      if (line.unitCost !== unitCost) {
-        form.setValue(`productLines.${index}.unitCost`, unitCost, {
-          shouldValidate: true,
-        });
-      }
       if (line.totalCost !== totalCost) {
         form.setValue(`productLines.${index}.totalCost`, totalCost, {
           shouldValidate: true,
         });
       }
     });
-  }, [productLines, inventoryProducts, form]);
+  }, [productLines, form]);
 
   const totalRequestCost = productLines.reduce(
     (sum, line) => sum + (line.totalCost || 0),
@@ -249,23 +305,30 @@ export default function MaterialConsumptionForm() {
         date_consumed: data.dateConsumed,
         notes: data.notes || "",
         lines: data.productLines.map((line) => ({
-          id: Number(line.productId),
+          product: Number(line.productId),
           quantity: line.quantity,
           unit_cost: line.unitCost.toFixed(2),
           total_cost: line.totalCost.toFixed(2),
         })),
       };
 
-      await createMaterialConsumption(payload).unwrap();
-
-      statusModal.showSuccess(
-        "Request Submitted",
-        "Material consumption logged successfully.",
-      );
+      if (requestId) {
+        await patchMaterialConsumption({ id: requestId, body: payload }).unwrap();
+        statusModal.showSuccess(
+          "Request Updated",
+          "Material consumption request updated successfully.",
+        );
+      } else {
+        await createMaterialConsumption(payload).unwrap();
+        statusModal.showSuccess(
+          "Request Submitted",
+          "Material consumption logged successfully.",
+        );
+      }
     } catch (error) {
       statusModal.showError(
         "Submission Failed",
-        "There was an error logging consumption. Please try again.",
+        "There was an error saving consumption. Please try again.",
       );
     }
   };
@@ -279,6 +342,7 @@ export default function MaterialConsumptionForm() {
   };
 
   return (
+    <>
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
@@ -297,7 +361,7 @@ export default function MaterialConsumptionForm() {
                 <ArrowLeft size={20} className="text-gray-600" />
               </button>
               <h1 className="text-lg font-bold text-gray-800">
-                Material Consumption
+                {requestId ? "Edit Material Consumption" : "Material Consumption"}
               </h1>
             </div>
 
@@ -315,112 +379,48 @@ export default function MaterialConsumptionForm() {
         <div className="max-w-2xl mx-auto pb-24 pt-4 space-y-4 px-4 sm:px-0">
           {/* Request Details Section */}
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
-            <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
+            <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
               Request Details
             </h2>
             <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                <span className="text-sm font-semibold text-gray-900">
-                  Request ID
-                </span>
-                <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  MCR-AUTO
-                </span>
+              <div className="space-y-1.5">
+                <FormLabel className="text-xs font-semibold text-gray-700">Request ID</FormLabel>
+                <Input value={requestData?.request_id || "MCR-AUTO"} readOnly className="bg-gray-50 border-gray-200 text-gray-500 h-11" />
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                <span className="text-sm font-semibold text-gray-900">
-                  Date
-                </span>
-                <span className="text-sm text-gray-600 font-medium">
-                  {new Date().toLocaleDateString("en-GB")}
-                </span>
+              <div className="space-y-1.5">
+                <FormLabel className="text-xs font-semibold text-gray-700">Date</FormLabel>
+                <Input value={requestData?.created_at ? new Date(requestData.created_at).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB")} readOnly className="bg-gray-50 border-gray-200 text-gray-500 h-11" />
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                <span className="text-sm font-semibold text-gray-900">
-                  Requested by
-                </span>
-                <span className="text-sm text-gray-600 font-medium">
-                  {loggedInUserName}
-                </span>
+              <div className="space-y-1.5">
+                <FormLabel className="text-xs font-semibold text-gray-700">Requested by</FormLabel>
+                <Input value={(requestData as any)?.requester_details?.name || loggedInUserName} readOnly className="bg-gray-50 border-gray-200 text-gray-500 h-11" />
               </div>
             </div>
           </div>
 
-          {/* Project & Location Section */}
+          {/* Consumption Details Section */}
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
-            <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
-              Project & Location
+            <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+              Consumption Details
             </h2>
 
-            {/* Available Budget Indicator */}
-            {availableBudget !== null && (
-              <div
-                className={cn(
-                  "mb-2 p-4 rounded-xl flex items-start gap-3 transition-all duration-300 border shadow-sm",
-                  availableBudget > 0
-                    ? "bg-blue-50/50 border-blue-100"
-                    : "bg-red-50/50 border-red-100",
-                )}
-              >
-                <AlertCircle
-                  className={cn(
-                    "h-5 w-5 mt-0.5",
-                    availableBudget > 0 ? "text-blue-500" : "text-red-500",
-                  )}
-                />
-                <div>
-                  <p
-                    className={cn(
-                      "text-sm font-semibold",
-                      availableBudget > 0 ? "text-blue-900" : "text-red-900",
-                    )}
-                  >
-                    Available Budget
-                  </p>
-                  <p
-                    className={cn(
-                      "text-lg font-bold tracking-tight",
-                      availableBudget > 0 ? "text-[#3B7CED]" : "text-red-600",
-                    )}
-                  >
-                    ₦
-                    {(availableBudget ?? 0).toLocaleString("en-NG", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               {/* Project */}
               <FormField
                 control={form.control}
                 name="project"
                 render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Project
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                  <FormItem className="space-y-1.5">
+                    <FormLabel className="text-xs font-semibold text-gray-700">Project</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger
                           className={cn(
                             "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                            form.formState.errors.project &&
-                              "border-red-500 focus:ring-red-500/20",
+                            form.formState.errors.project && "border-red-500 focus:ring-red-500/20"
                           )}
                         >
-                          <SelectValue
-                            placeholder={
-                              isLoadingProjects
-                                ? "Loading projects..."
-                                : "Select active project"
-                            }
-                          />
+                          <SelectValue placeholder={isLoadingProjects ? "Loading projects..." : "Select active project"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -436,35 +436,84 @@ export default function MaterialConsumptionForm() {
                 )}
               />
 
+              {/* Location / Warehouse */}
+              <FormField
+                control={form.control}
+                name="warehouse"
+                render={({ field }) => (
+                  <FormItem className="space-y-1.5">
+                    <FormLabel className="text-xs font-semibold text-gray-700">Site Location</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!!projectId}>
+                      <FormControl>
+                        <SelectTrigger
+                          className={cn(
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed",
+                            form.formState.errors.warehouse && "border-red-500 focus:ring-red-500/20"
+                          )}
+                        >
+                          <SelectValue placeholder={isLoadingLocations ? "Loading locations..." : "Select site store"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={String(loc.id)}>
+                            {loc.location_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Date Consumed */}
+              <FormField
+                control={form.control}
+                name="dateConsumed"
+                render={({ field }) => (
+                  <FormItem className="space-y-1.5">
+                    <FormLabel className="text-xs font-semibold text-gray-700">Date Consumed</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className={cn(
+                          "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                          form.formState.errors.dateConsumed && "border-red-500 focus:ring-red-500/20"
+                        )}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* WBS Section */}
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
+            <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+              WBS
+            </h2>
+
+            <div className="space-y-4">
               {/* Phase */}
               <FormField
                 control={form.control}
                 name="phase"
                 render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Phase
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={!projectId || phases.length === 0}
-                    >
+                  <FormItem className="space-y-1.5">
+                    <FormLabel className="text-xs font-semibold text-gray-700">Phase</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!projectId || phases.length === 0}>
                       <FormControl>
                         <SelectTrigger
                           className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                            form.formState.errors.phase &&
-                              "border-red-500 focus:ring-red-500/20",
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
+                            form.formState.errors.phase && "border-red-500 focus:ring-red-500/20"
                           )}
                         >
-                          <SelectValue
-                            placeholder={
-                              !projectId
-                                ? "Select a project first"
-                                : "Select phase"
-                            }
-                          />
+                          <SelectValue placeholder={!projectId ? "Select a project first" : "Select a phase"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -485,30 +534,17 @@ export default function MaterialConsumptionForm() {
                 control={form.control}
                 name="wbsElement"
                 render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Activity
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={!phaseId || activities.length === 0}
-                    >
+                  <FormItem className="space-y-1.5">
+                    <FormLabel className="text-xs font-semibold text-gray-700">Activity</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!phaseId || activities.length === 0}>
                       <FormControl>
                         <SelectTrigger
                           className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                            form.formState.errors.wbsElement &&
-                              "border-red-500 focus:ring-red-500/20",
+                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
+                            form.formState.errors.wbsElement && "border-red-500 focus:ring-red-500/20"
                           )}
                         >
-                          <SelectValue
-                            placeholder={
-                              !phaseId
-                                ? "Select a phase first"
-                                : "Select activity"
-                            }
-                          />
+                          <SelectValue placeholder={!phaseId ? "Select a phase first" : "Select an activity"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -524,128 +560,135 @@ export default function MaterialConsumptionForm() {
                 )}
               />
 
-              {/* Location / Warehouse */}
-              <FormField
-                control={form.control}
-                name="warehouse"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Location / Warehouse
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger
-                          className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                            form.formState.errors.warehouse &&
-                              "border-red-500 focus:ring-red-500/20",
-                          )}
-                        >
-                          <SelectValue
-                            placeholder={
-                              isLoadingLocations
-                                ? "Loading locations..."
-                                : "Select site store"
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.location_name}>
-                            {loc.location_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Date Consumed */}
-              <FormField
-                control={form.control}
-                name="dateConsumed"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Date Consumed
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        className={cn(
-                          "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                          form.formState.errors.dateConsumed &&
-                            "border-red-500 focus:ring-red-500/20",
-                        )}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="flex justify-between items-center py-2 border-t border-gray-100">
+                <span className="text-xs font-semibold text-gray-900">
+                  Available Budget
+                </span>
+                <span className="text-xs font-semibold text-[#3B7CED]">
+                  ₦
+                  {availableBudget.toLocaleString("en-NG", {
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Product Lines Section */}
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
-                Product Lines
+            <div
+              onClick={() => setIsProductLinesCollapsed(!isProductLinesCollapsed)}
+              className="flex justify-between items-center cursor-pointer select-none mb-2"
+            >
+              <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
+                Product Line
               </h2>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  append({
-                    productId: "",
-                    quantity: 0,
-                    unitCost: 0,
-                    totalCost: 0,
-                  })
-                }
-                className="text-blue-600 border-blue-200 hover:bg-blue-50"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Product
-              </Button>
+              <ChevronDown
+                className={`h-5 w-5 text-[#3B7CED] transition-transform duration-200 ${
+                  isProductLinesCollapsed ? "" : "rotate-180"
+                }`}
+              />
             </div>
 
-            <div className="space-y-6">
-              {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="p-4 border border-gray-100 bg-gray-50/50 rounded-lg space-y-4 relative"
-                >
-                  {fields.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => remove(index)}
-                      className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+            {!isProductLinesCollapsed && (
+              <div className="space-y-4">
+                {fields.map((fieldItem, index) => {
+                  const isEditing = form.watch(`productLines.${index}.isEditing`);
 
-                  <div className="grid grid-cols-2 gap-4">
+                  if (!isEditing) {
+                    const prodId = form.watch(`productLines.${index}.productId`);
+                    const prod = inventoryProducts.find(p => String(p.id) === String(prodId));
+                    const qty = form.watch(`productLines.${index}.quantity`) || 0;
+                    const uCost = form.watch(`productLines.${index}.unitCost`) || 0;
+                    const tCost = qty * uCost;
+
+                    return (
+                      <div
+                        key={fieldItem.id}
+                        className="p-4 border border-gray-200 rounded-lg bg-[#F8FAFC] relative space-y-1.5"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="text-xs font-medium text-gray-400">
+                            Item {index + 1}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => form.setValue(`productLines.${index}.isEditing`, true)}
+                              className="p-1 rounded-md hover:bg-gray-200 transition-colors text-blue-500"
+                              aria-label="Edit Item"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => remove(index)}
+                              className="p-1 rounded-md hover:bg-gray-200 transition-colors text-red-500"
+                              aria-label="Delete Item"
+                            >
+                              <Trash size={15} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-baseline">
+                          <h3 className="text-sm font-bold text-gray-900">
+                            {prod?.product_name || "Unknown Product"}
+                            {prod?.unit_of_measure_details?.unit_symbol ? ` (${prod.unit_of_measure_details.unit_symbol})` : ""}
+                          </h3>
+                        </div>
+
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-xs text-gray-800 font-medium">
+                            {qty} QTY
+                          </span>
+                          <span className="text-xs font-bold text-[#3B7CED]">
+                            ₦{tCost.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={fieldItem.id}
+                      className="p-4 border border-gray-200 bg-white rounded-lg shadow-sm space-y-4 relative"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-semibold text-gray-500">
+                          Item {index + 1}
+                        </span>
+                        {fields.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            className="p-1 rounded-md hover:bg-gray-100 transition-colors text-red-500"
+                            aria-label="Remove Item"
+                          >
+                            <Trash size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
                     {/* Product Select */}
                     <FormField
                       control={form.control}
                       name={`productLines.${index}.productId`}
                       render={({ field }) => (
                         <FormItem className="col-span-2">
-                          <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Select Material
+                          <FormLabel className="text-xs font-semibold text-gray-700">
+                            Product name
                           </FormLabel>
                           <Select
-                            onValueChange={field.onChange}
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
+                              if (selectedProd) {
+                                form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
+                              }
+                            }}
                             defaultValue={field.value}
                           >
                             <FormControl>
@@ -691,7 +734,7 @@ export default function MaterialConsumptionForm() {
                       name={`productLines.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem className="col-span-1">
-                          <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          <FormLabel className="text-xs font-semibold text-gray-700">
                             Quantity
                           </FormLabel>
                           <FormControl>
@@ -712,117 +755,138 @@ export default function MaterialConsumptionForm() {
                       )}
                     />
 
-                    {/* Unit Cost (read-only) */}
-                    <div className="col-span-1 space-y-2">
-                      <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Unit Cost (Auto)
-                      </Label>
-                      <div className="h-11 px-3 flex items-center bg-gray-50 border border-gray-200 rounded-md text-gray-500 text-sm font-medium">
-                        ₦
-                        {form
-                          .watch(`productLines.${index}.unitCost`)
-                          ?.toLocaleString() || 0}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                    <span className="text-sm font-semibold text-gray-600">
-                      Line Total
-                    </span>
-                    <span className="text-sm font-bold text-gray-900">
-                      ₦
-                      {form
-                        .watch(`productLines.${index}.totalCost`)
-                        ?.toLocaleString("en-NG", {
-                          minimumFractionDigits: 2,
-                        })}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Total Cost Summary */}
-            <div className="mt-6 pt-5 border-t border-gray-100 flex flex-col items-end">
-              <div className="flex justify-between items-center w-full">
-                <span className="text-base font-semibold text-gray-900">
-                  Total Request Cost
-                </span>
-                <span
-                  className={cn(
-                    "text-2xl font-bold tracking-tight",
-                    availableBudget !== null &&
-                      totalRequestCost > availableBudget
-                      ? "text-red-600"
-                      : "text-[#3B7CED]",
-                  )}
-                >
-                  ₦
-                  {totalRequestCost.toLocaleString("en-NG", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-              {availableBudget !== null &&
-                totalRequestCost > availableBudget && (
-                  <p className="text-sm text-red-500 mt-1 font-medium flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4" />
-                    Exceeds available budget
-                  </p>
-                )}
-            </div>
-          </div>
-
-          {/* Additional Info Section */}
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <h2 className="text-xs font-bold text-[#3B7CED] uppercase tracking-wider">
-              Additional Info
-            </h2>
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Notes (Optional)
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter any additional context or justification for this consumption..."
-                      className="resize-none bg-gray-50/50 border-gray-200 focus:ring-[#3B7CED]/20 min-h-[120px]"
-                      {...field}
+                    {/* Unit Cost */}
+                    <FormField
+                      control={form.control}
+                      name={`productLines.${index}.unitCost`}
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel className="text-xs font-semibold text-gray-700">
+                            Estimated unit cost
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className={cn(
+                                "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                                form.formState.errors.productLines?.[index]
+                                  ?.unitCost &&
+                                  "border-red-500 focus:ring-red-500/20",
+                              )}
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                field.onChange(val === "" ? undefined : Number(val));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prod = form.getValues(`productLines.${index}.productId`);
+                      const qty = form.getValues(`productLines.${index}.quantity`);
+                      if (!prod || !qty || qty <= 0) {
+                        form.trigger(`productLines.${index}`);
+                        return;
+                      }
+                      form.setValue(`productLines.${index}.isEditing`, false);
+                    }}
+                    className="w-full h-11 bg-[#2BA24D] hover:bg-[#238c41] text-white rounded-lg text-sm font-semibold flex items-center justify-center transition-colors mt-2"
+                  >
+                    Done
+                  </button>
+                </div>
+                  )
+                })}
+
+              <button
+                type="button"
+                onClick={() =>
+                  append({
+                    productId: "",
+                    quantity: 0,
+                    unitCost: 0,
+                    totalCost: 0,
+                    isEditing: true,
+                  })
+                }
+                className="w-full h-12 border-2 border-dashed border-blue-200 hover:border-[#3B7CED] hover:bg-blue-50/20 text-[#3B7CED] rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+              >
+                <Plus size={16} />
+                Add Another Product
+              </button>
+            </div>
+            )}
+          </div>
+
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
+            <div className="flex justify-between items-center py-1">
+              <span className="text-xs font-semibold text-gray-500">
+                Available Budget
+              </span>
+              <span className="text-xs font-semibold text-gray-500">
+                ₦{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-1 border-t border-gray-100 pt-3">
+              <span className="text-xs font-semibold text-gray-900">
+                Total Cost
+              </span>
+              <span className="text-xs font-bold text-[#3B7CED]">
+                ₦{totalRequestCost.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <div className="space-y-1.5 pt-2">
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-gray-700">
+                      Notes / Justification
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter any additional context..."
+                        className="min-h-[100px] border-gray-200 focus:ring-[#3B7CED]/20"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         </div>
-
-        {/* Fixed Submit Button */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20 shadow-none">
-          <div className="max-w-2xl mx-auto px-4">
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full h-12 text-sm font-bold flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-none"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit Request"
-              )}
-            </Button>
-          </div>
+      <div className="fixed bottom-0 left-16 right-0 bg-white border-t border-gray-100 p-4 z-20">
+        <div className="max-w-2xl mx-auto">
+          <Button
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="w-full h-12 text-sm font-bold flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-sm"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {requestId ? "Updating..." : "Submitting..."}
+              </>
+            ) : (
+              requestId ? "Save Changes" : "Submit Requisition"
+            )}
+          </Button>
         </div>
+      </div>
 
-        {/* Status Modal */}
         <StatusModal
           isOpen={statusModal.isOpen}
           onClose={statusModal.close}
@@ -835,5 +899,6 @@ export default function MaterialConsumptionForm() {
         />
       </form>
     </Form>
+    </>
   );
 }
