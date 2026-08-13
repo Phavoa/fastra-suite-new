@@ -2,7 +2,12 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
 import { EmbeddedUserDetails } from "./paymentsApi";
 
-export type InvoiceStatus = "paid" | "partial" | "pending" | "draft" | "cancelled";
+export type InvoiceStatus =
+  | "paid"
+  | "partial"
+  | "pending"
+  | "draft"
+  | "cancelled";
 export type InvoicingMethod = "ordered_quantity" | "delivered_quantity";
 
 export interface VendorBankAccount {
@@ -120,6 +125,39 @@ export interface CreateInvoiceRequest {
   invoice_items: CreateInvoiceItemRequest[];
 }
 
+export interface CreateVendorBillLineRequest {
+  project_purchase_order_line: number;
+  description: string;
+}
+
+export interface CreateVendorBillRequest {
+  source_type: "PROJECT_PO";
+  project_purchase_order: number;
+  vendor: number;
+  invoice_date: string;
+  payment_term: number;
+  company_bank_account: number;
+  document?: string;
+  lines: CreateVendorBillLineRequest[];
+  body?: FormData;
+}
+
+export interface VendorBillResponse {
+  id: number;
+  source_type: string;
+  project_purchase_order: number;
+  vendor: number;
+  invoice_date: string;
+  payment_term: number;
+  company_bank_account: number;
+  document: string | null;
+  lines: any[];
+  total_amount: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UpdateInvoiceRequest extends CreateInvoiceRequest {}
 
 export interface PatchInvoiceRequest extends Partial<CreateInvoiceRequest> {}
@@ -168,6 +206,11 @@ export const invoicesApi = createApi({
       url = `${baseUrl}${args.url}${queryString ? `?${queryString}` : ""}`;
     }
 
+    const isFormData = args && typeof args === "object" && args.body instanceof FormData;
+    if (isFormData) {
+      headers.delete("content-type");
+    }
+
     try {
       const response = await fetch(url, {
         method: typeof args === "string" ? "GET" : args.method || "GET",
@@ -176,7 +219,9 @@ export const invoicesApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-              ? JSON.stringify(args.body)
+              ? isFormData
+                ? args.body
+                : JSON.stringify(args.body)
               : undefined,
       });
 
@@ -279,6 +324,13 @@ export const invoicesApi = createApi({
     getHiddenInvoices: builder.query<Invoice[], void>({
       query: () => "/invoicing/invoice/hidden_list/",
     }),
+    createVendorBill: builder.mutation<VendorBillResponse, FormData>({
+      query: (body) => ({
+        url: "/invoicing/vendor-bills/",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -294,4 +346,5 @@ export const {
   usePatchToggleInvoiceHiddenStatusMutation,
   useGetActiveInvoicesQuery,
   useGetHiddenInvoicesQuery,
+  useCreateVendorBillMutation,
 } = invoicesApi;
