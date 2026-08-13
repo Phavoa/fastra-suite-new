@@ -1,7 +1,7 @@
 /**
  * Standardized permission actions supported by the system.
  */
-export type PermissionAction = "view" | "create" | "edit" | "delete" | "approve" | "reject";
+export type PermissionAction = "view" | "create" | "edit" | "delete" | "approve" | "reject" | (string & {});
 
 /**
  * Union of all application names in the system.

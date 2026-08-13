@@ -54,6 +54,8 @@ export interface TenantUserWithAccess {
   date_created: string;
   application_accesses: ApplicationAccess[];
   user_permissions?: PermissionTemplateItem[];
+  permissions?: any[];
+  permission_details?: any[];
 }
 
 

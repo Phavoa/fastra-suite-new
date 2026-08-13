@@ -15,6 +15,8 @@ import { PageGuard } from "@/components/auth/PageGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { useGetIncomingProductReturnQuery } from "@/api/inventory/incomingProductReturns";
+import { Loader2 } from "lucide-react";
 
 export default function SupplierReturnDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,8 +24,10 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: "", type: "success" as const });
 
-  // In reality, fetch this based on id
-  const isDraft = id.includes("0002"); // mock condition for draft
+  const safeId = encodeURIComponent(decodeURIComponent(id));
+  const { data: returnData, isLoading } = useGetIncomingProductReturnQuery(safeId);
+
+  const isDraft = (returnData?.status || "draft").toLowerCase() === "draft";
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -42,6 +46,27 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
     }, 1000);
   };
 
+  if (isLoading) {
+    return (
+      <PageGuard application="inventory" module="supplier_return">
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] bg-[#F6F9FC]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (!returnData) {
+    return (
+      <PageGuard application="inventory" module="supplier_return">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-[#F6F9FC] gap-4">
+          <p className="text-gray-500">Return record not found.</p>
+          <Button onClick={() => router.push("/inventory/operation/supplier_return")} variant="outline">Back to List</Button>
+        </div>
+      </PageGuard>
+    );
+  }
+
   return (
     <PageGuard application="inventory" module="supplier_return">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
@@ -59,19 +84,19 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                  <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Return ID</label>
-                  <div className="text-sm font-semibold text-gray-800">{id}</div>
+                  <div className="text-sm font-semibold text-gray-800">{returnData.unique_id || id}</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Receipt ID</label>
-                  <div className="text-sm font-semibold text-[#3B7CED]">WH-IN-0012</div>
+                  <div className="text-sm font-semibold text-[#3B7CED]">{returnData.source_document || "N/A"}</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Vendor</label>
-                  <div className="text-sm font-semibold text-gray-800">Dangote Cement Plc</div>
+                  <div className="text-sm font-semibold text-gray-400 italic">N/A</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Date</label>
-                  <div className="text-sm text-gray-800">2026-07-28</div>
+                  <div className="text-sm text-gray-800">{returnData.returned_date ? new Date(returnData.returned_date).toLocaleDateString() : "N/A"}</div>
                 </div>
               </div>
             </section>
@@ -100,20 +125,30 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
                     </TableRow>
                   </TableHeader>
                   <TableBody className="bg-white">
-                      <TableRow className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150">
-                        <TableCell className="border border-gray-200 px-4 align-middle">
-                          <div className="text-sm text-gray-800 font-medium line-clamp-2">Dangote Cement (50kg Bag)</div>
-                        </TableCell>
-                        <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                          <div className="text-sm text-gray-700">Bags</div>
-                        </TableCell>
-                        <TableCell className="border border-gray-200 align-middle text-center">
-                          <div className="text-sm font-bold text-[#E43D2B]">5</div>
-                        </TableCell>
-                        <TableCell className="border border-gray-200 px-4 align-middle">
-                          <div className="text-sm text-gray-700">Bags were torn and leaking upon inspection</div>
+                    {returnData.items && returnData.items.length > 0 ? (
+                      returnData.items.map((item, index) => (
+                        <TableRow key={item.id || index} className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150">
+                          <TableCell className="border border-gray-200 px-4 align-middle">
+                            <div className="text-sm text-gray-800 font-medium line-clamp-2">{item.product_details?.product_name || "Unknown Product"}</div>
+                          </TableCell>
+                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
+                            <div className="text-sm text-gray-700">{item.unit_of_measure_details?.unit_name || "Units"}</div>
+                          </TableCell>
+                          <TableCell className="border border-gray-200 align-middle text-center">
+                            <div className="text-sm font-bold text-[#E43D2B]">{item.quantity_to_return || 0}</div>
+                          </TableCell>
+                          <TableCell className="border border-gray-200 px-4 align-middle">
+                            <div className="text-sm text-gray-700">{returnData.reason_for_return || "N/A"}</div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="border border-gray-200 px-4 py-8 text-center text-gray-500">
+                          No return lines found.
                         </TableCell>
                       </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>

@@ -101,7 +101,7 @@ export default function UsersDetails() {
   useEffect(() => {
     if (userData) {
       setDirectPermissions(
-        convertApiItemsToPermissions(userData.user_permissions),
+        convertApiItemsToPermissions(userData.permissions || userData.user_permissions),
       );
     }
   }, [userData]);
@@ -220,7 +220,7 @@ export default function UsersDetails() {
   const handleResetPassword = async () => {
     setResetLoading(true);
     try {
-      await resetPassword({ email: form.email }).unwrap();
+      await resetPassword({ user_id: userId, email: form.email }).unwrap();
       statusModal.showSuccess(
         "Success",
         "Password reset email sent successfully!",

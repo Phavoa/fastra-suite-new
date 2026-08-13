@@ -16,18 +16,7 @@ import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import {
   useGetSubcontractorRequestQuery,
-  useUpdateSubcontractorRequestMutation,
 } from "@/api/subcontractorRequestApi";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 
 export default function SubcontractorRequestDetailsPage() {
   const params = useParams();
@@ -37,13 +26,6 @@ export default function SubcontractorRequestDetailsPage() {
 
   const { data: request, isLoading, error } =
     useGetSubcontractorRequestQuery(requestId);
-  const [updateRequest, { isLoading: isUpdating }] =
-    useUpdateSubcontractorRequestMutation();
-
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [isClarifyModalOpen, setIsClarifyModalOpen] = useState(false);
-  const [clarificationNote, setClarificationNote] = useState("");
 
   const getStatusBadgeClass = (status?: string) => {
     switch (status) {
@@ -73,76 +55,6 @@ export default function SubcontractorRequestDetailsPage() {
         return "In Progress";
       default:
         return status.charAt(0).toUpperCase() + status.slice(1);
-    }
-  };
-
-  const handleApprove = async () => {
-    try {
-      await updateRequest({
-        id: requestId,
-        body: { status: "approved" },
-      }).unwrap();
-
-      statusModal.showSuccess(
-        "Request Approved",
-        `Subcontractor request SR-${String(requestId).padStart(
-          5,
-          "0"
-        )} has been approved and moved to the processing queue.`
-      );
-    } catch (err) {
-      statusModal.showError(
-        "Approval Failed",
-        "There was an error approving the request. Please try again."
-      );
-    }
-  };
-
-  const handleReject = async () => {
-    if (!rejectionReason.trim()) return;
-
-    try {
-      await updateRequest({
-        id: requestId,
-        body: {
-          status: "rejected",
-        },
-      }).unwrap();
-
-      setIsRejectModalOpen(false);
-      statusModal.showSuccess(
-        "Request Rejected",
-        `The request has been rejected. The submitter has been notified with the reason: "${rejectionReason}"`
-      );
-    } catch (err) {
-      statusModal.showError(
-        "Rejection Failed",
-        "There was an error rejecting the request."
-      );
-    }
-  };
-
-  const handleClarify = async () => {
-    if (!clarificationNote.trim()) return;
-
-    try {
-      await updateRequest({
-        id: requestId,
-        body: {
-          status: "clarification_needed",
-        },
-      }).unwrap();
-
-      setIsClarifyModalOpen(false);
-      statusModal.showSuccess(
-        "Clarification Requested",
-        `The request has been sent back to the submitter for clarification.`
-      );
-    } catch (err) {
-      statusModal.showError(
-        "Action Failed",
-        "There was an error processing your request."
-      );
     }
   };
 
@@ -458,127 +370,14 @@ export default function SubcontractorRequestDetailsPage() {
                   <p className="font-bold text-gray-900">Request Rejected</p>
                   <p className="text-gray-400 text-[11px]">Just now</p>
                   <p className="text-red-600 mt-1 italic font-medium">
-                    "Reason: {rejectionReason || "Exceeds budget allocation."}"
+                    "Reason: Exceeds budget allocation."
                   </p>
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Action Buttons inside Card */}
-        {request.status === "submitted" && (
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none flex flex-wrap justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsClarifyModalOpen(true)}
-              className="h-10 px-5 text-xs font-bold border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
-            >
-              <HelpCircle size={14} className="mr-2" />
-              Request Clarification
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsRejectModalOpen(true)}
-              className="h-10 px-5 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 rounded-xl"
-            >
-              <XCircle size={14} className="mr-2" />
-              Reject Request
-            </Button>
-            <Button
-              onClick={handleApprove}
-              disabled={isUpdating}
-              className="h-10 px-6 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white shadow-xs rounded-xl"
-            >
-              <CheckCircle size={14} className="mr-2" />
-              {isUpdating ? "Approving..." : "Approve Request"}
-            </Button>
-          </div>
-        )}
       </main>
-
-      {/* Reject Modal */}
-      <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Reject Request</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this subcontractor request. This
-              will be visible to the submitter.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="reason" className="mb-2 block text-xs font-bold">
-              Rejection Reason *
-            </Label>
-            <Textarea
-              id="reason"
-              placeholder="e.g. Contract value exceeds budget limits or scope is unclear."
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              rows={4}
-              className="text-xs rounded-xl"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setIsRejectModalOpen(false)}
-              className="text-xs font-bold"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl"
-              onClick={handleReject}
-              disabled={!rejectionReason.trim()}
-            >
-              Confirm Rejection
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Clarification Modal */}
-      <Dialog open={isClarifyModalOpen} onOpenChange={setIsClarifyModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Request Clarification</DialogTitle>
-            <DialogDescription>
-              Explain what information is missing or needs adjustment.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="note" className="mb-2 block text-xs font-bold">
-              Clarification Note *
-            </Label>
-            <Textarea
-              id="note"
-              placeholder="Please provide more details on..."
-              value={clarificationNote}
-              onChange={(e) => setClarificationNote(e.target.value)}
-              rows={4}
-              className="text-xs rounded-xl"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setIsClarifyModalOpen(false)}
-              className="text-xs font-bold"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-[#3B7CED] text-white hover:bg-blue-700 text-xs font-bold rounded-xl"
-              onClick={handleClarify}
-              disabled={!clarificationNote.trim()}
-            >
-              Send Back
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <StatusModal
         isOpen={statusModal.isOpen}

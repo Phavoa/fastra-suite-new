@@ -2,10 +2,14 @@
 
 import React from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Bell, Calendar, User, Loader2 } from "lucide-react";
-import { useGetProjectRequestQuery } from "@/api/requests/projectRequestApi";
+import { ArrowLeft, Bell, Calendar, User, Loader2, Edit, Trash2, Send, AlertCircle } from "lucide-react";
+import { useGetProjectRequestQuery, useDeleteProjectRequestMutation, useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
+import { extractErrorMessage } from "@/lib/utils";
 
 interface PettyCashRequestDetail {
   id: string;
@@ -25,6 +29,13 @@ export default function PettyCashRequestDetailPage() {
   const router = useRouter();
   const { id } = useParams();
   const numericId = Number(id);
+  const { canDo } = useModulePermissions();
+  const statusModal = useStatusModal();
+
+  const [deleteRequest, { isLoading: isDeleting }] = useDeleteProjectRequestMutation();
+  const [submitRequest, { isLoading: isSubmitting }] = useSubmitProjectRequestMutation();
+
+  const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
 
   const { data: apiRequest, isLoading: apiLoading } = useGetProjectRequestQuery(numericId, {
     skip: isNaN(numericId),
@@ -105,6 +116,39 @@ export default function PettyCashRequestDetailPage() {
       notes: detail.notes || detail.justification_notes || "",
     };
   }, [apiRequest, projects]);
+
+  const canEdit = request?.status === "draft" && canDo("project_request", "edit");
+  const canDelete = request?.status === "draft" && canDo("project_request", "delete");
+  const canSubmit = request?.status === "draft" && canDo("project_request", "submit");
+
+  const handleEdit = () => {
+    router.push(`/project-request/petty-cash-request/${id}/edit`);
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteRequest(numericId).unwrap();
+      statusModal.showSuccess("Request Deleted", "The petty cash request has been deleted.");
+    } catch (error) {
+      statusModal.showError("Delete Failed", extractErrorMessage(error, "Failed to delete the request."));
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await submitRequest({ id: numericId }).unwrap();
+      statusModal.showSuccess("Request Submitted", "The petty cash request has been submitted for approval.");
+    } catch (error) {
+      statusModal.showError("Submit Failed", extractErrorMessage(error, "Failed to submit the request."));
+    }
+  };
+
+  const handleModalClose = () => {
+    statusModal.close();
+    if (statusModal.type === "success" && !isConfirmingDelete) {
+      router.push("/project-request/petty-cash-request");
+    }
+  };
 
   if (apiLoading) {
     return (
@@ -268,7 +312,84 @@ export default function PettyCashRequestDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Action Bottom Bar */}
+        {(canEdit || canDelete || canSubmit) && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20">
+            <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+              {isConfirmingDelete ? (
+                <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-lg border border-red-100">
+                  <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
+                    <AlertCircle size={16} className="text-red-600" /> Confirm delete?
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      className="h-8 text-xs bg-white border-gray-200 text-gray-700"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full flex flex-wrap justify-end gap-3">
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      onClick={handleEdit}
+                      className="h-10 px-5 text-xs font-bold border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                    >
+                      <Edit size={14} className="mr-2" />
+                      Edit Request
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="h-10 px-5 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 rounded-xl"
+                    >
+                      <Trash2 size={14} className="mr-2" />
+                      Delete Request
+                    </Button>
+                  )}
+                  {canSubmit && (
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="h-10 px-6 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white shadow-xs rounded-xl"
+                    >
+                      <Send size={14} className="mr-2" />
+                      {isSubmitting ? "Submitting..." : "Submit for Approval"}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
+
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={handleModalClose}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        actionText="Back to List"
+        onAction={handleModalClose}
+        showCloseButton={false}
+      />
     </div>
   );
 }

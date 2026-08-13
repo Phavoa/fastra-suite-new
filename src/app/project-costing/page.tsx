@@ -17,6 +17,8 @@ import { useRouter } from "next/navigation";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { CustomMessage } from "@/components/shared/CustomMessage";
 import { format } from "date-fns";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 const STATUS_TABS = [
   { label: "All", value: "all" },
@@ -160,6 +162,7 @@ export default function ProjectCostingListPage() {
   };
 
   return (
+    <PageGuard module="project_costing" entitlement="view_project">
     <div className="w-full flex flex-col bg-transparent">
       {/* Breadcrumbs */}
       <div className="px-4 pt-4 flex items-center gap-1 text-sm text-[#8898AA] mb-4 font-normal">
@@ -191,11 +194,13 @@ export default function ProjectCostingListPage() {
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
-            <Link href="/project-costing/new">
-              <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                New Project
-              </Button>
-            </Link>
+            <PermissionGuard module="project_costing" entitlement="create_project">
+              <Link href="/project-costing/new">
+                <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                  New Project
+                </Button>
+              </Link>
+            </PermissionGuard>
 
             {/* Grid / List View Toggle */}
             <div className="flex items-center border border-gray-200 rounded-lg p-0.5 bg-white gap-0.5 shadow-2xs">
@@ -454,5 +459,6 @@ export default function ProjectCostingListPage() {
         </div>
       )}
     </div>
+    </PageGuard>
   );
 }

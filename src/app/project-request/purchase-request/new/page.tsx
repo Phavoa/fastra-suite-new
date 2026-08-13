@@ -33,6 +33,7 @@ import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi"
 import { StatusModal } from "@/components/shared/StatusModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 interface ItemState {
   id: string;
@@ -629,7 +630,8 @@ export default function NewPurchaseRequestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-28">
+    <PageGuard module="project_request" entitlement="create">
+      <div className="min-h-screen bg-[#F9FAFB] pb-28">
       {/* Header Bar */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -1021,7 +1023,8 @@ export default function NewPurchaseRequestPage() {
         onAction={handleModalClose}
         showCloseButton={false}
       />
-    </div>
+      </div>
+    </PageGuard>
   );
 }
 

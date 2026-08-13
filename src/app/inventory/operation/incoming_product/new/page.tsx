@@ -318,12 +318,10 @@ export default function NewIncomingProductPage() {
       return;
     }
 
-    const hasDiscrepancy = validItems.some(
-      (it) => Number(it.received_quantity) < Number(it.expected_quantity)
-    );
-
     setIsSubmitting(true);
     statusModal.showInfo("Validating...", "Please wait while we validate the GRN.");
+    let createdProductId: string | null = null;
+
     try {
       const selectedPoId = data.related_po ? Number(data.related_po) : null;
       let selectedPo: any = null;
@@ -363,32 +361,44 @@ export default function NewIncomingProductPage() {
       }
 
       const res = await createIncomingProduct(payload).unwrap();
+      const productId = res?.incoming_product_id || res?.id;
       
-      // Attempt validation immediately after creation if no discrepancy
-      if (res && res.incoming_product_id) {
-        if (hasDiscrepancy) {
-          setIsSubmitting(false);
-          setDiscrepancyState({
-            isOpen: true,
-            type: "backorder",
-            ipId: res.incoming_product_id,
-          });
-          return;
-        } else {
-          await validateIncomingProduct({ id: res.incoming_product_id }).unwrap();
-          statusModal.showSuccess(
-            "GRN Validated",
-            "Accepted quantities added to active warehouse stock.",
-            "Go to Operations",
-            () => router.push("/inventory/operation")
-          );
-        }
+      if (productId) {
+        createdProductId = productId;
+        await validateIncomingProduct({ id: createdProductId }).unwrap();
+        statusModal.showSuccess(
+          "GRN Validated",
+          "Accepted quantities added to active warehouse stock.",
+          "Go to Operations",
+          () => router.push("/inventory/operation")
+        );
+      } else {
+        statusModal.showSuccess(
+          "Draft Created",
+          "GRN created successfully, but automatic validation could not proceed. Please validate it from the operations list.",
+          "Go to Operations",
+          () => router.push("/inventory/operation")
+        );
       }
     } catch (error: any) {
-      statusModal.showError(
-        "Validation Failed",
-        extractErrorMessage(error, "Failed to validate GRN.")
-      );
+      const isBackorderError = error?.data?.requires_backorder_confirmation || 
+                               error?.data?.error?.[0]?.error === "Short quantity detected. Please confirm backorder creation." ||
+                               error?.data?.error?.[0]?.requires_backorder_confirmation === true;
+
+      if (isBackorderError && createdProductId) {
+        statusModal.close();
+        setDiscrepancyState({
+          isOpen: true,
+          type: "backorder",
+          ipId: createdProductId,
+        });
+      } else {
+        statusModal.showError(
+          "Validation Failed",
+          extractErrorMessage(error, "Failed to validate GRN.")
+        );
+      }
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -398,10 +408,9 @@ export default function NewIncomingProductPage() {
     setIsSubmitting(true);
     statusModal.showInfo("Processing Backorder...", "Please wait while the backorder is created.");
     try {
-      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
-      await createIncomingProductBackorder({
-        response: true,
-        incoming_product: discrepancyState.ipId,
+      await validateIncomingProduct({ 
+        id: discrepancyState.ipId,
+        data: { create_backorder: true }
       }).unwrap();
 
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
@@ -426,10 +435,9 @@ export default function NewIncomingProductPage() {
     setIsSubmitting(true);
     statusModal.showInfo("Closing Delivery...", "Please wait while we close the delivery.");
     try {
-      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
-      await createIncomingProductBackorder({
-        response: false,
-        incoming_product: discrepancyState.ipId,
+      await validateIncomingProduct({ 
+        id: discrepancyState.ipId,
+        data: { create_backorder: false }
       }).unwrap();
 
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });

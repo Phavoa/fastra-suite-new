@@ -13,6 +13,7 @@ import {
 } from "@/api/requests/projectRequestApi";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { extractErrorMessage } from "@/lib/utils";
 
 const DataField = ({ label, value, fullWidth = false }: { label: string; value: string | React.ReactNode; fullWidth?: boolean }) => (
@@ -375,24 +376,25 @@ export default function RequestDetailsPage() {
                 </span>
               </div>
             </div>
-            
-            <div className="flex gap-3 pt-2">
-              <Button 
-                variant="outline" 
-                className="flex-1 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600 h-12 text-base font-semibold"
-                disabled={isApproving || isRejecting}
-                onClick={handleReject}
-              >
-                {isRejecting ? "Rejecting..." : "Reject"}
-              </Button>
-              <Button 
-                className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-white h-12 text-base font-semibold border-none"
-                disabled={isApproving || isRejecting}
-                onClick={handleApprove}
-              >
-                {isApproving ? "Approving..." : "Approve"}
-              </Button>
-            </div>
+            <PermissionGuard module="project_request" entitlement="approve">
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600 h-12 text-base font-semibold"
+                  disabled={isApproving || isRejecting}
+                  onClick={handleReject}
+                >
+                  {isRejecting ? "Rejecting..." : "Reject"}
+                </Button>
+                <Button 
+                  className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-white h-12 text-base font-semibold border-none"
+                  disabled={isApproving || isRejecting}
+                  onClick={handleApprove}
+                >
+                  {isApproving ? "Approving..." : "Approve"}
+                </Button>
+              </div>
+            </PermissionGuard>
           </div>
         </div>
       )}

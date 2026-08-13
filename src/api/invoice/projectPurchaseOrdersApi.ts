@@ -151,7 +151,6 @@ export const projectPurchaseOrdersApi = createApi({
     >({
       query: (params) => ({
         url: "/invoicing/project-purchase-orders/",
-        url: "/invoicing/project-purchase-orders/",
         params,
       }),
     }),

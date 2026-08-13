@@ -102,7 +102,7 @@ export const incomingProductReturnsApi = createApi({
 
     createIncomingProductReturn: builder.mutation<
       IncomingProductReturn,
-      FormData
+      any
     >({
       query: (formData) => ({
         url: "/inventory/return-incoming-product/",

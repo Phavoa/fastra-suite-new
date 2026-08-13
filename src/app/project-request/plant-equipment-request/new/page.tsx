@@ -24,6 +24,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { motion, AnimatePresence } from "framer-motion";
 import { StatusModal } from "@/components/shared/StatusModal";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 export default function NewPlantEquipmentRequestPage() {
   const router = useRouter();
@@ -71,19 +72,11 @@ export default function NewPlantEquipmentRequestPage() {
     return `PE${num}`;
   });
 
-  // Budget query
-  const { data: budgetData } = useGetAvailableBudgetQuery(
-    {
-      project_id: Number(selectedProjectId),
-      wbs_id: Number(selectedTaskId),
-      cost_code: "CC-04",
-    },
-    { skip: !selectedProjectId || !selectedTaskId }
-  );
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  const availableBudget = budgetData?.available_budget
-    ? Number(budgetData.available_budget)
-    : 0;
+  // Budget query is defined lower down after task is selected
+
+  // We will define availableBudget lower down
 
   // Fetch full project detail for WBS cascade
   const { data: costingProjectDetail } = useGetProjectCostingProjectQuery(
@@ -130,6 +123,37 @@ export default function NewPlantEquipmentRequestPage() {
       (w: any) => w.is_activity && String(w.parent) === String(selectedPhaseId)
     );
   }, [wbsList, selectedPhaseId]);
+
+  const selectedActivity = useMemo(() => {
+    return tasks.find((t: any) => String(t.id) === selectedTaskId);
+  }, [tasks, selectedTaskId]);
+
+  const selectedCostCode = selectedActivity?.cost_code || selectedActivity?.code || "CC-04";
+
+  // Budget query
+  const { data: budgetData, isLoading: isBudgetLoading } = useGetAvailableBudgetQuery(
+    {
+      project_id: Number(selectedProjectId),
+      wbs_id: Number(selectedTaskId),
+      cost_code: selectedCostCode,
+    },
+    { skip: !selectedProjectId || !selectedTaskId }
+  );
+
+  let availableBudget = 0;
+  if (selectedActivity) {
+    availableBudget = selectedActivity.available_budget !== undefined && selectedActivity.available_budget !== null
+      ? Number(selectedActivity.available_budget)
+      : selectedActivity.remaining_budget !== undefined && selectedActivity.remaining_budget !== null
+      ? Number(selectedActivity.remaining_budget)
+      : selectedActivity.amount !== undefined && selectedActivity.amount !== null
+      ? Number(selectedActivity.amount)
+      : budgetData?.available_budget !== undefined && budgetData?.available_budget !== null
+      ? Number(budgetData.available_budget)
+      : 0;
+  } else {
+    availableBudget = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
+  }
 
   // Calculations
   const qtyNum = Number(quantity || 0);
@@ -210,7 +234,8 @@ export default function NewPlantEquipmentRequestPage() {
         estimated_cost: String(estimatedCost),
         justification_notes: notes,
         is_hidden: false,
-        project_request: Number(selectedProjectId) || 1, // project ID
+        project: Number(selectedProjectId),
+        project_request: Number(selectedProjectId),
         activity: ensureValidUUID(selectedTaskId),
         wbs_element: ensureValidUUID(selectedTaskId),
       };
@@ -218,14 +243,27 @@ export default function NewPlantEquipmentRequestPage() {
       // Call API
       await createRequest(payload).unwrap();
       setModalType("submitted");
-    } catch (error) {
+    } catch (error: any) {
       console.error("API submission failed:", error);
+      
+      // Try to extract a useful error message from DRF format
+      let errMsg = "Your request submission was unsuccessful. Please check your data and try again.";
+      if (error?.data) {
+         const firstKey = Object.keys(error.data)[0];
+         if (firstKey) {
+            const val = error.data[firstKey];
+            const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+            errMsg = `${firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ")}: ${errorText}`;
+         }
+      }
+      setApiError(errMsg);
       setModalType("unsuccessful");
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-28">
+    <PageGuard module="project_request" entitlement="create">
+      <div className="min-h-screen bg-[#F9FAFB] pb-28">
       {/* Header Bar */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -413,8 +451,34 @@ export default function NewPlantEquipmentRequestPage() {
               </Select>
             </div>
 
-
-
+            {/* Available Budget Section */}
+            {selectedTaskId && (
+              <div className="pt-4 mt-4 border-t border-gray-100 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">
+                    Cost Code
+                  </span>
+                  <span className="text-sm text-gray-600 font-medium">
+                    {selectedCostCode}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">
+                    Available Budget
+                  </span>
+                  <span className="text-sm font-bold text-[#3B7CED]">
+                    {isBudgetLoading ? (
+                      "Loading..."
+                    ) : (
+                      `₦${availableBudget.toLocaleString("en-NG", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -495,12 +559,18 @@ export default function NewPlantEquipmentRequestPage() {
       {/* Submission Unsuccessful Dialog */}
       <StatusModal
         isOpen={modalType === "unsuccessful"}
-        onClose={() => setModalType(null)}
+        onClose={() => {
+          setModalType(null);
+          setApiError(null);
+        }}
         type="error"
         title="Submission Unsuccessful"
-        message="Your request submission was unsuccessfully. Please try again."
-        actionText="Try again"
-        onAction={() => setModalType(null)}
+        message={apiError || "Your request submission was unsuccessful. Please check your data and try again."}
+        actionText="Try Again"
+        onAction={() => {
+          setModalType(null);
+          setApiError(null);
+        }}
         showCloseButton={true}
       />
 
@@ -536,6 +606,7 @@ export default function NewPlantEquipmentRequestPage() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </PageGuard>
   );
 }

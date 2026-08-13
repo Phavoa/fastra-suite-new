@@ -14,6 +14,7 @@ import { useCreateProjectCostingProjectMutation } from "@/api/projectCostingApi"
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { extractErrorMessage } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -341,6 +342,7 @@ export default function NewProjectPage() {
   };
 
   return (
+    <PageGuard module="project_costing" entitlement="create_project">
     <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20 overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
@@ -642,5 +644,6 @@ export default function NewProjectPage() {
         showCloseButton={false}
       />
     </div>
+    </PageGuard>
   );
 }

@@ -94,15 +94,15 @@ export const incomingProductApi = createApi({
     }),
 
     getIncomingProduct: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/`,
+      query: (id) => `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/`,
     }),
 
     checkIncomingProductEditable: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/check_editable/`,
+      query: (id) => `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/check_editable/`,
     }),
 
     getIncomingProductBackorder: builder.query<IncomingProduct, string>({
-      query: (id) => `/inventory/incoming-product/${id}/get_backorder/`,
+      query: (id) => `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/get_backorder/`,
     }),
 
     getActiveIncomingProducts: builder.query<IncomingProduct[], void>({
@@ -130,7 +130,7 @@ export const incomingProductApi = createApi({
       { id: string; data: UpdateIncomingProductRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/`,
+        url: `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/`,
         method: "PUT",
         body: data,
       }),
@@ -141,7 +141,7 @@ export const incomingProductApi = createApi({
       { id: string; data: PatchIncomingProductRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/`,
+        url: `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/`,
         method: "PATCH",
         body: data,
       }),
@@ -149,7 +149,7 @@ export const incomingProductApi = createApi({
 
     deleteIncomingProduct: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/inventory/incoming-product/${id}/soft_delete/`,
+        url: `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/soft_delete/`,
         method: "DELETE",
       }),
     }),
@@ -159,7 +159,7 @@ export const incomingProductApi = createApi({
       { id: string; data?: PatchIncomingProductRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/toggle_hidden_status/`,
+        url: `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/toggle_hidden_status/`,
         method: "PUT",
         body: data || {},
       }),
@@ -170,7 +170,7 @@ export const incomingProductApi = createApi({
       { id: string; data?: PatchIncomingProductRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/toggle_hidden_status/`,
+        url: `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/toggle_hidden_status/`,
         method: "PATCH",
         body: data || {},
       }),
@@ -192,7 +192,7 @@ export const incomingProductApi = createApi({
       { id: string; data?: any }
     >({
       query: ({ id, data }) => ({
-        url: `/inventory/incoming-product/${id}/validate_receipt/`,
+        url: `/inventory/incoming-product/${encodeURIComponent(decodeURIComponent(id))}/validate_receipt/`,
         method: "POST",
         body: data || {},
       }),

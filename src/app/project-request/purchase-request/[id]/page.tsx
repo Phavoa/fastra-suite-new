@@ -13,6 +13,7 @@ import {
   usePatchProjectPurchaseRequestMutation,
 } from "@/api/requests/projectPurchaseRequestApi";
 import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 interface PurchaseRequestLineItemUi {
   id?: string | number;
@@ -451,34 +452,40 @@ export default function PurchaseRequestDetailPage() {
           ) : (
             <>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsConfirmingDelete(true)}
-                  className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-                >
-                  <Trash2 size={16} /> Delete
-                </Button>
-                
-                {request.status === "draft" && (
+                <PermissionGuard module="project_request" entitlement="delete">
                   <Button
                     variant="outline"
-                    onClick={() => router.push(`/project-request/purchase-request/${request.id}/edit`)}
-                    className="h-11 px-4 text-xs font-bold border-gray-200 text-gray-700 hover:bg-gray-50 gap-1.5"
+                    onClick={() => setIsConfirmingDelete(true)}
+                    className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
                   >
-                    <Edit3 size={16} /> Edit
+                    <Trash2 size={16} /> Delete
                   </Button>
+                </PermissionGuard>
+                
+                {request.status === "draft" && (
+                  <PermissionGuard module="project_request" entitlement="edit">
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/project-request/purchase-request/${request.id}/edit`)}
+                      className="h-11 px-4 text-xs font-bold border-gray-200 text-gray-700 hover:bg-gray-50 gap-1.5"
+                    >
+                      <Edit3 size={16} /> Edit
+                    </Button>
+                  </PermissionGuard>
                 )}
               </div>
 
               <div className="flex items-center gap-2 flex-1 justify-end">
                 {request.status === "draft" && (
-                  <Button
-                    disabled={isUpdating}
-                    onClick={() => handleStatusChange("pending")}
-                    className="h-11 px-5 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white gap-1.5"
-                  >
-                    <Check size={16} /> Submit
-                  </Button>
+                  <PermissionGuard module="project_request" entitlement="submit">
+                    <Button
+                      disabled={isUpdating}
+                      onClick={() => handleStatusChange("pending")}
+                      className="h-11 px-5 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white gap-1.5"
+                    >
+                      <Check size={16} /> Submit
+                    </Button>
+                  </PermissionGuard>
                 )}
               </div>
             </>

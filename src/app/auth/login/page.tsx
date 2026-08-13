@@ -132,32 +132,7 @@ const LoginPage: NextPage = () => {
       const isAdminByUsername = username.startsWith("admin_");
       dispatch(setIsAdmin(isAdminByUsername));
 
-      // --- Fetch tenant-user profile for permission_details ---
-      // The login response may not include permission_details,
-      // so we fetch the tenant-user profile to get them.
-      try {
-        const tenantUserId = result.tenant_user_id;
-        const tenantSchema = result.tenant_schema_name;
-        if (tenantUserId && tenantSchema) {
-          const profileRes = await fetch(
-            `https://${tenantSchema}.${process.env.NEXT_PUBLIC_API_DOMAIN}/users/tenant-users/${tenantUserId}/`,
-            {
-              headers: {
-                Authorization: `Bearer ${result.access_token}`,
-              },
-            }
-          );
-          if (profileRes.ok) {
-            const profile = await profileRes.json();
-            // Update permission details from profile if available
-            if (profile.permission_details) {
-              dispatch(setAuthData({ permission_details: profile.permission_details }));
-            }
-          }
-        }
-      } catch {
-        // Profile fetch failed — permission_details may be missing, non-critical
-      }
+
 
       // Set httpOnly cookie via API route for security
       await fetch("/api/auth/set-token", {

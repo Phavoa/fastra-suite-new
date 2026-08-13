@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
@@ -366,6 +367,7 @@ export function RequestForm<T extends Record<string, any>>({
         config.successMessage.description,
       );
     } catch (error) {
+      console.error("API Submission Error:", error);
       statusModal.showError(
         config.errorMessage?.title || "Submission Unsuccessful",
         extractErrorMessage(
@@ -375,6 +377,13 @@ export function RequestForm<T extends Record<string, any>>({
         ),
       );
     }
+  };
+
+  const onInvalid = (formErrors: any) => {
+    console.log("Form Validation Errors:", formErrors);
+    const firstKey = Object.keys(formErrors)[0];
+    const firstError = formErrors[firstKey]?.message || "Please ensure all required fields are filled out correctly.";
+    statusModal.showError("Validation Error", firstError);
   };
 
   const handleModalAction = () => {
@@ -707,17 +716,19 @@ export function RequestForm<T extends Record<string, any>>({
 
               {/* Submit Button placed cleanly inside/below the last card */}
               {sIndex === config.sections.length - 1 && (
-                <div className="pt-2">
-                  <Button
-                    type="button"
-                    variant="contained"
-                    className="w-full h-12 text-base font-medium flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg"
-                    onClick={handleSubmit(onSubmit)}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Submitting..." : "Submit request"}
-                  </Button>
-                </div>
+                <PermissionGuard module="project_request" entitlement="create">
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="contained"
+                      className="w-full h-12 text-base font-medium flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg"
+                      onClick={handleSubmit(onSubmit, onInvalid)}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit request"}
+                    </Button>
+                  </div>
+                </PermissionGuard>
               )}
             </div>
           ))}

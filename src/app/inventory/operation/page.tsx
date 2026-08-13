@@ -19,6 +19,7 @@ import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { IncomingProductCards } from "@/components/inventory/operation/IncomingProductCards";
 import { useGetIncomingProductsQuery } from "@/api/inventory/incomingProductApi";
+import { useGetIncomingProductReturnsQuery } from "@/api/inventory/incomingProductReturns";
 import {
   Table,
   TableBody,
@@ -40,8 +41,12 @@ const STATUS_TABS = [
 // StatusCards-style tiles: horizontal row, icon+label top, big colored count below, border-r dividers
 function OperationsNavigationTiles({
   incomingCount,
+  returnsCount,
+  backordersCount,
 }: {
   incomingCount: number;
+  returnsCount: number;
+  backordersCount: number;
 }) {
   const operationModules = [
     {
@@ -68,14 +73,14 @@ function OperationsNavigationTiles({
     {
       title: "Supplier Returns",
       href: "/inventory/operation/supplier_return",
-      count: 0,
+      count: returnsCount,
       icon: Undo2,
       color: "#8E44AD",
     },
     {
       title: "Backorders",
       href: "/inventory/operation/backorder",
-      count: 2,
+      count: backordersCount,
       icon: Archive,
       color: "#27AE60",
     },
@@ -131,6 +136,9 @@ export default function OperationPage() {
     search: query || undefined,
     status: selectedStatus !== "all" ? (selectedStatus as any) : undefined,
   });
+
+  const { data: returnsData = [] } = useGetIncomingProductReturnsQuery({});
+  const { data: backOrdersData = [] } = useGetIncomingProductsQuery({ is_backorder: true });
 
   const totalPages = Math.max(1, Math.ceil(incomingProductsData.length / ITEMS_PER_PAGE));
   const incomingProducts = useMemo(() => {
@@ -203,6 +211,8 @@ export default function OperationPage() {
           {/* StatusCards-style tiles */}
           <OperationsNavigationTiles
             incomingCount={incomingProductsData.length}
+            returnsCount={returnsData.length}
+            backordersCount={backOrdersData.length}
           />
 
           {/* White section 1: top bar + status pills */}
@@ -316,11 +326,11 @@ export default function OperationPage() {
                       <TableRow
                         key={item.incoming_product_id}
                         className="cursor-pointer hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
-                        onClick={() => router.push(`/inventory/operation/incoming_product/${item.incoming_product_id}`)}
+                        onClick={() => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(item.incoming_product_id)}`)}
                       >
                         <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap">
                           <Link
-                            href={`/inventory/operation/incoming_product/${item.incoming_product_id}`}
+                            href={`/inventory/operation/incoming_product/${encodeURIComponent(item.incoming_product_id)}`}
                             className="text-[#3B7CED] hover:underline font-semibold"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -329,7 +339,7 @@ export default function OperationPage() {
                         </TableCell>
                         <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
                           {highlightText(
-                            item.supplier_details?.company_name || "N/A",
+                            item.supplier_details?.vendor_name || "N/A",
                             query,
                           )}
                         </TableCell>
@@ -348,7 +358,7 @@ export default function OperationPage() {
                         </TableCell>
                         <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
                           {highlightText(
-                            item.created_at || "N/A",
+                            item.date_created ? new Date(item.date_created).toLocaleDateString() : "N/A",
                             query,
                           )}
                         </TableCell>

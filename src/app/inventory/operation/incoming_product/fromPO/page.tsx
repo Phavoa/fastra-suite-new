@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import StatusModal, { useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash, ArrowLeft, Loader2 } from "lucide-react";
@@ -118,15 +118,7 @@ export default function CreateIncomingProductFromPOPage() {
     ipId: null,
   });
 
-  const [notification, setNotification] = React.useState<{
-    message: string;
-    type: "success" | "error";
-    show: boolean;
-  }>({
-    message: "",
-    type: "success",
-    show: false,
-  });
+  const statusModal = useStatusModal();
 
   const addRow = () =>
     setItems((prev) => [
@@ -219,7 +211,7 @@ export default function CreateIncomingProductFromPOPage() {
   async function onSaveDraft(data: GRNFormData) {
     const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
     if (validItems.length === 0) {
-      setNotification({ message: "Please enter at least one valid product line with received quantity > 0", type: "error", show: true });
+      statusModal.showError("Validation Error", "Please enter at least one valid product line with received quantity > 0");
       return;
     }
     
@@ -242,24 +234,27 @@ export default function CreateIncomingProductFromPOPage() {
 
       await createIncomingProduct(payload).unwrap();
       
-      setNotification({ message: "Goods Receipt Note (GRN) draft saved successfully!", type: "success", show: true });
-      setTimeout(() => router.push("/inventory/operation"), 1000);
+      statusModal.showSuccess(
+        "Draft Saved",
+        "Goods Receipt Note (GRN) draft saved successfully!",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
     } catch (err: any) {
-      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to save draft.", type: "error", show: true });
+      statusModal.showError("Failed to Save Draft", extractErrorMessage(err, "Failed to save draft."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function onValidateGRN(data: GRNFormData) {
+    let createdProductId: string | null = null;
     const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
     if (validItems.length === 0) {
-      setNotification({ message: "Please enter at least one valid product line with received quantity > 0", type: "error", show: true });
+      statusModal.showError("Validation Error", "Please enter at least one valid product line with received quantity > 0");
       return;
     }
 
-    const hasBackorder = validItems.some((it) => Number(it.received_quantity) < Number(it.po_quantity));
-    
     setIsSubmitting(true);
     try {
       const payload = {
@@ -278,20 +273,41 @@ export default function CreateIncomingProductFromPOPage() {
       };
 
       const res = await createIncomingProduct(payload).unwrap();
+      const productId = res?.incoming_product_id || res?.id;
       
-      if (res && res.incoming_product_id) {
-        if (hasBackorder) {
-          setIsSubmitting(false);
-          setDiscrepancyState({ isOpen: true, type: "backorder", ipId: res.incoming_product_id });
-          return;
-        } else {
-          await validateIncomingProduct({ id: res.incoming_product_id }).unwrap();
-          setNotification({ message: "GRN Validated! Warehouse inventory stock and project costing ledger updated.", type: "success", show: true });
-          setTimeout(() => router.push("/inventory/operation"), 1200);
-        }
+      if (productId) {
+        createdProductId = productId;
+        await validateIncomingProduct({ id: createdProductId }).unwrap();
+        statusModal.showSuccess(
+          "GRN Validated",
+          "Warehouse inventory stock and project costing ledger updated.",
+          "Go to Operations",
+          () => router.push("/inventory/operation")
+        );
+      } else {
+        statusModal.showSuccess(
+          "Draft Created",
+          "GRN created successfully, but automatic validation could not proceed. Please validate it from the operations list.",
+          "Go to Operations",
+          () => router.push("/inventory/operation")
+        );
       }
     } catch (error: any) {
-      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to validate GRN.", type: "error", show: true });
+      const isBackorderError = error?.data?.requires_backorder_confirmation || 
+                               error?.data?.error?.[0]?.error === "Short quantity detected. Please confirm backorder creation." ||
+                               error?.data?.error?.[0]?.requires_backorder_confirmation === true;
+
+      if (isBackorderError && createdProductId) {
+        statusModal.close();
+        setDiscrepancyState({
+          isOpen: true,
+          type: "backorder",
+          ipId: createdProductId,
+        });
+      } else {
+        statusModal.showError("Validation Failed", extractErrorMessage(error, "Failed to validate GRN."));
+      }
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -300,13 +316,16 @@ export default function CreateIncomingProductFromPOPage() {
     if (!discrepancyState.ipId) return;
     setIsSubmitting(true);
     try {
-      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
-      await createIncomingProductBackorder({ response: true, incoming_product: discrepancyState.ipId }).unwrap();
+      await validateIncomingProduct({ id: discrepancyState.ipId, data: { create_backorder: true } }).unwrap();
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-      setNotification({ message: "GRN Validated & Backorder created for remaining balance!", type: "success", show: true });
-      setTimeout(() => router.push("/inventory/operation"), 1200);
+      statusModal.showSuccess(
+        "Backorder Created",
+        "GRN Validated & Backorder created for remaining balance!",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
     } catch (error: any) {
-      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to create backorder.", type: "error", show: true });
+      statusModal.showError("Action Failed", extractErrorMessage(error, "Failed to create backorder."));
     } finally {
       setIsSubmitting(false);
     }
@@ -316,13 +335,16 @@ export default function CreateIncomingProductFromPOPage() {
     if (!discrepancyState.ipId) return;
     setIsSubmitting(true);
     try {
-      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
-      await createIncomingProductBackorder({ response: false, incoming_product: discrepancyState.ipId }).unwrap();
+      await validateIncomingProduct({ id: discrepancyState.ipId, data: { create_backorder: false } }).unwrap();
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-      setNotification({ message: "GRN Validated! PO closed without backorder.", type: "success", show: true });
-      setTimeout(() => router.push("/inventory/operation"), 1200);
+      statusModal.showSuccess(
+        "Delivery Closed",
+        "GRN Validated! PO closed without backorder.",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
     } catch (error: any) {
-      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to close delivery.", type: "error", show: true });
+      statusModal.showError("Action Failed", extractErrorMessage(error, "Failed to close delivery."));
     } finally {
       setIsSubmitting(false);
     }
@@ -532,11 +554,14 @@ export default function CreateIncomingProductFromPOPage() {
           onDecline={handleCloseWithoutBackorder}
         />
 
-        <ToastNotification
-          message={notification.message}
-          type={notification.type}
-          show={notification.show}
-          onClose={() => setNotification((p) => ({ ...p, show: false }))}
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          onClose={statusModal.close}
         />
       </div>
     </PageGuard>

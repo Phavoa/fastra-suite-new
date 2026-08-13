@@ -48,7 +48,7 @@ function IncomingProductCard({ incomingProduct, index }: IncomingProductCardProp
 
   const handleCardClick = () => {
     router.push(
-      `/inventory/operation/incoming_product/${incomingProduct.incoming_product_id}`
+      `/inventory/operation/incoming_product/${encodeURIComponent(incomingProduct.incoming_product_id)}`
     );
   };
 
@@ -68,7 +68,7 @@ function IncomingProductCard({ incomingProduct, index }: IncomingProductCardProp
           {incomingProduct.receipt_type.replace(/_/g, " ")}
         </h3>
         <p className="text-xs text-[#8898AA] font-medium truncate">
-          {incomingProduct.supplier_details?.company_name || "—"}
+          {incomingProduct.supplier_details?.vendor_name || "—"}
         </p>
       </div>
 

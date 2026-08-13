@@ -116,6 +116,7 @@ export interface GetIncomingProductsParams {
   destination_location__id?: string;
   search?: string;
   status?: "draft" | "validated" | "canceled";
+  is_backorder?: boolean;
 }
 
 export interface CreateIncomingProductRequest {

@@ -13,6 +13,7 @@ import {
 } from "@/api/requests/projectRequestApi";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 export default function ApproveRequestPage() {
   const router = useRouter();
@@ -170,29 +171,31 @@ export default function ApproveRequestPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600 h-10 font-semibold"
-                      disabled={isApproving || isRejecting}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleReject(request.id);
-                      }}
-                    >
-                      Reject
-                    </Button>
-                    <Button
-                      className="flex-1 border border-[#22c55e] bg-[#22c55e] hover:bg-[#16a34a] text-white h-10 font-semibold"
-                      disabled={isApproving || isRejecting}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleApprove(request.id);
-                      }}
-                    >
-                      Approve
-                    </Button>
-                  </div>
+                  <PermissionGuard module="project_request" entitlement="approve">
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600 h-10 font-semibold"
+                        disabled={isApproving || isRejecting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReject(request.id);
+                        }}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        className="flex-1 border border-[#22c55e] bg-[#22c55e] hover:bg-[#16a34a] text-white h-10 font-semibold"
+                        disabled={isApproving || isRejecting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApprove(request.id);
+                        }}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  </PermissionGuard>
                 </div>
               </div>
             ))
@@ -236,4 +239,3 @@ export default function ApproveRequestPage() {
     </div>
   );
 }
-
