@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "@/lib/store/store";
+import type { PermissionDetail } from "@/utils/normalizePermissions";
 
 // Company Role interface
 export interface CompanyRole {
@@ -36,6 +37,10 @@ export interface TenantUser {
   date_created: string;
   signature: string | null;
   user_image: string | null;
+  /** Detailed permissions with entitlements */
+  permission_details?: PermissionDetail[];
+  /** Legacy flat permissions array */
+  permissions?: Array<{ module: string; permission_type: string }>;
 }
 
 // Create/Update Tenant User interface
@@ -66,6 +71,7 @@ export interface ChangePasswordRequest {
 
 // Reset password request interface
 export interface ResetPasswordRequest {
+  user_id?: number;
   email: string;
 }
 
@@ -238,7 +244,7 @@ export const tenantUserApi = createApi({
     // POST /users/tenant-users/change-password - Change password
     changePassword: builder.mutation<unknown, ChangePasswordRequest>({
       query: (passwordData) => ({
-        url: "/users/tenant-users/change-password",
+        url: "/users/tenant-users/change-password/",
         method: "POST",
         body: passwordData,
       }),
@@ -260,10 +266,10 @@ export const tenantUserApi = createApi({
       ],
     }),
 
-    // POST /users/tenant-users/reset-password - Reset password
+    // POST /users/tenant-users/reset-password/ - Reset password
     resetPassword: builder.mutation<TenantUser, ResetPasswordRequest>({
       query: (resetData) => ({
-        url: "/users/tenant-users/reset-password",
+        url: "/users/tenant-users/reset-password/",
         method: "POST",
         body: resetData,
       }),

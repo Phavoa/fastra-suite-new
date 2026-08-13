@@ -73,7 +73,9 @@ export function extractErrorMessage(
         const firstKey = Object.keys(firstError)[0];
         if (firstKey) {
           const val = firstError[firstKey];
-          return (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+          const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+          const formattedKey = firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ");
+          return `${formattedKey}: ${errorText}`;
         }
       }
     }
@@ -90,7 +92,9 @@ export function extractErrorMessage(
       const firstKey = Object.keys(data)[0];
       if (firstKey) {
         const val = data[firstKey];
-        return (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+        const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+        const formattedKey = firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ");
+        return `${formattedKey}: ${errorText}`;
       }
     }
   }

@@ -18,24 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const DUMMY_RETURNS: any[] = [
-  {
-    id: "WH-RET-0001",
-    vendor: "Dangote Cement Plc",
-    relatedReceipt: "WH-IN-0012",
-    date: "2026-07-28",
-    status: "validated",
-    lines: 1,
-  },
-  {
-    id: "WH-RET-0002",
-    vendor: "Julius Berger Steel",
-    relatedReceipt: "WH-IN-0005",
-    date: "2026-07-27",
-    status: "draft",
-    lines: 2,
-  },
-];
+import { useGetIncomingProductReturnsQuery } from "@/api/inventory/incomingProductReturns";
 
 const STATUS_TABS = [
   { label: "All Records", value: "all" },
@@ -66,21 +49,25 @@ export default function SupplierReturnPage() {
     },
   ];
 
+  const { data: returnsData = [], isLoading } = useGetIncomingProductReturnsQuery({});
+
   const filteredReturns = useMemo(() => {
-    return DUMMY_RETURNS.filter((ret) => {
+    return returnsData.filter((ret) => {
+      const currentStatus = ret.status?.toLowerCase() || "draft";
       const matchesStatus =
-        selectedStatus === "all" || ret.status === selectedStatus;
+        selectedStatus === "all" || currentStatus === selectedStatus;
 
       const lowerQuery = query.toLowerCase();
+      // Wait, there's no vendor name natively in the list API response anymore.
+      // So we will just use the source document ID.
       const matchesSearch =
         !query ||
-        ret.id.toLowerCase().includes(lowerQuery) ||
-        ret.vendor.toLowerCase().includes(lowerQuery) ||
-        ret.relatedReceipt.toLowerCase().includes(lowerQuery);
+        ret.unique_id?.toLowerCase().includes(lowerQuery) ||
+        ret.source_document?.toLowerCase().includes(lowerQuery);
 
       return matchesStatus && matchesSearch;
     });
-  }, [selectedStatus, query]);
+  }, [returnsData, selectedStatus, query]);
 
   const totalPages = Math.max(1, Math.ceil(filteredReturns.length / ITEMS_PER_PAGE));
   const paginatedReturns = useMemo(() => {
@@ -172,7 +159,13 @@ export default function SupplierReturnPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedReturns.length === 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="px-6 py-12 text-center text-[#8898AA] text-sm">
+                        Loading supplier returns...
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedReturns.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="px-6 py-12 text-center text-[#8898AA] text-sm">
                         No supplier returns found matching your search.
@@ -181,36 +174,44 @@ export default function SupplierReturnPage() {
                   ) : (
                     paginatedReturns.map((ret) => (
                       <TableRow
-                        key={ret.id}
+                        key={ret.unique_id}
                         className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/inventory/operation/supplier_return/${ret.id}`)}
+                        onClick={() => router.push(`/inventory/operation/supplier_return/${encodeURIComponent(decodeURIComponent(ret.unique_id))}`)}
                       >
                         <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
-                          <Link href={`/inventory/operation/supplier_return/${ret.id}`} className="text-[#3B7CED] hover:underline" onClick={(e) => e.stopPropagation()}>
-                            {ret.id}
+                          <Link href={`/inventory/operation/supplier_return/${encodeURIComponent(decodeURIComponent(ret.unique_id))}`} className="text-[#3B7CED] hover:underline" onClick={(e) => e.stopPropagation()}>
+                            {ret.unique_id}
                           </Link>
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-[#525F7F] text-sm">
-                          {ret.date}
+                          {ret.returned_date ? new Date(ret.returned_date).toLocaleDateString() : "N/A"}
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
-                          <span className="text-[#32325D] text-sm font-medium">
-                            {ret.vendor}
+                          <span className="text-[#32325D] text-sm font-medium text-gray-400 italic">
+                            N/A
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
-                          <span className="text-[#32325D] text-sm">
-                            {ret.relatedReceipt}
+                          <span className="text-[#3B7CED] text-sm hover:underline font-medium">
+                            <Link href={`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(ret.source_document))}`} onClick={(e) => e.stopPropagation()}>
+                              {ret.source_document || "N/A"}
+                            </Link>
                           </span>
                         </TableCell>
-                        <TableCell className="px-4 py-3.5 text-center text-[#525F7F] text-sm">
-                          {ret.lines}
+                        <TableCell className="px-4 py-3.5 text-center text-[#525F7F] text-sm font-medium">
+                          {ret.items?.length || 0}
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-center">
-                          <span className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize ${
-                            ret.status === "validated" ? "bg-[#E2F2E9] text-[#2BA24D]" : ret.status === "draft" ? "bg-[#E8F0FE] text-[#1A73E8]" : "bg-[#FCE8E6] text-[#E43D2B]"
-                          }`}>
-                            {ret.status}
+                          <span
+                            className={`inline-block px-3 py-1 text-xs rounded-full font-semibold capitalize ${
+                              (ret.status || "draft").toLowerCase() === "validated"
+                                ? "bg-[#E2F2E9] text-[#2BA24D]"
+                                : (ret.status || "draft").toLowerCase() === "canceled"
+                                ? "bg-[#FCE8E6] text-[#C5221F]"
+                                : "bg-[#E8F0FE] text-[#1A73E8]"
+                            }`}
+                          >
+                            {ret.status || "draft"}
                           </span>
                         </TableCell>
                       </TableRow>

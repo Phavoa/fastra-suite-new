@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AddBudgetAdjustmentModal } from "@/components/project-costing/modals/AddBudgetAdjustmentModal";
 import { ProjectCostingExportTemplate } from "@/components/project-costing/export/ProjectCostingExportTemplate";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { PageGuard } from "@/components/auth/PageGuard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -413,6 +415,7 @@ export default function ProjectDashboardPage() {
   }
 
   return (
+    <PageGuard module="project_costing" entitlement="view_project">
     <div className="flex flex-col h-full bg-gray-50 relative pb-20">
       {/* Top Navigation Row */}
       <div className="flex items-center px-6 py-4">
@@ -442,61 +445,69 @@ export default function ProjectDashboardPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-9 font-medium flex items-center gap-2 px-4 shadow-sm">
-                  <Download className="w-4 h-4" />
-                  {isExportingPdf || isExportingImage ? "Exporting..." : "Export Report"}
-                  <ChevronDown className="w-4 h-4 opacity-70 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border-gray-100 p-1">
-                <DropdownMenuItem 
-                  onClick={handleExportPdf} 
-                  disabled={isExportingPdf} 
-                  className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 focus:bg-gray-50"
-                >
-                  <FileText className="w-4 h-4 text-red-500" />
-                  <span className="font-medium text-gray-700">Download as PDF</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleExportImage} 
-                  disabled={isExportingImage} 
-                  className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 focus:bg-gray-50 mt-1"
-                >
-                  <ImageIcon className="w-4 h-4 text-blue-500" />
-                  <span className="font-medium text-gray-700">Download as Image</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <PermissionGuard module="project_costing" entitlement="export_reports">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-9 font-medium flex items-center gap-2 px-4 shadow-sm">
+                    <Download className="w-4 h-4" />
+                    {isExportingPdf || isExportingImage ? "Exporting..." : "Export Report"}
+                    <ChevronDown className="w-4 h-4 opacity-70 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border-gray-100 p-1">
+                  <DropdownMenuItem 
+                    onClick={handleExportPdf} 
+                    disabled={isExportingPdf} 
+                    className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 focus:bg-gray-50"
+                  >
+                    <FileText className="w-4 h-4 text-red-500" />
+                    <span className="font-medium text-gray-700">Download as PDF</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleExportImage} 
+                    disabled={isExportingImage} 
+                    className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 focus:bg-gray-50 mt-1"
+                  >
+                    <ImageIcon className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium text-gray-700">Download as Image</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </PermissionGuard>
 
             {(!project.status || project.status === "DRAFT") && (
-              <Button 
-                onClick={() => handleAction(submitProject, "submitted")}
-                disabled={isSubmitting}
-                className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9"
-              >
-                {isSubmitting ? "Submitting..." : "Submit Project"}
-              </Button>
+              <PermissionGuard module="project_costing" entitlement="submit_project">
+                <Button 
+                  onClick={() => handleAction(submitProject, "submitted")}
+                  disabled={isSubmitting}
+                  className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9"
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Project"}
+                </Button>
+              </PermissionGuard>
             )}
             
             {(project.status === "PENDING" || project.status === "PENDING_APPROVAL") && (
               <>
-                <Button 
-                  onClick={() => handleAction(rejectProject, "rejected")}
-                  disabled={isRejecting || isApproving}
-                  variant="outline"
-                  className="border-red-500 text-red-500 hover:bg-red-50 h-9"
-                >
-                  {isRejecting ? "Rejecting..." : "Reject"}
-                </Button>
-                <Button 
-                  onClick={() => handleAction(approveProject, "approved")}
-                  disabled={isApproving || isRejecting}
-                  className="bg-[#2BA24D] hover:bg-[#22853d] text-white h-9"
-                >
-                  {isApproving ? "Approving..." : "Approve"}
-                </Button>
+                <PermissionGuard module="project_costing" entitlement="reject_project">
+                  <Button 
+                    onClick={() => handleAction(rejectProject, "rejected")}
+                    disabled={isRejecting || isApproving}
+                    variant="outline"
+                    className="border-red-500 text-red-500 hover:bg-red-50 h-9"
+                  >
+                    {isRejecting ? "Rejecting..." : "Reject"}
+                  </Button>
+                </PermissionGuard>
+                <PermissionGuard module="project_costing" entitlement="approve_project">
+                  <Button 
+                    onClick={() => handleAction(approveProject, "approved")}
+                    disabled={isApproving || isRejecting}
+                    className="bg-[#2BA24D] hover:bg-[#22853d] text-white h-9"
+                  >
+                    {isApproving ? "Approving..." : "Approve"}
+                  </Button>
+                </PermissionGuard>
               </>
             )}
           </div>
@@ -532,9 +543,11 @@ export default function ProjectDashboardPage() {
             </div>
           </div>
           <div>
-            <Button onClick={() => setIsBudgetAdjustmentModalOpen(true)} variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 hover:text-[#3B7CED] h-9 font-medium px-6">
-              Create Budget Adjustment
-            </Button>
+            <PermissionGuard module="project_costing" entitlement="submit_budget_adjustment">
+              <Button onClick={() => setIsBudgetAdjustmentModalOpen(true)} variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 hover:text-[#3B7CED] h-9 font-medium px-6">
+                Create Budget Adjustment
+              </Button>
+            </PermissionGuard>
           </div>
         </div>
 
@@ -876,20 +889,24 @@ export default function ProjectDashboardPage() {
 
                           {/* Action Buttons Section */}
                           <div className="p-4 bg-white flex gap-4">
-                            <Button
-                              variant="destructive"
-                              className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white font-medium h-11 rounded-md"
-                              disabled={isRejecting}
-                            >
-                              Reject
-                            </Button>
-                            <Button
-                              className="flex-1 bg-[#10B981] hover:bg-emerald-600 text-white font-medium h-11 rounded-md"
-                              onClick={() => handleApproveAdjustment(adj)}
-                              disabled={isApprovingAdjustment}
-                            >
-                              Approve
-                            </Button>
+                            <PermissionGuard module="project_costing" entitlement="reject_budget">
+                              <Button
+                                variant="destructive"
+                                className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white font-medium h-11 rounded-md"
+                                disabled={isRejecting}
+                              >
+                                Reject
+                              </Button>
+                            </PermissionGuard>
+                            <PermissionGuard module="project_costing" entitlement="approve_budget">
+                              <Button
+                                className="flex-1 bg-[#10B981] hover:bg-emerald-600 text-white font-medium h-11 rounded-md"
+                                onClick={() => handleApproveAdjustment(adj)}
+                                disabled={isApprovingAdjustment}
+                              >
+                                Approve
+                              </Button>
+                            </PermissionGuard>
                           </div>
                         </div>
                       );
@@ -1111,15 +1128,6 @@ export default function ProjectDashboardPage() {
         </div>
       </div>
 
-      {/* Footer sticky bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <Button variant="outline" className="border-blue-400 text-blue-500 hover:bg-blue-50">
-          Cancel
-        </Button>
-        <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white">
-          Save
-        </Button>
-      </div>
 
       <AddBudgetAdjustmentModal
         isOpen={isBudgetAdjustmentModalOpen}
@@ -1146,5 +1154,6 @@ export default function ProjectDashboardPage() {
         </div>
       </div>
     </div>
+    </PageGuard>
   );
 }

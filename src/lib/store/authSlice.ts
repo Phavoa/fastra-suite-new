@@ -19,11 +19,9 @@ export interface AuthState {
   tenant_company_name: string | null;
   isOnboarded: boolean | null;
   /**
-   * New backend permission format (array of {module, permission_type}).
-   * Empty array [] signals that the user is an admin (bypasses all checks).
-   * Non-empty array contains explicit permission entries for regular users.
+   * New backend permission format with expanded entitlements per permission type.
    */
-  user_permissions: Array<{ module: string; permission_type: string }>;
+  user_permissions: PermissionDetail[];
   /**
    * Detailed permissions from backend with expanded entitlements per permission type.
    * Used for permission checking and UI rendering.

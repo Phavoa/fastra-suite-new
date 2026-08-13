@@ -102,8 +102,9 @@ export default function PermissionsGrid({
                                 )
                               }
                               disabled={readOnly}
-                              className={`size-4 transition-all duration-200 text-gray-500 font-bold 
+                              className={`size-4 transition-all duration-200 font-bold 
            ring-1 ring-gray-300 hover:ring-gray-400 
+           data-[state=checked]:bg-[#3B7CED] data-[state=checked]:border-[#3B7CED] data-[state=checked]:text-white
            ${!readOnly ? "hover:scale-110 active:scale-95" : ""}`}
                             />
                           </div>

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import StatusModal, { useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,15 +64,7 @@ export default function ProcessReturnPage() {
     }
   }, [incomingProduct]);
 
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-    show: boolean;
-  }>({
-    message: "",
-    type: "success",
-    show: false,
-  });
+  const statusModal = useStatusModal();
 
   const {
     register,
@@ -95,13 +87,13 @@ export default function ProcessReturnPage() {
 
     const valid = items.filter((it) => Number(it.return_qty) > 0);
     if (valid.length === 0) {
-      setNotification({ message: "Please enter a return quantity greater than 0", type: "error", show: true });
+      statusModal.showError("Validation Error", "Please enter a return quantity greater than 0");
       return;
     }
 
     for (const item of valid) {
       if (Number(item.return_qty) > item.received_qty) {
-        setNotification({ message: `Cannot return more than received quantity (${item.received_qty})`, type: "error", show: true });
+        statusModal.showError("Validation Error", `Cannot return more than received quantity (${item.received_qty})`);
         return;
       }
     }
@@ -125,12 +117,14 @@ export default function ProcessReturnPage() {
 
       await createIncomingProduct(payload).unwrap();
       
-      setNotification({ message: "Return processed! Supplier debit note generated and stock deducted.", type: "success", show: true });
-      setTimeout(() => {
-        router.push(`/inventory/operation/incoming_product/${id}`);
-      }, 1000);
+      statusModal.showSuccess(
+        "Return Processed",
+        "Return processed! Supplier debit note generated and stock deducted.",
+        "View GRN",
+        () => router.push(`/inventory/operation/incoming_product/${id}`)
+      );
     } catch (err: any) {
-      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to process return.", type: "error", show: true });
+      statusModal.showError("Failed to Process Return", extractErrorMessage(err, "Failed to process return."));
     } finally {
       setIsSubmitting(false);
     }
@@ -225,7 +219,15 @@ export default function ProcessReturnPage() {
           <Button type="button" disabled={isSubmitting} onClick={handleSubmit(onSubmit)} className="bg-[#3B7CED] hover:bg-[#3065c3] text-white">Confirm Supplier Return</Button>
         </div>
 
-        <ToastNotification message={notification.message} type={notification.type} show={notification.show} onClose={() => setNotification(p => ({ ...p, show: false }))} />
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          onClose={statusModal.close}
+        />
       </div>
     </PageGuard>
   );

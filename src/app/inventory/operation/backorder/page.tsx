@@ -16,25 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const DUMMY_BACKORDERS: any[] = [
-  {
-    id: "WH-IN-0017-BO",
-    vendor: "Lafarge Africa Plc",
-    relatedReceipt: "WH-IN-0017",
-    date: "2026-07-25",
-    status: "draft",
-    lines: 2,
-  },
-  {
-    id: "WH-IN-0021-BO",
-    vendor: "Nestle Nigeria Plc",
-    relatedReceipt: "WH-IN-0021",
-    date: "2026-07-28",
-    status: "draft",
-    lines: 1,
-  },
-];
+import { useGetIncomingProductsQuery } from "@/api/inventory/incomingProductApi";
+import { Loader2 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -54,23 +37,14 @@ export default function BackorderPage() {
     },
   ];
 
-  const filteredBackorders = useMemo(() => {
-    return DUMMY_BACKORDERS.filter((bo) => {
-      const lowerQuery = query.toLowerCase();
-      return (
-        !query ||
-        bo.id.toLowerCase().includes(lowerQuery) ||
-        bo.vendor.toLowerCase().includes(lowerQuery) ||
-        bo.relatedReceipt.toLowerCase().includes(lowerQuery)
-      );
-    });
-  }, [query]);
+  const { data: backordersData, isLoading } = useGetIncomingProductsQuery({
+    search: query || undefined,
+    is_backorder: true,
+  });
 
-  const totalPages = Math.max(1, Math.ceil(filteredBackorders.length / ITEMS_PER_PAGE));
-  const paginatedBackorders = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredBackorders.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredBackorders, currentPage]);
+  const backordersList = Array.isArray(backordersData) ? backordersData : [];
+  const totalPages = Math.max(1, Math.ceil(backordersList.length / ITEMS_PER_PAGE));
+  const paginatedBackorders = backordersList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <PageGuard application="inventory" module="backorder">
@@ -127,43 +101,51 @@ export default function BackorderPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedBackorders.length === 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-32 text-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-[#3B7CED] mx-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedBackorders.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="px-6 py-12 text-center text-[#8898AA] text-sm">
                         No backorders found matching your search.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedBackorders.map((bo) => (
+                    paginatedBackorders.map((bo: any) => (
                       <TableRow
-                        key={bo.id}
+                        key={bo.incoming_product_id || bo.id}
                         className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/inventory/operation/backorder/${bo.id}`)}
+                        onClick={() => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(bo.incoming_product_id || bo.id))}`)}
                       >
                         <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
-                          <Link href={`/inventory/operation/backorder/${bo.id}`} className="text-[#3B7CED] hover:underline" onClick={(e) => e.stopPropagation()}>
-                            {bo.id}
+                          <Link href={`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(bo.incoming_product_id || bo.id))}`} className="text-[#3B7CED] hover:underline" onClick={(e) => e.stopPropagation()}>
+                            {bo.incoming_product_id || bo.id}
                           </Link>
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-[#525F7F] text-sm">
-                          {bo.date}
+                          {bo.date_created ? new Date(bo.date_created).toLocaleDateString() : "N/A"}
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
                           <span className="text-[#32325D] text-sm font-medium">
-                            {bo.vendor}
+                            {bo.supplier_details?.vendor_name || bo.supplier_details?.company_name || "Unknown"}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
                           <span className="text-[#3B7CED] hover:underline text-sm font-medium">
-                            {bo.relatedReceipt}
+                            {bo.backorder_of_details?.incoming_product_id || bo.backorder_of || "N/A"}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-center text-[#525F7F] text-sm">
-                          {bo.lines}
+                          {bo.incoming_product_items?.length || 0}
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-center">
-                          <span className="inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize bg-[#E8F0FE] text-[#1A73E8]">
-                            Pending
+                          <span className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize ${
+                            bo.status === "validated" ? "bg-[#E2F2E9] text-[#2BA24D]" : "bg-[#E8F0FE] text-[#1A73E8]"
+                          }`}>
+                            {bo.status || "draft"}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -175,7 +157,7 @@ export default function BackorderPage() {
             
             <div className="px-6 py-3.5 flex items-center justify-between border-t border-gray-100 bg-white text-sm text-[#8898AA]">
               <span>
-                Showing <span className="font-semibold text-[#32325D]">{filteredBackorders.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}</span> – <span className="font-semibold text-[#32325D]">{Math.min(currentPage * ITEMS_PER_PAGE, filteredBackorders.length)}</span> of <span className="font-semibold text-[#32325D]">{filteredBackorders.length}</span> results
+                Showing <span className="font-semibold text-[#32325D]">{backordersList.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}</span> – <span className="font-semibold text-[#32325D]">{Math.min(currentPage * ITEMS_PER_PAGE, backordersList.length)}</span> of <span className="font-semibold text-[#32325D]">{backordersList.length}</span> results
               </span>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 rounded-md border border-gray-200 text-xs font-medium text-[#32325D] hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>

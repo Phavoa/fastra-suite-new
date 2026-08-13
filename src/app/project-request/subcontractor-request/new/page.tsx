@@ -7,11 +7,12 @@ import { RequestFormConfig } from "@/components/requests/types";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useCreateSubcontractorRequestMutation } from "@/api/subcontractorRequestApi";
-import { useGetVendorsQuery } from "@/api/purchase/vendorsApi";
+import { useGetActiveVendorsQuery } from "@/api/invoice/vendorsApi";
 import { useGetAvailableBudgetQuery } from "@/api/projectApi";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -39,7 +40,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function NewSubcontractorRequestPage() {
   const router = useRouter();
   const [createRequest, { isLoading: isSubmitting }] = useCreateSubcontractorRequestMutation();
-  const { data: vendors = [], isLoading: isLoadingVendors } = useGetVendorsQuery({});
+  const { data: vendors = [], isLoading: isLoadingVendors } = useGetActiveVendorsQuery();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserName = React.useMemo(() => {
     if (!loggedInUser) return "Current User";
@@ -54,7 +55,7 @@ export default function NewSubcontractorRequestPage() {
 
   const vendorOptions = useMemo(() => {
     return vendors.map((vendor) => ({
-      label: vendor.company_name,
+      label: vendor.vendor_name,
       value: String(vendor.id),
     }));
   }, [vendors]);
@@ -248,5 +249,9 @@ export default function NewSubcontractorRequestPage() {
     backPath: "/project-request/subcontractor-request",
   };
 
-  return <RequestForm config={config} />;
+  return (
+    <PageGuard module="project_request" entitlement="create">
+      <RequestForm config={config} />
+    </PageGuard>
+  );
 }

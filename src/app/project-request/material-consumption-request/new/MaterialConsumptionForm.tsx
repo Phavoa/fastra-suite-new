@@ -107,6 +107,25 @@ const toUUID = (val: string): string => {
   return "00000000-0000-0000-0000-000000000000";
 };
 
+const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, ...props }, ref) => {
+  return (
+    <div className="relative">
+      <select
+        ref={ref}
+        className={cn(
+          "flex h-11 w-full items-center justify-between whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-[#3B7CED] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 disabled:opacity-50 appearance-none",
+          className
+        )}
+        {...props}
+      />
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+        <ChevronDown size={16} />
+      </div>
+    </div>
+  );
+});
+NativeSelect.displayName = "NativeSelect";
+
 export default function MaterialConsumptionForm({ requestId }: { requestId?: number }) {
   const router = useRouter();
   const [isProductLinesCollapsed, setIsProductLinesCollapsed] = useState(false);
@@ -165,26 +184,7 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
     mode: "onBlur",
   });
 
-  useEffect(() => {
-    if (requestData) {
-      const req = requestData as any;
-      form.reset({
-        project: String(req.project_request || ""),
-        phase: String(req.phase || ""),
-        wbsElement: String(req.activity || ""),
-        dateConsumed: req.date_consumed || new Date().toISOString().split("T")[0],
-        warehouse: String(req.location || ""),
-        notes: req.notes || "",
-        productLines: req.lines.map((l: any) => ({
-          productId: String(l.product || ""),
-          quantity: Number(l.quantity || 0),
-          unitCost: parseFloat(l.unit_cost || "0") || 0,
-          totalCost: parseFloat(l.total_cost || "0") || 0,
-          isEditing: false,
-        })),
-      });
-    }
-  }, [requestData, form]);
+  // Note: Form reset logic, including project-detail based warehouse handling, is implemented in the effect starting at line 263.
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -207,21 +207,27 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
   // --- Derived WBS options (from project-costing data) ---
   const buildWbsList = (proj: any): any[] => {
     if (!proj) return [];
-    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) return proj.wbs;
+    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) {
+      return proj.wbs.map((w: any) => ({
+        ...w,
+        id: w.uuid || w.id || w.activity_id || w.phase_id,
+        parent: w.parent || w.phase || w.phase_id || w.parent_id
+      }));
+    }
     const items: any[] = [];
     const phasesArr = Array.isArray(proj.phases)
       ? proj.phases
       : Array.isArray(proj.phase_list) ? proj.phase_list : [];
     phasesArr.forEach((ph: any, pi: number) => {
-      const phId = ph.id || ph.phase_id || `phase-${pi + 1}`;
+      const phId = ph.uuid || ph.id || ph.phase_id || `phase-${pi + 1}`;
       const phName = ph.name || ph.phase_name || `Phase ${pi + 1}`;
-      items.push({ id: phId, name: phName, is_activity: false });
+      items.push({ ...ph, id: phId, name: phName, is_activity: false });
       const acts = Array.isArray(ph.activities) ? ph.activities
         : Array.isArray(ph.activity_list) ? ph.activity_list : [];
       acts.forEach((act: any, ai: number) => {
         items.push({ 
           ...act, 
-          id: act.id || `act-${phId}-${ai + 1}`, 
+          id: act.uuid || act.id || `act-${phId}-${ai + 1}`, 
           name: act.name || `Activity ${ai + 1}`, 
           is_activity: true, 
           parent: phId,
@@ -242,39 +248,140 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
 
   const wbsList = useMemo(() => buildWbsList(selectedProjectDetail), [selectedProjectDetail]);
 
+  // Determine if we are in edit mode
+  const isEdit = !!requestId;
+
   const phases = useMemo(() => {
-    return wbsList.filter((w: any) => !w.is_activity);
-  }, [wbsList]);
+    const list = wbsList.filter((w: any) => !w.is_activity);
+    if (isEdit && requestData) {
+      const pd = (requestData as any).phase_details;
+      if (pd && pd.id && pd.name) {
+        if (!list.find((p: any) => String(p.id) === String(pd.id) || String(p.uuid) === String(pd.id))) {
+          list.unshift({ id: pd.id, name: pd.name, is_activity: false });
+        }
+      }
+    }
+    return list;
+  }, [wbsList, isEdit, requestData]);
 
   const activities = useMemo(() => {
     if (!phaseId) return [];
-    return wbsList.filter((w: any) => w.is_activity && String(w.parent) === String(phaseId));
-  }, [wbsList, phaseId]);
+    const list = wbsList.filter((w: any) => w.is_activity && String(w.parent) === String(phaseId));
+    if (isEdit && requestData) {
+      const ad = (requestData as any).activity_details;
+      const pd = (requestData as any).phase_details;
+      // If the current phase matches the requestData's phase, inject the activity fallback
+      if (ad && ad.id && ad.name && pd && String(pd.id) === String(phaseId)) {
+        if (!list.find((a: any) => String(a.id) === String(ad.id) || String(a.uuid) === String(ad.id))) {
+          list.unshift({ id: ad.id, name: ad.name, is_activity: true, parent: pd.id });
+        }
+      }
+    }
+    return list;
+  }, [wbsList, phaseId, isEdit, requestData]);
 
   const availableBudget = useMemo(() => {
     if (!wbsElement) return 0;
-    const task = wbsList.find((w: any) => String(w.id) === String(wbsElement));
+    // First try activities list, then wbsList
+    let task = activities.find((w: any) => String(w.id) === String(wbsElement) || String(w.uuid) === String(wbsElement));
+    if (!task) {
+      task = wbsList.find((w: any) => String(w.id) === String(wbsElement) || String(w.uuid) === String(wbsElement));
+    }
     return task?.amount || 0;
-  }, [wbsElement, wbsList]);
+  }, [wbsElement, activities, wbsList]);
 
+  const hasInitialized = React.useRef(false);
+  // Effect to initialise form values when request data is loaded
   useEffect(() => {
-    form.setValue("phase", "");
-    form.setValue("wbsElement", "");
-    
-    if (projectId && selectedProjectDetail) {
+    if (requestData && !hasInitialized.current) {
+      hasInitialized.current = true;
+      const req = requestData as any;
+      const getId = (val: any) => (val && typeof val === "object" ? String(val.id || val.uuid || val.project_id || val.phase_id || val.activity_id || val.location_id || "") : String(val || ""));
+      form.reset({
+        project: getId(req.project_request || req.project),
+        phase: getId(req.phase),
+        wbsElement: getId(req.activity),
+        dateConsumed: req.date_consumed || new Date().toISOString().split("T")[0],
+        warehouse: getId(req.location),
+        notes: req.notes || "",
+        productLines: (req.lines || []).map((l: any) => ({
+          productId: getId(l.product),
+          quantity: Number(l.quantity || 0),
+          unitCost: parseFloat(l.unit_cost || "0") || 0,
+          totalCost: parseFloat(l.total_cost || "0") || 0,
+          isEditing: false,
+        })),
+      });
+    }
+  }, [requestData, form]);
+
+  // For edit mode, also set warehouse based on the loaded project
+  useEffect(() => {
+    if (isEdit && projectId && selectedProjectDetail) {
       const proj = selectedProjectDetail as any;
       if (proj.site_location) {
         form.setValue("warehouse", String(proj.site_location));
-      } else {
-        form.setValue("warehouse", "");
       }
     }
-  }, [projectId, form, selectedProjectDetail]);
+  }, [projectId, selectedProjectDetail, isEdit, form]);
 
-  // Reset activity when phase changes
+  const fromUUID = (uuid: string): string => {
+    if (!uuid) return "";
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-([0-9a-f]{12})$/i;
+    const match = uuid.match(uuidRegex);
+    if (match) {
+      const hex = match[1];
+      return parseInt(hex, 16).toString();
+    }
+    return uuid;
+  };
+
+  // Derive exact phase and activity IDs from wbsList to fix UUID vs Numeric mismatches
   useEffect(() => {
-    form.setValue("wbsElement", "");
-  }, [phaseId, form]);
+    if (isEdit && requestData && wbsList.length > 0) {
+      const req = requestData as any;
+      const getId = (val: any) => (val && typeof val === "object" ? String(val.id || val.uuid || val.project_id || val.phase_id || val.activity_id || val.location_id || "") : String(val || ""));
+      const reqPhaseVal = getId(req.phase);
+      const reqActVal = getId(req.activity);
+      
+      const foundPhase = wbsList.find((w: any) => {
+        if (w.is_activity) return false;
+        if (String(w.id) === reqPhaseVal || String(w.uuid) === reqPhaseVal || String(w.phase_id) === reqPhaseVal) return true;
+        if (req.phase_details?.name && w.name === req.phase_details.name) return true;
+        return false;
+      });
+
+      if (foundPhase) {
+        if (form.getValues("phase") !== String(foundPhase.id)) {
+          form.setValue("phase", String(foundPhase.id));
+        }
+      }
+
+      const foundAct = wbsList.find((w: any) => {
+        if (!w.is_activity) return false;
+        if (String(w.id) === reqActVal || String(w.uuid) === reqActVal || String(w.activity_id) === reqActVal) return true;
+        if (toUUID(String(w.id)) === reqActVal || String(w.id) === fromUUID(reqActVal)) return true;
+        if (req.activity_details?.name && w.name === req.activity_details.name) return true;
+        return false;
+      });
+
+      if (foundAct) {
+        if (form.getValues("wbsElement") !== String(foundAct.id)) {
+          form.setValue("wbsElement", String(foundAct.id));
+        }
+        if (foundAct.parent && form.getValues("phase") !== String(foundAct.parent)) {
+          form.setValue("phase", String(foundAct.parent));
+        }
+      }
+    }
+  }, [wbsList, requestData, isEdit, form]);
+
+  // Reset activity when phase changes – only for new requests
+  useEffect(() => {
+    if (!isEdit) {
+      form.setValue("wbsElement", "");
+    }
+  }, [phaseId, form, isEdit]);
 
   // --- Calculate totals when product lines change ---
   useEffect(() => {
@@ -296,6 +403,8 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
     0,
   );
 
+  const successRedirectId = React.useRef<number | null>(null);
+
   const onSubmit = async (data: FormValues) => {
     try {
       const payload = {
@@ -314,12 +423,16 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
 
       if (requestId) {
         await patchMaterialConsumption({ id: requestId, body: payload }).unwrap();
+        successRedirectId.current = requestId;
         statusModal.showSuccess(
           "Request Updated",
           "Material consumption request updated successfully.",
         );
       } else {
-        await createMaterialConsumption(payload).unwrap();
+        const response = await createMaterialConsumption(payload).unwrap();
+        if (response && response.id) {
+          successRedirectId.current = response.id;
+        }
         statusModal.showSuccess(
           "Request Submitted",
           "Material consumption logged successfully.",
@@ -337,7 +450,11 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
     statusModal.close();
     if (statusModal.type === "success") {
       form.reset();
-      router.push("/project-request/material-consumption-request");
+      if (successRedirectId.current) {
+        router.push(`/project-request/material-consumption-request/${successRedirectId.current}`);
+      } else {
+        router.push("/project-request/material-consumption-request");
+      }
     }
   };
 
@@ -412,25 +529,36 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
                     <FormLabel className="text-xs font-semibold text-gray-700">Project</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    {isEdit ? (
                       <FormControl>
-                        <SelectTrigger
-                          className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                            form.formState.errors.project && "border-red-500 focus:ring-red-500/20"
-                          )}
-                        >
-                          <SelectValue placeholder={isLoadingProjects ? "Loading projects..." : "Select active project"} />
-                        </SelectTrigger>
+                        <NativeSelect value={field.value} onChange={field.onChange} className={form.formState.errors.project ? "border-red-500 focus:ring-red-500/20" : ""}>
+                          <option value="" disabled>{isLoadingProjects ? "Loading projects..." : "Select active project"}</option>
+                          {projects.map((p: any) => (
+                            <option key={p.id} value={String(p.id)}>{p.name}</option>
+                          ))}
+                        </NativeSelect>
                       </FormControl>
-                      <SelectContent>
-                        {projects.map((p: any) => (
-                          <SelectItem key={p.id} value={String(p.id)}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    ) : (
+                      <Select key={`project-select-${projects.length}`} onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
+                        <FormControl>
+                          <SelectTrigger
+                            className={cn(
+                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                              form.formState.errors.project && "border-red-500 focus:ring-red-500/20"
+                            )}
+                          >
+                            <SelectValue placeholder={isLoadingProjects ? "Loading projects..." : "Select active project"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {projects.map((p: any) => (
+                            <SelectItem key={p.id} value={String(p.id)}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -443,25 +571,36 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
                     <FormLabel className="text-xs font-semibold text-gray-700">Site Location</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!!projectId}>
+                    {isEdit ? (
                       <FormControl>
-                        <SelectTrigger
-                          className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed",
-                            form.formState.errors.warehouse && "border-red-500 focus:ring-red-500/20"
-                          )}
-                        >
-                          <SelectValue placeholder={isLoadingLocations ? "Loading locations..." : "Select site store"} />
-                        </SelectTrigger>
+                        <NativeSelect value={field.value} onChange={field.onChange} disabled={!!projectId} className={form.formState.errors.warehouse ? "border-red-500 focus:ring-red-500/20" : ""}>
+                          <option value="" disabled>{isLoadingLocations ? "Loading locations..." : "Select site store"}</option>
+                          {locations.map((loc) => (
+                            <option key={loc.id} value={String(loc.id)}>{loc.location_name}</option>
+                          ))}
+                        </NativeSelect>
                       </FormControl>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={String(loc.id)}>
-                            {loc.location_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    ) : (
+                      <Select key={`warehouse-select-${locations.length}`} onValueChange={field.onChange} value={field.value ? String(field.value) : undefined} disabled={!!projectId}>
+                        <FormControl>
+                          <SelectTrigger
+                            className={cn(
+                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed",
+                              form.formState.errors.warehouse && "border-red-500 focus:ring-red-500/20"
+                            )}
+                          >
+                            <SelectValue placeholder={isLoadingLocations ? "Loading locations..." : "Select site store"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {locations.map((loc) => (
+                            <SelectItem key={loc.id} value={String(loc.id)}>
+                              {loc.location_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -505,25 +644,36 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
                     <FormLabel className="text-xs font-semibold text-gray-700">Phase</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!projectId || phases.length === 0}>
+                    {isEdit ? (
                       <FormControl>
-                        <SelectTrigger
-                          className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
-                            form.formState.errors.phase && "border-red-500 focus:ring-red-500/20"
-                          )}
-                        >
-                          <SelectValue placeholder={!projectId ? "Select a project first" : "Select a phase"} />
-                        </SelectTrigger>
+                        <NativeSelect value={field.value} onChange={field.onChange} disabled={!projectId || phases.length === 0} className={form.formState.errors.phase ? "border-red-500 focus:ring-red-500/20" : ""}>
+                          <option value="" disabled>{!projectId ? "Select a project first" : "Select a phase"}</option>
+                          {phases.map((p) => (
+                            <option key={p.id} value={String(p.id)}>{p.name}</option>
+                          ))}
+                        </NativeSelect>
                       </FormControl>
-                      <SelectContent>
-                        {phases.map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    ) : (
+                      <Select key={`phase-select-${phases.length}`} onValueChange={field.onChange} value={field.value ? String(field.value) : undefined} disabled={!projectId || phases.length === 0}>
+                        <FormControl>
+                          <SelectTrigger
+                            className={cn(
+                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
+                              form.formState.errors.phase && "border-red-500 focus:ring-red-500/20"
+                            )}
+                          >
+                            <SelectValue placeholder={!projectId ? "Select a project first" : "Select a phase"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {phases.map((p) => (
+                            <SelectItem key={p.id} value={String(p.id)}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -536,25 +686,36 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
                     <FormLabel className="text-xs font-semibold text-gray-700">Activity</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!phaseId || activities.length === 0}>
+                    {isEdit ? (
                       <FormControl>
-                        <SelectTrigger
-                          className={cn(
-                            "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
-                            form.formState.errors.wbsElement && "border-red-500 focus:ring-red-500/20"
-                          )}
-                        >
-                          <SelectValue placeholder={!phaseId ? "Select a phase first" : "Select an activity"} />
-                        </SelectTrigger>
+                        <NativeSelect value={field.value} onChange={field.onChange} disabled={!phaseId || activities.length === 0} className={form.formState.errors.wbsElement ? "border-red-500 focus:ring-red-500/20" : ""}>
+                          <option value="" disabled>{!phaseId ? "Select a phase first" : "Select an activity"}</option>
+                          {activities.map((a) => (
+                            <option key={a.id} value={String(a.id)}>{a.name}</option>
+                          ))}
+                        </NativeSelect>
                       </FormControl>
-                      <SelectContent>
-                        {activities.map((a) => (
-                          <SelectItem key={a.id} value={String(a.id)}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    ) : (
+                      <Select key={`activity-select-${activities.length}`} onValueChange={field.onChange} value={field.value ? String(field.value) : undefined} disabled={!phaseId || activities.length === 0}>
+                        <FormControl>
+                          <SelectTrigger
+                            className={cn(
+                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
+                              form.formState.errors.wbsElement && "border-red-500 focus:ring-red-500/20"
+                            )}
+                          >
+                            <SelectValue placeholder={!phaseId ? "Select a phase first" : "Select an activity"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {activities.map((a) => (
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              {a.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -681,48 +842,74 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                           <FormLabel className="text-xs font-semibold text-gray-700">
                             Product name
                           </FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              field.onChange(val);
-                              const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
-                              if (selectedProd) {
-                                form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
-                              }
-                            }}
-                            defaultValue={field.value}
-                          >
+                          {isEdit ? (
                             <FormControl>
-                              <SelectTrigger
-                                className={cn(
-                                  "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20 w-full",
-                                  form.formState.errors.productLines?.[index]
-                                    ?.productId &&
-                                    "border-red-500 focus:ring-red-500/20",
-                                )}
-                              >
-                                <SelectValue
-                                  placeholder={
-                                    isLoadingProducts
-                                      ? "Loading inventory..."
-                                      : "Search inventory..."
+                              <NativeSelect
+                                value={field.value}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  field.onChange(val);
+                                  const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
+                                  if (selectedProd) {
+                                    form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
                                   }
-                                />
-                              </SelectTrigger>
+                                }}
+                                className={form.formState.errors.productLines?.[index]?.productId ? "border-red-500 focus:ring-red-500/20" : ""}
+                              >
+                                <option value="" disabled>{isLoadingProducts ? "Loading inventory..." : "Search inventory..."}</option>
+                                {inventoryProducts.map((prod) => (
+                                  <option key={prod.id} value={String(prod.id)}>
+                                    {prod.product_name}
+                                    {prod.unit_of_measure_details?.unit_symbol ? ` (${prod.unit_of_measure_details.unit_symbol})` : ""}
+                                  </option>
+                                ))}
+                              </NativeSelect>
                             </FormControl>
-                            <SelectContent>
-                              {inventoryProducts.map((prod) => (
-                                <SelectItem
-                                  key={prod.id}
-                                  value={String(prod.id)}
+                          ) : (
+                            <Select
+                              key={`product-select-${index}-${inventoryProducts.length}`}
+                              onValueChange={(val) => {
+                                field.onChange(val);
+                                const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
+                                if (selectedProd) {
+                                  form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
+                                }
+                              }}
+                              value={field.value ? String(field.value) : undefined}
+                            >
+                              <FormControl>
+                                <SelectTrigger
+                                  className={cn(
+                                    "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20 w-full",
+                                    form.formState.errors.productLines?.[index]
+                                      ?.productId &&
+                                      "border-red-500 focus:ring-red-500/20",
+                                  )}
                                 >
-                                  {prod.product_name}
-                                  {prod.unit_of_measure_details?.unit_symbol
-                                    ? ` (${prod.unit_of_measure_details.unit_symbol})`
-                                    : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                  <SelectValue
+                                    placeholder={
+                                      isLoadingProducts
+                                        ? "Loading inventory..."
+                                        : "Search inventory..."
+                                    }
+                                  />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {inventoryProducts.map((prod) => (
+                                  <SelectItem
+                                    key={prod.id}
+                                    value={String(prod.id)}
+                                  >
+                                    {prod.product_name}
+                                    {prod.unit_of_measure_details?.unit_symbol
+                                      ? ` (${prod.unit_of_measure_details.unit_symbol})`
+                                      : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}

@@ -10,6 +10,7 @@ import { useGetAvailableBudgetQuery } from "@/api/projectApi";
 import { useCreatePettyCashRequestMutation } from "@/api/requests/pettyCashRequestApi";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -203,6 +204,10 @@ export default function NewPettyCashRequestPage() {
     backPath: "/project-request/petty-cash-request",
   };
 
-  return <RequestForm config={config} />;
+  return (
+    <PageGuard module="project_request" entitlement="create">
+      <RequestForm config={config} />
+    </PageGuard>
+  );
 }
 

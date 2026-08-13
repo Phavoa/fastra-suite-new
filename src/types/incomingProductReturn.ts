@@ -1,27 +1,27 @@
 import { LocationDetails, ProductDetails } from "./incomingProduct";
 
 export interface IncomingProductReturnItem {
-  id: string;
-  returned_product_item: number;
-  returned_product_item_details?: ProductDetails;
-  initial_quantity: string;
-  returned_quantity: string;
+  id: number;
+  product: number;
+  product_details?: ProductDetails;
+  unit_of_measure?: number;
+  unit_of_measure_details?: any;
+  received_quantity: string;
+  quantity_to_return: string;
 }
 
 export interface IncomingProductReturn {
-  id: string;
-  unique_record_id: string;
+  unique_id: string;
   source_document: string;
   source_document_details?: {
     incoming_product_id: string;
-    source_location_details: LocationDetails;
-    destination_location_details: LocationDetails;
   };
-  date_of_return: string;
+  returned_date: string;
   reason_for_return: string;
-  incoming_product_return_items: IncomingProductReturnItem[];
-  status?: string;
-  date_created?: string;
+  status: string;
+  returned_by?: any;
+  returned_at?: string;
+  items: IncomingProductReturnItem[];
   // Legacy compatibility fields
   email_subject?: string;
   email_body?: string;

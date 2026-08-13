@@ -8,6 +8,7 @@ export interface ModulePermissions {
   payer?: boolean;
   manager?: boolean;
   administrator?: boolean;
+  [key: string]: boolean | undefined;
 }
 
 export interface UserPermissions {
@@ -139,7 +140,7 @@ export function convertPermissionsToApiFormat(
 }
 
 export function convertApiItemsToPermissions(
-  items: PermissionTemplateItem[] | undefined,
+  items: any[] | undefined,
 ): UserPermissions {
   const result = createEmptyPermissions();
 
@@ -149,16 +150,22 @@ export function convertApiItemsToPermissions(
     const frontendKey = REVERSE_MODULE_KEY_MAP[item.module];
     if (!frontendKey) continue;
 
-    const modulePerms: Record<string, boolean> = {};
-    for (const perm of item.permission_types) {
-      if (typeof perm === "string") {
-        modulePerms[perm] = true;
-      } else {
-        modulePerms[perm.permission_type] = perm.is_selected;
-      }
+    // Handle simple format: { module: "project_request", permission_type: "requester" }
+    if (item.permission_type && typeof item.permission_type === "string") {
+      result[frontendKey][item.permission_type] = true;
+      continue;
     }
 
-    result[frontendKey] = modulePerms;
+    // Handle nested PermissionTemplateItem format: { module: "...", permission_types: [...] }
+    if (item.permission_types && Array.isArray(item.permission_types)) {
+      for (const perm of item.permission_types) {
+        if (typeof perm === "string") {
+          result[frontendKey][perm] = true;
+        } else if (perm && typeof perm === "object" && "permission_type" in perm) {
+          result[frontendKey][perm.permission_type] = perm.is_selected;
+        }
+      }
+    }
   }
 
   return result;

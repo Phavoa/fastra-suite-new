@@ -12,6 +12,7 @@ import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 
 interface PlantEquipmentRequestItem {
   id: string;
+  referenceId: string;
   project: string;
   equipment: string;
   description: string;
@@ -38,26 +39,25 @@ export default function PlantEquipmentRequestDashboard() {
 
   useEffect(() => {
     if (apiRequests && Array.isArray(apiRequests)) {
-      const mapped = apiRequests.map((req) => {
-        const projectId = req.project_request || (req as any).project;
-        const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
+      const mapped = apiRequests.map((req: any) => {
         return {
-          id: String(req.id),
-          project: projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
-          equipment: req.equipment_name,
+          id: String(req.project_request_id || req.project_request?.id || req.id),
+          referenceId: String(req.reference_id || req.project_request?.reference_id || req.id),
+          project: req.project_details?.name || "General Project",
+          equipment: req.equipment_name || "-",
           description: req.description || "",
-          quantity: req.quantity,
+          quantity: req.quantity || 0,
           estimatedCost: parseFloat(req.estimated_cost) || 0,
-          status: ((req as any).status || "pending") as "draft" | "approved" | "pending" | "rejected",
-          requester: "Requester",
+          status: (req.project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
+          requester: req.created_by_name || "Requester",
           date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
             day: "numeric",
             month: "short",
             year: "numeric"
           }),
-          requiredDate: req.required_date,
-          phase: "-",
-          task: "-",
+          requiredDate: req.required_date ? new Date(req.required_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-",
+          phase: req.phase_details?.name || "-",
+          task: req.activity_details?.name || "-",
           notes: req.justification_notes || ""
         };
       });
@@ -147,7 +147,7 @@ export default function PlantEquipmentRequestDashboard() {
         className="p-5 bg-white border border-gray-200 rounded-xl hover:shadow-xs transition-shadow duration-200 cursor-pointer space-y-4"
       >
         <div className="flex justify-between items-center">
-          <span className="text-sm font-bold text-[#3B7CED]">{req.id}</span>
+          <span className="text-sm font-bold text-[#3B7CED]">{req.referenceId || req.id}</span>
           <Badge variant={getStatusBadgeVariant(req.status)}>
             {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
           </Badge>

@@ -10,6 +10,7 @@ import { StatusModal } from "@/components/shared/StatusModal";
 import extractErrorMessage from "@/components/requests/utils/RequestErrorHandler";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -287,7 +288,7 @@ export default function NewLabourRequestPage() {
   };
 
   return (
-    <>
+    <PageGuard module="project_request" entitlement="create">
       <RequestForm config={config} />
 
       <StatusModal
@@ -297,6 +298,6 @@ export default function NewLabourRequestPage() {
         title={statusModal.title}
         message={statusModal.description}
       />
-    </>
+    </PageGuard>
   );
 }

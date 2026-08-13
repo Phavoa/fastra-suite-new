@@ -37,15 +37,14 @@ export interface LoginResponse {
   tenant_company_name: string;
   isOnboarded: boolean;
   /**
-   * New backend permission format.
-   * - Empty array [] for admin/superusers (they bypass all permission checks)
-   * - Array of {module, permission_type} objects for regular users
+   * New backend permission format with deeply nested entitlements.
+   * Empty array [] for admin/superusers (they bypass all permission checks).
    */
-  user_permissions: Array<{ module: string; permission_type: string }>;
+  user_permissions: PermissionDetail[];
   /**
-   * Detailed permissions from backend with expanded entitlements per permission type.
+   * This is likely redundant now, but kept for legacy fallback.
    */
-  permission_details: PermissionDetail[];
+  permission_details?: PermissionDetail[];
 }
 
 export interface ForgetPasswordRequest {

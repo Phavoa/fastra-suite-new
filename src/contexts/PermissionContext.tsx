@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, ReactNode, useMemo } from "react";
-import { useSelector } from "react-redux";
+import { createContext, useContext, ReactNode, useMemo, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { setAuthData } from "@/lib/store/authSlice";
 import type { RootState } from "@/lib/store/store";
 import {
   NormalizedPermissions,
@@ -18,36 +19,67 @@ interface PermissionProviderProps {
 }
 
 export function PermissionProvider({ children }: PermissionProviderProps) {
-  const user_permissions = useSelector(
-    (state: RootState) => state.auth.user_permissions
-  );
-  const permission_details = useSelector(
-    (state: RootState) => state.auth.permission_details
-  );
-  const isAdmin = useSelector((state: RootState) => state.auth.isAdmin);
-  const username = useSelector(
-    (state: RootState) => state.auth.user?.username ?? ""
-  );
+  const {
+    user_permissions,
+    permission_details,
+    isAdmin,
+    user,
+    tenant_user_id,
+    tenant_schema_name,
+    access_token,
+  } = useSelector((state: RootState) => state.auth);
+  
+  const dispatch = useDispatch();
 
+  const username = user?.username ?? "";
   const usernameContainsAdmin = username.toLowerCase().includes("admin");
   const effectiveIsAdmin = isAdmin || usernameContainsAdmin;
+
+  // Silent refresh of permissions on mount
+  useEffect(() => {
+    if (effectiveIsAdmin || !tenant_user_id || !tenant_schema_name || !access_token) return;
+
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(
+          `https://${tenant_schema_name}.${process.env.NEXT_PUBLIC_API_DOMAIN}/users/tenant-users/${tenant_user_id}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+            },
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.permission_details) {
+            dispatch(setAuthData({ permission_details: data.permission_details }));
+          }
+        }
+      } catch (err) {
+        // Silent catch for background refresh
+      }
+    };
+    
+    fetchProfile();
+  }, [tenant_user_id, tenant_schema_name, access_token, effectiveIsAdmin, dispatch]);
 
   const normalized = useMemo((): NormalizedPermissions => {
     if (effectiveIsAdmin) {
       return { isAdmin: true, permissions: {}, isReady: true };
     }
 
-    // Prefer new permission_details format if available
-    if (permission_details && Array.isArray(permission_details) && permission_details.length > 0) {
-      return normalizePermissionDetails(permission_details);
+    // Both permission_details and user_permissions now share the deeply nested structure.
+    // Prefer permission_details (as it might be fresher from the profile endpoint),
+    // but fall back to user_permissions (from the initial login payload).
+    const dataToNormalize = (permission_details && permission_details.length > 0) 
+      ? permission_details 
+      : user_permissions;
+
+    if (dataToNormalize && Array.isArray(dataToNormalize) && dataToNormalize.length > 0) {
+      return normalizePermissionDetails(dataToNormalize);
     }
 
-    // Fall back to old user_permissions format
-    if (!Array.isArray(user_permissions)) {
-      return { isAdmin: false, permissions: {}, isReady: false };
-    }
-
-    return normalizePermissionsFromBackend(user_permissions);
+    return { isAdmin: false, permissions: {}, isReady: false };
   }, [user_permissions, permission_details, effectiveIsAdmin]);
 
   return (

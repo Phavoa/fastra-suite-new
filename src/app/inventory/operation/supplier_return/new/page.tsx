@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash } from "lucide-react";
+import { Trash, Loader2, ArrowLeft } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,40 +17,48 @@ import { PageGuard } from "@/components/auth/PageGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { useGetIncomingProductQuery } from "@/api/inventory/incomingProductApi";
+import { useCreateIncomingProductReturnMutation } from "@/api/inventory/incomingProductReturns";
+import Link from "next/link";
 
 type ReturnLine = {
   id: string;
+  incoming_product_item: number; // ID of the specific line item
+  product: number; // The actual product ID
   product_description: string;
   unit_of_measure: string;
   received_quantity: number;
   return_quantity: number;
-  reason: string;
 };
-
-const INITIAL_LINES: ReturnLine[] = [
-  {
-    id: "line-1",
-    product_description: "Dangote Cement (50kg Bag)",
-    unit_of_measure: "Bags",
-    received_quantity: 100,
-    return_quantity: 0,
-    reason: "",
-  },
-  {
-    id: "line-2",
-    product_description: "Reinforcement Steel 16mm",
-    unit_of_measure: "Tonnes",
-    received_quantity: 20,
-    return_quantity: 0,
-    reason: "",
-  }
-];
 
 export default function NewSupplierReturnPage() {
   const router = useRouter();
-  const [items, setItems] = useState<ReturnLine[]>(INITIAL_LINES);
+  const searchParams = useSearchParams();
+  const receiptId = searchParams?.get("receiptId");
+
+  const [items, setItems] = useState<ReturnLine[]>([]);
+  const [reasonForReturn, setReasonForReturn] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: "", type: "success" as "success" | "error" });
+
+  const { data: receiptData, isLoading: isReceiptLoading } = useGetIncomingProductQuery(receiptId as string, { skip: !receiptId });
+  const [createReturn] = useCreateIncomingProductReturnMutation();
+
+  useEffect(() => {
+    if (receiptData?.incoming_product_items) {
+      setItems(
+        receiptData.incoming_product_items.map((it: any) => ({
+          id: it.id.toString(),
+          incoming_product_item: it.id,
+          product: it.product,
+          product_description: it.product_details?.product_name || `Product ${it.product}`,
+          unit_of_measure: it.product_details?.unit_of_measure_details?.unit_symbol || "Units",
+          received_quantity: it.quantity_received,
+          return_quantity: 0,
+        }))
+      );
+    }
+  }, [receiptData]);
 
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -78,19 +86,72 @@ export default function NewSupplierReturnPage() {
       return;
     }
 
-    const invalidLines = items.filter(it => it.return_quantity <= 0 || it.return_quantity > it.received_quantity || !it.reason.trim());
+    if (!reasonForReturn.trim()) {
+      setNotification({ show: true, message: "A reason for return is required.", type: "error" });
+      return;
+    }
+
+    const linesToReturn = items.filter(it => it.return_quantity > 0);
+
+    if (linesToReturn.length === 0) {
+      setNotification({ show: true, message: "You must specify a return quantity greater than 0 for at least one product.", type: "error" });
+      return;
+    }
+
+    const invalidLines = linesToReturn.filter(it => it.return_quantity > it.received_quantity);
     if (invalidLines.length > 0) {
-      setNotification({ show: true, message: "Please ensure all lines have a valid return quantity (greater than 0, less than received) and a reason.", type: "error" });
+      setNotification({ show: true, message: "Return quantity cannot exceed received quantity.", type: "error" });
+      return;
+    }
+
+    if (!receiptData?.incoming_product_id) {
+      setNotification({ show: true, message: "Original receipt data is missing.", type: "error" });
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const returnItems = linesToReturn.map((it) => ({
+        product: it.product,
+        quantity_to_return: it.return_quantity.toString(),
+      }));
+      
+      const payload = {
+        source_document: receiptData.incoming_product_id,
+        reason_for_return: reasonForReturn,
+        items: returnItems,
+      };
+
+      await createReturn(payload).unwrap();
+      
       setNotification({ show: true, message: "Supplier return document generated successfully.", type: "success" });
       setTimeout(() => router.push("/inventory/operation/supplier_return"), 1500);
-    }, 1000);
+    } catch (err: any) {
+      setNotification({ show: true, message: err?.data?.error?.[0]?.cause || "Failed to create return document.", type: "error" });
+      setIsSubmitting(false);
+    }
   };
+
+  if (!receiptId) {
+    return (
+      <PageGuard application="inventory" module="supplier_return">
+        <div className="flex flex-col h-screen items-center justify-center bg-[#F6F9FC] gap-4">
+          <p className="text-[#525F7F]">No original receipt specified for return.</p>
+          <Button variant="outline" onClick={() => router.back()} className="border-gray-200 text-gray-600">Go Back</Button>
+        </div>
+      </PageGuard>
+    );
+  }
+
+  if (isReceiptLoading) {
+    return (
+      <PageGuard application="inventory" module="supplier_return">
+        <div className="flex h-screen items-center justify-center bg-[#F6F9FC]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        </div>
+      </PageGuard>
+    );
+  }
 
   return (
     <PageGuard application="inventory" module="supplier_return">
@@ -98,21 +159,36 @@ export default function NewSupplierReturnPage() {
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs items={breadcrumbsItem} />
 
+          <div className="flex items-center">
+            <Link href={`/inventory/operation/incoming_product/${encodeURIComponent(receiptId)}`}>
+              <Button variant="ghost" size="icon" className="mr-2 hover:bg-gray-100">
+                <ArrowLeft className="h-5 w-5 text-gray-500" />
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-semibold text-[#32325D]">Initiate Supplier Return</h1>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-8">
             <section className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
               <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Original Receipt Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Receipt ID</label>
-                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">WH-IN-0012</div>
+                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+                    {receiptData?.incoming_product_id || "N/A"}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Vendor</label>
-                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">Dangote Cement Plc</div>
+                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+                    {receiptData?.supplier_details?.vendor_name || receiptData?.supplier_details?.company_name || "Unknown"}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Related PO</label>
-                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">PO-2026-0089</div>
+                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+                    {receiptData?.related_po || receiptData?.related_ppo_details?.po_number || "N/A"}
+                  </div>
                 </div>
               </div>
             </section>
@@ -120,11 +196,21 @@ export default function NewSupplierReturnPage() {
             <section className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
                 <h2 className="text-[#3B7CED] text-xl font-medium">Return Lines</h2>
-                <p className="text-sm text-gray-500 mt-1">Remove any lines you do not wish to return. Specify the quantity and mandatory reason.</p>
+                <p className="text-sm text-gray-500 mt-1">Remove any lines you do not wish to return. Specify the quantity you wish to return.</p>
               </div>
               
+              <div className="p-6 pb-2 border-b border-gray-100">
+                <label className="text-gray-700 font-medium text-sm block mb-2">Reason for Return (Mandatory) <span className="text-red-500">*</span></label>
+                <textarea 
+                  value={reasonForReturn}
+                  onChange={(e) => setReasonForReturn(e.target.value)}
+                  className="w-full min-h-[80px] p-3 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#3B7CED] focus:border-[#3B7CED] outline-none transition-all"
+                  placeholder="Provide a detailed reason for returning these items..."
+                />
+              </div>
+
               <div className="overflow-x-auto">
-                <Table className="min-w-[1100px] table-fixed">
+                <Table className="min-w-[800px] table-fixed">
                   <TableHeader className="bg-[#F6F7F8]">
                     <TableRow>
                       <TableHead className="w-80 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
@@ -139,9 +225,6 @@ export default function NewSupplierReturnPage() {
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                         Return Qty
                       </TableHead>
-                      <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Reason for Return
-                      </TableHead>
                       <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                         Action
                       </TableHead>
@@ -150,7 +233,7 @@ export default function NewSupplierReturnPage() {
                   <TableBody className="bg-white">
                     {items.length === 0 ? (
                        <TableRow>
-                         <TableCell colSpan={6} className="text-center py-8 text-gray-500">No products selected for return.</TableCell>
+                         <TableCell colSpan={5} className="text-center py-8 text-gray-500">No products selected for return.</TableCell>
                        </TableRow>
                     ) : items.map((it) => (
                       <TableRow key={it.id} className="group hover:bg-[#FBFBFB] focus-within:bg-[#FBFBFB] transition-colors duration-150">
@@ -172,15 +255,6 @@ export default function NewSupplierReturnPage() {
                             onChange={(e) => updateItem(it.id, "return_quantity", Number(e.target.value))}
                             className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0 bg-red-50/30 text-[#E43D2B] font-medium"
                             placeholder="0"
-                          />
-                        </TableCell>
-                        <TableCell className="border border-gray-200 align-middle p-0">
-                           <Input
-                            type="text"
-                            value={it.reason}
-                            onChange={(e) => updateItem(it.id, "reason", e.target.value)}
-                            className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0 px-4"
-                            placeholder="Mandatory reason..."
                           />
                         </TableCell>
                         <TableCell className="border border-gray-200 px-4 align-middle text-center">

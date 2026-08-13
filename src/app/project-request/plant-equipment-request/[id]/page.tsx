@@ -39,31 +39,40 @@ export default function PlantEquipmentRequestDetailPage() {
 
   useEffect(() => {
     if (apiRequest) {
-      const projectId = apiRequest.project_request || (apiRequest as any).project;
+      const projectId = apiRequest.project_details?.id || apiRequest.project_request_id || apiRequest.project_request || (apiRequest as any).project;
       const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
       setRequest({
-        id: String(apiRequest.id),
-        project: projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
-        equipment: apiRequest.equipment_name,
+        id: String(apiRequest.reference_id || apiRequest.project_request?.reference_id || apiRequest.id),
+        project: apiRequest.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
+        equipment: apiRequest.equipment_name || "-",
         description: apiRequest.description || "",
-        quantity: apiRequest.quantity,
+        quantity: apiRequest.quantity || 0,
         estimatedCost: parseFloat(apiRequest.estimated_cost) || 0,
-        status: ((apiRequest as any).status || "pending") as "draft" | "approved" | "pending" | "rejected",
+        status: (apiRequest.project_request?.status || (apiRequest as any).status || "pending") as "draft" | "approved" | "pending" | "rejected",
         requester: (apiRequest as any).created_by_name || (apiRequest as any).requester_name || "Current User",
         date: new Date(apiRequest.created_at || Date.now()).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
           year: "numeric"
         }),
-        requiredDate: apiRequest.required_date,
-        phase: "-",
-        task: "-",
+        requiredDate: apiRequest.required_date ? new Date(apiRequest.required_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-",
+        phase: apiRequest.phase_details?.name || "-",
+        task: apiRequest.activity_details?.name || "-",
         notes: apiRequest.justification_notes || ""
       });
     } else {
       setRequest(null);
     }
   }, [apiRequest, id, projects]);
+
+  if (apiLoading) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3B7CED] mb-4"></div>
+        <p className="text-gray-500 font-semibold">Loading request details...</p>
+      </div>
+    );
+  }
 
   if (!request) {
     return (

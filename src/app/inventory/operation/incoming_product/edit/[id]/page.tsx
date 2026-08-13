@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import StatusModal, { useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -85,15 +85,7 @@ export default function EditIncomingProductPage() {
     ipId: null,
   });
 
-  const [notification, setNotification] = React.useState<{
-    message: string;
-    type: "success" | "error";
-    show: boolean;
-  }>({
-    message: "",
-    type: "success",
-    show: false,
-  });
+  const statusModal = useStatusModal();
 
   const {
     register,
@@ -131,10 +123,17 @@ export default function EditIncomingProductPage() {
         },
       }).unwrap();
       
-      setNotification({ message: "GRN Draft updated successfully!", type: "success", show: true });
-      setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1000);
+      statusModal.showSuccess(
+        "Draft Updated",
+        "GRN Draft updated successfully!",
+        "Go to Operations",
+        () => router.push("/inventory/operation")
+      );
     } catch (err: any) {
-      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to update draft.", type: "error", show: true });
+      statusModal.showError(
+        "Update Failed",
+        extractErrorMessage(err, "Failed to update draft.")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -156,19 +155,27 @@ export default function EditIncomingProductPage() {
         },
       }).unwrap();
 
-      const hasBackorder = items.some((it) => Number(it.received_quantity) < Number(it.expected_quantity));
-
-      if (hasBackorder) {
-        setIsSubmitting(false);
-        setDiscrepancyState({ isOpen: true, type: "backorder", ipId: id });
-        return;
-      } else {
-        await validateIncomingProduct({ id }).unwrap();
-        setNotification({ message: "GRN Validated! Stock received into Inventory Ledger.", type: "success", show: true });
-        setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1200);
-      }
+      await validateIncomingProduct({ id }).unwrap();
+      statusModal.showSuccess(
+        "GRN Validated",
+        "Stock received into Inventory Ledger.",
+        "View GRN",
+        () => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(id))}`)
+      );
     } catch (err: any) {
-      setNotification({ message: err?.data?.error?.[0]?.cause || "Failed to validate GRN.", type: "error", show: true });
+      const isBackorderError = err?.data?.requires_backorder_confirmation || 
+                               err?.data?.error?.[0]?.error === "Short quantity detected. Please confirm backorder creation." ||
+                               err?.data?.error?.[0]?.requires_backorder_confirmation === true;
+      
+      if (isBackorderError) {
+        statusModal.close();
+        setDiscrepancyState({ isOpen: true, type: "backorder", ipId: id });
+      } else {
+        statusModal.showError(
+          "Validation Failed",
+          extractErrorMessage(err, "Failed to validate GRN.")
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -178,13 +185,19 @@ export default function EditIncomingProductPage() {
     if (!discrepancyState.ipId) return;
     setIsSubmitting(true);
     try {
-      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
-      await createIncomingProductBackorder({ response: true, incoming_product: discrepancyState.ipId }).unwrap();
+      await validateIncomingProduct({ id: discrepancyState.ipId, data: { create_backorder: true } }).unwrap();
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-      setNotification({ message: "GRN Validated & Backorder created for remaining pending balance!", type: "success", show: true });
-      setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1200);
+      statusModal.showSuccess(
+        "Backorder Created",
+        "GRN Validated & Backorder created for remaining pending balance!",
+        "View GRN",
+        () => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(id))}`)
+      );
     } catch (error: any) {
-      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to create backorder.", type: "error", show: true });
+      statusModal.showError(
+        "Action Failed",
+        extractErrorMessage(error, "Failed to create backorder.")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -194,21 +207,23 @@ export default function EditIncomingProductPage() {
     if (!discrepancyState.ipId) return;
     setIsSubmitting(true);
     try {
-      await validateIncomingProduct({ id: discrepancyState.ipId }).unwrap();
-      await createIncomingProductBackorder({ response: false, incoming_product: discrepancyState.ipId }).unwrap();
+      await validateIncomingProduct({ id: discrepancyState.ipId, data: { create_backorder: false } }).unwrap();
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-      setNotification({ message: "GRN Validated! Delivery closed without backorder.", type: "success", show: true });
-      setTimeout(() => router.push(`/inventory/operation/incoming_product/${id}`), 1200);
+      statusModal.showSuccess(
+        "Delivery Closed",
+        "GRN Validated! Delivery closed without backorder.",
+        "View GRN",
+        () => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(id))}`)
+      );
     } catch (error: any) {
-      setNotification({ message: error?.data?.error?.[0]?.cause || "Failed to close delivery.", type: "error", show: true });
+      statusModal.showError(
+        "Action Failed",
+        extractErrorMessage(error, "Failed to close delivery.")
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  function closeNotification() {
-    setNotification((prev) => ({ ...prev, show: false }));
-  }
 
   if (isLoading) {
     return (
@@ -237,7 +252,7 @@ export default function EditIncomingProductPage() {
     <PageGuard application="inventory" module="incomingproduct">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
         <div className="flex items-center px-6 py-4 border-b border-gray-100">
-          <Link href={`/inventory/operation/incoming_product/${id}`}>
+          <Link href={`/inventory/operation/incoming_product/${encodeURIComponent(decodeURIComponent(id))}`}>
             <Button variant="ghost" size="icon" className="mr-2">
               <ArrowLeft className="h-5 w-5 text-gray-500" />
             </Button>
@@ -253,7 +268,7 @@ export default function EditIncomingProductPage() {
                 <div className="flex flex-col gap-2">
                   <Label className="text-gray-700 font-medium">Related PO</Label>
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    {incomingProduct?.related_po || "N/A"}
+                    {incomingProduct?.related_po || incomingProduct?.related_ppo_details?.po_number || "N/A"}
                   </div>
                 </div>
 
@@ -261,7 +276,7 @@ export default function EditIncomingProductPage() {
                   <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
                   {/* Pre-filled from PO - not editable */}
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                    {incomingProduct?.supplier_details?.company_name || "N/A"}
+                    {incomingProduct?.supplier_details?.vendor_name || incomingProduct?.supplier_details?.company_name || "N/A"}
                   </div>
                 </div>
 
@@ -345,7 +360,15 @@ export default function EditIncomingProductPage() {
           onDecline={handleCloseWithoutBackorder}
         />
 
-        <ToastNotification message={notification.message} type={notification.type} show={notification.show} onClose={closeNotification} />
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          onClose={statusModal.close}
+        />
       </div>
     </PageGuard>
   );

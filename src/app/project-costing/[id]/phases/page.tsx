@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, CheckCircle2 } from "lucide-react
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 interface GroupedSubphase {
   name: string;
@@ -122,6 +123,7 @@ export default function WorkBreakdownStructurePage() {
   };
 
   return (
+    <PageGuard module="project_costing" entitlement="view_project">
     <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-gray-50">
       <div className="flex items-center px-6 py-4 bg-white border-b border-gray-100">
         <Link href={`/project-costing/${id}`}>
@@ -247,5 +249,6 @@ export default function WorkBreakdownStructurePage() {
         </div>
       </div>
     </div>
+    </PageGuard>
   );
 }

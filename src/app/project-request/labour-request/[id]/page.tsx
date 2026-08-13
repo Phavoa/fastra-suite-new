@@ -31,17 +31,15 @@ import {
   useGetLabourRequestQuery,
   useDeleteLabourRequestMutation,
   useSubmitLabourRequestMutation,
-  useApproveLabourRequestMutation,
-  useRejectLabourRequestMutation,
 } from "@/api/requests/labourRequestApi";
 import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
-import { usePermissionContext } from "@/contexts/PermissionContext";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
 
 export default function LabourRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = parseInt(params.id as string);
-  const { permissions, isAdmin } = usePermissionContext();
+  const { canDo } = useModulePermissions();
   const statusModal = useStatusModal();
 
   const {
@@ -57,15 +55,7 @@ export default function LabourRequestDetailPage() {
     useDeleteLabourRequestMutation();
   const [submitRequest, { isLoading: isSubmitting }] =
     useSubmitLabourRequestMutation();
-  const [approveLabourRequest, { isLoading: isApproving }] =
-    useApproveLabourRequestMutation();
-  const [rejectLabourRequest, { isLoading: isRejecting }] =
-    useRejectLabourRequestMutation();
 
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
-  const [approvalNotes, setApprovalNotes] = useState("");
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const detail = request?.detail || (request as any) || {};
@@ -170,48 +160,10 @@ export default function LabourRequestDetailPage() {
     }
   };
 
-  const handleApprove = async () => {
-    try {
-      await approveLabourRequest({
-        id,
-        data: { status: "approved", approval_notes: approvalNotes },
-      }).unwrap();
-      setIsApproveModalOpen(false);
-      statusModal.showSuccess(
-        "Request Approved",
-        "The labour request has been approved successfully."
-      );
-      refetch();
-    } catch (error) {
-      console.error("Failed to approve request:", error);
-      statusModal.showError("Approval Failed", extractErrorMessage(error, "Failed to approve the request. Please try again."));
-    }
-  };
-
-  const handleReject = async () => {
-    if (!rejectionReason.trim()) return;
-    try {
-      await rejectLabourRequest({
-        id,
-        data: { status: "rejected", rejection_notes: rejectionReason },
-      }).unwrap();
-      setIsRejectModalOpen(false);
-      statusModal.showSuccess(
-        "Request Rejected",
-        "The labour request has been rejected."
-      );
-    } catch (error) {
-      console.error("Failed to reject request:", error);
-      statusModal.showError("Rejection Failed", extractErrorMessage(error, "Failed to reject the request. Please try again."));
-    }
-  };
-
   const handleModalClose = () => {
     statusModal.close();
     if (
       statusModal.type === "success" &&
-      !isApproveModalOpen &&
-      !isRejectModalOpen &&
       !isConfirmDeleteOpen
     ) {
       router.push("/project-request/labour-request");
@@ -221,13 +173,11 @@ export default function LabourRequestDetailPage() {
   // Permission checks
   const canEdit =
     request?.status === "draft" &&
-    (isAdmin || permissions["labour-request"]?.has("edit"));
+    canDo("project_request", "edit");
   const canDelete =
     request?.status === "draft" &&
-    (isAdmin || permissions["labour-request"]?.has("delete"));
-  const canSubmit = request?.status === "draft";
-  const canApproveReject =
-    isAdmin || permissions["labour-request"]?.has("approve");
+    canDo("project_request", "delete");
+  const canSubmit = request?.status === "draft" && canDo("project_request", "submit");
 
   if (isLoading) {
     return (
@@ -534,8 +484,7 @@ export default function LabourRequestDetailPage() {
         {/* Action Buttons inside Card */}
         {(canEdit ||
           canDelete ||
-          canSubmit ||
-          (canApproveReject && request.status === "pending")) && (
+          canSubmit) && (
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none flex flex-wrap justify-end gap-3">
             {canEdit && (
               <Button
@@ -570,114 +519,9 @@ export default function LabourRequestDetailPage() {
                 {isSubmitting ? "Submitting..." : "Submit for Approval"}
               </Button>
             )}
-
-            {canApproveReject && request.status === "pending" && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsRejectModalOpen(true)}
-                  disabled={isRejecting}
-                  className="h-10 px-5 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 rounded-xl"
-                >
-                  <XCircle size={14} className="mr-2" />
-                  Reject Request
-                </Button>
-                <Button
-                  onClick={() => setIsApproveModalOpen(true)}
-                  disabled={isApproving}
-                  className="h-10 px-6 text-xs font-bold bg-[#2BA24D] hover:bg-[#238c3f] text-white shadow-xs rounded-xl"
-                >
-                  <CheckCircle size={14} className="mr-2" />
-                  Approve Request
-                </Button>
-              </>
-            )}
           </div>
         )}
       </main>
-
-      {/* Reject Modal */}
-      <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Reject Request</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this labour request. This will be
-              logged in the history.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="reason" className="mb-2 block text-xs font-bold">
-              Rejection Reason *
-            </Label>
-            <Textarea
-              id="reason"
-              placeholder="e.g. Rate exceeds WBS allocation limit."
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              rows={4}
-              className="text-xs rounded-xl"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setIsRejectModalOpen(false)}
-              className="text-xs font-bold"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl"
-              onClick={handleReject}
-              disabled={!rejectionReason.trim() || isRejecting}
-            >
-              {isRejecting ? "Rejecting..." : "Confirm Rejection"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Approve Modal */}
-      <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-green-600">Approve Request</DialogTitle>
-            <DialogDescription>
-              Optional: Enter approval notes for reference.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="notes" className="mb-2 block text-xs font-bold">
-              Approval Notes
-            </Label>
-            <Textarea
-              id="notes"
-              placeholder="e.g. Budget check passed."
-              value={approvalNotes}
-              onChange={(e) => setApprovalNotes(e.target.value)}
-              rows={4}
-              className="text-xs rounded-xl"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setIsApproveModalOpen(false)}
-              className="text-xs font-bold"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-[#2BA24D] hover:bg-green-700 text-white text-xs font-bold rounded-xl"
-              onClick={handleApprove}
-              disabled={isApproving}
-            >
-              {isApproving ? "Approving..." : "Approve Request"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Confirm Delete Modal */}
       <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
