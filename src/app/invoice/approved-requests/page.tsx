@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, Loader2 } from "lucide-react";
-import { useGetProjectRequestsQuery } from "@/api/requests/projectRequestApi";
+import { useGetApprovedProjectRequestsQuery } from "@/api/invoice/approvedProjectRequestsApi";
 import { useConvertRequestToPurchaseOrderMutation } from "@/api/invoice/projectPurchaseOrdersApi";
 import ConvertToPOModal from "@/components/invoice/ConvertToPOModal";
 import ConvertToPOSubcontractorModal from "@/components/invoice/subcontractor/ConvertToPOSubcontractorModal";
@@ -203,12 +203,10 @@ export default function ApprovedRequestsPage() {
     isError,
     error,
     refetch,
-  } = useGetProjectRequestsQuery({
-    status: "approved",
-    module_destination: "invoice",
-  });
+  } = useGetApprovedProjectRequestsQuery();
 
-  const [convertRequestToPurchaseOrder] = useConvertRequestToPurchaseOrderMutation();
+  const [convertRequestToPurchaseOrder] =
+    useConvertRequestToPurchaseOrderMutation();
 
   const handleConvertToPO = (request: any) => {
     setSelectedRequest(request);
@@ -272,17 +270,24 @@ export default function ApprovedRequestsPage() {
     setCurrentStep(1);
   };
 
-  const handleIssuePO = async (payload: { vendor: number; payment_term: number | null; expected_delivery_date: string; currency: number }) => {
+  const handleIssuePO = async (payload: {
+    vendor: number;
+    payment_term: number | null;
+    expected_delivery_date: string;
+    currency: number;
+  }) => {
     if (!selectedRequest || !selectedRequest.backendId) {
       alert("Invalid request selected.");
       return;
     }
-    
+
     try {
       // Map to the backend expected source_type
       let mappedSourceType = selectedRequest.originalType;
-      if (mappedSourceType === "purchase") mappedSourceType = "project_purchase_request";
-      if (mappedSourceType === "plant_equipment") mappedSourceType = "plant_equipment_request";
+      if (mappedSourceType === "purchase")
+        mappedSourceType = "project_purchase_request";
+      if (mappedSourceType === "plant_equipment")
+        mappedSourceType = "plant_equipment_request";
 
       const result = await convertRequestToPurchaseOrder({
         data: {
@@ -295,12 +300,16 @@ export default function ApprovedRequestsPage() {
           expected_delivery_date: payload.expected_delivery_date,
         },
       }).unwrap();
-      
+
       alert("Purchase Order Issued Successfully!");
       handleCloseModal();
       refetch(); // Refresh the list
     } catch (err: any) {
-      alert(err?.data?.error || err?.data?.detail || "Failed to issue Purchase Order. Please check your settings.");
+      alert(
+        err?.data?.error ||
+          err?.data?.detail ||
+          "Failed to issue Purchase Order. Please check your settings.",
+      );
       console.error(err);
     }
   };
@@ -327,20 +336,7 @@ export default function ApprovedRequestsPage() {
     setSelectedRequest(null);
   };
 
-  const parseDetail = (detail: any) => {
-    if (!detail) return {};
-    if (typeof detail === "string") {
-      try {
-        return JSON.parse(detail);
-      } catch {
-        return {};
-      }
-    }
-    return detail;
-  };
-
   const requests = (apiRequests ?? []).map((req: any) => {
-    const detail = parseDetail(req.detail);
     const typeMap: Record<string, string> = {
       purchase: "Purchase",
       subcontractor: "Subcontractor",
@@ -348,45 +344,26 @@ export default function ApprovedRequestsPage() {
       labour: "Labour Request",
       petty_cash: "Petty Cash Request",
     };
+    const amount = parseFloat(req.required_amount);
     return {
       id: req.reference_id || `REQ-${req.id}`,
       backendId: req.id,
-      sourceId: detail?.id || req.id, // The ID of the specific underlying request
+      sourceId: req.id,
       originalType: req.request_type,
       type: typeMap[req.request_type] || req.request_type,
-      wbs:
-        req.project_details?.name ||
-        req.project_details?.code ||
-        `Project #${req.project}`,
-      wbsId: detail?.wbs_element || detail?.task || req.project || "",
-      approvalDate: req.created_at?.split("T")[0] || "N/A",
-      requestedAmount:
-        detail?.amount_requested ||
-        detail?.amountRequested ||
-        detail?.amount ||
-        detail?.total_amount ||
-        0,
-      supplierName:
-        detail?.supplier_name ||
-        detail?.supplierName ||
-        req.created_by_details?.first_name ||
-        "",
-      projectName: req.project_details?.name || "General Project",
-      paymentTerms: detail?.payment_terms || detail?.paymentTerms || "N/A",
-      products: (detail?.products || detail?.lines || []).map((p: any) => ({
-        productName: p.productName || p.description || p.item_name || `Product #${p.product || 'Unknown'}`,
-        unit: p.unit || p.unit_of_measure || "Unit",
-        qty: Number(p.qty || p.quantity || 0),
-        unitPrice: Number(p.unitPrice || p.estimated_unit_cost || p.unit_cost || 0),
-        total: Number(p.total || p.line_total || 0),
-      })),
-      pettyCashId: detail?.petty_cash_id || detail?.pettyCashId || "",
-      requesterName: req.created_by_details
-        ? `${req.created_by_details.first_name} ${req.created_by_details.last_name}`
-        : "",
-      date: req.created_at?.split("T")[0] || "",
-      purpose: detail?.purpose || "",
-      accountType: detail?.account_type || detail?.accountType || "",
+      wbs: req.activity_name || req.phase_name || `Project #${req.id}`,
+      wbsId: "",
+      approvalDate: req.approval_date || "N/A",
+      requestedAmount: isNaN(amount) ? 0 : amount,
+      supplierName: "",
+      projectName: req.activity_name || req.phase_name || "General Project",
+      paymentTerms: "N/A",
+      products: [],
+      pettyCashId: "",
+      requesterName: "",
+      date: req.approval_date || "",
+      purpose: "",
+      accountType: req.cost_category || "",
     };
   });
 
@@ -593,7 +570,14 @@ export default function ApprovedRequestsPage() {
         currentStep={currentStep}
         onNextStep={handleNextStep}
         onBackStep={handleBackStep}
-        onIssuePO={() => handleIssuePO({ vendor: 0, payment_term: null, expected_delivery_date: "", currency: 0 })}
+        onIssuePO={() =>
+          handleIssuePO({
+            vendor: 0,
+            payment_term: null,
+            expected_delivery_date: "",
+            currency: 0,
+          })
+        }
         formatCurrency={formatCurrency}
       />
 

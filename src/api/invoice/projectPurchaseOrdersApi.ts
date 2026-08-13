@@ -21,6 +21,7 @@ export interface PurchaseOrderLine {
   quantity_received: string;
   quantity_billed: string;
   item_name: string;
+  unit?: string;
 }
 
 export interface ProjectPurchaseOrder {
@@ -151,7 +152,6 @@ export const projectPurchaseOrdersApi = createApi({
     >({
       query: (params) => ({
         url: "/invoicing/project-purchase-orders/",
-        url: "/invoicing/project-purchase-orders/",
         params,
       }),
     }),
@@ -161,13 +161,11 @@ export const projectPurchaseOrdersApi = createApi({
     >({
       query: (body) => ({
         url: "/invoicing/project-purchase-orders/",
-        url: "/invoicing/project-purchase-orders/",
         method: "POST",
         body,
       }),
     }),
     getPurchaseOrderById: builder.query<ProjectPurchaseOrder, number>({
-      query: (id) => `/invoicing/project-purchase-orders/${id}/`,
       query: (id) => `/invoicing/project-purchase-orders/${id}/`,
     }),
     updatePurchaseOrder: builder.mutation<
@@ -175,7 +173,6 @@ export const projectPurchaseOrdersApi = createApi({
       { id: number; data: UpdatePurchaseOrderRequest }
     >({
       query: ({ id, data }) => ({
-        url: `/invoicing/project-purchase-orders/${id}/`,
         url: `/invoicing/project-purchase-orders/${id}/`,
         method: "PUT",
         body: data,
@@ -187,7 +184,6 @@ export const projectPurchaseOrdersApi = createApi({
     >({
       query: ({ id, data }) => ({
         url: `/invoicing/project-purchase-orders/${id}/`,
-        url: `/invoicing/project-purchase-orders/${id}/`,
         method: "PATCH",
         body: data,
       }),
@@ -195,13 +191,11 @@ export const projectPurchaseOrdersApi = createApi({
     deletePurchaseOrder: builder.mutation<void, number>({
       query: (id) => ({
         url: `/invoicing/project-purchase-orders/${id}/`,
-        url: `/invoicing/project-purchase-orders/${id}/`,
         method: "DELETE",
       }),
     }),
     cancelPurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/project-purchase-orders/${id}/cancel/`,
         url: `/invoicing/project-purchase-orders/${id}/cancel/`,
         method: "POST",
       }),
@@ -209,20 +203,17 @@ export const projectPurchaseOrdersApi = createApi({
     closePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
         url: `/invoicing/project-purchase-orders/${id}/close/`,
-        url: `/invoicing/project-purchase-orders/${id}/close/`,
         method: "POST",
       }),
     }),
     fullyReceivePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
         url: `/invoicing/project-purchase-orders/${id}/fully-receive/`,
-        url: `/invoicing/project-purchase-orders/${id}/fully-receive/`,
         method: "POST",
       }),
     }),
     issuePurchaseOrder: builder.mutation<ProjectPurchaseOrder, number>({
       query: (id) => ({
-        url: `/invoicing/project-purchase-orders/${id}/issue/`,
         url: `/invoicing/project-purchase-orders/${id}/issue/`,
         method: "POST",
       }),
@@ -232,7 +223,6 @@ export const projectPurchaseOrdersApi = createApi({
       number
     >({
       query: (id) => ({
-        url: `/invoicing/project-purchase-orders/${id}/partially-receive/`,
         url: `/invoicing/project-purchase-orders/${id}/partially-receive/`,
         method: "POST",
       }),

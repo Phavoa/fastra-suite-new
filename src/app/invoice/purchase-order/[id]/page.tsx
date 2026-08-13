@@ -17,7 +17,11 @@ import {
 } from "lucide-react";
 import CreateVendorBillModal from "@/components/invoice/CreateVendorBillModal";
 
-import { useGetPurchaseOrderByIdQuery, useIssuePurchaseOrderMutation, useFullyReceivePurchaseOrderMutation } from "@/api/invoice/projectPurchaseOrdersApi";
+import {
+  useGetPurchaseOrderByIdQuery,
+  useIssuePurchaseOrderMutation,
+  useFullyReceivePurchaseOrderMutation,
+} from "@/api/invoice/projectPurchaseOrdersApi";
 import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 
 export default function PurchaseOrderDetailPage() {
@@ -25,13 +29,21 @@ export default function PurchaseOrderDetailPage() {
   const router = useRouter();
   const poId = Number(params?.id);
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
+  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
 
-  const { data: poDetail, isLoading, error, refetch } = useGetPurchaseOrderByIdQuery(poId, {
+  const {
+    data: poDetail,
+    isLoading,
+    error,
+    refetch,
+  } = useGetPurchaseOrderByIdQuery(poId, {
     skip: !poId || isNaN(poId),
   });
-  
-  const [issuePurchaseOrder, { isLoading: isIssuing }] = useIssuePurchaseOrderMutation();
-  const [fullyReceivePurchaseOrder, { isLoading: isReceiving }] = useFullyReceivePurchaseOrderMutation();
+
+  const [issuePurchaseOrder, { isLoading: isIssuing }] =
+    useIssuePurchaseOrderMutation();
+  const [fullyReceivePurchaseOrder, { isLoading: isReceiving }] =
+    useFullyReceivePurchaseOrderMutation();
 
   const handleIssuePO = async () => {
     try {
@@ -39,20 +51,31 @@ export default function PurchaseOrderDetailPage() {
       alert("Purchase Order Issued Successfully!");
       refetch();
     } catch (err: any) {
-      alert(err?.data?.error || err?.data?.detail || "Failed to issue Purchase Order.");
+      alert(
+        err?.data?.error ||
+          err?.data?.detail ||
+          "Failed to issue Purchase Order.",
+      );
       console.error(err);
     }
   };
 
   const handleReceiveGoods = async () => {
-    if (!confirm("Are you sure you want to fully receive all goods for this Purchase Order?")) return;
-    
+    if (
+      !confirm(
+        "Are you sure you want to fully receive all goods for this Purchase Order?",
+      )
+    )
+      return;
+
     try {
       await fullyReceivePurchaseOrder(poId).unwrap();
       alert("Goods Received Successfully!");
       refetch();
     } catch (err: any) {
-      alert(err?.data?.error || err?.data?.detail || "Failed to receive goods.");
+      alert(
+        err?.data?.error || err?.data?.detail || "Failed to receive goods.",
+      );
       console.error(err);
     }
   };
@@ -67,6 +90,37 @@ export default function PurchaseOrderDetailPage() {
   };
 
   const totalAmount = Number(poDetail?.total_amount || 0);
+  // replace _ with space and make first letter uppercase
+
+  const formatToSentenceCase = (text: string) =>
+    text
+      .split("_")
+      .join(" ")
+      .replace(/^./, (char) => char.toUpperCase());
+
+  const toggleLineSelection = (lineId: number) => {
+    setSelectedLineIds((prev) =>
+      prev.includes(lineId)
+        ? prev.filter((id) => id !== lineId)
+        : [...prev, lineId],
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (!poDetail?.lines) return;
+    const allIds = poDetail.lines.map((line) => line.id);
+    setSelectedLineIds((prev) =>
+      prev.length === allIds.length ? [] : allIds,
+    );
+  };
+
+  const selectedLines =
+    poDetail?.lines?.filter((line) => selectedLineIds.includes(line.id)) ||
+    [];
+
+  const allSelected =
+    !!poDetail?.lines?.length &&
+    selectedLineIds.length === poDetail.lines.length;
 
   if (isLoading) {
     return (
@@ -124,7 +178,7 @@ export default function PurchaseOrderDetailPage() {
             <Mail className="w-4 h-4" />
             Send Via Email
           </button>
-          
+
           {poDetail.status?.toLowerCase() === "draft" && (
             <button
               onClick={handleIssuePO}
@@ -136,7 +190,8 @@ export default function PurchaseOrderDetailPage() {
             </button>
           )}
 
-          {(poDetail.status?.toLowerCase() === "issued" || poDetail.status?.toLowerCase() === "partially_received") && (
+          {(poDetail.status?.toLowerCase() === "issued" ||
+            poDetail.status?.toLowerCase() === "partially_received") && (
             <button
               onClick={handleReceiveGoods}
               disabled={isReceiving}
@@ -150,10 +205,16 @@ export default function PurchaseOrderDetailPage() {
           {poDetail.status?.toLowerCase() !== "draft" && (
             <button
               onClick={() => setIsBillModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              disabled={selectedLines.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
             >
               <FileText className="w-4 h-4" />
               Create Bill
+              {selectedLines.length > 0 && (
+                <span className="ml-1 bg-white/20 rounded-full px-2 py-0.5 text-xs">
+                  {selectedLines.length}
+                </span>
+              )}
             </button>
           )}
         </div>
@@ -186,7 +247,7 @@ export default function PurchaseOrderDetailPage() {
               Status
             </p>
             <p className="text-sm font-medium text-gray-900 capitalize">
-              {poDetail.status?.replace(/_/g, ' ') || "N/A"}
+              {poDetail.status?.replace(/_/g, " ") || "N/A"}
             </p>
           </div>
           <div>
@@ -194,7 +255,9 @@ export default function PurchaseOrderDetailPage() {
               Expected Delivery
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {poDetail.expected_delivery_date ? new Date(poDetail.expected_delivery_date).toLocaleDateString() : "N/A"}
+              {poDetail.expected_delivery_date
+                ? new Date(poDetail.expected_delivery_date).toLocaleDateString()
+                : "N/A"}
             </p>
           </div>
           <div>
@@ -202,7 +265,9 @@ export default function PurchaseOrderDetailPage() {
               Issued Date
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {poDetail.issued_at ? new Date(poDetail.issued_at).toLocaleDateString() : "Not Issued"}
+              {poDetail.issued_at
+                ? new Date(poDetail.issued_at).toLocaleDateString()
+                : "Not Issued"}
             </p>
           </div>
           <div>
@@ -210,7 +275,9 @@ export default function PurchaseOrderDetailPage() {
               Created Date
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {poDetail.created_at ? new Date(poDetail.created_at).toLocaleDateString() : "N/A"}
+              {poDetail.created_at
+                ? new Date(poDetail.created_at).toLocaleDateString()
+                : "N/A"}
             </p>
           </div>
         </div>
@@ -221,7 +288,7 @@ export default function PurchaseOrderDetailPage() {
         <h2 className="text-sm font-medium text-gray-700 mb-4">Request type</h2>
         <div className="flex items-center gap-4">
           <span className="inline-flex px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
-            {poDetail.source_request_type || "Purchase Order"}
+            {formatToSentenceCase(poDetail.source_request_type || "NA")}
           </span>
         </div>
       </div>
@@ -232,6 +299,14 @@ export default function PurchaseOrderDetailPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Product Name
                 </th>
@@ -251,12 +326,25 @@ export default function PurchaseOrderDetailPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {poDetail.lines?.map((line: PurchaseOrderLine, index: number) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={index}
+                  className={`hover:bg-gray-50 transition-colors ${
+                    selectedLineIds.includes(line.id) ? "bg-blue-50/40" : ""
+                  }`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedLineIds.includes(line.id)}
+                      onChange={() => toggleLineSelection(line.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {line.item_name || line.description}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    - 
+                    {line.unit}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-600">
                     {line.qty}
@@ -272,10 +360,7 @@ export default function PurchaseOrderDetailPage() {
             </tbody>
             <tfoot className="bg-gray-50 border-t border-gray-200">
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-3 text-sm font-semibold text-gray-900 text-right"
-                >
+                <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
                   Total
                 </td>
                 <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
@@ -294,8 +379,24 @@ export default function PurchaseOrderDetailPage() {
         poId={poDetail.id}
         poNumber={poDetail.po_number}
         vendorId={poDetail.vendor}
-        products={poDetail.lines || []}
+        paymentTerm={poDetail.payment_term}
+        products={selectedLines.map((line) => ({
+          id: line.id,
+          product: line.product,
+          description: line.description || line.item_name,
+          qty: line.qty,
+          unit_price: line.unit_price,
+          line_total: line.line_total,
+          quantity_received: line.quantity_received,
+          quantity_billed: line.quantity_billed,
+          item_name: line.item_name,
+          unit: line.unit,
+        }))}
         formatCurrency={formatCurrency}
+        onCreated={() => {
+          setSelectedLineIds([]);
+          refetch();
+        }}
       />
     </div>
   );
