@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Upload, File, Trash2, ChevronRight, AlertCircle } from "lucide-react";
+import { X, Upload, File, Trash2, ChevronRight } from "lucide-react";
 
-import { useCreateVendorBillMutation } from "@/api/invoice/invoicesApi";
+import { useCreateVendorBillMutation } from "@/api/invoice/vendorBillsApi";
 import { useGetCompanyBankAccountsQuery } from "@/api/invoice/companyBankAccountsApi";
 import { CompanyBankAccount } from "@/api/invoice/companyBankAccountsApi";
-import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   Select,
@@ -16,28 +15,65 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
+
+export type VendorBillSourceType = "PROJECT_PO" | "LABOUR" | "SUBCONTRACTOR";
+
+export type SubcontractorLineType = "milestone" | "lump_sum";
+
+export interface VendorBillLineItem {
+  id: number;
+  description: string;
+  qty?: number | string;
+  unit_price?: number | string;
+  line_total?: number | string;
+  item_name?: string; // optional fallback
+}
+
 interface CreateVendorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
-  poId: number;
-  poNumber: string;
+
+  /** Required for all source types */
+  sourceType: VendorBillSourceType;
+  /** project_purchase_order id OR project_request id */
+  sourceId: number;
   vendorId: number;
   paymentTerm: number | null;
-  products: PurchaseOrderLine[];
+  lines: VendorBillLineItem[];
   formatCurrency: (amount: number) => string;
   onCreated?: () => void;
+
+  /**
+   * Only needed when sourceType === "SUBCONTRACTOR".
+   * Determines whether to send `subcontractor_milestone` or `subcontractor_request`.
+   */
+  subcontractorLineType?: SubcontractorLineType;
+
+  /** Optional UI helpers */
+  title?: string;
+  subtitle?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                Component                                   */
+/* -------------------------------------------------------------------------- */
 
 export default function CreateVendorBillModal({
   isOpen,
   onClose,
-  poId,
-  poNumber,
+  sourceType,
+  sourceId,
   vendorId,
   paymentTerm,
-  products,
+  lines,
   formatCurrency,
   onCreated,
+  subcontractorLineType = "milestone",
+  title = "Create Vendor Bill",
+  subtitle,
 }: CreateVendorBillModalProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -49,6 +85,7 @@ export default function CreateVendorBillModal({
     message: string;
     type: "success" | "error";
   }>({ show: false, message: "", type: "success" });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: bankAccounts } = useGetCompanyBankAccountsQuery();
@@ -58,6 +95,8 @@ export default function CreateVendorBillModal({
   const activeBankAccounts =
     bankAccounts?.filter((account: CompanyBankAccount) => account.is_active) ||
     [];
+
+  /* ------------------------------ Helpers --------------------------------- */
 
   const handleFileUpload = (file: File) => {
     setUploadedFile(file);
@@ -84,6 +123,8 @@ export default function CreateVendorBillModal({
     setToast({ show: true, message, type });
   };
 
+  /* ------------------------------ Submit ---------------------------------- */
+
   const handleSubmit = async () => {
     if (!uploadedFile) {
       showToast("Please upload the vendor invoice document", "error");
@@ -95,35 +136,75 @@ export default function CreateVendorBillModal({
       return;
     }
 
-    if (!products.length) {
-      showToast("Please select at least one product line", "error");
+    if (!lines.length) {
+      showToast("Please select at least one line item", "error");
       return;
     }
 
     if (!paymentTerm) {
-      showToast("Payment term is missing for this purchase order", "error");
+      showToast("Payment term is missing", "error");
+      return;
+    }
+
+    if (sourceType === "SUBCONTRACTOR" && !subcontractorLineType) {
+      showToast("Subcontractor line type is required", "error");
       return;
     }
 
     const invoiceDate = new Date().toISOString().split("T")[0];
 
     const formData = new FormData();
-    formData.append("source_type", "PROJECT_PO");
-    formData.append("project_purchase_order", String(poId));
+    formData.append("source_type", sourceType);
     formData.append("vendor", String(vendorId));
     formData.append("invoice_date", invoiceDate);
     formData.append("payment_term", String(paymentTerm));
     formData.append("company_bank_account", String(companyBankAccount));
     formData.append("document", uploadedFile);
-    formData.append(
-      "lines",
-      JSON.stringify(
-        products.map((line) => ({
+
+    // Top-level ID field
+    if (sourceType === "PROJECT_PO") {
+      formData.append("project_purchase_order", String(sourceId));
+    } else {
+      // LABOUR and SUBCONTRACTOR both use project_request
+      formData.append("project_request", String(sourceId));
+    }
+
+    // Line items – map the correct ID field based on source type
+    const mappedLines = lines.map((line) => {
+      const base = {
+        description: line.description || line.item_name || "",
+      };
+
+      if (sourceType === "PROJECT_PO") {
+        return {
+          ...base,
           project_purchase_order_line: line.id,
-          description: line.item_name || line.description,
-        })),
-      ),
-    );
+        };
+      }
+
+      if (sourceType === "LABOUR") {
+        return {
+          ...base,
+          labour_request: line.id,
+        };
+      }
+
+      // SUBCONTRACTOR
+      if (subcontractorLineType === "lump_sum") {
+        return {
+          ...base,
+          subcontractor_request: line.id,
+        };
+      }
+
+      // default: milestone
+      return {
+        ...base,
+        subcontractor_milestone: line.id,
+      };
+    });
+
+    formData.append("lines", JSON.stringify(mappedLines));
 
     try {
       await createVendorBill(formData).unwrap();
@@ -134,7 +215,9 @@ export default function CreateVendorBillModal({
       }, 1200);
     } catch (err: any) {
       showToast(
-        err?.data?.error || err?.data?.detail || "Failed to create vendor bill.",
+        err?.data?.error ||
+          err?.data?.detail ||
+          "Failed to create vendor bill.",
         "error",
       );
       console.error(err);
@@ -142,6 +225,16 @@ export default function CreateVendorBillModal({
   };
 
   if (!isOpen) return null;
+
+  /* ------------------------------- Render --------------------------------- */
+
+  const displaySubtitle =
+    subtitle ||
+    (sourceType === "PROJECT_PO"
+      ? `PO #${sourceId}`
+      : sourceType === "LABOUR"
+        ? `Labour Request #${sourceId}`
+        : `Subcontractor Request #${sourceId}`);
 
   return (
     <>
@@ -156,14 +249,11 @@ export default function CreateVendorBillModal({
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+          {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Create Vendor Bill
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                PO-{poNumber} • Originating Request: REQ-2024-0041
-              </p>
+              <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{displaySubtitle}</p>
             </div>
             <button
               type="button"
@@ -175,7 +265,9 @@ export default function CreateVendorBillModal({
             </button>
           </div>
 
+          {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
+            {/* File Upload */}
             <div className="mb-6">
               <h3 className="text-sm font-medium text-gray-700 mb-2">
                 Upload Vendor Invoice Document
@@ -244,6 +336,7 @@ export default function CreateVendorBillModal({
               )}
             </div>
 
+            {/* Company Bank Account */}
             <div className="mb-6">
               <h3 className="text-sm font-medium text-gray-700 mb-2">
                 Select Company Bank Account
@@ -254,9 +347,7 @@ export default function CreateVendorBillModal({
               </p>
               <Select
                 value={companyBankAccount ? String(companyBankAccount) : ""}
-                onValueChange={(value) =>
-                  setCompanyBankAccount(Number(value))
-                }
+                onValueChange={(value) => setCompanyBankAccount(Number(value))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select company bank account" />
@@ -268,10 +359,7 @@ export default function CreateVendorBillModal({
                     </SelectItem>
                   ) : (
                     activeBankAccounts.map((account) => (
-                      <SelectItem
-                        key={account.id}
-                        value={String(account.id)}
-                      >
+                      <SelectItem key={account.id} value={String(account.id)}>
                         {account.bank_name} • {account.account_number_display}
                       </SelectItem>
                     ))
@@ -280,9 +368,10 @@ export default function CreateVendorBillModal({
               </Select>
             </div>
 
+            {/* Line Items Table */}
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Products
+                Line Items
               </h3>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
@@ -293,33 +382,37 @@ export default function CreateVendorBillModal({
                           Description
                         </th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20">
-                          PO Qty
+                          Qty
                         </th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          PO Unit Price
+                          Unit Price
                         </th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          PO Total Price
+                          Total
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {products.map((product, index) => (
+                      {lines.map((line, index) => (
                         <tr
                           key={index}
                           className="hover:bg-gray-50 transition-colors"
                         >
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {product.item_name || product.description}
+                            {line.description || line.item_name}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">
-                            {product.qty}
+                            {line.qty ?? "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">
-                            {formatCurrency(Number(product.unit_price || 0))}
+                            {line.unit_price != null
+                              ? formatCurrency(Number(line.unit_price))
+                              : "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                            {formatCurrency(Number(product.line_total || 0))}
+                            {line.line_total != null
+                              ? formatCurrency(Number(line.line_total))
+                              : "—"}
                           </td>
                         </tr>
                       ))}
@@ -334,8 +427,8 @@ export default function CreateVendorBillModal({
                         </td>
                         <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
                           {formatCurrency(
-                            products.reduce(
-                              (sum, p) => sum + Number(p.line_total || 0),
+                            lines.reduce(
+                              (sum, l) => sum + Number(l.line_total || 0),
                               0,
                             ),
                           )}
@@ -348,6 +441,7 @@ export default function CreateVendorBillModal({
             </div>
           </div>
 
+          {/* Footer */}
           <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 shrink-0">
             <button
               onClick={onClose}

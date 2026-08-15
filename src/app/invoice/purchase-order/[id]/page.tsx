@@ -90,7 +90,6 @@ export default function PurchaseOrderDetailPage() {
   };
 
   const totalAmount = Number(poDetail?.total_amount || 0);
-  // replace _ with space and make first letter uppercase
 
   const formatToSentenceCase = (text: string) =>
     text
@@ -109,14 +108,11 @@ export default function PurchaseOrderDetailPage() {
   const toggleSelectAll = () => {
     if (!poDetail?.lines) return;
     const allIds = poDetail.lines.map((line) => line.id);
-    setSelectedLineIds((prev) =>
-      prev.length === allIds.length ? [] : allIds,
-    );
+    setSelectedLineIds((prev) => (prev.length === allIds.length ? [] : allIds));
   };
 
   const selectedLines =
-    poDetail?.lines?.filter((line) => selectedLineIds.includes(line.id)) ||
-    [];
+    poDetail?.lines?.filter((line) => selectedLineIds.includes(line.id)) || [];
 
   const allSelected =
     !!poDetail?.lines?.length &&
@@ -360,7 +356,10 @@ export default function PurchaseOrderDetailPage() {
             </tbody>
             <tfoot className="bg-gray-50 border-t border-gray-200">
               <tr>
-                <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                <td
+                  colSpan={5}
+                  className="px-4 py-3 text-sm font-semibold text-gray-900 text-right"
+                >
                   Total
                 </td>
                 <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
@@ -372,27 +371,24 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      {/* Create Vendor Bill Modal */}
+      {/* Create Vendor Bill Modal - Updated for new props */}
       <CreateVendorBillModal
         isOpen={isBillModalOpen}
         onClose={() => setIsBillModalOpen(false)}
-        poId={poDetail.id}
-        poNumber={poDetail.po_number}
+        sourceType="PROJECT_PO"
+        sourceId={poDetail.id}
         vendorId={poDetail.vendor}
         paymentTerm={poDetail.payment_term}
-        products={selectedLines.map((line) => ({
+        lines={selectedLines.map((line) => ({
           id: line.id,
-          product: line.product,
-          description: line.description || line.item_name,
+          description: line.description || line.item_name || "",
           qty: line.qty,
           unit_price: line.unit_price,
           line_total: line.line_total,
-          quantity_received: line.quantity_received,
-          quantity_billed: line.quantity_billed,
           item_name: line.item_name,
-          unit: line.unit,
         }))}
         formatCurrency={formatCurrency}
+        subtitle={`PO-${poDetail.po_number}`}
         onCreated={() => {
           setSelectedLineIds([]);
           refetch();
