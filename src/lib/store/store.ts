@@ -66,6 +66,9 @@ import { projectRequestApi } from "@/api/requests/projectRequestApi";
 import { pettyCashRequestApi } from "@/api/requests/pettyCashRequestApi";
 import { materialConsumptionRequestApi } from "@/api/requests/materialConsumptionRequestApi";
 
+import { approvedProjectRequestsApi } from "@/api/invoice/approvedProjectRequestsApi";
+import { vendorBillsApi } from "@/api/invoice/vendorBillsApi";
+
 const authPersistConfig = {
   key: "auth",
   storage,
@@ -123,7 +126,8 @@ const rootReducer = combineReducers({
   [plantEquipmentRequestApi.reducerPath]: plantEquipmentRequestApi.reducer,
   [projectRequestApi.reducerPath]: projectRequestApi.reducer,
   [pettyCashRequestApi.reducerPath]: pettyCashRequestApi.reducer,
-  [materialConsumptionRequestApi.reducerPath]: materialConsumptionRequestApi.reducer,
+  [materialConsumptionRequestApi.reducerPath]:
+    materialConsumptionRequestApi.reducer,
   [accountingSettingsApi.reducerPath]: accountingSettingsApi.reducer,
   [chartOfAccountsApi.reducerPath]: chartOfAccountsApi.reducer,
   [companyBankAccountsApi.reducerPath]: companyBankAccountsApi.reducer,
@@ -138,6 +142,9 @@ const rootReducer = combineReducers({
   [vendorBankAccountsApi.reducerPath]: vendorBankAccountsApi.reducer,
   [vendorImportApi.reducerPath]: vendorImportApi.reducer,
   [companyApi.reducerPath]: companyApi.reducer,
+
+  [approvedProjectRequestsApi.reducerPath]: approvedProjectRequestsApi.reducer,
+  [vendorBillsApi.reducerPath]: vendorBillsApi.reducer,
 });
 
 export const store = configureStore({
@@ -203,6 +210,9 @@ export const store = configureStore({
       vendorBankAccountsApi.middleware,
       vendorImportApi.middleware,
       companyApi.middleware,
+
+      approvedProjectRequestsApi.middleware,
+      vendorBillsApi.middleware,
     ),
 });
 

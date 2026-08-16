@@ -2,7 +2,13 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../../lib/store/store";
 import { EmbeddedUserDetails } from "./paymentsApi";
 
-export type InvoiceStatus = "paid" | "partial" | "pending" | "draft" | "cancelled";
+export type InvoiceStatus =
+  | "paid"
+  | "partial"
+  | "pending"
+  | "draft"
+  | "cancelled";
+
 export type InvoicingMethod = "ordered_quantity" | "delivered_quantity";
 
 export interface VendorBankAccount {
@@ -168,6 +174,13 @@ export const invoicesApi = createApi({
       url = `${baseUrl}${args.url}${queryString ? `?${queryString}` : ""}`;
     }
 
+    const isFormData =
+      args && typeof args === "object" && args.body instanceof FormData;
+
+    if (isFormData) {
+      headers.delete("content-type");
+    }
+
     try {
       const response = await fetch(url, {
         method: typeof args === "string" ? "GET" : args.method || "GET",
@@ -176,7 +189,9 @@ export const invoicesApi = createApi({
           typeof args === "string"
             ? undefined
             : args.body
-              ? JSON.stringify(args.body)
+              ? isFormData
+                ? args.body
+                : JSON.stringify(args.body)
               : undefined,
       });
 

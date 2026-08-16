@@ -21,6 +21,7 @@ export interface PurchaseOrderLine {
   quantity_received: string;
   quantity_billed: string;
   item_name: string;
+  unit?: string;
 }
 
 export interface ProjectPurchaseOrder {

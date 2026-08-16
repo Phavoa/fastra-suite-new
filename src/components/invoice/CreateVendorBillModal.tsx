@@ -1,50 +1,102 @@
 "use client";
 
 import { useState, useRef } from "react";
-import {
-  X,
-  Upload,
-  File,
-  Trash2,
-  ChevronRight,
-  AlertCircle,
-} from "lucide-react";
+import { X, Upload, File, Trash2, ChevronRight } from "lucide-react";
 
-import { useCreateInvoiceMutation } from "@/api/invoice/invoicesApi";
-import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
+import { useCreateVendorBillMutation } from "@/api/invoice/vendorBillsApi";
+import { useGetCompanyBankAccountsQuery } from "@/api/invoice/companyBankAccountsApi";
+import { CompanyBankAccount } from "@/api/invoice/companyBankAccountsApi";
+import { ToastNotification } from "@/components/shared/ToastNotification";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
+
+export type VendorBillSourceType = "PROJECT_PO" | "LABOUR" | "SUBCONTRACTOR";
+
+export type SubcontractorLineType = "milestone" | "lump_sum";
+
+export interface VendorBillLineItem {
+  id: number;
+  description: string;
+  qty?: number | string;
+  unit_price?: number | string;
+  line_total?: number | string;
+  item_name?: string; // optional fallback
+}
 
 interface CreateVendorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
-  poId: number;
-  poNumber: string;
+
+  /** Required for all source types */
+  sourceType: VendorBillSourceType;
+  /** project_purchase_order id OR project_request id */
+  sourceId: number;
   vendorId: number;
-  products: PurchaseOrderLine[];
+  paymentTerm: number | null;
+  lines: VendorBillLineItem[];
   formatCurrency: (amount: number) => string;
+  onCreated?: () => void;
+
+  /**
+   * Only needed when sourceType === "SUBCONTRACTOR".
+   * Determines whether to send `subcontractor_milestone` or `subcontractor_request`.
+   */
+  subcontractorLineType?: SubcontractorLineType;
+
+  /** Optional UI helpers */
+  title?: string;
+  subtitle?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                Component                                   */
+/* -------------------------------------------------------------------------- */
 
 export default function CreateVendorBillModal({
   isOpen,
   onClose,
-  poId,
-  poNumber,
+  sourceType,
+  sourceId,
   vendorId,
-  products,
+  paymentTerm,
+  lines,
   formatCurrency,
+  onCreated,
+  subcontractorLineType = "milestone",
+  title = "Create Vendor Bill",
+  subtitle,
 }: CreateVendorBillModalProps) {
-  const [invoiceQuantities, setInvoiceQuantities] = useState<number[]>(
-    products.map(() => 0),
-  );
-  const [invoiceUnitPrices, setInvoiceUnitPrices] = useState<number[]>(
-    products.map(() => 0),
-  );
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [createInvoice, { isLoading: isSubmitting }] = useCreateInvoiceMutation();
+  const [companyBankAccount, setCompanyBankAccount] = useState<number | null>(
+    null,
+  );
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({ show: false, message: "", type: "success" });
 
-  if (!isOpen) return null;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: bankAccounts } = useGetCompanyBankAccountsQuery();
+  const [createVendorBill, { isLoading: isSubmitting }] =
+    useCreateVendorBillMutation();
+
+  const activeBankAccounts =
+    bankAccounts?.filter((account: CompanyBankAccount) => account.is_active) ||
+    [];
+
+  /* ------------------------------ Helpers --------------------------------- */
 
   const handleFileUpload = (file: File) => {
     setUploadedFile(file);
@@ -67,89 +119,141 @@ export default function CreateVendorBillModal({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const updateInvoiceQty = (index: number, value: string) => {
-    const newQuantities = [...invoiceQuantities];
-    newQuantities[index] = value === "" ? 0 : Number(value);
-    setInvoiceQuantities(newQuantities);
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ show: true, message, type });
   };
 
-  const updateInvoicePrice = (index: number, value: string) => {
-    const newPrices = [...invoiceUnitPrices];
-    newPrices[index] = value === "" ? 0 : Number(value);
-    setInvoiceUnitPrices(newPrices);
-  };
-
-  const getInvoiceTotal = (index: number) => {
-    return invoiceQuantities[index] * invoiceUnitPrices[index];
-  };
-
-  const getTotalInvoiceAmount = () => {
-    return products.reduce((sum, _, index) => sum + getInvoiceTotal(index), 0);
-  };
-
-  const getTotalPOAmount = () => {
-    return products.reduce((sum, product) => sum + Number(product.line_total || 0), 0);
-  };
+  /* ------------------------------ Submit ---------------------------------- */
 
   const handleSubmit = async () => {
-    // We ignore the file upload check for now since API doesn't accept it in the JSON payload
-    // if (!uploadedFile) {
-    //   alert("Please upload the vendor invoice document");
-    //   return;
-    // }
-
-    // Validate all invoice quantities and prices are filled
-    const hasEmptyFields = products.some(
-      (_, index) =>
-        invoiceQuantities[index] === 0 || invoiceUnitPrices[index] === 0,
-    );
-    if (hasEmptyFields) {
-      alert("Please fill in all invoice quantities and unit prices");
+    if (!uploadedFile) {
+      showToast("Please upload the vendor invoice document", "error");
       return;
     }
 
+    if (!companyBankAccount) {
+      showToast("Please select a company bank account", "error");
+      return;
+    }
+
+    if (!lines.length) {
+      showToast("Please select at least one line item", "error");
+      return;
+    }
+
+    if (!paymentTerm) {
+      showToast("Payment term is missing", "error");
+      return;
+    }
+
+    if (sourceType === "SUBCONTRACTOR" && !subcontractorLineType) {
+      showToast("Subcontractor line type is required", "error");
+      return;
+    }
+
+    const invoiceDate = new Date().toISOString().split("T")[0];
+
+    const formData = new FormData();
+    formData.append("source_type", sourceType);
+    formData.append("vendor", String(vendorId));
+    formData.append("invoice_date", invoiceDate);
+    formData.append("payment_term", String(paymentTerm));
+    formData.append("company_bank_account", String(companyBankAccount));
+    formData.append("document", uploadedFile);
+
+    // Top-level ID field
+    if (sourceType === "PROJECT_PO") {
+      formData.append("project_purchase_order", String(sourceId));
+    } else {
+      // LABOUR and SUBCONTRACTOR both use project_request
+      formData.append("project_request", String(sourceId));
+    }
+
+    // Line items – map the correct ID field based on source type
+    const mappedLines = lines.map((line) => {
+      const base = {
+        description: line.description || line.item_name || "",
+      };
+
+      if (sourceType === "PROJECT_PO") {
+        return {
+          ...base,
+          project_purchase_order_line: line.id,
+        };
+      }
+
+      if (sourceType === "LABOUR") {
+        return {
+          ...base,
+          labour_request: line.id,
+        };
+      }
+
+      // SUBCONTRACTOR
+      if (subcontractorLineType === "lump_sum") {
+        return {
+          ...base,
+          subcontractor_request: line.id,
+        };
+      }
+
+      // default: milestone
+      return {
+        ...base,
+        subcontractor_milestone: line.id,
+      };
+    });
+
+    formData.append("lines", JSON.stringify(mappedLines));
+
     try {
-      const invoice_items = products.map((product, index) => ({
-        product: product.product,
-        quantity: invoiceQuantities[index],
-        unit_price: invoiceUnitPrices[index].toString(),
-      }));
-
-      // Default due date to 30 days from now
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 30);
-
-      await createInvoice({
-        vendor: vendorId,
-        purchase_order: poNumber as any,
-        due_date: dueDate.toISOString().split("T")[0],
-        invoice_items,
-      }).unwrap();
-
-      alert("Vendor bill submitted successfully!");
-      onClose();
+      await createVendorBill(formData).unwrap();
+      showToast("Vendor bill created successfully!", "success");
+      onCreated?.();
+      setTimeout(() => {
+        onClose();
+      }, 1200);
     } catch (err: any) {
-      alert(err?.data?.error || "Failed to create vendor bill.");
+      showToast(
+        err?.data?.error ||
+          err?.data?.detail ||
+          "Failed to create vendor bill.",
+        "error",
+      );
+      console.error(err);
     }
   };
 
+  if (!isOpen) return null;
+
+  /* ------------------------------- Render --------------------------------- */
+
+  const displaySubtitle =
+    subtitle ||
+    (sourceType === "PROJECT_PO"
+      ? `PO #${sourceId}`
+      : sourceType === "LABOUR"
+        ? `Labour Request #${sourceId}`
+        : `Subcontractor Request #${sourceId}`);
+
   return (
     <>
-      {/* Backdrop */}
+      <ToastNotification
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+      />
+
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
 
-      {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Create Vendor Bill
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                PO-{poNumber} • Originating Request: REQ-2024-0041
-              </p>
+              <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{displaySubtitle}</p>
             </div>
             <button
               type="button"
@@ -161,9 +265,9 @@ export default function CreateVendorBillModal({
             </button>
           </div>
 
-          {/* Content */}
+          {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
-            {/* Upload Section */}
+            {/* File Upload */}
             <div className="mb-6">
               <h3 className="text-sm font-medium text-gray-700 mb-2">
                 Upload Vendor Invoice Document
@@ -232,17 +336,42 @@ export default function CreateVendorBillModal({
               )}
             </div>
 
-            {/* Confirm Prices Button */}
-            <div className="flex justify-end mb-6">
-              <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                Confirm Prices
-              </button>
+            {/* Company Bank Account */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">
+                Select Company Bank Account
+              </h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Choose the company bank account this vendor bill will be paid
+                from.
+              </p>
+              <Select
+                value={companyBankAccount ? String(companyBankAccount) : ""}
+                onValueChange={(value) => setCompanyBankAccount(Number(value))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select company bank account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeBankAccounts.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No active bank accounts
+                    </SelectItem>
+                  ) : (
+                    activeBankAccounts.map((account) => (
+                      <SelectItem key={account.id} value={String(account.id)}>
+                        {account.bank_name} • {account.account_number_display}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Products Table */}
+            {/* Line Items Table */}
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Products
+                Line Items
               </h3>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
@@ -253,71 +382,37 @@ export default function CreateVendorBillModal({
                           Description
                         </th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20">
-                          PO Qty
+                          Qty
                         </th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          Invoice Qty
+                          Unit Price
                         </th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          PO Unit Price
-                        </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          Invoice Unit Price
-                        </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          PO Total Price
-                        </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
-                          Invoice Total Price
+                          Total
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {products.map((product, index) => (
+                      {lines.map((line, index) => (
                         <tr
                           key={index}
                           className="hover:bg-gray-50 transition-colors"
                         >
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {product.item_name || product.description}
+                            {line.description || line.item_name}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">
-                            {product.qty}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={invoiceQuantities[index] || ""}
-                              onChange={(e) =>
-                                updateInvoiceQty(index, e.target.value)
-                              }
-                              className="w-20 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="0"
-                            />
+                            {line.qty ?? "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">
-                            {formatCurrency(Number(product.unit_price || 0))}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1000"
-                              value={invoiceUnitPrices[index] || ""}
-                              onChange={(e) =>
-                                updateInvoicePrice(index, e.target.value)
-                              }
-                              className="w-28 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="0"
-                            />
+                            {line.unit_price != null
+                              ? formatCurrency(Number(line.unit_price))
+                              : "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                            {formatCurrency(Number(product.line_total || 0))}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                            {formatCurrency(getInvoiceTotal(index))}
+                            {line.line_total != null
+                              ? formatCurrency(Number(line.line_total))
+                              : "—"}
                           </td>
                         </tr>
                       ))}
@@ -325,16 +420,18 @@ export default function CreateVendorBillModal({
                     <tfoot className="bg-gray-50 border-t border-gray-200">
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={3}
                           className="px-4 py-3 text-sm font-semibold text-gray-900 text-right"
                         >
                           Total
                         </td>
                         <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
-                          {formatCurrency(getTotalPOAmount())}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
-                          {formatCurrency(getTotalInvoiceAmount())}
+                          {formatCurrency(
+                            lines.reduce(
+                              (sum, l) => sum + Number(l.line_total || 0),
+                              0,
+                            ),
+                          )}
                         </td>
                       </tr>
                     </tfoot>
