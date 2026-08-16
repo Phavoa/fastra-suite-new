@@ -21,7 +21,6 @@ import {
   HRIcon,
   InventoryIcon,
   LogisticsIcon,
-  PurchaseIcon,
   SalesIcon,
   SettingsIcon,
 } from "@/components/shared/icons";
@@ -49,15 +48,6 @@ const MODULES: Module[] = [
       "Manage all financial transactions, including invoicing, billing, and ledger entries, to ensure accurate accounting records and financial reporting.",
     color: "green",
     Icon: AccountIcon,
-    isFunctional: true,
-  },
-  {
-    id: "purchase",
-    title: "Purchase",
-    description:
-      "Streamline procurement processes by tracking purchase orders, vendor management, and inventory replenishment to optimize supply chain efficiency and cost savings.",
-    color: "blue",
-    Icon: PurchaseIcon,
     isFunctional: true,
   },
   {
@@ -234,7 +224,6 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
   const getRoute = (id: string): string | null => {
     const routeMap: Record<string, string> = {
       invoice: "/invoice/approved-requests",
-      purchase: "/purchase",
       inventory: "/inventory/operation",
       contacts: "/contact",
       settings: "/settings/company/1",
@@ -295,7 +284,7 @@ export default function DashboardPage(): ReactElement {
 
   const filteredModules = MODULES.filter((m) => {
     if (!isAdmin && !m.isFunctional) return false;
-    if (m.id === "invoice" || m.id === "purchase") return hasAccess("invoice");
+    if (m.id === "invoice") return hasAccess("invoice");
     if (m.id === "inventory") return hasAccess("inventory");
     if (m.id === "project-request") return hasAccess("projectRequest");
     if (m.id === "settings") return hasAccess("settings");

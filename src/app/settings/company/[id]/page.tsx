@@ -25,7 +25,7 @@ export default function CompanyDetails() {
 
   if (isLoading)
     return (
-      <PageGuard application="settings" module="company" action="view">
+      <PageGuard module="settings" entitlement="view_company">
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-[#F6F9FC]">
           <Loader2 className="h-8 w-8 animate-spin text-[#3B7CED]" />
           <p className="mt-2 text-sm font-semibold text-[#8898AA]">Loading company details...</p>
@@ -40,7 +40,7 @@ export default function CompanyDetails() {
   const websiteValue = data.website || "—";
 
   return (
-    <PageGuard application="settings" module="company" action="view">
+    <PageGuard module="settings" entitlement="view_company">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
         
         {/* Header */}
@@ -61,7 +61,7 @@ export default function CompanyDetails() {
             </div>
           </div>
 
-          <PermissionGuard application="settings" module="company" action="edit">
+          <PermissionGuard module="settings" entitlement="change_company">
             <Button
               onClick={() => router.push("/settings/company/updatecompany/")}
               className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"

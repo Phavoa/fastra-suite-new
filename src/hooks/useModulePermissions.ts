@@ -56,7 +56,39 @@ export function useModulePermissions() {
       const backendModule = LEGACY_MODULE_TO_BACKEND[moduleKey as string] ?? moduleKey;
 
       // Check new format (module as direct key)
-      if (permissions[backendModule]?.has(entitlement as PermissionAction)) {
+      const hasDirect = permissions[backendModule]?.has(entitlement as PermissionAction);
+      if (hasDirect) {
+        return true;
+      }
+
+      // Administrator / Admin / Manager role has access to all actions in this module
+      if (
+        permissions[backendModule]?.has("administrator" as PermissionAction) ||
+        permissions[backendModule]?.has("admin" as PermissionAction) ||
+        permissions[backendModule]?.has("manager" as PermissionAction)
+      ) {
+        return true;
+      }
+
+      // Fallback: If user has generic "view" entitlement, and the check is for a view entitlement
+      if (entitlement.startsWith("view") && permissions[backendModule]?.has("view" as PermissionAction)) {
+        return true;
+      }
+
+      // Fallback: If user has generic "create" or "add" entitlement, and the check is for an add/create entitlement
+      if ((entitlement.startsWith("add") || entitlement.startsWith("create")) && 
+          (permissions[backendModule]?.has("create" as PermissionAction) || permissions[backendModule]?.has("add" as PermissionAction))) {
+        return true;
+      }
+
+      // Fallback: If user has generic "edit" or "change" entitlement, and the check is for a change/edit entitlement
+      if ((entitlement.startsWith("change") || entitlement.startsWith("edit")) && 
+          (permissions[backendModule]?.has("edit" as PermissionAction) || permissions[backendModule]?.has("change" as PermissionAction))) {
+        return true;
+      }
+
+      // Fallback: If user has generic "delete" entitlement, and the check is for a delete entitlement
+      if (entitlement.startsWith("delete") && permissions[backendModule]?.has("delete" as PermissionAction)) {
         return true;
       }
 

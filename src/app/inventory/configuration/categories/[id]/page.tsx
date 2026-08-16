@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import {
@@ -98,7 +99,7 @@ export default function CategoryDetailsPage() {
 
   if (isLoading || isFetching) {
     return (
-      <PageGuard application="inventory" module="productcategories">
+      <PageGuard module="inventory" entitlement="view_productcategory">
         <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
           <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 shadow-2xs">
             <div className="flex items-center gap-3">
@@ -149,7 +150,7 @@ export default function CategoryDetailsPage() {
   const status = isActive ? "active" : "inactive";
 
   return (
-    <PageGuard application="inventory" module="productcategories">
+    <PageGuard module="inventory" entitlement="view_productcategory">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
         <StatusModal
           isOpen={statusModal.isOpen}
@@ -187,14 +188,16 @@ export default function CategoryDetailsPage() {
 
           <div className="flex items-center gap-3">
 
-            <Button
-              variant="outline"
-              onClick={handleDelete}
-              disabled={isSubmitting}
-              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 text-sm h-9 px-4 font-medium flex items-center gap-1.5"
-            >
-              <Trash2 className="w-4 h-4" /> Delete
-            </Button>
+            <PermissionGuard module="inventory" entitlement="change_productcategory">
+              <Button
+                variant="outline"
+                onClick={handleDelete}
+                disabled={isSubmitting}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 text-sm h-9 px-4 font-medium flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </Button>
+            </PermissionGuard>
           </div>
         </div>
 

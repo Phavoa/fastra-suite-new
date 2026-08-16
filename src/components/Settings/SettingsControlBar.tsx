@@ -16,7 +16,8 @@ type SettingsControlBarProps = {
     | "user"
     | "accessgroup"
     | "application"
-    | "permissiontemplates";
+    | "permissiontemplates"
+    | "multilocation";
   onSearch?: (query: string) => void;
   onNew?: () => void;
   onShowArchivedUsers?: () => void; // NEW HANDLER
@@ -62,6 +63,23 @@ export const SettingsControlBar = ({
     }
   };
 
+  const sectionToAddEntitlement: Record<
+    | "company"
+    | "user"
+    | "accessgroup"
+    | "application"
+    | "permissiontemplates"
+    | "multilocation",
+    string
+  > = {
+    company: "change_company",
+    user: "add_tenantuser",
+    permissiontemplates: "add_permissiontemplate",
+    multilocation: "change_location",
+    accessgroup: "add_permissiontemplate",
+    application: "change_company",
+  };
+
   return (
     <div
       className={cn(
@@ -84,9 +102,8 @@ export const SettingsControlBar = ({
       <div className="flex gap-3 items-center">
         {/* Primary Button */}
         <PermissionGuard
-          application="settings"
-          module={activeSection}
-          action="create"
+          module="settings"
+          entitlement={sectionToAddEntitlement[activeSection]}
         >
           <GrayButton
             size="md"

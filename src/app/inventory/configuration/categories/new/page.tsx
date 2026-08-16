@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCreateProductCategoryMutation } from "@/api/inventory/productCategoryApi";
@@ -117,7 +118,7 @@ export default function NewCategoryPage() {
   };
 
   return (
-    <PageGuard application="inventory" module="productcategories">
+    <PageGuard module="inventory" entitlement="add_productcategory">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
         <StatusModal
           isOpen={statusModal.isOpen}
@@ -215,14 +216,16 @@ export default function NewCategoryPage() {
               Cancel
             </Button>
           </Link>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
-          >
-            <Save className="w-4 h-4" />
-            {isSubmitting ? "Saving..." : "Save Category"}
-          </Button>
+          <PermissionGuard module="inventory" entitlement="add_productcategory">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
+            >
+              <Save className="w-4 h-4" />
+              {isSubmitting ? "Saving..." : "Save Category"}
+            </Button>
+          </PermissionGuard>
         </div>
       </div>
     </PageGuard>

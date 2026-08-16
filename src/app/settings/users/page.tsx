@@ -8,6 +8,7 @@ import { ReusableTable } from "@/components/Settings/settingsReusableTable";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import { useGetUsersQuery } from "@/api/settings/usersApi";
 import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ApiUser = {
   id?: number | string;
@@ -38,8 +39,62 @@ export default function Users() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search") ?? "";
 
-  const { data: users } = useGetUsersQuery();
-  console.log(users);
+  const { data: users, isLoading, isFetching } = useGetUsersQuery();
+
+  // 👉 Loading state with skeleton
+  if (isLoading || (!users && isFetching)) {
+    return (
+      <div className="py-4 w-full">
+        {viewMode === "grid" ? (
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pr-2">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div
+                key={`skeleton-card-${index}`}
+                className="flex flex-col items-center bg-white border border-[#E2E6E9] rounded-sm p-4 shadow-xs"
+              >
+                <div className="w-20 h-20 rounded-full bg-gray-200 animate-pulse mb-3" />
+                <Skeleton className="h-5 w-32 bg-gray-200 mb-3" />
+                <div className="flex flex-col items-center gap-2 w-full">
+                  <Skeleton className="h-4 w-24 bg-gray-200" />
+                  <Skeleton className="h-4 w-40 bg-gray-200" />
+                  <Skeleton className="h-4 w-28 bg-gray-200" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white p-4 border border-[#E2E6E9] rounded-sm shadow-xs w-full">
+            <div className="bg-[#F1F2F4] p-3 rounded-t-sm flex items-center justify-between gap-4">
+              <Skeleton className="h-4 w-4 rounded bg-gray-300" />
+              <Skeleton className="h-4 w-28 bg-gray-300" />
+              <Skeleton className="h-4 w-40 bg-gray-300 hidden md:block" />
+              <Skeleton className="h-4 w-28 bg-gray-300 hidden lg:block" />
+              <Skeleton className="h-4 w-24 bg-gray-300 hidden lg:block" />
+              <Skeleton className="h-4 w-20 bg-gray-300 hidden xl:block" />
+            </div>
+            <div className="divide-y divide-gray-100">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <div
+                  key={`skeleton-row-${index}`}
+                  className="p-3 flex items-center justify-between gap-4"
+                >
+                  <Skeleton className="h-4 w-4 rounded bg-gray-200" />
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-10 h-10 rounded-full bg-gray-200 shrink-0" />
+                    <Skeleton className="h-4 w-28 bg-gray-200" />
+                  </div>
+                  <Skeleton className="h-4 w-40 bg-gray-200 hidden md:block" />
+                  <Skeleton className="h-4 w-28 bg-gray-200 hidden lg:block" />
+                  <Skeleton className="h-4 w-24 bg-gray-200 hidden lg:block" />
+                  <Skeleton className="h-4 w-20 bg-gray-200 hidden xl:block" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const formattedUsers: User[] =
     users?.map((u: any) => ({

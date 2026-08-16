@@ -8,6 +8,7 @@ import {
   NormalizedPermissions,
   normalizePermissionDetails,
   normalizePermissionsFromBackend,
+  PermissionDetail,
 } from "../utils/normalizePermissions";
 
 const PermissionContext = createContext<NormalizedPermissions | undefined>(
@@ -76,7 +77,12 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
       : user_permissions;
 
     if (dataToNormalize && Array.isArray(dataToNormalize) && dataToNormalize.length > 0) {
-      return normalizePermissionDetails(dataToNormalize);
+      const isNestedFormat = "permissions" in dataToNormalize[0];
+      if (isNestedFormat) {
+        return normalizePermissionDetails(dataToNormalize as PermissionDetail[]);
+      } else {
+        return normalizePermissionsFromBackend(dataToNormalize as any);
+      }
     }
 
     return { isAdmin: false, permissions: {}, isReady: false };

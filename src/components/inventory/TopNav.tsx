@@ -21,6 +21,20 @@ export function TopNav() {
     { label: "Scrap", href: "/inventory/stocks/scrap" },
   ];
 
+  const configurationOptions: NavOption[] = [
+    { label: "Products", href: "/inventory/configuration/products" },
+    {
+      label: "Units of Measure",
+      href: "/inventory/configuration/units-of-measure",
+    },
+    {
+      label: "Product Categories",
+      href: "/inventory/configuration/categories",
+    },
+    { label: "Locations", href: "/inventory/configuration/locations" },
+    { label: "General Settings", href: "/inventory/configuration/settings" },
+  ];
+
   const operationOptions: NavOption[] = [
     {
       label: "Incoming Product",
@@ -132,28 +146,38 @@ export function TopNav() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Static Navigation Items */}
-          <Link
-            href="/inventory/locations"
-            className={`h-full flex items-center text-base font-medium transition-all duration-200 ${
-              isActive("/inventory/locations")
-                ? "text-[#3B7CED] border-b-2 border-[#3B7CED] font-semibold"
-                : "hover:text-[#3B7CED] hover:border-b-2 hover:border-[#3B7CED]"
-            }`}
-          >
-            Location
-          </Link>
 
-          <Link
-            href="/inventory/configuration"
-            className={`h-full flex items-center text-base font-medium transition-all duration-200 ${
-              isActive("/inventory/configuration")
-                ? "text-[#3B7CED] border-b-2 border-[#3B7CED] font-semibold"
-                : "hover:text-[#3B7CED] hover:border-b-2 hover:border-[#3B7CED]"
-            }`}
-          >
-            Configuration
-          </Link>
+
+          {/* Configuration Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="h-full flex items-center text-base font-medium transition-all duration-200 hover:text-[#3B7CED] hover:border-b-2 hover:border-[#3B7CED] focus:outline-none focus:text-[#3B7CED] focus:border-b-2 focus:border-[#3B7CED] group">
+              <span className="flex items-center">
+                Configuration
+                <ChevronDownIcon className="ml-1 h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              </span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="w-64 bg-white border border-gray-200 shadow-lg rounded-lg py-2 mt-1"
+            >
+              {configurationOptions.map((option, index) => (
+                <DropdownMenuItem key={option.href} asChild>
+                  <Link
+                    href={option.href}
+                    className={`w-full px-3 py-2.5 text-sm cursor-pointer transition-colors duration-150 border-l-2 ${
+                      isActive(option.href)
+                        ? "text-[#3B7CED] bg-blue-50 border-l-[#3B7CED] font-medium"
+                        : "text-gray-700 hover:text-[#3B7CED] hover:bg-gray-50 hover:border-l-gray-300"
+                    } ${
+                      index === configurationOptions.length - 1 ? "rounded-b-lg" : ""
+                    }`}
+                  >
+                    {option.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
         <NotifySection />
       </div>

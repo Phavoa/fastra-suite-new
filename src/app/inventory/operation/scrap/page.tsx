@@ -11,6 +11,7 @@ import { BreadcrumbItem } from "@/components/shared/types";
 import { StockAdjustmentCards } from "@/components/inventory/scrap/StockAdjustmentCards";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import {
   Table,
   TableBody,
@@ -86,7 +87,7 @@ export default function ScrapPage() {
   };
 
   return (
-    <PageGuard application="inventory" module="scrap">
+    <PageGuard module="inventory" entitlement="view_scrap">
       {/* Two-tone: gray page canvas */}
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
@@ -124,11 +125,13 @@ export default function ScrapPage() {
               </div>
 
               <div className="flex items-center gap-3 self-end sm:self-auto">
-                <Link href="/inventory/operation/scrap/new">
-                  <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                    Record New Scrap
-                  </Button>
-                </Link>
+                <PermissionGuard module="inventory" entitlement="add_scrap">
+                  <Link href="/inventory/operation/scrap/new">
+                    <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                      Record New Scrap
+                    </Button>
+                  </Link>
+                </PermissionGuard>
                 <div className="flex items-center border border-gray-200 rounded-lg p-0.5 bg-white gap-0.5 shadow-2xs">
                   <button
                     type="button"

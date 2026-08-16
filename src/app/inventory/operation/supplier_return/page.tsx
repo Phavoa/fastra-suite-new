@@ -86,7 +86,7 @@ export default function SupplierReturnPage() {
   };
 
   return (
-    <PageGuard application="inventory" module="supplier_return">
+    <PageGuard module="inventory" entitlement="view_returnincomingproduct">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs

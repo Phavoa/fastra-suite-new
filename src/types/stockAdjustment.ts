@@ -93,6 +93,7 @@ export interface StockAdjustment {
   warehouse_location: string;
   warehouse_location_details: WarehouseLocationDetails;
   notes: string;
+  reason?: string;
   status: StockAdjustmentStatus;
   is_hidden: boolean;
   stock_adjustment_items: StockAdjustmentItem[];
@@ -104,6 +105,7 @@ export interface StockAdjustment {
 export interface CreateStockAdjustmentRequest {
   warehouse_location: string;
   notes?: string;
+  reason?: string;
   status?: StockAdjustmentStatus;
   is_hidden?: boolean;
   stock_adjustment_items: {
@@ -115,6 +117,7 @@ export interface CreateStockAdjustmentRequest {
 export interface UpdateStockAdjustmentRequest {
   warehouse_location?: string;
   notes?: string;
+  reason?: string;
   status?: StockAdjustmentStatus;
   is_hidden?: boolean;
   stock_adjustment_items?: {

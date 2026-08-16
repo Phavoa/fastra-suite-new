@@ -215,7 +215,7 @@ export default function MaterialConsumptionApprovalsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedRequests.map((req) => (
+                    paginatedRequests.map((req: any) => (
                       <TableRow
                         key={req.id}
                         className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"

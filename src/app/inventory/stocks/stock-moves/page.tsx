@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StockMovesPage() {
   const { data: movesResponse, isLoading, isError } = useGetStockMovesQuery({});
-  const moves = movesResponse?.results || [];
+  const moves = (movesResponse as any)?.results || (Array.isArray(movesResponse) ? movesResponse : []);
 
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("ALL");

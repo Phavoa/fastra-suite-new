@@ -64,6 +64,31 @@ const APP_LABEL_MAP: Record<string, string> = {
  *
  * Output: NormalizedPermissions with a Record of "module" → Set<entitlement>
  */
+function expandPermissionType(type: string): PermissionAction[] {
+  const actions: PermissionAction[] = [];
+  const normalizedType = type.toLowerCase();
+  
+  if (normalizedType === "reviewer" || normalizedType === "viewer") {
+    actions.push("view");
+  } else if (normalizedType === "processor" || normalizedType === "editor") {
+    actions.push("view", "create" as any, "add" as any, "edit" as any, "change" as any);
+  } else if (normalizedType === "creator") {
+    actions.push("view", "create" as any, "add" as any);
+  } else if (
+    normalizedType === "manager" ||
+    normalizedType === "admin" ||
+    normalizedType === "administrator"
+  ) {
+    actions.push("view", "create" as any, "add" as any, "edit" as any, "change" as any, "delete" as any);
+  } else if (normalizedType === "approver") {
+    actions.push("view", "approve" as any, "reject" as any);
+  } else {
+    actions.push(type as PermissionAction);
+  }
+  
+  return actions;
+}
+
 export function normalizePermissionDetails(
   permissionDetails: PermissionDetail[] | undefined,
 ): NormalizedPermissions {
@@ -74,14 +99,65 @@ export function normalizePermissionDetails(
   }
 
   for (const detail of permissionDetails) {
+    if (!detail.permissions || !Array.isArray(detail.permissions)) continue;
     for (const perm of detail.permissions) {
-      for (const entitlement of perm.entitlements) {
-        // Normalize entitlement names to PermissionAction vocabulary
-        const action = DJANGO_ACTION_MAP[entitlement] ?? entitlement;
-        if (!permissions[detail.module]) {
-          permissions[detail.module] = new Set();
+      if (!permissions[detail.module]) {
+        permissions[detail.module] = new Set();
+      }
+
+      // Add the raw permission_type and its expanded actions (e.g. administrator/admin/reviewer)
+      if (perm.permission_type) {
+        permissions[detail.module].add(perm.permission_type as PermissionAction);
+        const expanded = expandPermissionType(perm.permission_type);
+        for (const act of expanded) {
+          permissions[detail.module].add(act);
         }
-        permissions[detail.module].add(action);
+      }
+
+      // Add any explicit entitlements
+      if (perm.entitlements && Array.isArray(perm.entitlements)) {
+        for (let entitlement of perm.entitlements) {
+          // --- TEMPORARY WORKAROUND FOR BACKEND TYPOS & MISMATCHES ---
+          const toAdd: string[] = [];
+          
+          if (entitlement === "edit_unit_of_measurecreate_location") {
+            toAdd.push("change_unitofmeasure", "add_location");
+          } else if (entitlement === "view_unit_of_measureview_location") {
+            toAdd.push("view_unitofmeasure", "view_location");
+          } else if (entitlement === "create_stock_movecreate_location") {
+            toAdd.push("add_stockmove", "add_location");
+          } else {
+            toAdd.push(entitlement);
+          }
+
+          // Map new backend names to the old Django names the frontend UI expects
+          const TEMPORARY_MAP: Record<string, string> = {
+            "view_product_category": "view_productcategory",
+            "create_product_category": "add_productcategory",
+            "edit_product_category": "change_productcategory",
+            "delete_product_category": "delete_productcategory",
+            "view_unit_of_measure": "view_unitofmeasure",
+            "create_unit_of_measure": "add_unitofmeasure",
+            "edit_unit_of_measure": "change_unitofmeasure",
+            "delete_unit_of_measure": "delete_unitofmeasure",
+            "create_products": "add_products",
+            "edit_products": "change_products",
+            "view_stock_adjustment": "view_stockadjustment",
+            "create_stock_adjustment": "add_stockadjustment",
+            "edit_stock_adjustment": "change_stockadjustment",
+            "create_location": "add_location",
+            "edit_location": "change_location",
+            "create_delivery_return": "add_returnincomingproduct",
+            "edit_delivery_return": "change_returnincomingproduct",
+            // Add any other specific mappings here if needed
+          };
+
+          for (const rawEnt of toAdd) {
+            const mappedEnt = TEMPORARY_MAP[rawEnt] || rawEnt;
+            const action = DJANGO_ACTION_MAP[mappedEnt] ?? mappedEnt;
+            permissions[detail.module].add(action as PermissionAction);
+          }
+        }
       }
     }
   }
@@ -89,19 +165,6 @@ export function normalizePermissionDetails(
   return { isAdmin: false, permissions, isReady: true };
 }
 
-/**
- * Normalizes the old backend permission format (array of Django codenames).
- *
- * Input: string[] of Django codenames, e.g.:
- *   ["inventory.view_deliveryorder", "purchase.add_purchaserequest"]
- *
- * Or the new format (array of {module, permission_type}):
- *   [{module: "project_costing", permission_type: "reviewer"}]
- *
- * Output: NormalizedPermissions with a Record of "application:module" → Set<PermissionAction>
- *
- * @deprecated Use normalizePermissionDetails instead.
- */
 export function normalizePermissionsFromBackend(
   user_permissions: string[] | Array<{ module: string; permission_type: string }>
 ): NormalizedPermissions {
@@ -117,6 +180,10 @@ export function normalizePermissionsFromBackend(
       const key = entry.module;
       if (!permissions[key]) {
         permissions[key] = new Set();
+      }
+      const expanded = expandPermissionType(entry.permission_type);
+      for (const act of expanded) {
+        permissions[key].add(act);
       }
       permissions[key].add(entry.permission_type as PermissionAction);
     }

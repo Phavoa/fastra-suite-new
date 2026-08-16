@@ -39,26 +39,27 @@ export default function PlantEquipmentRequestDetailPage() {
 
   useEffect(() => {
     if (apiRequest) {
-      const projectId = apiRequest.project_details?.id || apiRequest.project_request_id || apiRequest.project_request || (apiRequest as any).project;
+      const req = apiRequest as any;
+      const projectId = req.project_details?.id || req.project_request_id || req.project_request?.id || req.project_request || req.project;
       const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
       setRequest({
-        id: String(apiRequest.reference_id || apiRequest.project_request?.reference_id || apiRequest.id),
-        project: apiRequest.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
-        equipment: apiRequest.equipment_name || "-",
-        description: apiRequest.description || "",
-        quantity: apiRequest.quantity || 0,
-        estimatedCost: parseFloat(apiRequest.estimated_cost) || 0,
-        status: (apiRequest.project_request?.status || (apiRequest as any).status || "pending") as "draft" | "approved" | "pending" | "rejected",
-        requester: (apiRequest as any).created_by_name || (apiRequest as any).requester_name || "Current User",
-        date: new Date(apiRequest.created_at || Date.now()).toLocaleDateString("en-GB", {
+        id: String(req.reference_id || req.project_request?.reference_id || req.id),
+        project: req.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
+        equipment: req.equipment_name || "-",
+        description: req.description || "",
+        quantity: req.quantity || 0,
+        estimatedCost: parseFloat(req.estimated_cost) || 0,
+        status: (req.project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
+        requester: req.created_by_name || req.requester_name || "Current User",
+        date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
           year: "numeric"
         }),
-        requiredDate: apiRequest.required_date ? new Date(apiRequest.required_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-",
-        phase: apiRequest.phase_details?.name || "-",
-        task: apiRequest.activity_details?.name || "-",
-        notes: apiRequest.justification_notes || ""
+        requiredDate: req.required_date ? new Date(req.required_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-",
+        phase: req.phase_details?.name || "-",
+        task: req.activity_details?.name || "-",
+        notes: req.justification_notes || ""
       });
     } else {
       setRequest(null);

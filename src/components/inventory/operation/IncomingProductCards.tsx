@@ -68,7 +68,7 @@ function IncomingProductCard({ incomingProduct, index }: IncomingProductCardProp
           {incomingProduct.receipt_type.replace(/_/g, " ")}
         </h3>
         <p className="text-xs text-[#8898AA] font-medium truncate">
-          {incomingProduct.supplier_details?.vendor_name || "—"}
+          {incomingProduct.supplier_details?.company_name || "—"}
         </p>
       </div>
 

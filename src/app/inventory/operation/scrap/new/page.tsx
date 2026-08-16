@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import StatusModal, { extractErrorMessage } from "@/components/shared/StatusModal";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
@@ -188,7 +189,7 @@ export default function CreateScrapPage() {
     );
 
     if (validItems.length === 0) {
-      setNotification({
+      setToastState({
         message:
           "Please add at least one valid item with product and scrap quantity greater than 0",
         type: "error",
@@ -256,7 +257,7 @@ export default function CreateScrapPage() {
 
 
   return (
-    <PageGuard application="inventory" module="scrap">
+    <PageGuard module="inventory" entitlement="add_scrap">
       {/* Two-tone: gray page canvas */}
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-28">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
@@ -533,14 +534,16 @@ export default function CreateScrapPage() {
               Cancel
             </Button>
           </Link>
-          <Button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubmit(onSave)}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm h-9 px-4 font-semibold shadow-2xs"
-          >
-            {isSubmitting ? "Saving..." : "Save Scrap"}
-          </Button>
+          <PermissionGuard module="inventory" entitlement="add_scrap">
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubmit(onSave)}
+              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm h-9 px-4 font-semibold shadow-2xs"
+            >
+              {isSubmitting ? "Saving..." : "Save Scrap"}
+            </Button>
+          </PermissionGuard>
         </div>
 
         {/* Status Modal */}

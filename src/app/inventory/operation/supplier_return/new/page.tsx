@@ -14,9 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import { useStatusModal, StatusModal } from "@/components/shared/StatusModal";
 import { useGetIncomingProductQuery } from "@/api/inventory/incomingProductApi";
 import { useCreateIncomingProductReturnMutation } from "@/api/inventory/incomingProductReturns";
 import Link from "next/link";
@@ -39,7 +40,7 @@ export default function NewSupplierReturnPage() {
   const [items, setItems] = useState<ReturnLine[]>([]);
   const [reasonForReturn, setReasonForReturn] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notification, setNotification] = useState({ show: false, message: "", type: "success" as "success" | "error" });
+  const statusModal = useStatusModal();
 
   const { data: receiptData, isLoading: isReceiptLoading } = useGetIncomingProductQuery(receiptId as string, { skip: !receiptId });
   const [createReturn] = useCreateIncomingProductReturnMutation();
@@ -82,30 +83,30 @@ export default function NewSupplierReturnPage() {
     e.preventDefault();
     
     if (items.length === 0) {
-      setNotification({ show: true, message: "You must include at least one product to return.", type: "error" });
+      statusModal.showError("Validation Error", "You must include at least one product to return.");
       return;
     }
 
     if (!reasonForReturn.trim()) {
-      setNotification({ show: true, message: "A reason for return is required.", type: "error" });
+      statusModal.showError("Validation Error", "A reason for return is required.");
       return;
     }
 
     const linesToReturn = items.filter(it => it.return_quantity > 0);
 
     if (linesToReturn.length === 0) {
-      setNotification({ show: true, message: "You must specify a return quantity greater than 0 for at least one product.", type: "error" });
+      statusModal.showError("Validation Error", "You must specify a return quantity greater than 0 for at least one product.");
       return;
     }
 
     const invalidLines = linesToReturn.filter(it => it.return_quantity > it.received_quantity);
     if (invalidLines.length > 0) {
-      setNotification({ show: true, message: "Return quantity cannot exceed received quantity.", type: "error" });
+      statusModal.showError("Validation Error", "Return quantity cannot exceed received quantity.");
       return;
     }
 
     if (!receiptData?.incoming_product_id) {
-      setNotification({ show: true, message: "Original receipt data is missing.", type: "error" });
+      statusModal.showError("Validation Error", "Original receipt data is missing.");
       return;
     }
 
@@ -124,17 +125,24 @@ export default function NewSupplierReturnPage() {
 
       await createReturn(payload).unwrap();
       
-      setNotification({ show: true, message: "Supplier return document generated successfully.", type: "success" });
-      setTimeout(() => router.push("/inventory/operation/supplier_return"), 1500);
+      statusModal.showSuccess(
+        "Return Generated",
+        "Supplier return document generated successfully.",
+        "Go to Supplier Returns",
+        () => router.push("/inventory/operation/supplier_return")
+      );
     } catch (err: any) {
-      setNotification({ show: true, message: err?.data?.error?.[0]?.cause || "Failed to create return document.", type: "error" });
+      statusModal.showError(
+        "Return Generation Failed",
+        err?.data?.error?.[0]?.cause || "Failed to create return document."
+      );
       setIsSubmitting(false);
     }
   };
 
   if (!receiptId) {
     return (
-      <PageGuard application="inventory" module="supplier_return">
+      <PageGuard module="inventory" entitlement="add_returnincomingproduct">
         <div className="flex flex-col h-screen items-center justify-center bg-[#F6F9FC] gap-4">
           <p className="text-[#525F7F]">No original receipt specified for return.</p>
           <Button variant="outline" onClick={() => router.back()} className="border-gray-200 text-gray-600">Go Back</Button>
@@ -145,7 +153,7 @@ export default function NewSupplierReturnPage() {
 
   if (isReceiptLoading) {
     return (
-      <PageGuard application="inventory" module="supplier_return">
+      <PageGuard module="inventory" entitlement="add_returnincomingproduct">
         <div className="flex h-screen items-center justify-center bg-[#F6F9FC]">
           <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
         </div>
@@ -154,7 +162,7 @@ export default function NewSupplierReturnPage() {
   }
 
   return (
-    <PageGuard application="inventory" module="supplier_return">
+    <PageGuard module="inventory" entitlement="add_returnincomingproduct">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs items={breadcrumbsItem} />
@@ -282,17 +290,29 @@ export default function NewSupplierReturnPage() {
           <Button variant="outline" type="button" onClick={() => router.back()} className="border-blue-400 text-blue-500 hover:bg-blue-50">
             Cancel
           </Button>
-          <Button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubmit}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
-          >
-            {isSubmitting ? "Validating..." : "Confirm Return"}
-          </Button>
+          <PermissionGuard module="inventory" entitlement="add_returnincomingproduct">
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubmit}
+              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+            >
+              {isSubmitting ? "Validating..." : "Confirm Return"}
+            </Button>
+          </PermissionGuard>
         </div>
 
-        <ToastNotification message={notification.message} type={notification.type as any} show={notification.show} onClose={() => setNotification(p => ({...p, show: false}))} />
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={statusModal.close}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          secondaryText={statusModal.secondaryText}
+          onSecondary={statusModal.onSecondary}
+        />
       </div>
     </PageGuard>
   );

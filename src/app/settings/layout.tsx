@@ -17,7 +17,8 @@ type SettingsSection =
   | "user"
   | "accessgroup"
   | "application"
-  | "permissiontemplates";
+  | "permissiontemplates"
+  | "multilocation";
 
 export default function SettingsLayout({
   children,
@@ -46,6 +47,11 @@ export default function SettingsLayout({
       label: "Permission Templates",
       href: "/settings/permission-templates",
     },
+    {
+      key: "multilocation",
+      label: "Multi Location",
+      href: "/settings/multi-location",
+    },
     //{ label: "Application", href: "/settings/application" },
   ];
 
@@ -56,6 +62,8 @@ export default function SettingsLayout({
     if (path.startsWith("/settings/application")) return "application";
     if (path.startsWith("/settings/permission-templates"))
       return "permissiontemplates";
+    if (path.startsWith("/settings/multi-location"))
+      return "multilocation";
     return "company";
   };
 
@@ -141,9 +149,20 @@ export default function SettingsLayout({
       pathname !== "/settings/permission-templates") ||
     pathname === "/settings" ||
     pathname === "/settings/company/1" ||
+    pathname === "/settings/multi-location" ||
     /^\/settings\/company\/updatecompany\/?$/.test(pathname);
+
+  const sectionToEntitlement: Record<SettingsSection, string> = {
+    company: "view_company",
+    user: "view_tenantuser",
+    permissiontemplates: "view_permissiontemplate",
+    multilocation: "view_location",
+    accessgroup: "view_permissiontemplate",
+    application: "view_company",
+  };
+
   return (
-    <PageGuard application="settings" module={activeSection}>
+    <PageGuard module="settings" entitlement={sectionToEntitlement[activeSection]}>
       <NavBar title="Settings" items={navItems} activeHref={activeNav?.href} />
 
       {/* Breadcrumb / secondary top bar */}
