@@ -364,7 +364,7 @@ export default function NewIncomingProductPage() {
       const productId = res?.incoming_product_id || res?.id;
       
       if (productId) {
-        createdProductId = productId;
+        createdProductId = productId.toString();
         await validateIncomingProduct({ id: createdProductId }).unwrap();
         statusModal.showSuccess(
           "GRN Validated",

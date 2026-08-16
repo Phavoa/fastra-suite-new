@@ -73,7 +73,9 @@ export default function MaterialConsumptionRequestDetailPage() {
   const handleStatusChange = async (newStatus: "approved" | "rejected" | "pending") => {
     try {
       if (newStatus === "pending" && request) {
-        const parentId = request.project_request;
+        const parentId = typeof request.project_request === "object" 
+          ? (request.project_request as any)?.id 
+          : request.project_request;
         if (parentId) {
           await submitProjectRequest({ id: parentId as number }).unwrap();
           setModalState({
@@ -176,6 +178,12 @@ export default function MaterialConsumptionRequestDetailPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  const availableBudgetFormatted = (request as any).available_budget
+    ? parseFloat((request as any).available_budget).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "0.00";
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-24 font-sans antialiased text-gray-900">
@@ -259,7 +267,7 @@ export default function MaterialConsumptionRequestDetailPage() {
             <div className="flex justify-between py-1.5 border-b border-gray-50">
               <span className="text-gray-500 font-semibold">Project ID</span>
               <span className="font-bold text-gray-900">
-                Project #{request.project_request || "General"}
+                Project #{(request as any).project_request?.reference_id || (request as any).project_request?.id || "General"}
               </span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-gray-50">
@@ -272,6 +280,12 @@ export default function MaterialConsumptionRequestDetailPage() {
               <span className="text-gray-500 font-semibold">Total Cost</span>
               <span className="font-black text-[#3B7CED] text-sm">
                 ₦{totalCostFormatted}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500 font-semibold">Available Budget</span>
+              <span className="font-bold text-gray-900">
+                ₦{availableBudgetFormatted}
               </span>
             </div>
             {request.notes && (

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Package, Scale, Tags, Settings, ArrowRight } from "lucide-react";
+import { Package, Scale, Tags, Settings, ArrowRight, MapPin } from "lucide-react";
 import { BreadcrumbItem } from "@/components/shared/types";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,14 @@ export default function InventoryConfiguration() {
       icon: Tags,
       color: "text-purple-600",
       bg: "bg-purple-50",
+    },
+    {
+      title: "Locations",
+      description: "Configure physical warehouses, stock yards, and active project locations.",
+      href: "/inventory/configuration/locations",
+      icon: MapPin,
+      color: "text-rose-600",
+      bg: "bg-rose-50",
     },
     {
       title: "General Settings",

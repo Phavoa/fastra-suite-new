@@ -22,7 +22,43 @@ export function usePermission() {
 
       // New API: direct module + entitlement check
       if (entitlement && module) {
-        return permissions[module]?.has(entitlement as PermissionAction) ?? false;
+        const hasDirect = permissions[module]?.has(entitlement as PermissionAction) ?? false;
+        if (hasDirect) {
+          return true;
+        }
+
+        // Administrator / Admin / Manager role has access to all actions in this module
+        if (
+          permissions[module]?.has("administrator" as PermissionAction) ||
+          permissions[module]?.has("admin" as PermissionAction) ||
+          permissions[module]?.has("manager" as PermissionAction)
+        ) {
+          return true;
+        }
+
+        // Fallback: If user has generic "view" entitlement, and the check is for a view entitlement
+        if (entitlement.startsWith("view") && permissions[module]?.has("view" as PermissionAction)) {
+          return true;
+        }
+
+        // Fallback: If user has generic "create" or "add" entitlement, and the check is for an add/create entitlement
+        if ((entitlement.startsWith("add") || entitlement.startsWith("create")) && 
+            (permissions[module]?.has("create" as PermissionAction) || permissions[module]?.has("add" as PermissionAction))) {
+          return true;
+        }
+
+        // Fallback: If user has generic "edit" or "change" entitlement, and the check is for a change/edit entitlement
+        if ((entitlement.startsWith("change") || entitlement.startsWith("edit")) && 
+            (permissions[module]?.has("edit" as PermissionAction) || permissions[module]?.has("change" as PermissionAction))) {
+          return true;
+        }
+
+        // Fallback: If user has generic "delete" entitlement, and the check is for a delete entitlement
+        if (entitlement.startsWith("delete") && permissions[module]?.has("delete" as PermissionAction)) {
+          return true;
+        }
+
+        return false;
       }
 
       // Legacy API: application:module + action check

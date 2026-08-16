@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -131,7 +132,7 @@ export default function UnitOfMeasureDetailsPage() {
 
   if (isLoadingUnit) {
     return (
-      <PageGuard application="inventory" module="unitsofmeasure">
+      <PageGuard module="inventory" entitlement="view_unitofmeasure">
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-[#F6F9FC]">
           <Loader2 className="h-8 w-8 animate-spin text-[#3B7CED]" />
           <p className="mt-2 text-sm font-semibold text-[#8898AA]">Loading unit details...</p>
@@ -143,7 +144,7 @@ export default function UnitOfMeasureDetailsPage() {
   const statusStr = isActive ? "ACTIVE" : "INACTIVE";
 
   return (
-    <PageGuard application="inventory" module="unitsofmeasure">
+    <PageGuard module="inventory" entitlement="view_unitofmeasure">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
         <StatusModal
           isOpen={statusModal.isOpen}
@@ -188,19 +189,21 @@ export default function UnitOfMeasureDetailsPage() {
 
           <div className="flex items-center gap-3">
 
-            <Button
-              variant="outline"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="border-red-200 text-red-600 hover:bg-red-50 text-sm h-9 px-4 font-medium flex items-center gap-1.5"
-            >
-              {isDeleting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-              Delete
-            </Button>
+            <PermissionGuard module="inventory" entitlement="change_unitofmeasure">
+              <Button
+                variant="outline"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="border-red-200 text-red-600 hover:bg-red-50 text-sm h-9 px-4 font-medium flex items-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Delete
+              </Button>
+            </PermissionGuard>
           </div>
         </div>
 

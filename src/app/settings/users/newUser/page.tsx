@@ -258,7 +258,7 @@ export default function NewUser() {
   };
 
   return (
-    <PageGuard application="settings" module="user" action="create">
+    <PageGuard module="settings" entitlement="add_tenantuser">
       <div className="pb-6 w-full mx-auto mw-full rounded-xs bg-white">
         {/* Top bar */}
         <div className="flex px-6 items-center border-b py-4 border-[#E2E6E9]">

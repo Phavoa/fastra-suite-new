@@ -19,7 +19,7 @@ function LocationCard({ location, index }: LocationCardProps) {
   const router = useRouter();
 
   const handleCardClick = () => {
-    router.push(`/inventory/locations/${location.id}`);
+    router.push(`/inventory/configuration/locations/${location.id}`);
   };
 
   return (

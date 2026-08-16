@@ -122,7 +122,7 @@ export default function EditStockAdjustmentPage() {
       stockAdjustmentSchema,
     ) as Resolver<StockAdjustmentFormData>,
     values: record ? {
-      warehouse_location: String(record.warehouse_location?.id || record.warehouse_location || ""),
+      warehouse_location: String((record.warehouse_location as any)?.id || record.warehouse_location || ""),
       notes: record.notes || record.reason || "",
     } : {
       warehouse_location: "",
@@ -132,7 +132,7 @@ export default function EditStockAdjustmentPage() {
 
   useEffect(() => {
     if (record) {
-      const apiItems = record.stock_adjustment_items || record.items || [];
+      const apiItems = record.stock_adjustment_items || (record as any).items || [];
       if (apiItems.length > 0) {
         setItems(
           apiItems.map((item: any) => ({

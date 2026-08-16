@@ -14,6 +14,7 @@ import {
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 export default function ApproveRequestPage() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export default function ApproveRequestPage() {
       );
       refetch();
     } catch (err: any) {
-      const errMsg = err?.data?.message || err?.data?.detail || "An error occurred while approving the request.";
+      const errMsg = extractErrorMessage(err, "An error occurred while approving the request.");
       statusModal.showError("Approval Failed", errMsg);
     }
   };
@@ -82,7 +83,7 @@ export default function ApproveRequestPage() {
       );
       refetch();
     } catch (err: any) {
-      const errMsg = err?.data?.message || err?.data?.detail || "An error occurred while rejecting the request.";
+      const errMsg = extractErrorMessage(err, "An error occurred while rejecting the request.");
       statusModal.showError("Rejection Failed", errMsg);
     }
   };

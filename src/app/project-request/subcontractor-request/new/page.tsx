@@ -218,7 +218,8 @@ export default function NewSubcontractorRequestPage() {
 
         const payload: any = {
           project: Number(data.project),
-          project_request: Number(data.project),
+          activity: ensureValidUUID(data.task),
+          vendor: Number(data.vendor),
           scope_of_work: data.scope_of_work,
           payment_type: "lump_sum",
           contract_value: data.contract_value,
@@ -227,9 +228,6 @@ export default function NewSubcontractorRequestPage() {
           end_date: data.end_date,
           justification_notes: data.justification_notes || "",
           milestones: [],
-          vendor: Number(data.vendor),
-          activity: ensureValidUUID(data.task),
-          wbs_element: ensureValidUUID(data.task),
         };
 
         await createRequest(payload).unwrap();

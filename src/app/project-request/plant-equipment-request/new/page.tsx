@@ -134,7 +134,7 @@ export default function NewPlantEquipmentRequestPage() {
   const { data: budgetData, isLoading: isBudgetLoading } = useGetAvailableBudgetQuery(
     {
       project_id: Number(selectedProjectId),
-      wbs_id: Number(selectedTaskId),
+      wbs_id: selectedTaskId,
       cost_code: selectedCostCode,
     },
     { skip: !selectedProjectId || !selectedTaskId }

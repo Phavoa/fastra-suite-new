@@ -6,7 +6,6 @@ import {
   MenuIcon,
   DashboardIcon,
   AccountIcon,
-  PurchaseIcon,
   SalesIcon,
   FinanceIcon,
   InventoryIcon,
@@ -32,12 +31,11 @@ const middleItems = [
     label: "Invoice",
     route: "/invoice/approved-requests",
   },
-  { id: "purchase", icon: PurchaseIcon, label: "Purchase", route: "/purchase" },
   {
     id: "inventory",
     icon: InventoryIcon,
     label: "Inventory",
-    route: "/inventory",
+    route: "/inventory/operation",
   },
   {
     id: "project-request",
@@ -110,8 +108,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           return true;
         case "account":
           return hasAccess("invoice");
-        case "purchase":
-          return hasAccess("purchase");
         case "inventory":
           return hasAccess("inventory");
         case "project-request":
@@ -144,11 +140,20 @@ const Sidebar: React.FC<SidebarProps> = ({
     router.push(item.route);
   };
 
-  const isActiveItem = (route: string) => {
-    if (route === "/") {
+  const isActiveItem = (item: { id: string; route: string }) => {
+    if (item.route === "/") {
       return pathname === "/";
     }
-    return pathname?.startsWith(route);
+    if (item.id === "account") {
+      return pathname?.startsWith("/invoice");
+    }
+    if (item.id === "inventory") {
+      return pathname?.startsWith("/inventory");
+    }
+    if (item.id === "settings") {
+      return pathname?.startsWith("/settings");
+    }
+    return pathname?.startsWith(item.route);
   };
 
   const handleMouseEnter = (
@@ -201,7 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           {visibleMiddleItems.map((item) => {
             const IconComponent = item.icon;
-            const isActive = isActiveItem(item.route);
+            const isActive = isActiveItem(item);
             return (
               <button
                 key={item.id}
@@ -239,7 +244,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           {visibleBottomItems.map((item) => {
             const IconComponent = item.icon;
-            const isActive = isActiveItem(item.route);
+            const isActive = isActiveItem(item);
             return (
               <button
                 key={item.id}

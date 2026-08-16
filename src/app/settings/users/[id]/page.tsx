@@ -262,7 +262,7 @@ export default function UsersDetails() {
           </button>
           <h1 className="text-xl text-[#1A1A1A] font-normal">User Details</h1>
         </div>
-        <PermissionGuard application="settings" module="user" action="edit">
+        <PermissionGuard module="settings" entitlement="change_tenantuser">
           <button
             className="text-[#3B7CED]"
             onClick={() => setEditMode((prev) => !prev)}
@@ -294,7 +294,7 @@ export default function UsersDetails() {
         >
           Module Permissions
         </button>
-        <PermissionGuard application="settings" module="user" action="edit">
+        <PermissionGuard module="settings" entitlement="change_tenantuser">
           <button
             onClick={handleResetPassword}
             disabled={resetLoading}

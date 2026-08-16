@@ -14,6 +14,7 @@ import {
 import { Edit, RotateCcw, Package } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
@@ -177,7 +178,7 @@ export default function IncomingProductDetailPage() {
   };
 
   return (
-    <PageGuard application="inventory" module="incomingproduct">
+    <PageGuard module="inventory" entitlement="view_incomingproduct">
       <StatusModal
         isOpen={statusModal.isOpen}
         type={statusModal.type}
@@ -190,9 +191,7 @@ export default function IncomingProductDetailPage() {
       <DiscrepancyDialog
         isOpen={discrepancyState.isOpen}
         type={discrepancyState.type}
-        onOpenChange={(open) => {
-          if (!open) setDiscrepancyState({ isOpen: false, type: null, ipId: null });
-        }}
+        onClose={() => setDiscrepancyState({ isOpen: false, type: null, ipId: null })}
         onConfirm={handleCreateBackorder}
         onDecline={handleCloseWithoutBackorder}
       />
@@ -249,27 +248,33 @@ export default function IncomingProductDetailPage() {
             <div className="flex items-center gap-3 self-end sm:self-auto">
               {displayData.status === "draft" && (
                 <>
-                  <Link href={`/inventory/operation/incoming_product/edit/${encodeURIComponent(decodeURIComponent(id))}`}>
-                    <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                      <Edit className="w-4 h-4 mr-1.5" /> Edit
+                  <PermissionGuard module="inventory" entitlement="change_incomingproduct">
+                    <Link href={`/inventory/operation/incoming_product/edit/${encodeURIComponent(decodeURIComponent(id))}`}>
+                      <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                        <Edit className="w-4 h-4 mr-1.5" /> Edit
+                      </Button>
+                    </Link>
+                  </PermissionGuard>
+                  <PermissionGuard module="inventory" entitlement="change_incomingproduct">
+                    <Button 
+                      onClick={handleValidate} 
+                      disabled={isValidating}
+                      className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all"
+                    >
+                      {isValidating ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Check className="w-4 h-4 mr-1.5" />}
+                      Confirm Quantities
                     </Button>
-                  </Link>
-                  <Button 
-                    onClick={handleValidate} 
-                    disabled={isValidating}
-                    className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all"
-                  >
-                    {isValidating ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Check className="w-4 h-4 mr-1.5" />}
-                    Confirm Quantities
-                  </Button>
+                  </PermissionGuard>
                 </>
               )}
               {displayData.status === "validated" && (
-                <Link href={`/inventory/operation/supplier_return/new?receiptId=${encodeURIComponent(decodeURIComponent(id))}`}>
-                  <Button variant="outline" className="border-red-300 text-[#E43D2B] hover:bg-red-50 h-9 px-4 rounded-md font-medium text-sm transition-all">
-                    <RotateCcw className="w-4 h-4 mr-1.5" /> Return to Supplier
-                  </Button>
-                </Link>
+                <PermissionGuard module="inventory" entitlement="add_returnincomingproduct">
+                  <Link href={`/inventory/operation/supplier_return/new?receiptId=${encodeURIComponent(decodeURIComponent(id))}`}>
+                    <Button variant="outline" className="border-red-300 text-[#E43D2B] hover:bg-red-50 h-9 px-4 rounded-md font-medium text-sm transition-all">
+                      <RotateCcw className="w-4 h-4 mr-1.5" /> Return to Supplier
+                    </Button>
+                  </Link>
+                </PermissionGuard>
               )}
             </div>
           </div>

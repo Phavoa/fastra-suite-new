@@ -63,6 +63,9 @@ export default function LabourRequestDetailPage() {
 
   const projectId = request?.project || projectRequest?.project;
   const activityId = request?.activity;
+  
+  const approvalNotes = (request as any)?.approval_notes || (request as any)?.approval_comment || (request as any)?.notes || "";
+  const rejectionReason = (request as any)?.rejection_reason || (request as any)?.rejection_comment || (request as any)?.notes || "";
 
   const { data: projectCosting, isLoading: isBudgetLoading } = useGetProjectCostingProjectQuery(
     Number(projectId),

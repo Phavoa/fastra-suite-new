@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Edit, Trash2, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
@@ -56,7 +57,7 @@ export default function ScrapDetailPage() {
   ];
 
   return (
-    <PageGuard application="inventory" module="scrap">
+    <PageGuard module="inventory" entitlement="view_scrap">
       {/* Two-tone: gray page canvas */}
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
@@ -106,18 +107,22 @@ export default function ScrapDetailPage() {
             <div className="flex items-center gap-3">
               {record.status === "draft" && (
                 <>
-                  <Button 
-                    onClick={handleValidate} 
-                    disabled={isValidating}
-                    className="bg-[#2BA24D] hover:bg-[#238a40] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-1.5" /> {isValidating ? "Validating..." : "Validate"}
-                  </Button>
-                  <Link href={`/inventory/operation/scrap/edit/${id}`}>
-                    <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                      <Edit className="w-4 h-4 mr-1.5" /> Edit Draft
+                  <PermissionGuard module="inventory" entitlement="change_scrap">
+                    <Button 
+                      onClick={handleValidate} 
+                      disabled={isValidating}
+                      className="bg-[#2BA24D] hover:bg-[#238a40] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1.5" /> {isValidating ? "Validating..." : "Validate"}
                     </Button>
-                  </Link>
+                  </PermissionGuard>
+                  <PermissionGuard module="inventory" entitlement="change_scrap">
+                    <Link href={`/inventory/operation/scrap/edit/${id}`}>
+                      <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                        <Edit className="w-4 h-4 mr-1.5" /> Edit Draft
+                      </Button>
+                    </Link>
+                  </PermissionGuard>
                 </>
               )}
             </div>

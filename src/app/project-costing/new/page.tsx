@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { BasicInformationForm } from "@/components/project-costing/BasicInformationForm";
 import { WBSTable } from "@/components/project-costing/wbs/WBSTable";
 import { Phase, Activity } from "@/components/project-costing/types";
-import { useCreateProjectCostingProjectMutation } from "@/api/projectCostingApi";
+import { useCreateProjectCostingProjectMutation, useAddProjectDocumentMutation } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { extractErrorMessage } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,6 +39,7 @@ export default function NewProjectPage() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const [createProject, { isLoading }] = useCreateProjectCostingProjectMutation();
+  const [addProjectDocument] = useAddProjectDocumentMutation();
   const statusModal = useStatusModal();
 
   const wbsFileInputRef = useRef<HTMLInputElement>(null);
@@ -308,7 +309,7 @@ export default function NewProjectPage() {
     }));
 
     try {
-      await createProject({
+      const res = await createProject({
         name,
         client_name: clientName,
         project_type: projectType,
@@ -318,6 +319,33 @@ export default function NewProjectPage() {
         site_location: siteLocation,
         phases: phasesPayload,
       } as any).unwrap();
+
+      const newProjectId = res.id;
+
+      // Upload documents if any
+      if (documents.length > 0 && newProjectId) {
+        // We will loop and upload sequentially to avoid overwhelming the server
+        for (const doc of documents) {
+          const formData = new FormData();
+          if (doc.file) {
+            formData.append("file", doc.file);
+            formData.append("name", doc.file.name);
+            formData.append("document_type", "FILE");
+          } else if (doc.url) {
+            // For links, some backends accept URL in a specific field, we'll try sending it as a text field
+            formData.append("url", doc.url);
+            formData.append("name", doc.name);
+            formData.append("document_type", "LINK");
+          }
+          
+          try {
+            await addProjectDocument({ id: newProjectId, body: formData }).unwrap();
+          } catch (docErr) {
+            console.error("Failed to upload document:", doc.name, docErr);
+            // We ignore individual document upload failures so we don't break the whole project creation flow
+          }
+        }
+      }
 
       statusModal.showSuccess(
         "Project Created Successfully",

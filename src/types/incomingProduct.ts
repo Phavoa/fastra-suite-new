@@ -71,6 +71,7 @@ export interface SupplierDetails {
   url: string;
   id: number;
   company_name: string;
+  vendor_name?: string;
   profile_picture: string;
   email: string;
   address: string;
@@ -79,10 +80,15 @@ export interface SupplierDetails {
 }
 
 export interface IncomingProduct {
+  id?: number | string;
   incoming_product_id: string;
   receipt_type: string;
   related_po: string | null;
   related_ppo?: number | null;
+  related_ppo_details?: {
+    id: number;
+    po_number: string;
+  };
   supplier: number;
   source_location: string;
   source_location_details: LocationDetails;

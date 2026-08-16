@@ -4,8 +4,9 @@ import React, { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import { useStatusModal, StatusModal } from "@/components/shared/StatusModal";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -75,6 +76,7 @@ export default function EditScrapPage() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const statusModal = useStatusModal();
 
   const [items, setItems] = useState<ScrapLineItem[]>([
     {
@@ -86,16 +88,6 @@ export default function EditScrapPage() {
       scrap_quantity: "2",
     },
   ]);
-
-  const [notification, setNotification] = React.useState<{
-    message: string;
-    type: "success" | "error";
-    show: boolean;
-  }>({
-    message: "",
-    type: "success",
-    show: false,
-  });
 
   const addRow = () =>
     setItems((prev) => [
@@ -163,22 +155,20 @@ export default function EditScrapPage() {
     );
 
     if (validItems.length === 0) {
-      setNotification({
-        message: "Please add at least one valid product line to scrap",
-        type: "error",
-        show: true,
-      });
+      statusModal.showError(
+        "Validation Error",
+        "Please add at least one valid product line to scrap"
+      );
       return;
     }
 
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      setNotification({
-        message: "Scrap record draft updated!",
-        type: "success",
-        show: true,
-      });
+      statusModal.showSuccess(
+        "Success",
+        "Scrap record draft updated!"
+      );
 
       setTimeout(() => {
         router.push(`/inventory/operation/scrap/${id}`);
@@ -192,21 +182,19 @@ export default function EditScrapPage() {
     );
 
     if (validItems.length === 0) {
-      setNotification({
-        message: "Please add at least one valid product line to scrap",
-        type: "error",
-        show: true,
-      });
+      statusModal.showError(
+        "Validation Error",
+        "Please add at least one valid product line to scrap"
+      );
       return;
     }
 
     for (const item of validItems) {
       if (Number(item.scrap_quantity) > Number(item.current_quantity)) {
-        setNotification({
-          message: `Cannot scrap more than available stock (${item.current_quantity}) for selected product.`,
-          type: "error",
-          show: true,
-        });
+        statusModal.showError(
+          "Validation Error",
+          `Cannot scrap more than available stock (${item.current_quantity}) for selected product.`
+        );
         return;
       }
     }
@@ -214,24 +202,26 @@ export default function EditScrapPage() {
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      setNotification({
-        message: "Scrap record validated! Stock deducted and recorded in Ledger.",
-        type: "success",
-        show: true,
-      });
-
-      setTimeout(() => {
-        router.push(`/inventory/operation/scrap/${id}`);
-      }, 1000);
+      statusModal.showSuccess(
+        "Scrap Validated",
+        "Scrap record validated! Stock deducted and recorded in Ledger.",
+        "View Scrap Record",
+        () => router.push(`/inventory/operation/scrap/${id}`)
+      );
     }, 500);
   }
 
-  function closeNotification() {
-    setNotification((prev) => ({ ...prev, show: false }));
-  }
-
   return (
-    <PageGuard application="inventory" module="scrap">
+    <PageGuard module="inventory" entitlement="change_scrap">
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        actionText={statusModal.actionText}
+        onAction={statusModal.onAction}
+        onClose={statusModal.close}
+      />
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
         {/* Clean Header */}
         <div className="flex items-center px-6 py-4 border-b border-gray-100">
@@ -430,21 +420,28 @@ export default function EditScrapPage() {
               Cancel
             </Button>
           </Link>
-          <Button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubmit(onValidate)}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
-          >
-            {isSubmitting ? "Validating..." : "Validate"}
-          </Button>
+          <PermissionGuard module="inventory" entitlement="change_scrap">
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubmit(onValidate)}
+              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
+            >
+              {isSubmitting ? "Validating..." : "Validate"}
+            </Button>
+          </PermissionGuard>
         </div>
 
-        <ToastNotification
-          message={notification.message}
-          type={notification.type}
-          show={notification.show}
-          onClose={closeNotification}
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={statusModal.close}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          secondaryText={statusModal.secondaryText}
+          onSecondary={statusModal.onSecondary}
         />
       </div>
     </PageGuard>

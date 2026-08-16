@@ -23,63 +23,6 @@ import {
 } from "recharts";
 import { ProjectCostingProject } from "@/types/projectCosting";
 
-// Fake Data Generation
-const MOCK_LINE_DATA = [
-  { month: "Jan", planned: 500000, actual: 480000 },
-  { month: "Feb", planned: 800000, actual: 820000 },
-  { month: "Mar", planned: 1200000, actual: 1100000 },
-  { month: "Apr", planned: 1500000, actual: 1600000 },
-  { month: "May", planned: 2000000, actual: 1950000 },
-  { month: "Jun", planned: 2500000, actual: 2600000 },
-];
-
-const MOCK_PIE_DATA = [
-  { name: "Labor", value: 4500000 },
-  { name: "Materials", value: 3200000 },
-  { name: "Equipment", value: 1500000 },
-  { name: "Subcontractors", value: 800000 },
-];
-const COLORS = ["#3B7CED", "#F09100", "#2BA24D", "#9B51E0"];
-
-const MOCK_WBS_DATA = [
-  {
-    id: "PH-001",
-    name: "Phase 1: Foundation & Structuring",
-    amount: "4500000.00",
-    activities: [
-      { id: "ACT-001", name: "Site Clearance", amount: "500000.00" },
-      { id: "ACT-002", name: "Excavation", amount: "1000000.00" },
-      { id: "ACT-003", name: "Concrete Pouring", amount: "3000000.00" },
-    ]
-  },
-  {
-    id: "PH-002",
-    name: "Phase 2: Core Engineering",
-    amount: "3000000.00",
-    activities: [
-      { id: "ACT-004", name: "Steel Framework", amount: "1500000.00" },
-      { id: "ACT-005", name: "Roofing Installation", amount: "1500000.00" },
-    ]
-  },
-  {
-    id: "PH-003",
-    name: "Phase 3: Interior Finishing",
-    amount: "2500000.00",
-    activities: [
-      { id: "ACT-006", name: "Drywall & Plastering", amount: "800000.00" },
-      { id: "ACT-007", name: "Electrical Wiring", amount: "700000.00" },
-      { id: "ACT-008", name: "Plumbing", amount: "1000000.00" },
-    ]
-  }
-];
-
-const MOCK_TRANSACTIONS = [
-  { date: "2026-07-20", ref: "TRX-1092", category: "Labor", amount: "450000.00", status: "Completed" },
-  { date: "2026-07-18", ref: "TRX-1091", category: "Materials", amount: "1200000.00", status: "Completed" },
-  { date: "2026-07-15", ref: "TRX-1090", category: "Equipment", amount: "350000.00", status: "Pending" },
-  { date: "2026-07-10", ref: "TRX-1089", category: "Subcontractors", amount: "200000.00", status: "Completed" },
-];
-
 const formatCurrency = (amount: number | string) => {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -88,8 +31,34 @@ const formatCurrency = (amount: number | string) => {
   }).format(Number(amount));
 };
 
-export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCostingProject }) => {
+interface ExportTemplateProps {
+  project?: ProjectCostingProject;
+  transactions?: any[];
+  parsedPhases?: any[];
+  customColumns?: string[];
+  budgetNum?: number;
+  actualSpend?: number;
+  committedSpend?: number;
+  lineChartData?: any[];
+  pieChartData?: any[];
+}
+
+export const ProjectCostingExportTemplate = ({
+  project,
+  transactions = [],
+  parsedPhases = [],
+  customColumns = [],
+  budgetNum = 0,
+  actualSpend = 0,
+  committedSpend = 0,
+  lineChartData = [],
+  pieChartData = []
+}: ExportTemplateProps) => {
   const today = new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
+  const remaining = budgetNum - actualSpend;
+  const variance = budgetNum > 0 ? ((budgetNum - actualSpend) / budgetNum) * 100 : 0;
+  
+  const COLORS = ["#3B7CED", "#2BA24D", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
   return (
     <div className="w-[1400px] bg-gray-50 p-8 font-sans text-gray-800 flex flex-col gap-6 relative overflow-hidden">
@@ -108,14 +77,14 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
             </div>
             <div>
               <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">{project?.name || "Mock Fastra Residential Estate Project"}</h2>
+                <h2 className="text-2xl font-bold text-gray-800">{project?.name || "Project"}</h2>
                 <Badge className="bg-green-100 text-green-700 px-3 py-0.5 border-0 font-medium text-xs">
                   {project?.status || "ACTIVE"}
                 </Badge>
               </div>
-              <div className="text-sm text-gray-500 mt-2">{project?.project_code || "PRJ-2026-X99"}</div>
+              <div className="text-sm text-gray-500 mt-2">{(project as any)?.project_code || "PRJ-CODE"}</div>
               <div className="text-sm text-gray-800 mt-1">
-                <span className="font-semibold text-gray-600">Project Manager:</span> John Doe <span className="mx-2"> </span> <span className="font-semibold text-gray-600">Date:</span> {project?.start_date || "2026-01-01"} - {project?.expected_end_date || "2026-12-31"}
+                <span className="font-semibold text-gray-600">Project Manager:</span> {(project as any)?.project_manager || "Manager"} <span className="mx-2"> </span> <span className="font-semibold text-gray-600">Date:</span> {(project as any)?.start_date || "Start Date"} - {(project as any)?.expected_end_date || "End Date"}
               </div>
             </div>
           </div>
@@ -129,23 +98,23 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
         <div className="grid grid-cols-5 gap-4">
           <div className="p-5 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col justify-center">
             <div className="text-xs text-blue-600 font-bold mb-1 uppercase tracking-wide">Total Planned Budget</div>
-            <div className="text-2xl font-black text-blue-900">{formatCurrency(10000000)}</div>
+            <div className="text-2xl font-black text-blue-900">{formatCurrency(budgetNum)}</div>
           </div>
           <div className="p-5 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col justify-center">
             <div className="text-xs text-orange-600 font-bold mb-1 uppercase tracking-wide">Amount Spent (Actual)</div>
-            <div className="text-2xl font-black text-orange-900">{formatCurrency(8550000)}</div>
+            <div className="text-2xl font-black text-orange-900">{formatCurrency(actualSpend)}</div>
           </div>
           <div className="p-5 rounded-xl border border-purple-100 bg-purple-50/50 flex flex-col justify-center">
             <div className="text-xs text-purple-600 font-bold mb-1 uppercase tracking-wide">Committed</div>
-            <div className="text-2xl font-black text-purple-900">{formatCurrency(250000)}</div>
+            <div className="text-2xl font-black text-purple-900">{formatCurrency(committedSpend)}</div>
           </div>
           <div className="p-5 rounded-xl border border-green-100 bg-green-50/50 flex flex-col justify-center">
             <div className="text-xs text-green-600 font-bold mb-1 uppercase tracking-wide">Remaining</div>
-            <div className="text-2xl font-black text-green-900">{formatCurrency(1200000)}</div>
+            <div className="text-2xl font-black text-green-900">{formatCurrency(remaining)}</div>
           </div>
           <div className="p-5 rounded-xl border border-red-100 bg-red-50/50 flex flex-col justify-center">
             <div className="text-xs text-red-600 font-bold mb-1 uppercase tracking-wide">Variance</div>
-            <div className="text-2xl font-black text-red-900">8.5%</div>
+            <div className="text-2xl font-black text-red-900">{variance.toFixed(1)}%</div>
           </div>
         </div>
 
@@ -155,9 +124,9 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
             <h3 className="text-lg font-medium text-[#3B7CED] mb-6">Spend Over Time vs Budget Curve</h3>
             <div className="flex-1 w-full min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={MOCK_LINE_DATA} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={lineChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} tickFormatter={(val) => val === 0 ? "₦0" : `₦${(val/1000000).toFixed(1)}M`} />
                   <Tooltip formatter={(value) => formatCurrency(value as number)} />
                   <Legend />
@@ -173,8 +142,8 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
             <div className="flex-1 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={MOCK_PIE_DATA}
+                    <Pie
+                    data={pieChartData.length > 0 ? pieChartData : [{ name: "No Data", value: 1 }]}
                     cx="50%"
                     cy="45%"
                     innerRadius={75}
@@ -194,6 +163,7 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
                       const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                       const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
                       const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+                      if (pieChartData.length === 0) return null;
                       return (
                         <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
                           {`${(percent * 100).toFixed(0)}%`}
@@ -202,8 +172,8 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
                     }}
                     labelLine={false}
                   >
-                    {MOCK_PIE_DATA.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {(pieChartData.length > 0 ? pieChartData : [{ name: "No Data", value: 1 }]).map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
@@ -217,7 +187,7 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
               {/* Inner Pie Chart Label (Donut Hole text) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-12">
                 <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Total</span>
-                <span className="text-lg font-black text-gray-800">{formatCurrency(10000000).replace(/\.\d+/, '')}</span>
+                <span className="text-lg font-black text-gray-800">{formatCurrency(actualSpend).replace(/\.\d+/, '')}</span>
               </div>
             </div>
           </div>
@@ -231,36 +201,54 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
           <Table>
             <TableHeader className="bg-gray-50 border-b border-gray-200">
               <TableRow className="hover:bg-gray-50">
-                <TableHead className="w-20 font-bold text-gray-700">S/N</TableHead>
+                <TableHead className="w-16 font-bold text-gray-700">S/N</TableHead>
                 <TableHead className="font-bold text-gray-700">Phase / Activity</TableHead>
-                <TableHead className="text-right font-bold text-gray-700">Planned Amount</TableHead>
-                <TableHead className="text-right font-bold text-gray-700">Actual Cost</TableHead>
-                <TableHead className="text-right font-bold text-gray-700">Variance</TableHead>
+                <TableHead className="font-bold text-gray-700 text-center w-16">Qty</TableHead>
+                <TableHead className="font-bold text-gray-700 text-right">Rate</TableHead>
+                <TableHead className="text-right font-bold text-gray-700">Budget</TableHead>
+                {customColumns.map(col => (
+                  <TableHead key={col} className="font-bold text-gray-700 text-right">{col}</TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {MOCK_WBS_DATA.map((phase, pIndex) => (
-                <React.Fragment key={phase.id}>
+              {parsedPhases.map((phase, pIndex) => (
+                <React.Fragment key={phase.id || pIndex}>
                   {/* Phase Row */}
-                  <TableRow className="bg-gray-50/80 border-b border-gray-200">
-                    <TableCell className="font-bold text-gray-800">{pIndex + 1}</TableCell>
-                    <TableCell className="font-bold text-gray-800">{phase.name}</TableCell>
-                    <TableCell className="text-right font-bold text-gray-800">{formatCurrency(phase.amount)}</TableCell>
-                    <TableCell className="text-right font-bold text-gray-800">{formatCurrency(Number(phase.amount) * 0.9)}</TableCell>
-                    <TableCell className="text-right font-bold text-green-600">{formatCurrency(Number(phase.amount) * 0.1)}</TableCell>
+                  <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white">
+                    <TableCell className="font-bold text-gray-800"></TableCell>
+                    <TableCell className="font-bold text-gray-800">{phase.name || `Phase ${pIndex + 1}`}</TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell className="text-right font-bold text-gray-800">
+                      {formatCurrency(phase.activities?.reduce((sum: number, act: any) => sum + Number(act.amount || 0), 0) || 0)}
+                    </TableCell>
+                    {customColumns.map(col => <TableCell key={col}></TableCell>)}
                   </TableRow>
                   {/* Activity Rows */}
-                  {phase.activities.map((act, aIndex) => (
-                    <TableRow key={act.id} className="border-b border-gray-100">
+                  {phase.activities?.map((act: any, aIndex: number) => (
+                    <TableRow key={act.id || aIndex} className="border-b border-gray-100">
                       <TableCell className="text-gray-500 pl-4">{pIndex + 1}.{aIndex + 1}</TableCell>
                       <TableCell className="pl-10 text-gray-600">{act.name}</TableCell>
-                      <TableCell className="text-right text-gray-600">{formatCurrency(act.amount)}</TableCell>
-                      <TableCell className="text-right text-gray-600">{formatCurrency(Number(act.amount) * 0.85)}</TableCell>
-                      <TableCell className="text-right text-green-600">{formatCurrency(Number(act.amount) * 0.15)}</TableCell>
+                      <TableCell className="text-center text-gray-600">{act.quantity || 1}</TableCell>
+                      <TableCell className="text-right text-gray-600">{formatCurrency(act.rate || Number(act.amount || 0) / Number(act.quantity || 1))}</TableCell>
+                      <TableCell className="text-right text-gray-600">{formatCurrency(act.amount || 0)}</TableCell>
+                      {customColumns.map(col => (
+                        <TableCell key={col} className="text-right text-gray-600">
+                          {act[col] || act.custom_values?.[col] || ""}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </React.Fragment>
               ))}
+              {parsedPhases.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5 + customColumns.length} className="text-center py-6 text-gray-500">
+                    No phases data available for this project.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -281,19 +269,25 @@ export const ProjectCostingExportTemplate = ({ project }: { project?: ProjectCos
               </TableRow>
             </TableHeader>
             <TableBody>
-              {MOCK_TRANSACTIONS.map((trx, idx) => (
+              {transactions.length > 0 ? transactions.slice(0, 10).map((trx: any, idx: number) => (
                 <TableRow key={idx} className="border-b border-gray-100">
-                  <TableCell className="text-gray-600">{trx.date}</TableCell>
-                  <TableCell className="font-medium text-gray-800">{trx.ref}</TableCell>
-                  <TableCell className="text-gray-600">{trx.category}</TableCell>
-                  <TableCell className="text-right font-bold text-gray-800">{formatCurrency(trx.amount)}</TableCell>
+                  <TableCell className="text-gray-600">{new Date(trx.created_at || trx.date).toLocaleDateString()}</TableCell>
+                  <TableCell className="font-medium text-gray-800">{trx.reference_id || trx.ref || `TRX-${idx}`}</TableCell>
+                  <TableCell className="text-gray-600">{trx.category || trx.type || trx.request_type || "-"}</TableCell>
+                  <TableCell className="text-right font-bold text-gray-800">{formatCurrency(trx.amount || trx.total_amount || trx.detail?.total_amount || 0)}</TableCell>
                   <TableCell>
-                    <Badge variant={trx.status === "Completed" ? "validated" : "pending"} className="shadow-none border-0 px-2 py-0.5 font-normal">
-                      {trx.status}
+                    <Badge variant={(trx.status || "Completed") === "Completed" ? "validated" : "pending"} className="shadow-none border-0 px-2 py-0.5 font-normal">
+                      {trx.status || "Completed"}
                     </Badge>
                   </TableCell>
                 </TableRow>
-              ))}
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                    No recent transactions recorded for this project yet.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>

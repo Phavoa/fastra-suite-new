@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCreateInventoryUnitOfMeasureMutation } from "@/api/inventory/unitOfMeasureApi";
@@ -72,7 +73,7 @@ export default function NewUnitOfMeasurePage() {
   };
 
   return (
-    <PageGuard application="inventory" module="unitsofmeasure">
+    <PageGuard module="inventory" entitlement="add_unitofmeasure">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-24">
         <StatusModal
           isOpen={statusModal.isOpen}
@@ -165,23 +166,25 @@ export default function NewUnitOfMeasurePage() {
               Cancel
             </Button>
           </Link>
-          <Button
-            onClick={handleSubmit}
-            disabled={isCreating}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Unit
-              </>
-            )}
-          </Button>
+          <PermissionGuard module="inventory" entitlement="add_unitofmeasure">
+            <Button
+              onClick={handleSubmit}
+              disabled={isCreating}
+              className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 text-sm font-semibold shadow-2xs flex items-center gap-1.5"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Save Unit
+                </>
+              )}
+            </Button>
+          </PermissionGuard>
         </div>
       </div>
     </PageGuard>

@@ -168,6 +168,14 @@ export const projectCostingApi = createApi({
         body,
       }),
     }),
+    addProjectDocument: builder.mutation<ProjectCostingProject, { id: number; body: FormData }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/add_document/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: "ProjectCosting", id }],
+    }),
 
     // Phase & Activity Management
     createAddPhaseActivity: builder.mutation<{ phase_id: number; activities: Activity[] }, { id: number; body: CreateAddPhaseActivityRequest }>({
@@ -300,6 +308,7 @@ export const {
   useCloseProjectMutation,
   useRejectProjectMutation,
   useSubmitProjectMutation,
+  useAddProjectDocumentMutation,
   useCreateAddPhaseActivityMutation,
   useDeletePhaseMutation,
   useUpdatePhaseBundleMutation,

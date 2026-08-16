@@ -25,13 +25,6 @@ const cards = [
     link: "/accounts",
   },
   {
-    title: "Purchase",
-    icon: <FaShoppingCart className="text-blue-600 text-3xl" />,
-    description:
-      "Streamline procurement processes by tracking purchase orders, vendor management, and inventory replenishment to optimize supply chain efficiency and cost savings.",
-    link: "/purchase",
-  },
-  {
     title: "Sales",
     icon: <FaChartLine className="text-green-600 text-3xl" />,
     description:
@@ -50,7 +43,7 @@ const cards = [
     icon: <FaWarehouse className="text-green-600 text-3xl" />,
     description:
       "Monitor stock levels, track inventory movements, and optimize warehouse operations to ensure optimal inventory management and minimize stockouts.",
-    link: "/inventory",
+    link: "/inventory/operation",
   },
   {
     title: "HR",

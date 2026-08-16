@@ -68,7 +68,7 @@ export default function Settings() {
 
   console.log("company", company);
   return (
-    <PageGuard application="settings" module="company" action="view">
+    <PageGuard module="settings" entitlement="view_company">
       <div className="py-4 w-full">
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -21,6 +21,12 @@ export interface StockMove {
   moved_by_details: any;
   date_moved: string;
   date_created: string;
+  created_at?: string;
+  notes?: string;
+  unit_cost?: number;
+  total_value?: number;
+  source_location_details?: any;
+  destination_location_details?: any;
 }
 
 export interface GetStockMovesParams {

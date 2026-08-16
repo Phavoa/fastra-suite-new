@@ -12,9 +12,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import { useStatusModal, StatusModal } from "@/components/shared/StatusModal";
 import { useGetIncomingProductReturnQuery } from "@/api/inventory/incomingProductReturns";
 import { Loader2 } from "lucide-react";
 
@@ -22,7 +23,7 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
   const { id } = use(params);
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notification, setNotification] = useState({ show: false, message: "", type: "success" as const });
+  const statusModal = useStatusModal();
 
   const safeId = encodeURIComponent(decodeURIComponent(id));
   const { data: returnData, isLoading } = useGetIncomingProductReturnQuery(safeId);
@@ -41,14 +42,18 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      setNotification({ show: true, message: "Supplier return validated and stock deducted.", type: "success" });
-      setTimeout(() => router.push("/inventory/operation/supplier_return"), 1500);
+      statusModal.showSuccess(
+        "Return Validated",
+        "Supplier return validated and stock deducted.",
+        "Go to Supplier Returns",
+        () => router.push("/inventory/operation/supplier_return")
+      );
     }, 1000);
   };
 
   if (isLoading) {
     return (
-      <PageGuard application="inventory" module="supplier_return">
+      <PageGuard module="inventory" entitlement="view_returnincomingproduct">
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)] bg-[#F6F9FC]">
           <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
         </div>
@@ -58,7 +63,7 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
 
   if (!returnData) {
     return (
-      <PageGuard application="inventory" module="supplier_return">
+      <PageGuard module="inventory" entitlement="view_returnincomingproduct">
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-[#F6F9FC] gap-4">
           <p className="text-gray-500">Return record not found.</p>
           <Button onClick={() => router.push("/inventory/operation/supplier_return")} variant="outline">Back to List</Button>
@@ -68,7 +73,7 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
   }
 
   return (
-    <PageGuard application="inventory" module="supplier_return">
+    <PageGuard module="inventory" entitlement="view_returnincomingproduct">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <div className="flex items-center justify-between">
@@ -161,18 +166,30 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
             {isDraft ? "Cancel" : "Back"}
           </Button>
           {isDraft && (
-             <Button
+            <PermissionGuard module="inventory" entitlement="change_returnincomingproduct">
+              <Button
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleValidate}
                 className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
-            >
+              >
                 {isSubmitting ? "Validating..." : "Validate Return"}
-            </Button>
+              </Button>
+            </PermissionGuard>
           )}
         </div>
 
-        <ToastNotification message={notification.message} type={notification.type as any} show={notification.show} onClose={() => setNotification(p => ({...p, show: false}))} />
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={statusModal.close}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          secondaryText={statusModal.secondaryText}
+          onSecondary={statusModal.onSecondary}
+        />
       </div>
     </PageGuard>
   );

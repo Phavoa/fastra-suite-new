@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Edit, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { useGetStockAdjustmentQuery, useValidateStockAdjustmentMutation } from "@/api/inventory/stockAdjustmentApi";
-import StatusModal, { extractErrorMessage } from "@/components/shared/StatusModal";
+import StatusModal, { useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 import {
   Table,
   TableBody,
@@ -23,6 +24,7 @@ export default function StockAdjustmentDetailPage() {
 
   const { data: adjData, isLoading, error } = useGetStockAdjustmentQuery(id, { skip: !id });
   const [validateAdj, { isLoading: isValidating }] = useValidateStockAdjustmentMutation();
+  const statusModal = useStatusModal();
 
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
@@ -71,7 +73,7 @@ export default function StockAdjustmentDetailPage() {
   } : null;
 
   return (
-    <PageGuard application="inventory" module="stockadjustment">
+    <PageGuard module="inventory" entitlement="view_stockadjustment">
       <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
         {/* Clean Header Card */}
         {isLoading && <div className="p-6 text-center text-gray-500">Loading record details...</div>}
@@ -105,22 +107,26 @@ export default function StockAdjustmentDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {record.status === "draft" && (
-              <>
-                <Button 
-                  onClick={handleValidate} 
-                  disabled={isValidating}
-                  className="bg-[#2BA24D] hover:bg-[#238a40] text-white text-sm font-semibold h-9 px-4 shadow-2xs"
-                >
-                  <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> {isValidating ? "Validating..." : "Validate"}
-                </Button>
-                <Link href={`/inventory/stocks/adjustment/edit/${id}`}>
-                  <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm font-semibold h-9 px-4 shadow-2xs">
-                    <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit Draft
-                  </Button>
-                </Link>
-              </>
-            )}
+              {record.status === "draft" && (
+                <>
+                  <PermissionGuard module="inventory" entitlement="change_stockadjustment">
+                    <Button 
+                      onClick={handleValidate} 
+                      disabled={isValidating}
+                      className="bg-[#2BA24D] hover:bg-[#238a40] text-white text-sm font-semibold h-9 px-4 shadow-2xs"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> {isValidating ? "Validating..." : "Validate"}
+                    </Button>
+                  </PermissionGuard>
+                  <PermissionGuard module="inventory" entitlement="change_stockadjustment">
+                    <Link href={`/inventory/stocks/adjustment/edit/${id}`}>
+                      <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm font-semibold h-9 px-4 shadow-2xs">
+                        <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit Draft
+                      </Button>
+                    </Link>
+                  </PermissionGuard>
+                </>
+              )}
           </div>
         </div>
 

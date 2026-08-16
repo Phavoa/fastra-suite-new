@@ -69,6 +69,12 @@ export default function InventoryLayout({
           module: "productcategories",
         },
         {
+          label: "Locations",
+          href: "/inventory/configuration/locations",
+          application: "inventory",
+          module: "location",
+        },
+        {
           label: "Settings",
           href: "/inventory/configuration/settings",
           application: "inventory",

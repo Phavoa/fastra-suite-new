@@ -41,14 +41,14 @@ export default function PlantEquipmentRequestDashboard() {
     if (apiRequests && Array.isArray(apiRequests)) {
       const mapped = apiRequests.map((req: any) => {
         return {
-          id: String(req.project_request_id || req.project_request?.id || req.id),
-          referenceId: String(req.reference_id || req.project_request?.reference_id || req.id),
+          id: String(req.id),
+          referenceId: String((req as any).project_request?.reference_id || req.reference_id || req.id),
           project: req.project_details?.name || "General Project",
           equipment: req.equipment_name || "-",
           description: req.description || "",
           quantity: req.quantity || 0,
           estimatedCost: parseFloat(req.estimated_cost) || 0,
-          status: (req.project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
+          status: ((req as any).project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
           requester: req.created_by_name || "Requester",
           date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
             day: "numeric",

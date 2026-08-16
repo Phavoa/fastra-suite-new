@@ -177,6 +177,13 @@ export const plantEquipmentRequestApi = createApi({
     getHiddenPlantEquipmentRequests: builder.query<PlantEquipmentRequest[], void>({
       query: () => "/project-requests/plant-equipment/hidden_list/",
     }),
+    submitPlantEquipmentRequest: builder.mutation<PlantEquipmentRequest, { id: number; data?: any }>({
+      query: ({ id, data }) => ({
+        url: `/project-requests/project-requests/${id}/submit/`,
+        method: "POST",
+        body: data || {},
+      }),
+    }),
   }),
 });
 
@@ -191,4 +198,5 @@ export const {
   useToggleHiddenStatusMutation,
   useGetActivePlantEquipmentRequestsQuery,
   useGetHiddenPlantEquipmentRequestsQuery,
+  useSubmitPlantEquipmentRequestMutation,
 } = plantEquipmentRequestApi;
