@@ -33,7 +33,7 @@ export default function SubcontractorRequestPage() {
     // Wait, the previous mock had status. I'll use a placeholder or check if vendor_name exists to count as 'draft'.
     
     requests.forEach((req: any) => {
-      const status = (req.status || "pending") as RequestStatus;
+      const status = ((req as any).project_request?.status || req.status || "pending") as RequestStatus;
       if (counts[status] !== undefined) {
         counts[status]++;
       }
@@ -96,33 +96,36 @@ export default function SubcontractorRequestPage() {
         borderColorClass: "border-red-200",
       },
     ],
-    renderItem: (request: any) => (
+    renderItem: (req: any) => {
+      const displayTitle = (req as any).activity_details?.name || (req as any).project_details?.name || "Subcontractor Request";
+      
+      return (
       <div 
-        key={request.id}
-        onClick={() => router.push(`/project-request/subcontractor-request/${request.id}`)}
+        key={req.id}
+        onClick={() => router.push(`/project-request/subcontractor-request/${req.id}`)}
         className="p-4 border border-gray-200 rounded-lg bg-white hover:border-[#3B7CED] hover:shadow-md transition-all cursor-pointer group"
       >
         <div className="flex justify-between items-start">
-          <span className="text-sm font-bold text-[#3B7CED] group-hover:text-blue-600">{request.reference_id || `SR-${String(request.id).padStart(5, "0")}`}</span>
-          <Badge variant={getStatusBadgeVariant(request.status || "pending")}>
-            {(request.status || "pending").charAt(0).toUpperCase() + (request.status || "pending").slice(1)}
+          <span className="text-sm font-bold text-[#3B7CED] group-hover:text-blue-600">{(req as any).project_request?.reference_id || req.reference_id || `SR-${String(req.id).padStart(5, "0")}`}</span>
+          <Badge variant={getStatusBadgeVariant((req as any).project_request?.status || req.status || "pending")}>
+            {((req as any).project_request?.status || req.status || "pending").charAt(0).toUpperCase() + ((req as any).project_request?.status || req.status || "pending").slice(1)}
           </Badge>
         </div>
-        <p className="text-sm font-bold text-gray-900 mt-1">{request.vendor_name || "No Vendor Name"}</p>
+        <p className="text-sm font-bold text-gray-900 mt-1">{displayTitle}</p>
 
         <div className="flex justify-between items-center mt-4">
           <div>
             <p className="text-xs text-gray-400 font-medium uppercase tracking-tight">Scope of Work</p>
-            <p className="text-sm font-semibold text-gray-700 mt-0.5 line-clamp-1">{request.scope_of_work}</p>
+            <p className="text-sm font-semibold text-gray-700 mt-0.5 line-clamp-1">{req.scope_of_work}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-tight">Value</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">₦{Number(request.contract_value).toLocaleString()}</p>
+            <p className="text-sm font-bold text-gray-900 mt-0.5">₦{Number(req.contract_value || 0).toLocaleString()}</p>
           </div>
         </div>
       </div>
-    ),
-    mockData: requests.map(req => ({ ...req, status: req.status || "pending" })),
+    )},
+    mockData: requests.map(req => ({ ...req, status: (req as any).project_request?.status || req.status || "pending" })),
   };
 
   if (isLoading) {

@@ -11,12 +11,27 @@ import {
   XCircle,
   HelpCircle,
   Loader2,
+  Edit,
+  Trash2,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   useGetSubcontractorRequestQuery,
+  useDeleteSubcontractorRequestMutation,
+  useSubmitSubcontractorRequestMutation,
 } from "@/api/subcontractorRequestApi";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
+import { extractErrorMessage } from "@/lib/utils";
 
 export default function SubcontractorRequestDetailsPage() {
   const params = useParams();
@@ -24,8 +39,14 @@ export default function SubcontractorRequestDetailsPage() {
   const statusModal = useStatusModal();
   const requestId = Number(params.id);
 
-  const { data: request, isLoading, error } =
+  const { canDo } = useModulePermissions();
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+
+  const { data: request, isLoading, error, refetch } =
     useGetSubcontractorRequestQuery(requestId);
+
+  const [deleteRequest, { isLoading: isDeleting }] = useDeleteSubcontractorRequestMutation();
+  const [submitRequest, { isLoading: isSubmitting }] = useSubmitSubcontractorRequestMutation();
 
   const getStatusBadgeClass = (status?: string) => {
     switch (status) {
@@ -60,10 +81,49 @@ export default function SubcontractorRequestDetailsPage() {
 
   const handleModalClose = () => {
     statusModal.close();
-    if (statusModal.type === "success") {
+    if (statusModal.type === "success" && !isConfirmDeleteOpen) {
       router.push("/project-request/subcontractor-request");
     }
   };
+
+  const handleEdit = () => {
+    router.push(`/project-request/subcontractor-request/edit/${requestId}`);
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteRequest(requestId).unwrap();
+      setIsConfirmDeleteOpen(false);
+      statusModal.showSuccess(
+        "Request Deleted",
+        "The subcontractor request has been deleted successfully."
+      );
+    } catch (error) {
+      console.error("Failed to delete request:", error);
+      statusModal.showError("Error", extractErrorMessage(error, "Failed to delete the request. Please try again."));
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const parentRequestId = (request as any)?.project_request?.id || (request as any)?.project_request;
+      if (!parentRequestId) throw new Error("Could not find parent project request ID");
+      await submitRequest({ id: parentRequestId }).unwrap();
+      statusModal.showSuccess(
+        "Request Submitted",
+        "The subcontractor request has been submitted for approval."
+      );
+      refetch();
+    } catch (error) {
+      console.error("Failed to submit request:", error);
+      statusModal.showError("Submit Failed", extractErrorMessage(error, "Failed to submit the request. Please try again."));
+    }
+  };
+
+  const requestStatus = (request as any)?.project_request?.status || request?.status;
+  const canEdit = requestStatus === "draft" && canDo("project_request", "edit");
+  const canDelete = requestStatus === "draft" && canDo("project_request", "delete");
+  const canSubmit = requestStatus === "draft" && canDo("project_request", "submit");
 
   if (isLoading) {
     return (
@@ -110,6 +170,16 @@ export default function SubcontractorRequestDetailsPage() {
     maximumFractionDigits: 2,
   });
 
+  const displayTitle = request.vendor_name || (request as any).activity_details?.name || (request as any).project_details?.name || "Subcontractor Contract";
+  const displayRefId = (request as any).project_request?.reference_id || request.reference_id || `SR-${String(request.id).padStart(5, "0")}`;
+  const displayStatus = (request as any).project_request?.status || request.status;
+  
+  const requesterName = 
+    (request as any).project_request?.created_by_details?.user?.first_name || 
+    (request as any).project_request?.created_by_details?.user?.username || 
+    request.created_by_name || 
+    "Unknown User";
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-24 font-sans antialiased text-gray-900">
       {/* Header Bar */}
@@ -148,14 +218,14 @@ export default function SubcontractorRequestDetailsPage() {
           <div className="flex justify-between items-center">
             <div>
               <span className="text-xs font-bold text-[#3B7CED] uppercase">
-                {request.reference_id || `SR-${String(request.id).padStart(5, "0")}`}
+                {displayRefId}
               </span>
               <h2 className="text-lg font-bold text-gray-900 mt-1">
-                {request.vendor_name || "Subcontractor Contract"}
+                {displayTitle}
               </h2>
             </div>
-            <span className={getStatusBadgeClass(request.status)}>
-              {getStatusLabel(request.status)}
+            <span className={getStatusBadgeClass(displayStatus)}>
+              {getStatusLabel(displayStatus)}
             </span>
           </div>
 
@@ -174,7 +244,7 @@ export default function SubcontractorRequestDetailsPage() {
               </span>
               <span className="font-bold text-gray-800 flex items-center gap-1">
                 <User size={14} className="text-gray-500" />{" "}
-                {request.created_by_name || `User #${request.created_by || 1}`}
+                {requesterName}
               </span>
             </div>
           </div>
@@ -191,7 +261,7 @@ export default function SubcontractorRequestDetailsPage() {
             <div className="flex justify-between py-1.5 border-b border-gray-50">
               <span className="text-gray-500 font-semibold">Subcontractor</span>
               <span className="font-bold text-gray-900">
-                {request.vendor_name || "N/A"} ({request.vendor_email})
+                {displayTitle}
               </span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-gray-50">
@@ -378,6 +448,86 @@ export default function SubcontractorRequestDetailsPage() {
           </div>
         </div>
       </main>
+
+      {/* Fixed Action Bar for Draft Status */}
+      {(canEdit || canSubmit || canDelete) && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="max-w-2xl mx-auto flex gap-3">
+            {canDelete && (
+              <Button
+                variant="outline"
+                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-11"
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                disabled={isDeleting || isSubmitting}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
+            
+            {canEdit && (
+              <Button
+                variant="outline"
+                className="flex-1 border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-11"
+                onClick={handleEdit}
+                disabled={isDeleting || isSubmitting}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
+
+            {canSubmit && (
+              <Button
+                className="flex-[2] bg-[#3B7CED] hover:bg-blue-600 text-white h-11"
+                onClick={handleSubmit}
+                disabled={isDeleting || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isSubmitting ? "Submitting..." : "Submit for Approval"}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              Delete Subcontractor Request
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this subcontractor request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <StatusModal
         isOpen={statusModal.isOpen}

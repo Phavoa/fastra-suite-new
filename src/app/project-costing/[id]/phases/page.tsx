@@ -77,6 +77,26 @@ export default function WorkBreakdownStructurePage() {
       return acc + (phase.activities || []).reduce((sum: number, act: any) => sum + Number(act.amount || 0), 0);
     }, 0);
   }
+  let customColumns: string[] = [];
+  if (parsedPhases && parsedPhases.length > 0) {
+    const colSet = new Set<string>();
+    const standardKeys = new Set(["id", "name", "quantity", "rate", "amount", "budget", "start_date", "end_date", "status", "cost_category", "sn", "displayName", "custom_values"]);
+    parsedPhases.forEach((phase: any) => {
+      if (phase.activities && Array.isArray(phase.activities)) {
+        phase.activities.forEach((act: any) => {
+          Object.keys(act).forEach(key => {
+            if (!standardKeys.has(key)) {
+              colSet.add(key);
+            }
+          });
+          if (act.custom_values && typeof act.custom_values === 'object') {
+            Object.keys(act.custom_values).forEach(key => colSet.add(key));
+          }
+        });
+      }
+    });
+    customColumns = Array.from(colSet);
+  }
 
   // Group phases
   const groupedPhases: GroupedPhase[] = parsedPhases.map((phase: any) => {
@@ -152,9 +172,14 @@ export default function WorkBreakdownStructurePage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[45%]">WBS Elements</th>
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[35%]">Activities</th>
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[20%]">Budget</th>
+                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[25%]">WBS Elements</th>
+                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[20%]">Activities</th>
+                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[10%]">Quantity</th>
+                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[15%]">Rate</th>
+                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[15%]">Budget</th>
+                {customColumns.map(col => (
+                  <th key={col} className="py-3 px-4 font-medium text-sm text-gray-500 whitespace-nowrap">{col}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -173,9 +198,12 @@ export default function WorkBreakdownStructurePage() {
                         {phase.name}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600"></td>
+                      <td className="py-3 px-4 text-sm text-gray-600"></td>
+                      <td className="py-3 px-4 text-sm text-gray-600"></td>
                       <td className="py-3 px-4 text-sm font-semibold text-gray-800">
                         {phase.budget.toLocaleString()}
                       </td>
+                      {customColumns.map(col => <td key={col} className="py-3 px-4"></td>)}
                     </tr>
 
                     {/* Phase Content */}
@@ -189,9 +217,14 @@ export default function WorkBreakdownStructurePage() {
                               <div className="absolute left-6 top-1/2 w-4 h-px bg-gray-300"></div>
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-600">{act.displayName}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{act.quantity || 1}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{Number(act.rate || Number(act.amount || 0) / Number(act.quantity || 1) || 0).toLocaleString()}</td>
                             <td className="py-3 px-4 text-sm text-gray-600">
                               {Number(act.amount || 0).toLocaleString()}
                             </td>
+                            {customColumns.map(col => (
+                              <td key={col} className="py-3 px-4 text-sm text-gray-600">{act[col] || act.custom_values?.[col] || ""}</td>
+                            ))}
                           </tr>
                         ))}
 
@@ -213,9 +246,12 @@ export default function WorkBreakdownStructurePage() {
                                   {sub.name}
                                 </td>
                                 <td className="py-3 px-4 text-sm text-gray-600"></td>
+                                <td className="py-3 px-4 text-sm text-gray-600"></td>
+                                <td className="py-3 px-4 text-sm text-gray-600"></td>
                                 <td className="py-3 px-4 text-sm font-semibold text-gray-700">
                                   {sub.budget.toLocaleString()}
                                 </td>
+                                {customColumns.map(col => <td key={col} className="py-3 px-4"></td>)}
                               </tr>
 
                               {isSubExpanded && sub.activities.map((act, saIndex) => (
@@ -224,9 +260,14 @@ export default function WorkBreakdownStructurePage() {
                                     <div className="absolute left-6 top-0 bottom-full w-px bg-gray-300"></div>
                                   </td>
                                   <td className="py-3 px-4 text-sm text-gray-600">{act.displayName}</td>
+                                  <td className="py-3 px-4 text-sm text-gray-600">{act.quantity || 1}</td>
+                                  <td className="py-3 px-4 text-sm text-gray-600">{Number(act.rate || Number(act.amount || 0) / Number(act.quantity || 1) || 0).toLocaleString()}</td>
                                   <td className="py-3 px-4 text-sm text-gray-600">
                                     {Number(act.amount || 0).toLocaleString()}
                                   </td>
+                                  {customColumns.map(col => (
+                                    <td key={col} className="py-3 px-4 text-sm text-gray-600">{act[col] || act.custom_values?.[col] || ""}</td>
+                                  ))}
                                 </tr>
                               ))}
                             </React.Fragment>
@@ -240,7 +281,7 @@ export default function WorkBreakdownStructurePage() {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} className="py-4 px-6 text-right font-medium text-gray-600">
+                <td colSpan={5 + customColumns.length} className="py-4 px-6 text-right font-medium text-gray-600">
                   Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">{projectBudget.toLocaleString()}</span>
                 </td>
               </tr>

@@ -49,10 +49,10 @@ export default function MaterialConsumptionRequestPage() {
 
       return {
         id: req.request_id || `MCR-${req.id}`,
-        project: req.project_request ? `Project #${req.project_request}` : "—",
+        project: req.project_details?.name || "—",
         itemsCount: (req.lines ?? []).length,
         totalCost,
-        requester: "—",
+        requester: req.created_by_name || "—",
         status: statusMap[req.status] ?? "pending",
         realId: req.id,
       };

@@ -63,7 +63,7 @@ export default function LabourRequestPage() {
 
     const displayApiRequests: DisplayLabourRequest[] = apiRequests.map(
       (req) => {
-        const projectId = req.project_request?.project || (req as any).project;
+        const projectId = (req as any).project_request?.project || (req as any).project;
         const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
         return {
           id: req.id,

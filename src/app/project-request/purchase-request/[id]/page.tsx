@@ -43,7 +43,7 @@ interface PurchaseRequestItem {
 }
 
 const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
-  let parsedProject = req.project_details?.name || (typeof req.project_request === "object" ? req.project_request?.project_details?.name : null) || (typeof req.project === "number" ? `Project #${req.project}` : req.project) || "Project";
+  let parsedProject = req.project_details?.name || (typeof (req as any).project_request === "object" ? (req as any).project_request?.project_details?.name : null) || (typeof req.project === "number" ? `Project #${req.project}` : req.project) || "Project";
   let parsedPhase = req.phase || "Phase";
   let parsedTask = req.activity ? `Activity ${req.activity}` : (req.task || "Task");
   const rawNotes = req.notes || req.purpose || "";
@@ -84,8 +84,8 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     requesterName = req.requester;
   } else if (req.requester_details?.user) {
     requesterName = `${req.requester_details.user.first_name || ""} ${req.requester_details.user.last_name || ""}`.trim() || req.requester_details.user.username;
-  } else if (typeof req.project_request === "object" && req.project_request?.created_by_details) {
-    requesterName = `${req.project_request.created_by_details.first_name || ""} ${req.project_request.created_by_details.last_name || ""}`.trim() || req.project_request.created_by_details.username;
+  } else if (typeof (req as any).project_request === "object" && (req as any).project_request?.created_by_details) {
+    requesterName = `${(req as any).project_request.created_by_details.first_name || ""} ${(req as any).project_request.created_by_details.last_name || ""}`.trim() || (req as any).project_request.created_by_details.username;
   }
 
   const dateValue = req.created_at || req.date_created || req.date || Date.now();
@@ -95,8 +95,8 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     year: "numeric",
   });
 
-  const refId = req.reference_id || (typeof req.project_request === "object" ? req.project_request?.reference_id : null) || String(req.id || "PR-REQ");
-  const statusVal = req.request_status || req.status || (typeof req.project_request === "object" ? req.project_request?.status : null) || "pending";
+  const refId = req.reference_id || (typeof (req as any).project_request === "object" ? (req as any).project_request?.reference_id : null) || String(req.id || "PR-REQ");
+  const statusVal = req.request_status || req.status || (typeof (req as any).project_request === "object" ? (req as any).project_request?.status : null) || "pending";
   const locationVal = req.site_location || req.requesting_location_details?.location_name || req.requesting_location || req.location || "Lagos Site";
   const reqDateVal = req.required_by_date || req.requiredDate || (req.date_updated ? new Date(req.date_updated).toISOString().split("T")[0] : "");
 

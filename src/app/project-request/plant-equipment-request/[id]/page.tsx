@@ -2,7 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Bell, Calendar, User } from "lucide-react";
+import { ArrowLeft, Bell, Calendar, User, CheckCircle, XCircle, HelpCircle, Loader2, Edit, Trash2, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
+import { extractErrorMessage } from "@/lib/utils";
 
 interface PlantEquipmentRequestItem {
   id: string;
@@ -20,18 +32,29 @@ interface PlantEquipmentRequestItem {
   notes: string;
 }
 
-import { useGetPlantEquipmentRequestQuery } from "@/api/requests/plantEquipmentRequestApi";
+import { 
+  useGetPlantEquipmentRequestQuery,
+  useDeletePlantEquipmentRequestMutation,
+  useSubmitPlantEquipmentRequestMutation
+} from "@/api/requests/plantEquipmentRequestApi";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 
 export default function PlantEquipmentRequestDetailPage() {
   const router = useRouter();
   const { id } = useParams();
+  const statusModal = useStatusModal();
+  const { canDo } = useModulePermissions();
   const [request, setRequest] = useState<PlantEquipmentRequestItem | null>(null);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [rawRequestData, setRawRequestData] = useState<any>(null);
 
   const numericId = Number(id);
-  const { data: apiRequest, isLoading: apiLoading } = useGetPlantEquipmentRequestQuery(numericId, {
+  const { data: apiRequest, isLoading: apiLoading, refetch } = useGetPlantEquipmentRequestQuery(numericId, {
     skip: isNaN(numericId)
   });
+  const [deleteRequest, { isLoading: isDeleting }] = useDeletePlantEquipmentRequestMutation();
+  const [submitRequest, { isLoading: isSubmitting }] = useSubmitPlantEquipmentRequestMutation();
+
   const { data: projectsData } = useGetProjectCostingProjectsQuery({});
   const projects = Array.isArray(projectsData)
     ? projectsData
@@ -40,16 +63,17 @@ export default function PlantEquipmentRequestDetailPage() {
   useEffect(() => {
     if (apiRequest) {
       const req = apiRequest as any;
-      const projectId = req.project_details?.id || req.project_request_id || req.project_request?.id || req.project_request || req.project;
+      setRawRequestData(req);
+      const projectId = (req as any).project_details?.id || (req as any).project_request_id || (req as any).project_request?.id || (req as any).project_request || (req as any).project;
       const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
       setRequest({
-        id: String(req.reference_id || req.project_request?.reference_id || req.id),
+        id: String(req.reference_id || (req as any).project_request?.reference_id || req.id),
         project: req.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
         equipment: req.equipment_name || "-",
         description: req.description || "",
         quantity: req.quantity || 0,
         estimatedCost: parseFloat(req.estimated_cost) || 0,
-        status: (req.project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
+        status: ((req as any).project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
         requester: req.created_by_name || req.requester_name || "Current User",
         date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
           day: "numeric",
@@ -63,8 +87,54 @@ export default function PlantEquipmentRequestDetailPage() {
       });
     } else {
       setRequest(null);
+      setRawRequestData(null);
     }
   }, [apiRequest, id, projects]);
+
+  const handleModalClose = () => {
+    statusModal.close();
+    if (statusModal.type === "success" && !isConfirmDeleteOpen) {
+      router.push("/project-request/plant-equipment-request");
+    }
+  };
+
+  const handleEdit = () => {
+    router.push(`/project-request/plant-equipment-request/edit/${numericId}`);
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteRequest(numericId).unwrap();
+      setIsConfirmDeleteOpen(false);
+      statusModal.showSuccess(
+        "Request Deleted",
+        "The plant & equipment request has been deleted successfully."
+      );
+    } catch (error) {
+      console.error("Failed to delete request:", error);
+      statusModal.showError("Error", extractErrorMessage(error, "Failed to delete the request. Please try again."));
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const parentRequestId = (rawRequestData as any)?.project_request?.id || (rawRequestData as any)?.project_request_id;
+      if (!parentRequestId) throw new Error("Could not find parent project request ID");
+      await submitRequest({ id: parentRequestId }).unwrap();
+      statusModal.showSuccess(
+        "Request Submitted",
+        "The plant & equipment request has been submitted for approval."
+      );
+      refetch();
+    } catch (error) {
+      console.error("Failed to submit request:", error);
+      statusModal.showError("Submit Failed", extractErrorMessage(error, "Failed to submit the request. Please try again."));
+    }
+  };
+
+  const canEdit = request?.status === "draft" && canDo("project_request", "edit");
+  const canDelete = request?.status === "draft" && canDo("project_request", "delete");
+  const canSubmit = request?.status === "draft" && canDo("project_request", "submit");
 
   if (apiLoading) {
     return (
@@ -258,6 +328,94 @@ export default function PlantEquipmentRequestDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Fixed Action Bar for Draft Status */}
+      {(canEdit || canSubmit || canDelete) && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="max-w-2xl mx-auto flex gap-3">
+            {canDelete && (
+              <Button
+                variant="outline"
+                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-11"
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                disabled={isDeleting || isSubmitting}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
+            
+            {canEdit && (
+              <Button
+                variant="outline"
+                className="flex-1 border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-11"
+                onClick={handleEdit}
+                disabled={isDeleting || isSubmitting}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
+
+            {canSubmit && (
+              <Button
+                className="flex-[2] bg-[#3B7CED] hover:bg-blue-600 text-white h-11"
+                onClick={handleSubmit}
+                disabled={isDeleting || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isSubmitting ? "Submitting..." : "Submit for Approval"}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              Delete Plant & Equipment Request
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this plant and equipment request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={handleModalClose}
+        title={statusModal.title}
+        message={statusModal.message}
+        type={statusModal.type}
+      />
     </div>
   );
 }

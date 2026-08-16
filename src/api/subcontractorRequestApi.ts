@@ -101,6 +101,13 @@ export const subcontractorRequestApi = createApi({
         method: "DELETE",
       }),
     }),
+    submitSubcontractorRequest: builder.mutation<SubcontractorRequest, { id: number; data?: any }>({
+      query: ({ id, data }) => ({
+        url: `/project-requests/project-requests/${id}/submit/`,
+        method: "POST",
+        body: data,
+      }),
+    }),
     // Milestone endpoints
     getSubcontractorMilestones: builder.query<Milestone[], GetSubcontractorRequestsParams>({
       query: (params) => ({
@@ -124,6 +131,7 @@ export const {
   useCreateSubcontractorRequestMutation,
   useUpdateSubcontractorRequestMutation,
   useDeleteSubcontractorRequestMutation,
+  useSubmitSubcontractorRequestMutation,
   useGetSubcontractorMilestonesQuery,
   useCreateSubcontractorMilestoneMutation,
 } = subcontractorRequestApi;

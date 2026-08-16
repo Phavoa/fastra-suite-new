@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Bell, AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft, Bell, AlertTriangle, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,15 +19,21 @@ import {
   useGetProjectCostingProjectsQuery,
   useGetProjectCostingProjectQuery,
 } from "@/api/projectCostingApi";
-import { useCreatePlantEquipmentRequestMutation } from "@/api/requests/plantEquipmentRequestApi";
+import { 
+  useGetPlantEquipmentRequestQuery,
+  useUpdatePlantEquipmentRequestMutation 
+} from "@/api/requests/plantEquipmentRequestApi";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { motion, AnimatePresence } from "framer-motion";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-export default function NewPlantEquipmentRequestPage() {
+export default function EditPlantEquipmentRequestPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = Number(params.id);
+
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserName = React.useMemo(() => {
     if (!loggedInUser) return "Current User";
@@ -36,6 +42,7 @@ export default function NewPlantEquipmentRequestPage() {
   }, [loggedInUser]);
 
   // Queries
+  const { data: existingRequest, isLoading: isLoadingRequest } = useGetPlantEquipmentRequestQuery(id, { skip: !id || isNaN(id) });
   const { data: rawCostingProjects = [] } = useGetProjectCostingProjectsQuery({});
 
   // Filter approved/active projects
@@ -66,17 +73,34 @@ export default function NewPlantEquipmentRequestPage() {
   // Validation feedback modal state
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Auto-generate a Request ID
-  const [requestId] = useState(() => {
-    const num = Math.floor(Math.random() * 90000) + 10000;
-    return `PE${num}`;
-  });
+  const [requestId, setRequestId] = useState("Loading...");
 
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Budget query is defined lower down after task is selected
+  // Populate data when existing request is loaded
+  useEffect(() => {
+    if (existingRequest) {
+      const req = existingRequest as any;
+      setRequestId(req.reference_id || (req as any).project_request?.reference_id || `PE-${req.id}`);
+      setEquipmentName(req.equipment_name || "");
+      setDescription(req.description || "");
+      setQuantity(req.quantity || "");
+      if (req.required_date) {
+        setRequiredDate(new Date(req.required_date).toISOString().split('T')[0]);
+      }
+      setEstimatedCost(req.estimated_cost ? parseFloat(req.estimated_cost) : "");
+      setNotes(req.justification_notes || "");
+      
+      if (req.project) setSelectedProjectId(String(req.project));
+      else if (req.project_details?.id) setSelectedProjectId(String(req.project_details.id));
 
-  // We will define availableBudget lower down
+      if (req.phase) setSelectedPhaseId(String(req.phase));
+      else if (req.phase_details?.id) setSelectedPhaseId(String(req.phase_details.id));
+
+      if (req.activity) setSelectedTaskId(String(req.activity));
+      else if (req.activity_details?.id) setSelectedTaskId(String(req.activity_details.id));
+    }
+  }, [existingRequest]);
 
   // Fetch full project detail for WBS cascade
   const { data: costingProjectDetail } = useGetProjectCostingProjectQuery(
@@ -202,15 +226,9 @@ export default function NewPlantEquipmentRequestPage() {
     }
   };
 
-  const [createRequest, { isLoading: isCreating }] = useCreatePlantEquipmentRequestMutation();
+  const [updateRequest, { isLoading: isUpdating }] = useUpdatePlantEquipmentRequestMutation();
 
   const executeSubmission = async () => {
-    // Check for a specific trigger to simulate failed submission if needed
-    if (estimatedCost === 999999) {
-      setModalType("unsuccessful");
-      return;
-    }
-
     try {
       const ensureValidUUID = (val: string): string => {
         if (!val) return "";
@@ -241,13 +259,11 @@ export default function NewPlantEquipmentRequestPage() {
       };
 
       // Call API
-      await createRequest(payload).unwrap();
+      await updateRequest({ id, data: payload }).unwrap();
       setModalType("submitted");
     } catch (error: any) {
       console.error("API submission failed:", error);
-      
-      // Try to extract a useful error message from DRF format
-      let errMsg = "Your request submission was unsuccessful. Please check your data and try again.";
+      let errMsg = "Your request update was unsuccessful. Please check your data and try again.";
       if (error?.data) {
          const firstKey = Object.keys(error.data)[0];
          if (firstKey) {
@@ -261,21 +277,30 @@ export default function NewPlantEquipmentRequestPage() {
     }
   };
 
+  if (isLoadingRequest) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-[#3B7CED] animate-spin mb-4" />
+        <p className="text-gray-500 font-semibold">Loading request...</p>
+      </div>
+    );
+  }
+
   return (
-    <PageGuard module="project_request" entitlement="create">
+    <PageGuard module="project_request" entitlement="edit">
       <div className="min-h-screen bg-[#F9FAFB] pb-28">
       {/* Header Bar */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push("/project-request/plant-equipment-request")}
+              onClick={() => router.push(`/project-request/plant-equipment-request/${id}`)}
               className="p-1 rounded-lg hover:bg-gray-50 transition-colors"
               aria-label="Back"
             >
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
-            <h1 className="text-lg font-bold text-gray-800">Plant & Equipment Re...</h1>
+            <h1 className="text-lg font-bold text-gray-800">Edit Plant & Equipment Request</h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -307,7 +332,7 @@ export default function NewPlantEquipmentRequestPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-700">Date</Label>
-              <Input value={new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} disabled className="h-11 bg-gray-50 text-gray-500 font-normal border-gray-200 shadow-none" />
+              <Input value={new Date(existingRequest?.created_at || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} disabled className="h-11 bg-gray-50 text-gray-500 font-normal border-gray-200 shadow-none" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-700">Requested by</Label>
@@ -532,9 +557,10 @@ export default function NewPlantEquipmentRequestPage() {
         <div className="max-w-2xl mx-auto">
           <Button
             onClick={handleFormSubmit}
+            disabled={isUpdating}
             className="w-full h-12 text-sm font-bold flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-none"
           >
-            Submit request
+            {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Changes"}
           </Button>
         </div>
       </div>
@@ -564,8 +590,8 @@ export default function NewPlantEquipmentRequestPage() {
           setApiError(null);
         }}
         type="error"
-        title="Submission Unsuccessful"
-        message={apiError || "Your request submission was unsuccessful. Please check your data and try again."}
+        title="Update Unsuccessful"
+        message={apiError || "Your request update was unsuccessful. Please check your data and try again."}
         actionText="Try Again"
         onAction={() => {
           setModalType(null);
@@ -579,15 +605,15 @@ export default function NewPlantEquipmentRequestPage() {
         isOpen={modalType === "submitted"}
         onClose={() => {
           setModalType(null);
-          router.push("/project-request/plant-equipment-request");
+          router.push(`/project-request/plant-equipment-request/${id}`);
         }}
         type="success"
-        title="Request Submitted"
-        message="Your request has successfully been submitted"
+        title="Request Updated"
+        message="Your request has successfully been updated"
         actionText="Done"
         onAction={() => {
           setModalType(null);
-          router.push("/project-request/plant-equipment-request");
+          router.push(`/project-request/plant-equipment-request/${id}`);
         }}
         showCloseButton={true}
       />

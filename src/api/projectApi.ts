@@ -73,7 +73,7 @@ export const projectApi = createApi({
     getProject: builder.query<Project, number>({
       query: (id) => `/projects/${id}/`,
     }),
-    getAvailableBudget: builder.query<Budget, { project_id: number; wbs_id: number; cost_code: string }>({
+    getAvailableBudget: builder.query<Budget, { project_id: number; wbs_id: number | string; cost_code: string }>({
       query: (params) => ({
         url: "/budget/available/",
         params,

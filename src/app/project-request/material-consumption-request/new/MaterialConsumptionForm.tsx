@@ -315,15 +315,15 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
     }
   }, [requestData, form]);
 
-  // For edit mode, also set warehouse based on the loaded project
+  // Auto-fill warehouse based on the selected project
   useEffect(() => {
-    if (isEdit && projectId && selectedProjectDetail) {
+    if (projectId && selectedProjectDetail) {
       const proj = selectedProjectDetail as any;
       if (proj.site_location) {
         form.setValue("warehouse", String(proj.site_location));
       }
     }
-  }, [projectId, selectedProjectDetail, isEdit, form]);
+  }, [projectId, selectedProjectDetail, form]);
 
   const fromUUID = (uuid: string): string => {
     if (!uuid) return "";

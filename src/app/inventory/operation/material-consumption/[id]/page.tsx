@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Trash2, Edit, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,19 +17,27 @@ import {
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
 
-import { useGetMaterialConsumptionQuery, useUpdateMaterialConsumptionMutation } from "@/api/requests/materialConsumptionRequestApi";
+import { 
+  useGetMaterialConsumptionQuery, 
+  useUpdateMaterialConsumptionMutation,
+  useDeleteMaterialConsumptionMutation,
+  useSubmitMaterialConsumptionRequestMutation
+} from "@/api/requests/materialConsumptionRequestApi";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MaterialConsumptionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const reqId = (params?.id as string) || "";
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   
   const { data: apiData, isLoading, isError } = useGetMaterialConsumptionQuery(Number(reqId), {
     skip: !reqId || isNaN(Number(reqId)),
   });
 
   const [updateStatus] = useUpdateMaterialConsumptionMutation();
+  const [deleteRequest, { isLoading: isDeleting }] = useDeleteMaterialConsumptionMutation();
+  const [submitRequest, { isLoading: isSubmitting }] = useSubmitMaterialConsumptionRequestMutation();
 
   const req: any = React.useMemo(() => {
     if (!apiData) return null;
@@ -58,8 +66,9 @@ export default function MaterialConsumptionDetailPage() {
       status: apiData.status || "pending",
       notes: apiData.notes || "",
       isOverrun: apiData.status === "held_overrun",
-      availableBudget: (apiData as any).available_budget,
+      availableBudget: (apiData as any).available_budget ? parseFloat((apiData as any).available_budget) : undefined,
       costCode: (apiData as any).cost_code || "-",
+      parentRequestId: (apiData as any).project_request?.id || (apiData as any).project_request,
     };
   }, [apiData]);
 
@@ -87,6 +96,28 @@ export default function MaterialConsumptionDetailPage() {
         "Action Failed",
         err.data?.message || err.error || "An error occurred while releasing the material."
       );
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteRequest(Number(reqId)).unwrap();
+      setIsConfirmDeleteOpen(false);
+      statusModal.showSuccess("Deleted", "Material Consumption request deleted successfully.");
+      router.push("/inventory/operation/material-consumption");
+    } catch (err: any) {
+      statusModal.showError("Delete Failed", err.data?.message || err.error || "Failed to delete the request.");
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      if (!req.parentRequestId) throw new Error("Could not find parent project request ID");
+      await submitRequest({ id: req.parentRequestId }).unwrap();
+      statusModal.showSuccess("Submitted", "Material Consumption request submitted successfully.");
+      router.refresh();
+    } catch (err: any) {
+      statusModal.showError("Submit Failed", err.data?.message || err.error || "Failed to submit the request.");
     }
   };
 
@@ -291,6 +322,65 @@ export default function MaterialConsumptionDetailPage() {
             </div>
           </section>
         </div>
+
+        {/* Fixed Action Bar for Draft Status */}
+        {req.status === "draft" && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="max-w-2xl mx-auto flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-11"
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                disabled={isDeleting || isSubmitting}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="flex-1 border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-11"
+                onClick={() => router.push(`/inventory/operation/material-consumption/edit/${reqId}`)}
+                disabled={isDeleting || isSubmitting}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+
+              <Button
+                className="flex-[2] bg-[#3B7CED] hover:bg-blue-600 text-white h-11"
+                onClick={handleSubmit}
+                disabled={isDeleting || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isSubmitting ? "Submitting..." : "Submit for Approval"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        {isConfirmDeleteOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-2">
+                <Trash2 className="w-5 h-5 text-red-600" /> Delete Request
+              </h3>
+              <p className="text-gray-600 mb-6">Are you sure you want to delete this material consumption request? This cannot be undone.</p>
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={() => setIsConfirmDeleteOpen(false)} disabled={isDeleting}>Cancel</Button>
+                <Button variant="destructive" onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         </>
         )}
 

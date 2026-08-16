@@ -44,14 +44,25 @@ export default function MaterialConsumptionApprovalsPage() {
     // Map API data to UI structure
     const mapped = rawList.map((req: any) => {
       const isOverrun = req.status === "held_overrun" || req.status === "rejected";
+      
+      let wbsActivity = "N/A";
+      if (req.activity_details?.name) {
+        wbsActivity = req.activity_details.name;
+      } else if (req.project_details?.name) {
+        wbsActivity = req.project_details.name;
+      } else if (req.project) {
+        wbsActivity = `Project #${req.project}`;
+      }
+
       return {
         id: req.request_id || `MCR-${req.id}`,
         realId: req.id,
-        wbsActivity: req.activity_details?.name || `Project #${req.project_request || 'N/A'}`, // Fallback since WBS info is missing from types
-        requester: req.requester_details?.name || "System Request", // Fallback
-        requestDate: req.date_consumed || new Date(req.created_at).toISOString().split('T')[0],
+        wbsActivity: wbsActivity,
+        requester: req.created_by_name || req.requester_details?.name || "System Request",
+        requestDate: req.date_consumed ? new Date(req.date_consumed).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : new Date(req.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         numberOfItems: (req.lines ?? []).length,
         status: req.status || "pending",
+        releaseStatus: req.release_status || "PENDING",
         queue: isOverrun ? "overrun" : "normal",
         isOverrun: isOverrun,
       };
@@ -250,13 +261,17 @@ export default function MaterialConsumptionApprovalsPage() {
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-center">
                           <span
-                            className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold ${
-                              req.isOverrun
+                            className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize ${
+                              req.status === "draft"
+                                ? "bg-[#EEF4FF] text-[#3B7CED]"
+                                : req.isOverrun
                                 ? "bg-[#FCE8E6] text-[#E43D2B]"
-                                : "bg-[#E8F0FE] text-[#1A73E8]"
+                                : req.status === "approved"
+                                ? "bg-[#EAFDF0] text-[#2BA24D]"
+                                : "bg-[#FFFDF0] text-[#F0B401]"
                             }`}
                           >
-                            {req.isOverrun ? "Held: Overrun" : "Pending"}
+                            {req.isOverrun ? "Held: Overrun" : req.status}
                           </span>
                         </TableCell>
                       </TableRow>

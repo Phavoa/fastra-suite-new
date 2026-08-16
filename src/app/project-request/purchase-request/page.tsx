@@ -37,7 +37,7 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   let parsedProject =
     req.project_details?.name ||
     (typeof req.project_request === "object"
-      ? req.project_request?.project_details?.name
+      ? (req as any).project_request?.project_details?.name
       : null) ||
     (typeof req.project === "number"
       ? `Project #${req.project}`
@@ -99,11 +99,11 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
       req.requester_details.user.username;
   } else if (
     typeof req.project_request === "object" &&
-    req.project_request?.created_by_details
+    (req as any).project_request?.created_by_details
   ) {
     requesterName =
-      `${req.project_request.created_by_details.first_name || ""} ${req.project_request.created_by_details.last_name || ""}`.trim() ||
-      req.project_request.created_by_details.username;
+      `${(req as any).project_request.created_by_details.first_name || ""} ${(req as any).project_request.created_by_details.last_name || ""}`.trim() ||
+      (req as any).project_request.created_by_details.username;
   }
 
   const dateValue =
@@ -117,14 +117,14 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   const refId =
     req.reference_id ||
     (typeof req.project_request === "object"
-      ? req.project_request?.reference_id
+      ? (req as any).project_request?.reference_id
       : null) ||
     String(req.id || "PR-REQ");
   const statusVal =
     req.request_status ||
     req.status ||
     (typeof req.project_request === "object"
-      ? req.project_request?.status
+      ? (req as any).project_request?.status
       : null) ||
     "pending";
   const locationVal =

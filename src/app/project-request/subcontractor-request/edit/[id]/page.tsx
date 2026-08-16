@@ -6,13 +6,16 @@ import { RequestForm } from "@/components/requests/RequestForm";
 import { RequestFormConfig } from "@/components/requests/types";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useCreateSubcontractorRequestMutation } from "@/api/subcontractorRequestApi";
+import { 
+  useGetSubcontractorRequestQuery,
+  useUpdateSubcontractorRequestMutation 
+} from "@/api/subcontractorRequestApi";
 import { useGetActiveVendorsQuery } from "@/api/invoice/vendorsApi";
-import { useGetAvailableBudgetQuery } from "@/api/projectApi";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
@@ -37,9 +40,16 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function NewSubcontractorRequestPage() {
+export default function EditSubcontractorRequestPage() {
   const router = useRouter();
-  const [createRequest, { isLoading: isSubmitting }] = useCreateSubcontractorRequestMutation();
+  const params = useParams();
+  const id = Number(params.id);
+
+  const { data: request, isLoading: isLoadingRequest } = useGetSubcontractorRequestQuery(id, {
+    skip: !id,
+  });
+
+  const [updateRequest, { isLoading: isSubmitting }] = useUpdateSubcontractorRequestMutation();
   const { data: vendors = [], isLoading: isLoadingVendors } = useGetActiveVendorsQuery();
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserName = React.useMemo(() => {
@@ -48,11 +58,6 @@ export default function NewSubcontractorRequestPage() {
     return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
   }, [loggedInUser]);
 
-  const [requestId] = React.useState(() => {
-    const num = Math.floor(Math.random() * 90000) + 10000;
-    return `SC${num}`;
-  });
-
   const vendorOptions = useMemo(() => {
     return vendors.map((vendor) => ({
       label: vendor.vendor_name,
@@ -60,11 +65,22 @@ export default function NewSubcontractorRequestPage() {
     }));
   }, [vendors]);
 
+  if (isLoadingRequest || !request) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-[#3B7CED] animate-spin" />
+        <p className="text-sm font-semibold text-gray-500">Loading request...</p>
+      </div>
+    );
+  }
+
+  const requestId = (request as any).project_request?.reference_id || request.reference_id || `SR-${String(request.id).padStart(5, "0")}`;
+
   const config: RequestFormConfig<FormValues> = {
-    title: "Subcontractor Request",
+    title: "Edit Subcontractor Request",
     requestId: requestId,
     requesterName: loggedInUserName,
-    date: new Date().toLocaleDateString("en-GB", {
+    date: new Date(request.created_at || Date.now()).toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -79,7 +95,7 @@ export default function NewSubcontractorRequestPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="date" className="text-sm font-semibold text-gray-900">Date</Label>
-            <Input id="date" value={new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} readOnly className="bg-white text-gray-900" />
+            <Input id="date" value={new Date(request.created_at || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} readOnly className="bg-white text-gray-900" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="requestedBy" className="text-sm font-semibold text-gray-900">Requested by</Label>
@@ -191,16 +207,16 @@ export default function NewSubcontractorRequestPage() {
     ],
     schema: formSchema,
     defaultValues: {
-      project: "",
-      vendor: "",
-      scope_of_work: "",
-      start_date: "",
-      end_date: "",
-      contract_value: "",
-      payment_terms: "",
-      phase: "",
-      task: "",
-      justification_notes: "",
+      project: String((request as any).project_details?.id || (request as any).project || ""),
+      vendor: String((request as any).vendor || ""),
+      scope_of_work: (request as any).scope_of_work || "",
+      start_date: (request as any).start_date || "",
+      end_date: (request as any).end_date || "",
+      contract_value: String((request as any).contract_value || ""),
+      payment_terms: (request as any).payment_terms || "",
+      phase: String((request as any).phase_details?.id || (request as any).phase || ""),
+      task: String((request as any).activity_details?.id || (request as any).activity || ""),
+      justification_notes: (request as any).justification_notes || "",
     },
     onSubmit: async (data) => {
       try {
@@ -227,28 +243,28 @@ export default function NewSubcontractorRequestPage() {
           start_date: data.start_date,
           end_date: data.end_date,
           justification_notes: data.justification_notes || "",
-          milestones: [],
+          milestones: request.milestones || [],
         };
 
-        await createRequest(payload).unwrap();
+        await updateRequest({ id, body: payload }).unwrap();
       } catch (error) {
-        console.error("Failed to submit subcontractor request:", error);
+        console.error("Failed to update subcontractor request:", error);
         throw error;
       }
     },
     successMessage: {
-      title: "Request Submitted",
-      description: "Your subcontractor request has successfully been submitted",
+      title: "Request Updated",
+      description: "Your subcontractor request has successfully been updated",
     },
     errorMessage: {
-      title: "Submission Unsuccessful",
-      description: "Your request submission was unsuccessful. Please check your data and try again.",
+      title: "Update Unsuccessful",
+      description: "Your request update was unsuccessful. Please check your data and try again.",
     },
-    backPath: "/project-request/subcontractor-request",
+    backPath: `/project-request/subcontractor-request/${id}`,
   };
 
   return (
-    <PageGuard module="project_request" entitlement="create">
+    <PageGuard module="project_request" entitlement="edit">
       <RequestForm config={config} />
     </PageGuard>
   );

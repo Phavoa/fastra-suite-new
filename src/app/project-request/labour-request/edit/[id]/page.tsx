@@ -135,12 +135,12 @@ export default function EditLabourRequestPage() {
     requestId: request?.reference_id || `LR-${request?.id || id}`,
     requesterName:
       request?.detail?.created_by_name ||
-      request?.project_request?.created_by_details?.user?.first_name ||
+      (request as any)?.project_request?.created_by_details?.user?.first_name ||
       (request as any)?.created_by_name ||
       loggedInUserName,
     date: new Date(
       request?.detail?.created_at ||
-        request?.project_request?.created_at ||
+        (request as any)?.project_request?.created_at ||
         request?.created_at ||
         Date.now(),
     ).toLocaleDateString("en-GB", {
@@ -285,7 +285,7 @@ export default function EditLabourRequestPage() {
     defaultValues: {
       project:
         request?.project?.toString() ||
-        request?.project_request?.project?.toString() ||
+        (request as any)?.project_request?.project?.toString() ||
         "",
       numberOfWorkers:
         request?.detail?.number_of_workers ??

@@ -6,6 +6,7 @@ import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AddBudgetAdjustmentModal } from "@/components/project-costing/modals/AddBudgetAdjustmentModal";
+import { AddDocumentModal } from "@/components/project-costing/modals/AddDocumentModal";
 import { ProjectCostingExportTemplate } from "@/components/project-costing/export/ProjectCostingExportTemplate";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { PageGuard } from "@/components/auth/PageGuard";
@@ -30,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, RefreshCw, Plus, ChevronDown, CheckCircle2, FileText, Image as ImageIcon, Download } from "lucide-react";
+import { ArrowLeft, RefreshCw, Plus, ChevronDown, CheckCircle2, FileText, Image as ImageIcon, Download, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toPng, toJpeg } from "html-to-image";
@@ -42,7 +43,8 @@ import {
   useSubmitProjectMutation,
   useGetBudgetAdjustmentsQuery,
   useApproveBudgetAdjustmentMutation,
-  useGetProjectTransactionsQuery
+  useGetProjectTransactionsQuery,
+  useAddProjectDocumentMutation
 } from "@/api/projectCostingApi";
 import {
   LineChart,
@@ -106,10 +108,11 @@ export default function ProjectDashboardPage() {
   const [approveProject, { isLoading: isApproving }] = useApproveProjectMutation();
   const [rejectProject, { isLoading: isRejecting }] = useRejectProjectMutation();
   const [submitProject, { isLoading: isSubmitting }] = useSubmitProjectMutation();
-  const [approveBudgetAdjustment, { isLoading: isApprovingAdjustment }] = useApproveBudgetAdjustmentMutation();
+  const [approveBudgetAdjustment, { isLoading: isApprovingBudget }] = useApproveBudgetAdjustmentMutation();
 
   const exportRef = React.useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isAddDocumentModalOpen, setIsAddDocumentModalOpen] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
 
   const handleExportPdf = async () => {
@@ -226,8 +229,9 @@ export default function ProjectDashboardPage() {
     }
   };
 
-  const pendingAdjsList = budgetAdjustments?.filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase())) || [];
-  const pendingAdjsTotal = pendingAdjsList.reduce((acc: number, a: any) => acc + Number(a.total_adjustment || a.amount || 0), 0);
+  const parsedBudgetAdjustments = (budgetAdjustments && ((budgetAdjustments as any).data || (budgetAdjustments as any).results)) || budgetAdjustments || [];
+  const pendingAdjsList = Array.isArray(parsedBudgetAdjustments) ? parsedBudgetAdjustments.filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase())) : [];
+  let pendingAdjsTotal = pendingAdjsList.reduce((acc: number, a: any) => acc + Number(a.total_adjustment || a.amount || 0), 0);
   
   if (isLoading) {
     return (
@@ -264,6 +268,27 @@ export default function ProjectDashboardPage() {
     }
   }
 
+  let customColumns: string[] = [];
+  if (parsedPhases && parsedPhases.length > 0) {
+    const colSet = new Set<string>();
+    const standardKeys = new Set(["id", "name", "quantity", "rate", "amount", "budget", "start_date", "end_date", "status", "cost_category", "sn", "displayName", "custom_values"]);
+    parsedPhases.forEach((phase: any) => {
+      if (phase.activities && Array.isArray(phase.activities)) {
+        phase.activities.forEach((act: any) => {
+          Object.keys(act).forEach(key => {
+            if (!standardKeys.has(key)) {
+              colSet.add(key);
+            }
+          });
+          if (act.custom_values && typeof act.custom_values === 'object') {
+            Object.keys(act.custom_values).forEach(key => colSet.add(key));
+          }
+        });
+      }
+    });
+    customColumns = Array.from(colSet);
+  }
+
   if (project?.financials) {
     try {
       fin = typeof project.financials === "string" ? JSON.parse(project.financials) : project.financials;
@@ -296,9 +321,24 @@ export default function ProjectDashboardPage() {
          budgetNum = filteredBudget;
       } else {
         // All Categories
-        actualSpend = Number(fin.actual || fin.spent || 0);
-        committed = Number(fin.committed || 0);
-        budgetNum = Number(fin.budget || 0);
+        actualSpend = Number(fin.actual || fin.spent || fin.actual_spend || fin.total_actual_spend || fin.total_actual_cost || 0);
+        committed = Number(fin.committed || fin.committed_spend || fin.total_committed || fin.total_commitment || 0);
+        budgetNum = Number(fin.budget || fin.total_budget || fin.total_amount || 0);
+        
+        if (actualSpend === 0 && fin.category_breakdown && Array.isArray(fin.category_breakdown)) {
+           actualSpend = fin.category_breakdown.reduce((sum: number, cat: any) => sum + Number(cat.amount || 0), 0);
+        }
+      }
+      
+      // Fallback for pending adjustments if empty
+      if (pendingAdjsList.length === 0) {
+        if (fin.pending_requests_count !== undefined || fin.pending_count !== undefined || fin.pending_approval_count !== undefined) {
+           const count = Number(fin.pending_requests_count || fin.pending_count || fin.pending_approval_count || 0);
+           if (count > 0) {
+             pendingAdjsList.length = count;
+             pendingAdjsTotal = Number(fin.pending_requests_value || fin.pending_value || fin.pending_approval_value || 0);
+           }
+        }
       }
     } catch (e) {
       console.error("Failed to parse financials", e);
@@ -355,6 +395,14 @@ export default function ProjectDashboardPage() {
     }
   }
 
+  if (dynamicLineChartData.length === 1) {
+    dynamicLineChartData.unshift({
+      name: "Start",
+      planned: 0,
+      actual: 0
+    });
+  }
+
   const renderPhaseRows = (phases: any[]): React.ReactNode => {
     if (!phases || !Array.isArray(phases)) return null;
     return phases.flatMap((phase, pIndex) => {
@@ -372,6 +420,7 @@ export default function ProjectDashboardPage() {
           <TableCell className="py-3 text-sm text-gray-600"></TableCell>
           <TableCell className="py-3 text-sm text-gray-600"></TableCell>
           <TableCell className="font-medium text-sm text-gray-600">{phaseBudget > 0 ? phaseBudget.toLocaleString() : ""}</TableCell>
+          {customColumns.map(col => <TableCell key={col} />)}
         </TableRow>
       ];
 
@@ -392,6 +441,11 @@ export default function ProjectDashboardPage() {
               <TableCell className="py-3 text-sm text-gray-600">{quantity}</TableCell>
               <TableCell className="py-3 text-sm text-gray-600">{rate.toLocaleString()}</TableCell>
               <TableCell className="font-medium text-sm text-gray-600">{actBudget > 0 ? actBudget.toLocaleString() : ""}</TableCell>
+              {customColumns.map(col => (
+                <TableCell key={col} className="py-3 text-sm text-gray-600">
+                  {act[col] || act.custom_values?.[col] || ""}
+                </TableCell>
+              ))}
             </TableRow>
           );
         });
@@ -663,7 +717,7 @@ export default function ProjectDashboardPage() {
 
             {/* Pending Requests */}
             <div className="bg-white p-6 rounded shadow-sm border border-gray-100">
-              <h3 className="text-lg font-medium text-[#3B7CED] mb-6">Pending Requests</h3>
+              <h3 className="text-lg font-medium text-[#3B7CED] mb-6">Pending Requests {fin ? `(fin keys: ${Object.keys(fin).filter(k => k.toLowerCase().includes('pending') || k.toLowerCase().includes('await') || k.toLowerCase().includes('req')).join(', ')})` : ''}</h3>
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Awaiting Approval</div>
@@ -736,6 +790,12 @@ export default function ProjectDashboardPage() {
           >
             Budget Adjustments
           </button>
+          <button 
+            className={`pb-3 text-sm font-medium ${activeTab === 'documents' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('documents')}
+          >
+            Documents & Links
+          </button>
         </div>
 
         {/* Tabs Content */}
@@ -755,6 +815,9 @@ export default function ProjectDashboardPage() {
                   <TableHead className="w-[10%] font-medium text-gray-500 py-3">Qty</TableHead>
                   <TableHead className="w-[15%] font-medium text-gray-500 py-3">Rate</TableHead>
                   <TableHead className="w-[15%] font-medium text-gray-500 py-3">Budget</TableHead>
+                  {customColumns.map(col => (
+                    <TableHead key={col} className="font-medium text-gray-500 py-3 whitespace-nowrap">{col}</TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -902,7 +965,7 @@ export default function ProjectDashboardPage() {
                               <Button
                                 className="flex-1 bg-[#10B981] hover:bg-emerald-600 text-white font-medium h-11 rounded-md"
                                 onClick={() => handleApproveAdjustment(adj)}
-                                disabled={isApprovingAdjustment}
+                                disabled={isApprovingBudget}
                               >
                                 Approve
                               </Button>
@@ -1042,7 +1105,56 @@ export default function ProjectDashboardPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
 
+        {activeTab === 'documents' && (
+          <div className="bg-white rounded shadow-sm border border-gray-100 p-6 mb-12">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-[#3B7CED]">Project Documents & Links</h3>
+              {(!project?.status || ["DRAFT", "PENDING_APPROVAL"].includes(project.status.toUpperCase())) && (
+                <Button
+                  onClick={() => setIsAddDocumentModalOpen(true)}
+                  size="sm"
+                  className="bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center gap-1 text-xs h-8"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Document
+                </Button>
+              )}
+            </div>
+            
+            {(!(project as any).documents || (Array.isArray((project as any).documents) && (project as any).documents.length === 0)) ? (
+              <div className="text-center py-10 border border-dashed border-gray-200 rounded text-gray-500">
+                <p>No documents have been added to this project yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.isArray((project as any).documents) ? (project as any).documents.map((doc: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between p-4 border border-gray-200 rounded hover:border-[#3B7CED] transition-colors bg-gray-50">
+                    <div className="flex flex-col truncate pr-4">
+                      <span className="font-medium text-sm text-gray-800 truncate">{doc.name || `Document ${i + 1}`}</span>
+                      {doc.created_at && (
+                        <span className="text-xs text-gray-500 mt-1">Added: {new Date(doc.created_at).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    <a
+                      href={doc.file || doc.file_url || doc.url || doc.document || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-white border border-gray-200 rounded text-xs text-[#3B7CED] hover:bg-blue-50 shrink-0 font-medium"
+                    >
+                      View
+                    </a>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-700">
+                    {/* Fallback if documents is just a string (e.g. from broken Swagger schema) */}
+                    {String((project as any).documents)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1137,6 +1249,12 @@ export default function ProjectDashboardPage() {
         }}
         project={project}
       />
+
+      <AddDocumentModal
+        isOpen={isAddDocumentModalOpen}
+        onClose={() => setIsAddDocumentModalOpen(false)}
+        projectId={Number(id)}
+      />
       
       <StatusModal
         isOpen={statusModal.isOpen}
@@ -1150,7 +1268,17 @@ export default function ProjectDashboardPage() {
       {/* Hidden Export Template */}
       <div className="absolute -left-[9999px] top-0 pointer-events-none">
         <div ref={exportRef}>
-          <ProjectCostingExportTemplate project={project} />
+          <ProjectCostingExportTemplate 
+            project={project} 
+            transactions={transactions}
+            parsedPhases={parsedPhases}
+            customColumns={customColumns}
+            budgetNum={budgetNum}
+            actualSpend={actualSpend}
+            committedSpend={committed}
+            lineChartData={dynamicLineChartData}
+            pieChartData={pieChartData}
+          />
         </div>
       </div>
     </div>

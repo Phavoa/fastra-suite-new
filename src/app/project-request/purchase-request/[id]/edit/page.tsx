@@ -122,7 +122,7 @@ export default function EditPurchaseRequestPage() {
   const { data: budgetData } = useGetAvailableBudgetQuery(
     {
       project_id: Number(selectedProjectId),
-      wbs_id: Number(selectedTaskId),
+      wbs_id: selectedTaskId,
       cost_code: "CC-04",
     },
     { skip: !selectedProjectId || !selectedTaskId },
