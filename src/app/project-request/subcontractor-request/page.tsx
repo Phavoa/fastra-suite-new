@@ -128,28 +128,11 @@ export default function SubcontractorRequestPage() {
     mockData: requests.map(req => ({ ...req, status: (req as any).project_request?.status || req.status || "pending" })),
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F1F5F9]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3B7CED] mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading requests...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F1F5F9]">
-        <div className="text-center text-red-600 p-8 bg-white rounded-lg shadow-sm border border-red-100">
-          <XCircle className="h-12 w-12 mx-auto mb-4" />
-          <h3 className="text-lg font-bold mb-2">Error Loading Requests</h3>
-          <p className="text-sm">{extractErrorMessage(error, "Please try again later")}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return <RequestDashboard config={config} backUrl="/project-request/make-request" />;
+  return (
+    <RequestDashboard
+      config={config}
+      backUrl="/project-request/make-request"
+      isLoading={isLoading && requests.length === 0}
+    />
+  );
 }

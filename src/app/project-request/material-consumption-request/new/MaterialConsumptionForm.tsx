@@ -48,6 +48,8 @@ import {
   useGetProjectCostingProjectQuery,
 } from "@/api/projectCostingApi";
 import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
@@ -459,7 +461,11 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
   };
 
   return (
-    <>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+    >
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
@@ -1086,6 +1092,6 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
         />
       </form>
     </Form>
-    </>
+    </motion.div>
   );
 }

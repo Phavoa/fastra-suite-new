@@ -7,6 +7,7 @@ import { StockMoveCards } from "@/components/inventory/stocks/StockMoveCards";
 import { InventoryPageShell, InventoryListHeader } from "@/components/inventory/shared";
 import { useGetStockMovesQuery } from "@/api/inventory/stockMoveApi";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function StockMovesPage() {
   const { data: movesResponse, isLoading, isError } = useGetStockMovesQuery({});
@@ -41,11 +42,17 @@ export default function StockMovesPage() {
   }, [moves, query, selectedType]);
 
   return (
-    <InventoryPageShell
-      application="inventory"
-      module="stockmove"
-      breadcrumbs={items}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="w-full h-full"
     >
+      <InventoryPageShell
+        application="inventory"
+        module="stockmove"
+        breadcrumbs={items}
+      >
       <InventoryListHeader
         title="Inventory Ledger"
         query={query}
@@ -64,10 +71,16 @@ export default function StockMovesPage() {
 
       <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
         {isLoading ? (
-          <div className="space-y-4 p-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+          <div className="p-4 space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex gap-4 items-center border-b border-gray-100 pb-3">
+                <Skeleton className="h-5 w-1/6" />
+                <Skeleton className="h-5 w-2/6" />
+                <Skeleton className="h-5 w-1/6" />
+                <Skeleton className="h-5 w-1/6" />
+                <Skeleton className="h-5 w-1/6" />
+              </div>
+            ))}
           </div>
         ) : isError ? (
           <div className="p-8 text-center text-red-500">
@@ -81,6 +94,7 @@ export default function StockMovesPage() {
           </div>
         )}
       </div>
-    </InventoryPageShell>
+      </InventoryPageShell>
+    </motion.div>
   );
 }

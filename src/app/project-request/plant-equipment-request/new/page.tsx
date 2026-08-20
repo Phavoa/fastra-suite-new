@@ -263,7 +263,12 @@ export default function NewPlantEquipmentRequestPage() {
 
   return (
     <PageGuard module="project_request" entitlement="create">
-      <div className="min-h-screen bg-[#F9FAFB] pb-28">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="min-h-screen bg-[#F9FAFB] pb-28"
+      >
       {/* Header Bar */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -606,7 +611,7 @@ export default function NewPlantEquipmentRequestPage() {
           </div>
         )}
       </AnimatePresence>
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }

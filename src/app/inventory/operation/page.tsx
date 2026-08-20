@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 const STATUS_TABS = [
@@ -193,8 +195,12 @@ export default function OperationPage() {
 
   return (
     <PageGuard module="inventory" entitlement="view_incomingproduct">
-      {/* Two-tone: gray page canvas */}
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20"
+      >
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           {/* Breadcrumbs — sits on gray */}
           <Breadcrumbs
@@ -325,69 +331,82 @@ export default function OperationPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {incomingProducts.map((item: any) => (
-                      <TableRow
-                        key={item.incoming_product_id}
-                        className="cursor-pointer hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
-                        onClick={() => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(item.incoming_product_id)}`)}
-                      >
-                        <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap">
-                          <Link
-                            href={`/inventory/operation/incoming_product/${encodeURIComponent(item.incoming_product_id)}`}
-                            className="text-[#3B7CED] hover:underline font-semibold"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {highlightText(item.incoming_product_id, query)}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
-                          {highlightText(
-                            item.supplier_details?.vendor_name || "N/A",
-                            query,
-                          )}
-                        </TableCell>
-                        <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
-                          {highlightText(
-                            item.related_po || "N/A",
-                            query,
-                          )}
-                        </TableCell>
-                        <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
-                          {highlightText(
-                            item.destination_location_details?.location_name ||
-                              "N/A",
-                            query,
-                          )}
-                        </TableCell>
-                        <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
-                          {highlightText(
-                            item.date_created ? new Date(item.date_created).toLocaleDateString() : "N/A",
-                            query,
-                          )}
-                        </TableCell>
-                        <TableCell className="py-3.5 px-6 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold min-w-[80px] ${
-                              item.status === "validated"
-                                ? "bg-[#E2F2E9] text-[#1E8E3E]"
+                    {isLoading ? (
+                      Array.from({ length: 5 }).map((_, idx) => (
+                        <TableRow key={`skeleton-row-${idx}`} className="border-b border-[#E9ECEF]">
+                          <TableCell className="py-4 px-6"><Skeleton className="h-5 w-24 bg-gray-200 rounded animate-pulse" /></TableCell>
+                          <TableCell className="py-4 px-6"><Skeleton className="h-5 w-32 bg-gray-200 rounded animate-pulse" /></TableCell>
+                          <TableCell className="py-4 px-6"><Skeleton className="h-5 w-24 bg-gray-200 rounded animate-pulse" /></TableCell>
+                          <TableCell className="py-4 px-6"><Skeleton className="h-5 w-28 bg-gray-200 rounded animate-pulse" /></TableCell>
+                          <TableCell className="py-4 px-6"><Skeleton className="h-5 w-20 bg-gray-200 rounded animate-pulse" /></TableCell>
+                          <TableCell className="py-4 px-6"><Skeleton className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      incomingProducts.map((item: any) => (
+                        <TableRow
+                          key={item.incoming_product_id}
+                          className="cursor-pointer hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
+                          onClick={() => router.push(`/inventory/operation/incoming_product/${encodeURIComponent(item.incoming_product_id)}`)}
+                        >
+                          <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap">
+                            <Link
+                              href={`/inventory/operation/incoming_product/${encodeURIComponent(item.incoming_product_id)}`}
+                              className="text-[#3B7CED] hover:underline font-semibold"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {highlightText(item.incoming_product_id, query)}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
+                            {highlightText(
+                              item.supplier_details?.vendor_name || "N/A",
+                              query,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
+                            {highlightText(
+                              item.related_po || item.related_ppo_details?.po_number || "N/A",
+                              query,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
+                            {highlightText(
+                              item.destination_location_details?.location_name ||
+                                "N/A",
+                              query,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
+                            {highlightText(
+                              item.date_created ? new Date(item.date_created).toLocaleDateString() : "N/A",
+                              query,
+                            )}
+                          </TableCell>
+                          <TableCell className="py-3.5 px-6 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold min-w-[80px] ${
+                                item.status === "validated"
+                                  ? "bg-[#E2F2E9] text-[#1E8E3E]"
+                                  : item.status === "draft"
+                                    ? "bg-[#E8F0FE] text-[#1A73E8]"
+                                    : item.status === "canceled"
+                                      ? "bg-[#FCE8E6] text-[#C5221F]"
+                                      : "bg-[#E9ECEF] text-[#8898AA]"
+                              }`}
+                            >
+                              {item.status === "validated"
+                                ? "Validated"
                                 : item.status === "draft"
-                                  ? "bg-[#E8F0FE] text-[#1A73E8]"
+                                  ? "Draft"
                                   : item.status === "canceled"
-                                    ? "bg-[#FCE8E6] text-[#C5221F]"
-                                    : "bg-[#E9ECEF] text-[#8898AA]"
-                            }`}
-                          >
-                            {item.status === "validated"
-                              ? "Validated"
-                              : item.status === "draft"
-                                ? "Draft"
-                                : item.status === "canceled"
-                                  ? "Canceled"
-                                  : item.status}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                    ? "Canceled"
+                                    : item.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                     {incomingProducts.length === 0 && (
                       <TableRow>
                         <TableCell
@@ -487,7 +506,7 @@ export default function OperationPage() {
             </div>
           </div>
         </main>
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }

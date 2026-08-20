@@ -154,6 +154,13 @@ export const materialConsumptionRequestApi = createApi({
         body: data || {},
       }),
     }),
+    releaseMaterialConsumption: builder.mutation<any, { id: number; body: { location: string; date_consumed: string; notes: string } }>({
+      query: ({ id, body }) => ({
+        url: `/project-requests/material-consumption/${id}/release/`,
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -165,4 +172,5 @@ export const {
   usePatchMaterialConsumptionMutation,
   useDeleteMaterialConsumptionMutation,
   useSubmitMaterialConsumptionRequestMutation,
+  useReleaseMaterialConsumptionMutation,
 } = materialConsumptionRequestApi;

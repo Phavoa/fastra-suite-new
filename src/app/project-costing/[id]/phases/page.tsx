@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface GroupedSubphase {
   name: string;
@@ -35,8 +37,40 @@ export default function WorkBreakdownStructurePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-gray-50">
-        <p className="text-gray-500 text-sm">Loading Work Breakdown Structure...</p>
+      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-gray-50">
+        <div className="flex items-center px-6 py-4 bg-white border-b border-gray-100">
+          <Skeleton className="h-4 w-48 bg-gray-200" />
+        </div>
+
+        <div className="p-6 max-w-[1200px] mx-auto w-full flex flex-col gap-6">
+          {/* Budget Card Skeleton */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex flex-col gap-2">
+            <Skeleton className="h-4 w-28 bg-gray-200" />
+            <Skeleton className="h-8 w-48 bg-gray-200" />
+          </div>
+
+          {/* WBS Table Skeleton */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-12">
+            <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between gap-4">
+              <Skeleton className="h-4 w-1/4 bg-gray-200" />
+              <Skeleton className="h-4 w-1/6 bg-gray-200" />
+              <Skeleton className="h-4 w-[10%] bg-gray-200" />
+              <Skeleton className="h-4 w-1/6 bg-gray-200" />
+              <Skeleton className="h-4 w-1/6 bg-gray-200" />
+            </div>
+            <div className="divide-y divide-gray-100">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="p-4 flex justify-between gap-4 bg-white">
+                  <Skeleton className="h-4 w-1/3 bg-gray-100" />
+                  <Skeleton className="h-4 w-1/6 bg-gray-100" />
+                  <Skeleton className="h-4 w-[8%] bg-gray-100" />
+                  <Skeleton className="h-4 w-1/6 bg-gray-100" />
+                  <Skeleton className="h-4 w-1/6 bg-gray-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -144,7 +178,12 @@ export default function WorkBreakdownStructurePage() {
 
   return (
     <PageGuard module="project_costing" entitlement="view_project">
-    <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-gray-50">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-gray-50"
+    >
       <div className="flex items-center px-6 py-4 bg-white border-b border-gray-100">
         <Link href={`/project-costing/${id}`}>
           <button className="mr-3 flex items-center justify-center p-1 hover:bg-gray-100 rounded">
@@ -289,7 +328,7 @@ export default function WorkBreakdownStructurePage() {
           </table>
         </div>
       </div>
-    </div>
+    </motion.div>
     </PageGuard>
   );
 }

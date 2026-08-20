@@ -147,14 +147,11 @@ export default function PettyCashRequestPage() {
     mockData: requests,
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F1F5F9] flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="w-10 h-10 text-[#3B7CED] animate-spin" />
-        <p className="text-gray-500 font-medium">Loading Petty Cash dashboard...</p>
-      </div>
-    );
-  }
-
-  return <RequestDashboard config={config} backUrl="/project-request/make-request" />;
+  return (
+    <RequestDashboard
+      config={config}
+      backUrl="/project-request/make-request"
+      isLoading={isLoading && requests.length === 0}
+    />
+  );
 }

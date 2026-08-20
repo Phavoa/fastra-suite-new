@@ -6,6 +6,7 @@ import { FileText, FileCheck } from "lucide-react";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { UnauthorizedMessage } from "@/components/shared/UnauthorizedMessage";
+import { motion } from "framer-motion";
 
 export default function ApproverDashboardPage() {
   const { hasAccess } = useModulePermissions();
@@ -20,8 +21,13 @@ export default function ApproverDashboardPage() {
   }
 
   return (
-      <div className="min-h-screen bg-[#F9FAFB]">
-        <NavBar title="Approver Dashboard" items={[]} backUrl="/" />
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="min-h-screen bg-[#F9FAFB]"
+    >
+      <NavBar title="Approver Dashboard" items={[]} backUrl="/" />
       
       <main className="max-w-2xl mx-auto p-4 pt-6">
         <div className="space-y-4">
@@ -50,6 +56,6 @@ export default function ApproverDashboardPage() {
             </Link>
         </div>
       </main>
-    </div>
+    </motion.div>
   );
 }

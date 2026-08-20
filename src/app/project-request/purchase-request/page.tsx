@@ -320,74 +320,11 @@ export default function PurchaseRequestsDashboard() {
     mockData: requests,
   };
 
-  if (isApiLoading && requests.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#F9FAFB] pb-28">
-        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
-          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
-              <div className="h-6 bg-gray-200 rounded w-36 animate-pulse"></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs">
-            <div className="grid grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="p-4 border border-gray-100 rounded-lg h-24 bg-gray-50 animate-pulse"
-                >
-                  <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-10"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <div className="h-5 bg-gray-200 rounded w-40 animate-pulse"></div>
-            <div className="flex gap-2 pb-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className="h-8 bg-gray-200 rounded-full w-20 animate-pulse"
-                ></div>
-              ))}
-            </div>
-            <div className="space-y-3 pt-2">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="p-4 border border-gray-100 rounded-lg space-y-3 animate-pulse"
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    <div className="h-5 bg-gray-200 rounded-full w-16"></div>
-                  </div>
-                  <div className="h-5 bg-gray-200 rounded w-64"></div>
-                  <div className="h-3 bg-gray-200 rounded w-32"></div>
-                  <div className="grid grid-cols-3 gap-2 border-t border-gray-50 pt-3">
-                    <div className="h-8 bg-gray-200 rounded"></div>
-                    <div className="h-8 bg-gray-200 rounded"></div>
-                    <div className="h-8 bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <RequestDashboard
       config={config}
       backUrl="/project-request/make-request"
+      isLoading={isApiLoading && requests.length === 0}
     />
   );
 }

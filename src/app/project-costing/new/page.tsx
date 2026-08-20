@@ -15,6 +15,8 @@ import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { extractErrorMessage } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -428,15 +430,17 @@ export default function NewProjectPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => wbsFileInputRef.current?.click()}
                     onDragOver={handleDragOverWbs}
                     onDragLeave={handleDragLeaveWbs}
                     onDrop={handleDropWbs}
-                    className={`flex items-center justify-center gap-2 px-6 py-6 border-2 border-dashed rounded transition-colors ${
+                    className={`flex items-center justify-center gap-2 px-6 py-6 border-2 border-dashed rounded transition-colors cursor-pointer ${
                       isDraggingWbs 
-                        ? "border-blue-500 bg-blue-50 text-blue-600 scale-[1.02]" 
+                        ? "border-blue-500 bg-blue-50 text-blue-600" 
                         : "border-[#3B7CED] opacity-80 text-[#3B7CED] hover:bg-blue-50"
                     }`}
                   >
@@ -444,7 +448,7 @@ export default function NewProjectPage() {
                     <span className="text-sm font-medium">
                       {isDraggingWbs ? "Drop Excel File Here" : "Import WBS Excel (Drag & Drop)"}
                     </span>
-                  </button>
+                  </motion.button>
                 </TooltipTrigger>
                 <TooltipContent className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-xs border border-gray-800 max-w-xs z-50">
                   <p className="font-semibold mb-1">Mandatory WBS Columns:</p>
@@ -464,14 +468,16 @@ export default function NewProjectPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={handleDownloadTemplate}
-                    className="flex items-center justify-center gap-2 px-6 py-6 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                    className="flex items-center justify-center gap-2 px-6 py-6 border border-gray-200 rounded text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
                     <span className="text-sm font-medium">Download WBS Template</span>
-                  </button>
+                  </motion.button>
                 </TooltipTrigger>
                 <TooltipContent className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-xs border border-gray-800 max-w-xs z-50">
                   <p className="font-semibold mb-1">Download Excel template</p>
@@ -522,143 +528,152 @@ export default function NewProjectPage() {
       </div>
 
       {/* Side Over Panel / Drawer */}
-      {isPanelOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 transition-opacity"
-          onClick={() => setIsPanelOpen(false)}
-        />
-      )}
-      <div
-        className={`fixed inset-y-0 right-0 z-50 w-[460px] max-w-[90vw] bg-white shadow-2xl border-l border-gray-100 flex flex-col transition-transform duration-300 ease-in-out transform ${
-          isPanelOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* Panel Header */}
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <div>
-            <h2 className="text-[#3B7CED] text-lg font-medium">Documents & Links</h2>
-            <p className="text-xs text-gray-500 mt-1">Manage files and links for this project.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsPanelOpen(false)}
-            className="text-gray-400 hover:text-gray-600 font-bold text-xl p-1"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Panel Body */}
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-8">
-          {/* File Upload Section */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold text-gray-700 font-medium">Upload Files</h3>
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              id="external-doc-upload"
-              onChange={handleFileUploadExternal}
+      <AnimatePresence>
+        {isPanelOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/40"
+              onClick={() => setIsPanelOpen(false)}
             />
-            <label
-              htmlFor="external-doc-upload"
-              className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded hover:border-[#3B7CED] hover:bg-blue-50/20 transition-all cursor-pointer text-gray-500 hover:text-[#3B7CED] text-sm font-medium"
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 26, stiffness: 220 }}
+              className="fixed inset-y-0 right-0 z-50 w-[460px] max-w-[90vw] bg-white shadow-2xl border-l border-gray-100 flex flex-col"
             >
-              <Paperclip className="w-4 h-4" />
-              Click to select files
-            </label>
-          </div>
+              {/* Panel Header */}
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div>
+                  <h2 className="text-[#3B7CED] text-lg font-medium">Documents & Links</h2>
+                  <p className="text-xs text-gray-500 mt-1">Manage files and links for this project.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPanelOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 font-bold text-xl p-1"
+                >
+                  ×
+                </button>
+              </div>
 
-          {/* Link Attachment Section */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold text-gray-700 font-medium">Attach Web Link</h3>
-            <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded border border-gray-100">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-600 font-medium">Link Label</label>
-                <Input
-                  placeholder="e.g. Live PRD"
-                  value={linkName}
-                  onChange={(e) => setLinkName(e.target.value)}
-                  className="h-9 bg-white"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-600 font-medium">Link URL</label>
-                <Input
-                  placeholder="https://example.com/prd"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  className="h-9 bg-white"
-                />
-              </div>
-              <Button
-                type="button"
-                onClick={handleAddLink}
-                className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 mt-2 flex items-center gap-1"
-              >
-                <Link2 className="w-4 h-4" /> Attach Link
-              </Button>
-            </div>
-          </div>
-
-          {/* List of Attachments */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold text-gray-700 font-medium">Currently Attached</h3>
-            {documents.length === 0 ? (
-              <div className="text-center py-6 text-xs text-gray-400 border border-dashed border-gray-100 rounded">
-                No documents or links attached yet.
-              </div>
-            ) : (
-              <div className="border border-gray-200 rounded bg-white divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
-                {documents.map((doc, idx) => (
-                  <div
-                    key={idx}
-                    className="flex justify-between items-center px-3 py-2 text-sm text-gray-700 font-normal"
+              {/* Panel Body */}
+              <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-8">
+                {/* File Upload Section */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-gray-700 font-medium">Upload Files</h3>
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    id="external-doc-upload"
+                    onChange={handleFileUploadExternal}
+                  />
+                  <label
+                    htmlFor="external-doc-upload"
+                    className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded hover:border-[#3B7CED] hover:bg-blue-50/20 transition-all cursor-pointer text-gray-500 hover:text-[#3B7CED] text-sm font-medium"
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      {doc.url ? (
-                        <Link2 className="w-4 h-4 text-[#3B7CED] shrink-0" />
-                      ) : (
-                        <Paperclip className="w-4 h-4 text-gray-400 shrink-0" />
-                      )}
-                      {doc.url ? (
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#3B7CED] hover:underline truncate"
-                        >
-                          {doc.name}
-                        </a>
-                      ) : (
-                        <span className="truncate">{doc.name}</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveDocument(idx)}
-                      className="text-gray-400 hover:text-red-500 shrink-0 p-1"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+                    <Paperclip className="w-4 h-4" />
+                    Click to select files
+                  </label>
+                </div>
 
-        {/* Panel Footer */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-          <Button
-            type="button"
-            onClick={() => setIsPanelOpen(false)}
-            className="bg-[#3B7CED] hover:bg-[#3065c3] text-white w-full"
-          >
-            Done
-          </Button>
-        </div>
-      </div>
+                {/* Link Attachment Section */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-gray-700 font-medium">Attach Web Link</h3>
+                  <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded border border-gray-100">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-600 font-medium">Link Label</label>
+                      <Input
+                        placeholder="e.g. Bill of Quantities (BOQ)"
+                        value={linkName}
+                        onChange={(e) => setLinkName(e.target.value)}
+                        className="h-9 bg-white"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-600 font-medium">Link URL</label>
+                      <Input
+                        placeholder="https://example.com/prd"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        className="h-9 bg-white"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleAddLink}
+                      className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 mt-2 flex items-center gap-1"
+                    >
+                      <Link2 className="w-4 h-4" /> Attach Link
+                    </Button>
+                  </div>
+                </div>
+
+                {/* List of Attachments */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-gray-700 font-medium">Currently Attached</h3>
+                  {documents.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-gray-400 border border-dashed border-gray-100 rounded">
+                      No documents or links attached yet.
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded bg-white divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
+                      {documents.map((doc, idx) => (
+                        <div
+                          key={idx}
+                          className="flex justify-between items-center px-3 py-2 text-sm text-gray-700 font-normal"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            {doc.url ? (
+                              <Link2 className="w-4 h-4 text-[#3B7CED] shrink-0" />
+                            ) : (
+                              <Paperclip className="w-4 h-4 text-gray-400 shrink-0" />
+                            )}
+                            {doc.url ? (
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#3B7CED] hover:underline truncate"
+                              >
+                                {doc.name}
+                              </a>
+                            ) : (
+                              <span className="truncate">{doc.name}</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDocument(idx)}
+                            className="text-gray-400 hover:text-red-500 shrink-0 p-1"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Panel Footer */}
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => setIsPanelOpen(false)}
+                  className="bg-[#3B7CED] hover:bg-[#3065c3] text-white w-full"
+                >
+                  Done
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Status Modal */}
       <StatusModal

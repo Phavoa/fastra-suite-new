@@ -6,6 +6,8 @@ import { ArrowLeft, Bell, User, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
 import { 
   useGetProjectRequestQuery, 
   useApproveProjectRequestMutation, 
@@ -168,7 +170,12 @@ export default function RequestDetailsPage() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-32">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="min-h-screen bg-[#F9FAFB] pb-32"
+    >
       {/* Custom Header */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -200,9 +207,28 @@ export default function RequestDetailsPage() {
 
       <main className="max-w-2xl mx-auto px-4 pt-6 bg-white min-h-[calc(100vh-64px)] shadow-sm">
         {isRequestLoading ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-4">
-            <Loader2 className="w-10 h-10 text-[#3B7CED] animate-spin" />
-            <p className="text-gray-500 font-medium">Loading request details...</p>
+          <div className="flex flex-col gap-6 py-6">
+            <Skeleton className="h-5 w-40 bg-gray-200" />
+            <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="flex flex-col gap-1.5">
+                  <Skeleton className="h-3 w-20 bg-gray-100" />
+                  <Skeleton className="h-4 w-36 bg-gray-100" />
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-150 my-2"></div>
+            <Skeleton className="h-5 w-24 bg-gray-200" />
+            <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+              <div className="flex flex-col gap-1.5">
+                <Skeleton className="h-3 w-16 bg-gray-100" />
+                <Skeleton className="h-4 w-28 bg-gray-100" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Skeleton className="h-3 w-16 bg-gray-100" />
+                <Skeleton className="h-4 w-28 bg-gray-100" />
+              </div>
+            </div>
           </div>
         ) : request ? (
           <>
@@ -409,7 +435,7 @@ export default function RequestDetailsPage() {
         onAction={handleModalClose}
         showCloseButton={false}
       />
-    </div>
+    </motion.div>
   );
 }
 

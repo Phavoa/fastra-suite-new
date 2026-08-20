@@ -6,6 +6,8 @@ import { ArrowLeft, Bell, User, Loader2, FileCheck, ArrowRight } from "lucide-re
 import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
 import { 
   useGetProjectRequestsQuery, 
   useApproveProjectRequestMutation, 
@@ -89,7 +91,12 @@ export default function ApproveRequestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="min-h-screen bg-[#F9FAFB]"
+    >
       {/* Custom Header with Back Button */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -128,9 +135,29 @@ export default function ApproveRequestPage() {
       <main className="max-w-2xl mx-auto p-4 pt-6 pb-24">
         <div className="space-y-4">
           {isRequestsLoading ? (
-            <div className="flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-lg border border-gray-200">
-              <Loader2 className="w-8 h-8 text-[#3B7CED] animate-spin" />
-              <p className="text-gray-500 font-medium text-sm">Loading pending requests...</p>
+            <div className="flex flex-col gap-4">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="bg-white border border-gray-200 rounded-lg p-5 flex flex-col gap-4">
+                  <div>
+                    <Skeleton className="h-3 w-16 bg-gray-100 mb-2" />
+                    <Skeleton className="h-5 w-48 bg-gray-100" />
+                  </div>
+                  <div className="flex justify-between items-center border-t border-gray-50 pt-3">
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-3 w-16 bg-gray-100" />
+                      <Skeleton className="h-4 w-24 bg-gray-100" />
+                    </div>
+                    <div className="flex flex-col gap-1 items-end">
+                      <Skeleton className="h-3 w-16 bg-gray-100" />
+                      <Skeleton className="h-4 w-28 bg-gray-100" />
+                    </div>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Skeleton className="h-10 flex-1 bg-gray-100 rounded" />
+                    <Skeleton className="h-10 flex-1 bg-gray-100 rounded" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : apiRequests && apiRequests.length > 0 ? (
             apiRequests.map((request: any) => (
@@ -237,6 +264,6 @@ export default function ApproveRequestPage() {
         message={statusModal.message}
         actionText="Done"
       />
-    </div>
+    </motion.div>
   );
 }

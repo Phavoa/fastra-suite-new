@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ChevronRight, Calculator, Package, Wallet, Settings } from "lucide-react";
 import { NavBar } from "@/components/shared/TopBar/reusableTopBar";
+import { motion } from "framer-motion";
 
 export default function MakeRequestPage() {
   const requestTypes = [
@@ -64,7 +65,12 @@ export default function MakeRequestPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="min-h-screen bg-[#F9FAFB]"
+    >
       <NavBar title="Make Request" items={[]} backUrl="/project-request" />
       
       <main className="max-w-2xl mx-auto p-4 pt-6 pb-24">
@@ -73,7 +79,11 @@ export default function MakeRequestPage() {
             const Icon = req.icon;
             return (
               <Link key={index} href={req.href} className="block">
-                <div className={`bg-white border ${req.borderColor} rounded-lg p-4 flex items-center justify-between hover:shadow-md transition-shadow group`}>
+                <motion.div
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  className={`bg-white border ${req.borderColor} rounded-lg p-4 flex items-center justify-between hover:shadow-md transition-shadow group cursor-pointer`}
+                >
                   <div className="flex items-start gap-4">
                     <Icon className={`w-5 h-5 ${req.iconColor} mt-0.5 shrink-0`} />
                     <div>
@@ -86,12 +96,12 @@ export default function MakeRequestPage() {
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400 shrink-0 group-hover:text-gray-600 transition-colors" />
-                </div>
+                </motion.div>
               </Link>
             );
           })}
         </div>
       </main>
-    </div>
+    </motion.div>
   );
 }

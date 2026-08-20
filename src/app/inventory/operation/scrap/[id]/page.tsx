@@ -10,6 +10,8 @@ import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useGetScrapQuery, useGetScrapEditableQuery, useValidateScrapMutation } from "@/api/inventory/scrapApi";
 import {
   Table,
@@ -58,8 +60,12 @@ export default function ScrapDetailPage() {
 
   return (
     <PageGuard module="inventory" entitlement="view_scrap">
-      {/* Two-tone: gray page canvas */}
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20"
+      >
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs
             items={breadcrumbsItem}
@@ -73,7 +79,22 @@ export default function ScrapDetailPage() {
             }
           />
 
-          {isLoading && <div className="p-6 text-center text-gray-500">Loading record details...</div>}
+          {isLoading && (
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-2xs space-y-4">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-7 bg-gray-200 rounded w-64 animate-pulse" />
+                <Skeleton className="h-6 bg-gray-200 rounded-full w-20 animate-pulse" />
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="space-y-1">
+                    <Skeleton className="h-3 bg-gray-200 rounded w-20 animate-pulse" />
+                    <Skeleton className="h-5 bg-gray-200 rounded w-32 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!isLoading && record && (
             <>
@@ -235,7 +256,7 @@ export default function ScrapDetailPage() {
           </>
           )}
         </main>
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }
