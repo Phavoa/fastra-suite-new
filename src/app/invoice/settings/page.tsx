@@ -5,8 +5,9 @@ import { CompanyBankAccountsTab } from "@/components/invoice/settings/CompanyBan
 import { AccountingSettingsTab } from "@/components/invoice/settings/AccountingSettingsTab";
 import { CurrenciesTab } from "@/components/invoice/settings/CurrenciesTab";
 import { PaymentTermsTab } from "@/components/invoice/settings/PaymentTermsTab";
+import { RequestAccountMappingsTab } from "@/components/invoice/settings/RequestAccountMappingsTab";
 
-type Tab = "accounting" | "bank-accounts" | "currencies" | "payment-terms";
+type Tab = "accounting" | "bank-accounts" | "request-mappings" | "currencies" | "payment-terms";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("accounting");
@@ -52,6 +53,16 @@ export default function SettingsPage() {
             Company Bank Accounts
           </button>
           <button
+            onClick={() => setActiveTab("request-mappings")}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === "request-mappings"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            Account Mapping
+          </button>
+          <button
             onClick={() => setActiveTab("currencies")}
             className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === "currencies"
@@ -78,6 +89,7 @@ export default function SettingsPage() {
       <div className="mt-6">
         {activeTab === "accounting" && <AccountingSettingsTab />}
         {activeTab === "bank-accounts" && <CompanyBankAccountsTab />}
+        {activeTab === "request-mappings" && <RequestAccountMappingsTab />}
         {activeTab === "currencies" && <CurrenciesTab />}
         {activeTab === "payment-terms" && <PaymentTermsTab />}
       </div>
