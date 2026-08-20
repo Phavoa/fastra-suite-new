@@ -5,12 +5,16 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
-  CheckCircle,
+  CalendarIcon,
   InfoIcon,
   Loader2,
+  Wrench,
 } from "lucide-react";
-import { useGetApprovedProjectRequestDetailsQuery } from "@/api/invoice/approvedProjectRequestsApi";
+import { Input } from "@/components/ui/input";
+import PaymentTermsSelect from "@/components/shared/PaymentTermsSelect";
+import { useGetVendorsQuery } from "@/api/invoice/vendorsApi";
 import { useGetActiveCurrenciesQuery } from "@/api/invoice/invoiceCurrencyApi";
+import { useGetApprovedProjectRequestDetailsQuery } from "@/api/invoice/approvedProjectRequestsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 interface Request {
@@ -22,16 +26,22 @@ interface Request {
   [key: string]: any;
 }
 
-interface ConvertToPOSubcontractorModalProps {
+interface ConvertToPOPlantEquipmentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  request: Request | null;
   currentStep: number;
   onNextStep: () => void;
   onBackStep: () => void;
-  /** Converts approved subcontractor request → Vendor Bill (not PO) */
-  onConvertToInvoice: () => void | Promise<void>;
+  onIssuePO: (payload: {
+    vendor: number;
+    payment_term: number | null;
+    expected_delivery_date: string;
+    currency: number;
+    source_id: number;
+    source_type: string;
+  }) => Promise<void>;
   formatCurrency: (amount: number) => string;
-  request: Request | null;
   isIssuing?: boolean;
 }
 
@@ -71,23 +81,28 @@ function formatLabel(value?: string | null) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default function ConvertToPOSubcontractorModal({
+export default function ConvertToPOPlantEquipmentModal({
   isOpen,
   onClose,
+  request,
   currentStep,
   onNextStep,
   onBackStep,
-  onConvertToInvoice,
+  onIssuePO,
   formatCurrency,
-  request,
   isIssuing = false,
-}: ConvertToPOSubcontractorModalProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [toast, setToast] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+}: ConvertToPOPlantEquipmentModalProps) {
+  const { data: vendorsResponse } = useGetVendorsQuery({});
+  const vendors = Array.isArray(vendorsResponse)
+    ? vendorsResponse
+    : (vendorsResponse as any)?.results || [];
+
+  const { data: activeCurrenciesResponse } = useGetActiveCurrenciesQuery();
+  const activeCurrencies = Array.isArray(activeCurrenciesResponse)
+    ? activeCurrenciesResponse
+    : (activeCurrenciesResponse as any)?.results || [];
+  const defaultCurrencyId =
+    activeCurrencies.length > 0 ? activeCurrencies[0].id : 1;
 
   const requestId = (() => {
     if (request?.backendId) return Number(request.backendId);
@@ -104,12 +119,16 @@ export default function ConvertToPOSubcontractorModal({
     skip: !isOpen || !requestId,
   });
 
-  const { data: activeCurrenciesResponse } = useGetActiveCurrenciesQuery();
-  const activeCurrencies = Array.isArray(activeCurrenciesResponse)
-    ? activeCurrenciesResponse
-    : (activeCurrenciesResponse as any)?.results || [];
-  const defaultCurrencyId =
-    activeCurrencies.length > 0 ? activeCurrencies[0].id : 1;
+  const [selectedVendor, setSelectedVendor] = useState("");
+  const [selectedPaymentTerms, setSelectedPaymentTerms] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [isVisible, setIsVisible] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const primaryButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -121,58 +140,107 @@ export default function ConvertToPOSubcontractorModal({
     }
   }, [isOpen]);
 
+  // Prefill delivery date from required_date when details load
   useEffect(() => {
-    if (!isOpen) setToast(null);
+    if (detailsData?.required_date && !deliveryDate) {
+      setDeliveryDate(detailsData.required_date.slice(0, 10));
+    }
+  }, [detailsData, deliveryDate]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedVendor("");
+      setSelectedPaymentTerms("");
+      setDeliveryDate("");
+      setToast(null);
+    }
   }, [isOpen]);
 
   if (!isOpen && !isVisible) return null;
 
-  // ---------- Derived values from details ----------
-  const vendorName =
-    detailsData?.vendor_name ||
-    (detailsData?.vendor ? `Vendor #${detailsData.vendor}` : "Not specified");
+  // ---------- Derived ----------
+  const equipmentName = detailsData?.equipment_name || "—";
+  const description = detailsData?.description || "—";
+  const quantity = detailsData?.quantity ?? 0;
+  const estimatedCost = Number(detailsData?.estimated_cost) || 0;
+  const paymentType = (detailsData?.payment_type || "purchase").toLowerCase();
+  const isHire = paymentType === "hire";
+  const expectedReturnDate = detailsData?.expected_return_date
+    ? detailsData.expected_return_date.slice(0, 10)
+    : null;
+  const requiredDate = detailsData?.required_date
+    ? detailsData.required_date.slice(0, 10)
+    : "—";
+  const justification = detailsData?.justification_notes || "";
+  const availableBudget = detailsData?.available_budget
+    ? Number(detailsData.available_budget)
+    : null;
 
-  const scopeOfWork = detailsData?.scope_of_work || "—";
-  const contractValue = Number(detailsData?.contract_value) || 0;
-  const projectName = detailsData?.project_details?.name || "—";
   const wbsLabel = detailsData
     ? `${detailsData.project_details?.name || "—"} › ${detailsData.phase_details?.name || "—"} › ${detailsData.activity_details?.name || "—"}`
     : "—";
-  const paymentType = formatLabel(detailsData?.payment_type);
-  const paymentTermsText = detailsData?.payment_terms || "—";
-  const startDate = detailsData?.start_date || "—";
-  const endDate = detailsData?.end_date || "—";
+
   const referenceId =
-    detailsData?.project_request?.reference_id || request?.id || "—";
-  const milestones = detailsData?.milestones ?? [];
-  const justification = detailsData?.justification_notes || "";
+    detailsData?.project_request?.reference_id ||
+    detailsData?.reference_id ||
+    request?.id ||
+    "—";
+
+  const vendorObj = vendors.find(
+    (v: any) => v.id.toString() === selectedVendor,
+  );
+  const displayVendorName = vendorObj
+    ? vendorObj.vendor_name
+    : selectedVendor || "Not selected";
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4500);
   };
 
-  const handleConvertToInvoice = async () => {
-    if (!detailsData?.id && !requestId) {
+  const handleNext = () => {
+    if (!selectedVendor) {
+      showToast("error", "Please select a vendor");
+      return;
+    }
+    if (!selectedPaymentTerms) {
+      showToast("error", "Please select payment terms");
+      return;
+    }
+    if (!deliveryDate) {
+      showToast("error", "Please select an expected delivery date");
+      return;
+    }
+    onNextStep();
+  };
+
+  const handleConvert = async () => {
+    const sourceId = detailsData?.id ?? requestId;
+
+    if (!sourceId) {
       showToast("error", "Unable to determine request ID. Please try again.");
       return;
     }
 
-    console.log("Convert Subcontractor → Vendor Bill", {
-      approved_request_id: detailsData?.id ?? requestId,
-      vendor: detailsData?.vendor,
-      contract_value: detailsData?.contract_value,
-      reference_id: detailsData?.project_request?.reference_id,
-    });
+    const payload = {
+      vendor: Number(selectedVendor),
+      payment_term: selectedPaymentTerms ? Number(selectedPaymentTerms) : null,
+      expected_delivery_date: deliveryDate,
+      currency: defaultCurrencyId,
+      source_id: Number(sourceId),
+      source_type: "plant_and_equipment",
+    };
+
+    console.log("Convert Plant & Equipment to PO – final payload →", payload);
 
     try {
-      await onConvertToInvoice();
+      await onIssuePO(payload);
     } catch (err) {
-      console.error("Convert Subcontractor to Invoice failed:", err);
+      console.error("Convert Plant & Equipment to PO failed:", err);
     }
   };
 
-  // ---------- UI helpers ----------
+  // ---------- UI ----------
   const renderStepIndicator = () => (
     <div className="flex items-center gap-4 mb-6" aria-label="Progress">
       <div className="flex items-center gap-2">
@@ -180,10 +248,11 @@ export default function ConvertToPOSubcontractorModal({
           className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
             currentStep === 1
               ? "bg-blue-600 text-white"
-              : "bg-green-500 text-white"
+              : "bg-gray-200 text-gray-600"
           }`}
+          aria-current={currentStep === 1 ? "step" : undefined}
         >
-          {currentStep === 1 ? 1 : <CheckCircle className="w-4 h-4" />}
+          1
         </div>
         <span
           className={`text-sm ${
@@ -201,6 +270,7 @@ export default function ConvertToPOSubcontractorModal({
               ? "bg-blue-600 text-white"
               : "bg-gray-200 text-gray-600"
           }`}
+          aria-current={currentStep === 2 ? "step" : undefined}
         >
           2
         </div>
@@ -226,53 +296,13 @@ export default function ConvertToPOSubcontractorModal({
     </div>
   );
 
-  const renderMilestones = () => {
-    if (!milestones.length) {
-      return (
-        <div className="border border-gray-200 rounded-lg px-4 py-6 text-center text-sm text-gray-500">
-          No milestones defined (Lump Sum contract)
-        </div>
-      );
-    }
-
-    return (
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        {milestones.map((m, index) => (
-          <div
-            key={m.id ?? index}
-            className={`${
-              index % 2 === 0 ? "bg-gray-50" : "bg-white"
-            } px-4 py-3 border-b border-gray-200 last:border-b-0 flex items-center justify-between gap-4`}
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {m.name || `Milestone ${index + 1}`}
-              </p>
-              {m.description && (
-                <p className="text-xs text-gray-500 mt-0.5">
-                  <TruncateWithTooltip
-                    text={String(m.description)}
-                    maxLength={60}
-                  />
-                </p>
-              )}
-            </div>
-            <p className="text-sm font-semibold text-gray-900 shrink-0">
-              {formatCurrency(Number(m.amount) || 0)}
-            </p>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const renderStep1 = () => (
     <>
       <div className="space-y-6">
         {isDetailsLoading ? (
           <div className="flex items-center justify-center py-16 gap-2 text-sm text-gray-500">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Loading subcontractor details…
+            Loading equipment details…
           </div>
         ) : isDetailsError ? (
           <div className="border border-red-200 bg-red-50 rounded-lg p-4 text-sm text-red-700">
@@ -280,19 +310,51 @@ export default function ConvertToPOSubcontractorModal({
           </div>
         ) : (
           <>
+            {/* Equipment summary banner */}
+            <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <Wrench className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-blue-900">
+                  {equipmentName}
+                </p>
+                <p className="text-xs text-blue-700 mt-0.5">
+                  {description !== equipmentName
+                    ? description
+                    : "Plant & Equipment Request"}
+                  {" · "}
+                  Qty: {quantity}
+                  {" · "}
+                  {formatLabel(paymentType)}
+                  {isHire && expectedReturnDate
+                    ? ` · Return by ${expectedReturnDate}`
+                    : ""}
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <InfoCard label="Subcontractor Name" value={vendorName} />
-              <InfoCard label="Scope of Work" value={scopeOfWork} />
+              <InfoCard label="Equipment Name" value={equipmentName} />
+              <InfoCard label="Description" value={description} />
+              <InfoCard label="Quantity" value={String(quantity)} />
               <InfoCard
-                label="Contract Value"
-                value={formatCurrency(contractValue)}
+                label="Estimated Cost"
+                value={formatCurrency(estimatedCost)}
               />
-              <InfoCard label="Project Name" value={projectName} />
+              <InfoCard label="Payment Type" value={formatLabel(paymentType)} />
+              <InfoCard label="Required Date" value={requiredDate} />
+              {isHire && (
+                <InfoCard
+                  label="Expected Return Date"
+                  value={expectedReturnDate || "Not set"}
+                />
+              )}
               <InfoCard label="WBS Element" value={wbsLabel} />
-              <InfoCard label="Payment Type" value={paymentType} />
-              <InfoCard label="Payment Terms" value={paymentTermsText} />
-              <InfoCard label="Start Date" value={startDate} />
-              <InfoCard label="End Date" value={endDate} />
+              {availableBudget !== null && (
+                <InfoCard
+                  label="Available Budget"
+                  value={formatCurrency(availableBudget)}
+                />
+              )}
             </div>
 
             {justification && (
@@ -304,11 +366,62 @@ export default function ConvertToPOSubcontractorModal({
               </div>
             )}
 
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
-                Milestones
-              </h3>
-              {renderMilestones()}
+            {/* Form fields */}
+            <div className="space-y-4 pt-2">
+              <div>
+                <label
+                  htmlFor="pe-vendor"
+                  className="text-sm font-medium text-gray-700 mb-2 block"
+                >
+                  Vendor
+                </label>
+                <select
+                  id="pe-vendor"
+                  value={selectedVendor}
+                  onChange={(e) => setSelectedVendor(e.target.value)}
+                  disabled={isIssuing}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white disabled:opacity-60"
+                >
+                  <option value="">Select Vendor</option>
+                  {vendors.map((vendor: any) => (
+                    <option key={vendor.id} value={vendor.id.toString()}>
+                      {vendor.vendor_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Payment Terms
+                </label>
+                <PaymentTermsSelect
+                  value={selectedPaymentTerms}
+                  onChange={setSelectedPaymentTerms}
+                  placeholder="Select payment terms"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="pe-delivery-date"
+                  className="text-sm font-medium text-gray-700 mb-2 block"
+                >
+                  Expected Delivery Date
+                </label>
+                <div className="relative">
+                  <Input
+                    id="pe-delivery-date"
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    disabled={isIssuing}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                    min={new Date().toISOString().split("T")[0]}
+                  />
+                  <CalendarIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -326,7 +439,7 @@ export default function ConvertToPOSubcontractorModal({
         <button
           ref={primaryButtonRef}
           type="button"
-          onClick={onNextStep}
+          onClick={handleNext}
           disabled={isIssuing || isDetailsLoading || isDetailsError}
           className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -343,38 +456,51 @@ export default function ConvertToPOSubcontractorModal({
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-2">
           <InfoIcon className="w-4 h-4 text-amber-800 mt-0.5 shrink-0" />
           <p className="text-sm text-amber-800">
-            Once confirmed, a <strong>Vendor Bill</strong> will be created for{" "}
+            Once converted, this Purchase Order will be sent to{" "}
             <strong>
-              <TruncateWithTooltip text={vendorName} maxLength={28} />
+              <TruncateWithTooltip text={displayVendorName} maxLength={28} />
             </strong>
             . The Committed Amount of{" "}
-            <strong>{formatCurrency(contractValue)}</strong> remains locked
+            <strong>{formatCurrency(estimatedCost)}</strong> will be locked
             against{" "}
             <strong>
               <TruncateWithTooltip text={wbsLabel} maxLength={36} />
-            </strong>{" "}
-            until payment is confirmed or the bill is cancelled.
+            </strong>
+            {isHire
+              ? ". A hire tracking record will be created automatically when the PO is issued."
+              : " until payment is confirmed or the PO is cancelled."}
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <InfoCard label="Subcontractor Name" value={vendorName} />
-          <InfoCard label="Scope of Work" value={scopeOfWork} />
+          <InfoCard label="Vendor" value={displayVendorName} />
+          <InfoCard label="Equipment Name" value={equipmentName} />
           <InfoCard
-            label="Contract Value"
-            value={formatCurrency(contractValue)}
+            label="Estimated Cost"
+            value={formatCurrency(estimatedCost)}
           />
-          <InfoCard label="Project Name" value={projectName} />
-          <InfoCard label="Payment Type" value={paymentType} />
+          <InfoCard label="Quantity" value={String(quantity)} />
+          <InfoCard label="Payment Type" value={formatLabel(paymentType)} />
           <InfoCard label="WBS Element" value={wbsLabel} />
-          <InfoCard label="Payment Terms" value={paymentTermsText} />
-          <InfoCard label="Start Date" value={startDate} />
-          <InfoCard label="End Date" value={endDate} />
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Milestones</h3>
-          {renderMilestones()}
+          <InfoCard
+            label="Expected Delivery Date"
+            value={
+              deliveryDate
+                ? new Date(deliveryDate).toLocaleDateString("en-NG", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : "Not specified"
+            }
+          />
+          {isHire && (
+            <InfoCard
+              label="Expected Return Date"
+              value={expectedReturnDate || "Not set"}
+            />
+          )}
+          <InfoCard label="Originating Request" value={referenceId} />
         </div>
       </div>
 
@@ -390,11 +516,10 @@ export default function ConvertToPOSubcontractorModal({
             Back
           </span>
         </button>
-
         <button
           ref={primaryButtonRef}
           type="button"
-          onClick={handleConvertToInvoice}
+          onClick={handleConvert}
           disabled={isIssuing}
           aria-busy={isIssuing}
           className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -402,10 +527,10 @@ export default function ConvertToPOSubcontractorModal({
           {isIssuing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Creating Vendor Bill…
+              Converting to PO…
             </>
           ) : (
-            "Convert to Invoice"
+            "Convert to PO"
           )}
         </button>
       </div>
@@ -425,7 +550,7 @@ export default function ConvertToPOSubcontractorModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="convert-sub-po-title"
+        aria-labelledby="convert-pe-po-title"
         className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
           isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95"
         }`}
@@ -434,14 +559,19 @@ export default function ConvertToPOSubcontractorModal({
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
             <div>
               <h2
-                id="convert-sub-po-title"
+                id="convert-pe-po-title"
                 className="text-xl font-semibold text-gray-900"
               >
-                Convert to Vendor Bill
+                Convert to Purchase Order
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 Originating Request:{" "}
                 <TruncateWithTooltip text={referenceId} maxLength={30} />
+                {isHire && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                    Hire
+                  </span>
+                )}
               </p>
             </div>
             <button
