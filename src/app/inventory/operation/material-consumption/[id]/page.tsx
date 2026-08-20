@@ -52,7 +52,7 @@ export default function MaterialConsumptionDetailPage() {
       wbsPhase: (apiData as any).phase_details?.name || "Unknown Phase",
       wbsActivity: (apiData as any).activity_details?.name || "Unknown Activity",
       equipmentId: (apiData as any).equipment_details?.name || "-",
-      requester: apiData.created_by_name || (apiData as any).requester_details?.name || "-",
+      requester: (apiData as any).created_by_name || (apiData as any).requester_details?.name || "-",
       gateReceiver: (apiData as any).gate_receiver_details?.name || "-",
       requisitionDate: apiData.date_consumed || new Date(apiData.created_at || Date.now()).toISOString().split('T')[0],
       issueDate: (apiData as any).issue_date || "-",

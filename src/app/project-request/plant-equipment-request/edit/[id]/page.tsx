@@ -28,6 +28,7 @@ import { RootState } from "@/lib/store/store";
 import { motion, AnimatePresence } from "framer-motion";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EditPlantEquipmentRequestPage() {
   const router = useRouter();

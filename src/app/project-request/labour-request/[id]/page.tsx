@@ -600,6 +600,5 @@ export default function LabourRequestDetailPage() {
         showCloseButton={false}
       />
       </motion.div>
-    </div>
   );
 }
