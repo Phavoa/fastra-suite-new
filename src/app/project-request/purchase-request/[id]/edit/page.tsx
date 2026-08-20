@@ -33,6 +33,9 @@ import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi"
 import { StatusModal } from "@/components/shared/StatusModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ItemState {
   id: string;
@@ -678,14 +681,46 @@ export default function EditPurchaseRequestPage() {
 
   if (isRequestLoading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-[#3B7CED] border-t-transparent animate-spin" />
+      <div className="min-h-screen bg-[#F9FAFB] pb-28">
+        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
+          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 bg-gray-200 rounded-lg" />
+              <Skeleton className="h-6 bg-gray-200 rounded w-36" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-20 h-8 bg-gray-200 rounded-lg" />
+            </div>
+          </div>
+        </header>
+        <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
+            <div className="flex justify-between items-center">
+              <Skeleton className="h-6 bg-gray-200 rounded w-48" />
+              <Skeleton className="h-6 bg-gray-200 rounded-full w-20" />
+            </div>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="space-y-1">
+                  <Skeleton className="h-3 bg-gray-200 rounded w-20" />
+                  <Skeleton className="h-5 bg-gray-200 rounded w-32" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-28">
+    <PageGuard module="project_request" entitlement="update">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="min-h-screen bg-[#F9FAFB] pb-28"
+      >
       {/* Header Bar */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -1078,7 +1113,8 @@ export default function EditPurchaseRequestPage() {
         onAction={handleModalClose}
         showCloseButton={false}
       />
-    </div>
+      </motion.div>
+    </PageGuard>
   );
 }
 

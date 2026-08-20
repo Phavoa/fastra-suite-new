@@ -16,12 +16,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { 
   useGetMaterialConsumptionQuery, 
   useUpdateMaterialConsumptionMutation,
   useDeleteMaterialConsumptionMutation,
-  useSubmitMaterialConsumptionRequestMutation
+  useSubmitMaterialConsumptionRequestMutation,
+  useReleaseMaterialConsumptionMutation
 } from "@/api/requests/materialConsumptionRequestApi";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -31,13 +33,14 @@ export default function MaterialConsumptionDetailPage() {
   const reqId = (params?.id as string) || "";
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   
-  const { data: apiData, isLoading, isError } = useGetMaterialConsumptionQuery(Number(reqId), {
+  const { data: apiData, isLoading, isError, refetch } = useGetMaterialConsumptionQuery(Number(reqId), {
     skip: !reqId || isNaN(Number(reqId)),
   });
 
   const [updateStatus] = useUpdateMaterialConsumptionMutation();
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteMaterialConsumptionMutation();
   const [submitRequest, { isLoading: isSubmitting }] = useSubmitMaterialConsumptionRequestMutation();
+  const [releaseMaterial, { isLoading: isReleasing }] = useReleaseMaterialConsumptionMutation();
 
   const req: any = React.useMemo(() => {
     if (!apiData) return null;
@@ -49,7 +52,7 @@ export default function MaterialConsumptionDetailPage() {
       wbsPhase: (apiData as any).phase_details?.name || "Unknown Phase",
       wbsActivity: (apiData as any).activity_details?.name || "Unknown Activity",
       equipmentId: (apiData as any).equipment_details?.name || "-",
-      requester: (apiData as any).requester_details?.name || "-",
+      requester: apiData.created_by_name || (apiData as any).requester_details?.name || "-",
       gateReceiver: (apiData as any).gate_receiver_details?.name || "-",
       requisitionDate: apiData.date_consumed || new Date(apiData.created_at || Date.now()).toISOString().split('T')[0],
       issueDate: (apiData as any).issue_date || "-",
@@ -58,8 +61,8 @@ export default function MaterialConsumptionDetailPage() {
         id: line.id || Math.random().toString(),
         name: line.product_details?.product_name || `Product ID: ${line.product || 'Unknown'}`,
         description: line.product_details?.description || "-",
-        unit: line.unit_of_measure_details?.unit_symbol || "Units",
-        requestedQty: line.quantity || 0,
+        unit: line.product_details?.unit_of_measure_details?.unit_symbol || line.unit_of_measure_details?.unit_symbol || "Units",
+        requestedQty: parseFloat(line.quantity) || 0,
         availableStock: line.product_details?.available_stock || 0,
         unitCost: parseFloat(line.unit_cost) || 0,
       })) || [],
@@ -77,20 +80,23 @@ export default function MaterialConsumptionDetailPage() {
   const statusModal = useStatusModal();
 
   const handleAction = async (action: "release") => {
-    if (!req) return;
+    if (!req || !apiData) return;
 
     try {
-      // Assuming a release status for now until the backend implements the release endpoint
-      await updateStatus({
+      await releaseMaterial({
         id: Number(reqId),
-        body: { status: "released" }
+        body: {
+          location: apiData.location || "LAGS00001",
+          date_consumed: apiData.date_consumed || new Date().toISOString().split("T")[0],
+          notes: apiData.notes || "Material released from inventory."
+        }
       }).unwrap();
 
       statusModal.showSuccess(
         "Material Released",
         `Material Consumption ${req.id} released successfully.`
       );
-      router.refresh();
+      refetch();
     } catch (err: any) {
       statusModal.showError(
         "Action Failed",
@@ -115,7 +121,7 @@ export default function MaterialConsumptionDetailPage() {
       if (!req.parentRequestId) throw new Error("Could not find parent project request ID");
       await submitRequest({ id: req.parentRequestId }).unwrap();
       statusModal.showSuccess("Submitted", "Material Consumption request submitted successfully.");
-      router.refresh();
+      refetch();
     } catch (err: any) {
       statusModal.showError("Submit Failed", err.data?.message || err.error || "Failed to submit the request.");
     }
@@ -123,11 +129,32 @@ export default function MaterialConsumptionDetailPage() {
 
   return (
     <PageGuard application="inventory" module="materialconsumption">
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-white relative pb-20"
+      >
         {isLoading ? (
-          <div className="p-8 space-y-4">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-64 w-full" />
+          <div className="max-w-2xl mx-auto px-4 pt-6 w-full space-y-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
+              <Skeleton className="h-6 bg-gray-200 rounded w-36 animate-pulse" />
+            </div>
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-6 bg-gray-200 rounded w-48 animate-pulse" />
+                <Skeleton className="h-6 bg-gray-200 rounded-full w-20 animate-pulse" />
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="space-y-1">
+                    <Skeleton className="h-3 bg-gray-200 rounded w-20 animate-pulse" />
+                    <Skeleton className="h-5 bg-gray-200 rounded w-32 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : isError || !req ? (
           <div className="p-12 text-center text-red-500 font-medium">Failed to load material consumption details.</div>
@@ -164,13 +191,19 @@ export default function MaterialConsumptionDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {req.status === "pending" && (
+            {req.status === "approved" && (
               <>
                 <Button
                   className="bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs h-9 shadow-sm"
                   onClick={() => handleAction("release")}
+                  disabled={isReleasing}
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Release Material
+                  {isReleasing ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  {isReleasing ? "Releasing..." : "Release Material"}
                 </Button>
               </>
             )}
@@ -227,22 +260,32 @@ export default function MaterialConsumptionDetailPage() {
                 <span className="text-sm font-bold text-gray-900">₦{req.totalCost.toLocaleString()}</span>
               </div>
 
-              <div className="border-t border-gray-200 pt-4 mt-2">
-                <span className="text-xs text-gray-400 block mb-1">Requested By</span>
-                <span className="text-sm font-medium text-gray-800">{req.requester}</span>
-              </div>
-              <div className="border-t border-gray-200 pt-4 mt-2">
-                <span className="text-xs text-gray-400 block mb-1">Gate Receiver / Signatory</span>
-                <span className="text-sm font-medium text-gray-800">{req.gateReceiver}</span>
-              </div>
-              <div className="border-t border-gray-200 pt-4 mt-2">
-                <span className="text-xs text-gray-400 block mb-1">Target Asset / Equipment</span>
-                <span className="text-sm font-medium text-amber-800">{req.equipmentId}</span>
-              </div>
-              <div className="border-t border-gray-200 pt-4 mt-2">
-                <span className="text-xs text-gray-400 block mb-1">Requisition vs Issue Date</span>
-                <span className="text-sm font-medium text-gray-800">{req.requisitionDate} → {req.issueDate}</span>
-              </div>
+              {req.requester && req.requester !== "-" && req.requester !== "N/A" && (
+                <div className="border-t border-gray-200 pt-4 mt-2">
+                  <span className="text-xs text-gray-400 block mb-1">Requested By</span>
+                  <span className="text-sm font-medium text-gray-800">{req.requester}</span>
+                </div>
+              )}
+              {req.gateReceiver && req.gateReceiver !== "-" && req.gateReceiver !== "N/A" && (
+                <div className="border-t border-gray-200 pt-4 mt-2">
+                  <span className="text-xs text-gray-400 block mb-1">Gate Receiver / Signatory</span>
+                  <span className="text-sm font-medium text-gray-800">{req.gateReceiver}</span>
+                </div>
+              )}
+              {req.equipmentId && req.equipmentId !== "-" && req.equipmentId !== "N/A" && (
+                <div className="border-t border-gray-200 pt-4 mt-2">
+                  <span className="text-xs text-gray-400 block mb-1">Target Asset / Equipment</span>
+                  <span className="text-sm font-medium text-amber-800">{req.equipmentId}</span>
+                </div>
+              )}
+              {req.requisitionDate && req.requisitionDate !== "-" && req.requisitionDate !== "N/A" && (
+                <div className="border-t border-gray-200 pt-4 mt-2">
+                  <span className="text-xs text-gray-400 block mb-1">Requisition vs Issue Date</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    {req.requisitionDate} {req.issueDate && req.issueDate !== "-" && req.issueDate !== "N/A" ? `→ ${req.issueDate}` : ""}
+                  </span>
+                </div>
+              )}
 
               {req.notes && (
                 <div className="md:col-span-4 border-t border-gray-200 pt-4 mt-2">
@@ -391,7 +434,7 @@ export default function MaterialConsumptionDetailPage() {
           message={statusModal.message}
           type={statusModal.type}
         />
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }

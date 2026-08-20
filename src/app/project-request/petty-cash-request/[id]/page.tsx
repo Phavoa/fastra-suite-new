@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { extractErrorMessage } from "@/lib/utils";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PettyCashRequestDetail {
   id: string;
@@ -150,31 +153,48 @@ export default function PettyCashRequestDetailPage() {
     }
   };
 
-  if (apiLoading) {
+  if (apiLoading || !request) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="w-10 h-10 text-[#3B7CED] animate-spin" />
-        <p className="text-gray-500 font-medium">Loading Petty Cash request details...</p>
-      </div>
-    );
-  }
-
-  if (!request) {
-    return (
-      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-4">
-        <p className="text-gray-500 font-semibold mb-4">Request not found.</p>
-        <button
-          onClick={() => router.push("/project-request/petty-cash-request")}
-          className="px-4 py-2 bg-[#3B7CED] text-white rounded-lg text-xs font-bold shadow-none"
-        >
-          Back to Dashboard
-        </button>
+      <div className="min-h-screen bg-[#F9FAFB] pb-28">
+        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
+          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
+              <Skeleton className="h-6 bg-gray-200 rounded w-36 animate-pulse" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-20 h-8 bg-gray-200 rounded-lg animate-pulse" />
+            </div>
+          </div>
+        </header>
+        <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
+            <div className="flex justify-between items-center">
+              <Skeleton className="h-6 bg-gray-200 rounded w-48 animate-pulse" />
+              <Skeleton className="h-6 bg-gray-200 rounded-full w-20 animate-pulse" />
+            </div>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="space-y-1">
+                  <Skeleton className="h-3 bg-gray-200 rounded w-20 animate-pulse" />
+                  <Skeleton className="h-5 bg-gray-200 rounded w-32 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-24">
+    <PageGuard module="project_request" entitlement="view">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="min-h-screen bg-[#F9FAFB] pb-24"
+      >
       {/* Header Bar */}
       <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -390,6 +410,7 @@ export default function PettyCashRequestDetailPage() {
         onAction={handleModalClose}
         showCloseButton={false}
       />
-    </div>
+      </motion.div>
+    </PageGuard>
   );
 }

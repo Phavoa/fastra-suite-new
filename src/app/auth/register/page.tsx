@@ -127,7 +127,7 @@ const RegisterPage: NextPage = () => {
             Enter your details to register
           </p>
 
-          <div className="relative min-h-100 flex items-center justify-center">
+          <div className="relative min-h-[480px] flex items-center justify-center">
             {/* Company Information Section */}
             <AnimatePresence mode="wait">
               {!showPasswordSection && (
@@ -203,7 +203,7 @@ const RegisterPage: NextPage = () => {
                   {!showPasswordSection && (
                     <Link
                       href="/auth/login"
-                      className="text-center mt- w-full block cursor-pointer"
+                      className="text-center mt-4 w-full block cursor-pointer"
                     >
                       <p className="text-[#3B7CED] font-semibold hover:underline text-sm cursor-pointer">
                         Already have an account?
@@ -404,13 +404,13 @@ const RegisterPage: NextPage = () => {
                     type="submit"
                     variant={"default"}
                     className={cn(
-                      "b  g-blue-500 hover:bg-blue-600 text-white w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
-                      !passwordForm.formState.isValid || loading
+                      "bg-[#3B7CED] hover:bg-blue-600 text-white w-full py-6 rounded-md text-lg font-medium transition-transform active:scale-[0.995] mt-4",
+                      !passwordForm.formState.isValid || isRegistering
                         ? "opacity-60 cursor-not-allowed"
                         : "hover:shadow-md cursor-pointer",
                     )}
                     disabled={!passwordForm.formState.isValid || isRegistering}
-                    aria-disabled={!passwordForm.formState.isValid || loading}
+                    aria-disabled={!passwordForm.formState.isValid || isRegistering}
                   >
                     {isRegistering ? "Creating Account..." : "Create Account"}
                   </Button>

@@ -15,6 +15,8 @@ import { Edit, RotateCcw, Package } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
@@ -138,8 +140,27 @@ export default function IncomingProductDetailPage() {
   if (isLoading) {
     return (
       <PageGuard application="inventory" module="incomingproduct">
-        <div className="flex h-screen items-center justify-center bg-[#F6F9FC]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#3B7CED]" />
+        <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] pb-20">
+          <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
+              <Skeleton className="h-6 bg-gray-200 rounded w-36 animate-pulse" />
+            </div>
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-2xs space-y-4">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-7 bg-gray-200 rounded w-64 animate-pulse" />
+                <Skeleton className="h-6 bg-gray-200 rounded-full w-20 animate-pulse" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-gray-100">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 bg-gray-200 rounded w-24 animate-pulse" />
+                    <Skeleton className="h-5 bg-gray-200 rounded w-48 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </main>
         </div>
       </PageGuard>
     );
@@ -179,6 +200,12 @@ export default function IncomingProductDetailPage() {
 
   return (
     <PageGuard module="inventory" entitlement="view_incomingproduct">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20"
+      >
       <StatusModal
         isOpen={statusModal.isOpen}
         type={statusModal.type}
@@ -195,7 +222,7 @@ export default function IncomingProductDetailPage() {
         onConfirm={handleCreateBackorder}
         onDecline={handleCloseWithoutBackorder}
       />
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+      
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           {/* Breadcrumbs */}
           <Breadcrumbs
@@ -378,7 +405,7 @@ export default function IncomingProductDetailPage() {
             </div>
           </div>
         </main>
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }

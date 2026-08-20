@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   transactions?: any[];
@@ -55,11 +56,16 @@ export function TransactionHistoryTable({ transactions = [], isLoading = false, 
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  Loading transactions...
-                </TableCell>
-              </TableRow>
+              Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={`tx-skeleton-${idx}`} className="border-b border-[#E9ECEF]">
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-20 bg-gray-100" /></TableCell>
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-52 bg-gray-100" /></TableCell>
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-28 bg-gray-100" /></TableCell>
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-6 w-20 bg-gray-100 rounded-full" /></TableCell>
+                </TableRow>
+              ))
             ) : paginatedTransactions && paginatedTransactions.length > 0 ? (
               paginatedTransactions.map((tx: any, idx: number) => {
                 const dateStr = tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString() : "-";

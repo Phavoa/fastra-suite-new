@@ -174,21 +174,11 @@ export default function PlantEquipmentRequestDashboard() {
     mockData: requests,
   };
 
-  if (apiLoading && requests.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-[#3B7CED]" />
-          <p className="text-gray-600">Loading plant & equipment requests...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <RequestDashboard
       config={config}
       backUrl="/project-request/make-request"
+      isLoading={apiLoading && requests.length === 0}
     />
   );
 }

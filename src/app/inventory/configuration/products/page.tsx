@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/components/shared/types";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -102,8 +104,12 @@ export default function ProductsPage() {
 
   return (
     <PageGuard module="inventory" entitlement="view_products">
-      {/* Two-tone: gray page canvas */}
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20"
+      >
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs
             items={items}
@@ -215,18 +221,18 @@ export default function ProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12">
-                        <div className="flex items-center justify-center gap-2 text-[#8898AA] text-sm">
-                          <Loader2 className="h-5 w-5 animate-spin text-[#3B7CED]" />
-                          <span>Loading products...</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {!isLoading &&
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, idx) => (
+                      <TableRow key={`skeleton-row-${idx}`} className="border-b border-gray-100">
+                        <TableCell className="py-4 px-6"><Skeleton className="h-5 w-24 bg-gray-200 rounded animate-pulse" /></TableCell>
+                        <TableCell className="py-4 px-6"><Skeleton className="h-5 w-48 bg-gray-200 rounded animate-pulse" /></TableCell>
+                        <TableCell className="py-4 px-6"><Skeleton className="h-5 w-28 bg-gray-200 rounded animate-pulse" /></TableCell>
+                        <TableCell className="py-4 px-6"><Skeleton className="h-5 w-16 bg-gray-200 rounded animate-pulse" /></TableCell>
+                        <TableCell className="py-4 px-6 text-right"><Skeleton className="h-5 w-20 bg-gray-200 rounded animate-pulse ml-auto" /></TableCell>
+                        <TableCell className="py-4 pr-6 text-center"><Skeleton className="h-6 w-20 bg-gray-200 rounded-full animate-pulse mx-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
                     filteredProducts.map((prd: any) => {
                       const statusStr = prd.is_active !== false ? "ACTIVE" : "INACTIVE";
                       const uomStr =
@@ -266,7 +272,8 @@ export default function ProductsPage() {
                           </TableCell>
                         </TableRow>
                       );
-                    })}
+                    })
+                  )}
 
                   {!isLoading && filteredProducts.length === 0 && (
                     <TableRow>
@@ -283,7 +290,7 @@ export default function ProductsPage() {
             </div>
           </div>
         </main>
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }

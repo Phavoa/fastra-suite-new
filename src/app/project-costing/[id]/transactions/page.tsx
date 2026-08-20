@@ -10,6 +10,8 @@ import { TransactionDetailsModal } from "@/components/project-costing/modals/Tra
 import { useParams } from "next/navigation";
 import { useGetProjectTransactionsQuery } from "@/api/projectCostingApi";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const StatusIcon = ({ color }: { color: string }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0">
@@ -53,7 +55,12 @@ export default function TransactionsPage() {
 
   return (
     <PageGuard module="project_costing" entitlement="view_transactions">
-    <div className="flex flex-col h-full bg-gray-50 relative min-h-screen">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="flex flex-col h-full bg-gray-50 relative min-h-screen"
+    >
       {/* Breadcrumbs */}
       <div className="px-6 pt-6 flex items-center gap-1 text-sm text-[#8898AA] font-normal bg-transparent">
         <Link href="/" className="hover:text-gray-600 transition-colors">
@@ -133,7 +140,7 @@ export default function TransactionsPage() {
         onClose={() => setIsTransactionModalOpen(false)}
         transaction={selectedTransaction}
       />
-    </div>
+    </motion.div>
     </PageGuard>
   );
 }

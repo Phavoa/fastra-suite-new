@@ -74,12 +74,12 @@ export default function InventoryLayout({
           application: "inventory",
           module: "location",
         },
-        {
-          label: "Settings",
-          href: "/inventory/configuration/settings",
-          application: "inventory",
-          module: "settings",
-        },
+        // {
+        //   label: "Settings",
+        //   href: "/inventory/configuration/settings",
+        //   application: "inventory",
+        //   module: "settings",
+        // },
       ],
     },
   ];

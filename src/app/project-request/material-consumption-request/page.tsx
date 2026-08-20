@@ -173,21 +173,11 @@ export default function MaterialConsumptionRequestPage() {
     mockData: requests,
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 text-[#3B7CED] animate-spin" />
-        <p className="text-gray-500 text-sm font-medium">
-          Loading requests...
-        </p>
-      </div>
-    );
-  }
-
   return (
     <RequestDashboard
       config={config}
       backUrl="/project-request/make-request"
+      isLoading={isLoading && requests.length === 0}
     />
   );
 }

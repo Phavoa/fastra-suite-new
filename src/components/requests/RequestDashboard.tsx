@@ -7,15 +7,19 @@ import { Button } from "@/components/ui/button";
 import { RequestDashboardConfig, RequestStatus } from "./types";
 import { NavBar } from "../shared/TopBar/reusableTopBar";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RequestDashboardProps<T extends { status: RequestStatus }> {
   config: RequestDashboardConfig<T>;
   backUrl?: string;
+  isLoading?: boolean;
 }
 
 export function RequestDashboard<T extends { status: RequestStatus }>({
   config,
   backUrl,
+  isLoading = false,
 }: RequestDashboardProps<T>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,11 +47,65 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
 
   const navBarBackUrl = activeStatusQuery ? pathname : backUrl;
 
-  console.log(config);
-  console.log(config.mockData, "mockData");
-  console.log(filteredRequests, "filteredRequests");
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] pb-28">
+        <NavBar title={config.title} items={[]} backUrl={navBarBackUrl} />
+        <main className="max-w-7xl mx-auto px-4 pt-4 space-y-4">
+          {!activeStatusQuery && (
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-xs">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-4 border border-gray-100 rounded-lg h-24 bg-gray-50 flex flex-col gap-2">
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="h-4 w-4 bg-gray-200 rounded-full animate-pulse" />
+                      <Skeleton className="h-4 w-16 bg-gray-200 animate-pulse" />
+                    </div>
+                    <Skeleton className="h-8 w-12 bg-gray-200 mt-1 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-xs space-y-4">
+            <Skeleton className="h-5 w-40 bg-gray-200 animate-pulse" />
+            {!activeStatusQuery && (
+              <div className="flex gap-2 pb-1 overflow-x-auto">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-8 w-20 bg-gray-200 rounded-full shrink-0 animate-pulse" />
+                ))}
+              </div>
+            )}
+            <div className="space-y-4 pt-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-5 border border-gray-150 rounded-lg flex flex-col gap-4 bg-white">
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-20 bg-gray-100 animate-pulse" />
+                    <Skeleton className="h-5.5 w-16 bg-gray-100 rounded-full animate-pulse" />
+                  </div>
+                  <Skeleton className="h-5 w-72 bg-gray-100 animate-pulse" />
+                  <div className="grid grid-cols-3 gap-4 border-t border-gray-50 pt-4 mt-2">
+                    <div className="flex flex-col gap-1.5"><Skeleton className="h-3 w-16 bg-gray-100 animate-pulse" /><Skeleton className="h-4 w-20 bg-gray-100 animate-pulse" /></div>
+                    <div className="flex flex-col gap-1.5 items-center"><Skeleton className="h-3 w-16 bg-gray-100 animate-pulse" /><Skeleton className="h-4 w-20 bg-gray-100 animate-pulse" /></div>
+                    <div className="flex flex-col gap-1.5 items-end"><Skeleton className="h-3 w-16 bg-gray-100 animate-pulse" /><Skeleton className="h-4 w-24 bg-gray-100 animate-pulse" /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F1F5F9]">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="min-h-screen bg-[#F1F5F9]"
+    >
       {/* Header - Top Bar */}
       <NavBar title={config.title} items={[]} backUrl={navBarBackUrl} />
 
@@ -179,6 +237,6 @@ export function RequestDashboard<T extends { status: RequestStatus }>({
           </Button>
         </div>
       </PermissionGuard>
-    </div>
+    </motion.div>
   );
 }

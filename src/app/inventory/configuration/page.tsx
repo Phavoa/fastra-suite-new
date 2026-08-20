@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { PageGuard } from "@/components/auth/PageGuard";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 
 const items: BreadcrumbItem[] = [
   { label: "Home", href: "/" },
@@ -49,20 +50,16 @@ export default function InventoryConfiguration() {
       color: "text-rose-600",
       bg: "bg-rose-50",
     },
-    {
-      title: "General Settings",
-      description: "Validation thresholds, mandatory waybill photos, and low stock alert notifications.",
-      href: "/inventory/configuration/settings",
-      icon: Settings,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-    },
   ];
 
   return (
     <PageGuard application="inventory" module="configuration">
-      {/* Two-tone: gray page canvas */}
-      <div className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20"
+      >
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs
             items={items}
@@ -109,7 +106,7 @@ export default function InventoryConfiguration() {
             ))}
           </div>
         </main>
-      </div>
+      </motion.div>
     </PageGuard>
   );
 }

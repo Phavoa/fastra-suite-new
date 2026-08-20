@@ -25,6 +25,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { motion } from "framer-motion";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
@@ -395,7 +396,12 @@ export function RequestForm<T extends Record<string, any>>({
   };
   console.log("config", config);
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-28">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="min-h-screen bg-[#F9FAFB] pb-28"
+    >
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10 shadow-xs">
         <div className="flex items-center gap-3 max-w-2xl mx-auto">
@@ -746,6 +752,6 @@ export function RequestForm<T extends Record<string, any>>({
         onAction={handleModalAction}
         showCloseButton={false}
       />
-    </div>
+    </motion.div>
   );
 }

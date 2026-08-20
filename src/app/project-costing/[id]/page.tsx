@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AddBudgetAdjustmentModal } from "@/components/project-costing/modals/AddBudgetAdjustmentModal";
 import { AddDocumentModal } from "@/components/project-costing/modals/AddDocumentModal";
 import { ProjectCostingExportTemplate } from "@/components/project-costing/export/ProjectCostingExportTemplate";
@@ -235,8 +237,102 @@ export default function ProjectDashboardPage() {
   
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-gray-50">
-        <p className="text-gray-500 text-sm">Loading project costing dashboard...</p>
+      <div className="flex flex-col h-full bg-gray-50 pb-20">
+        {/* Top Navigation Row */}
+        <div className="flex items-center px-6 py-4 bg-white border-b border-gray-100">
+          <Skeleton className="h-4 w-36 bg-gray-200" />
+        </div>
+
+        <div className="px-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6 mt-6">
+          {/* Project Header Info Skeleton */}
+          <div className="flex justify-between items-start">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-8 w-64 bg-gray-200" />
+                <Skeleton className="h-6 w-20 bg-gray-200 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-32 bg-gray-200 mt-1" />
+              <Skeleton className="h-4 w-96 bg-gray-200 mt-1" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-32 bg-gray-200" />
+              <Skeleton className="h-9 w-32 bg-gray-200" />
+            </div>
+          </div>
+
+          {/* Filters and Actions Skeleton */}
+          <div className="flex items-end justify-between py-2 border-b border-gray-100 pb-6">
+            <div className="flex gap-8 items-center">
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-4 w-20 bg-gray-200" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-36 bg-gray-200" />
+                  <Skeleton className="h-9 w-36 bg-gray-200" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-4 w-28 bg-gray-200" />
+                <Skeleton className="h-9 w-56 bg-gray-200" />
+              </div>
+            </div>
+            <Skeleton className="h-9 w-48 bg-gray-200" />
+          </div>
+
+          {/* Main Content Grid Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-5 bg-white rounded shadow-sm border border-gray-100">
+                {Array.from({ length: 5 }).map((_, idx) => (
+                  <div key={idx} className="p-4 border-r border-gray-100 last:border-r-0">
+                    <Skeleton className="h-3 w-16 bg-gray-200 mb-2" />
+                    <Skeleton className="h-6 w-24 bg-gray-200" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Line Chart Card */}
+              <div className="bg-white p-6 rounded shadow-sm border border-gray-100 min-h-[380px] flex flex-col gap-6">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-5 w-48 bg-gray-200" />
+                  <Skeleton className="h-4 w-32 bg-gray-200" />
+                </div>
+                <Skeleton className="flex-1 w-full bg-gray-100 rounded" />
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="col-span-1 flex flex-col gap-6">
+              {/* Budget Utilization */}
+              <div className="bg-white p-6 rounded shadow-sm border border-gray-100 flex flex-col gap-4">
+                <Skeleton className="h-5 w-36 bg-gray-200" />
+                <Skeleton className="h-4 w-28 bg-gray-200" />
+                <Skeleton className="h-8 w-full bg-gray-100 rounded mt-2" />
+                <Skeleton className="h-4 w-3/4 bg-gray-200" />
+              </div>
+
+              {/* Pending Requests */}
+              <div className="bg-white p-6 rounded shadow-sm border border-gray-100 flex flex-col gap-3">
+                <Skeleton className="h-5 w-40 bg-gray-200" />
+                <Skeleton className="h-8 w-16 bg-gray-200 mt-2" />
+                <Skeleton className="h-8 w-32 bg-gray-200" />
+              </div>
+
+              {/* Spend by Category */}
+              <div className="bg-white p-6 rounded shadow-sm border border-gray-100 flex flex-col gap-4">
+                <Skeleton className="h-5 w-36 bg-gray-200" />
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-36 w-36 bg-gray-200 rounded-full" />
+                  <div className="flex flex-col gap-2 flex-1">
+                    <Skeleton className="h-4 w-full bg-gray-200" />
+                    <Skeleton className="h-4 w-5/6 bg-gray-200" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -799,7 +895,16 @@ export default function ProjectDashboardPage() {
         </div>
 
         {/* Tabs Content */}
-        {activeTab === 'phases' && (
+        <div className="relative min-h-[250px] w-full mt-4">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === 'phases' && (
           <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
             <div className="flex justify-between items-center p-4 border-b border-gray-100">
               <h3 className="text-lg font-medium text-[#3B7CED]">Project Phases & Activities</h3>
@@ -857,8 +962,19 @@ export default function ProjectDashboardPage() {
               </div>
 
               {isLoadingAdjustments ? (
-                <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 text-center text-gray-500">
-                  <p>Loading adjustments...</p>
+                <div className="flex flex-col gap-4">
+                  {Array.from({ length: 2 }).map((_, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 flex flex-col gap-3">
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col gap-1.5">
+                          <Skeleton className="h-5 w-32 bg-gray-100" />
+                          <Skeleton className="h-3 w-48 bg-gray-100" />
+                        </div>
+                        <Skeleton className="h-6 w-24 bg-gray-100" />
+                      </div>
+                      <Skeleton className="h-10 w-full bg-gray-50 rounded mt-2" />
+                    </div>
+                  ))}
                 </div>
               ) : budgetAdjustments && budgetAdjustments.filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase())).length > 0 ? (
                 <div className="flex flex-col gap-6">
@@ -990,8 +1106,19 @@ export default function ProjectDashboardPage() {
               </div>
 
               {isLoadingAdjustments ? (
-                <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 text-center text-gray-500">
-                  <p>Loading adjustments...</p>
+                <div className="flex flex-col gap-4">
+                  {Array.from({ length: 2 }).map((_, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 flex flex-col gap-3">
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col gap-1.5">
+                          <Skeleton className="h-5 w-32 bg-gray-100" />
+                          <Skeleton className="h-3 w-48 bg-gray-100" />
+                        </div>
+                        <Skeleton className="h-6 w-24 bg-gray-100" />
+                      </div>
+                      <Skeleton className="h-10 w-full bg-gray-50 rounded mt-2" />
+                    </div>
+                  ))}
                 </div>
               ) : budgetAdjustments && budgetAdjustments.filter((a: any) => ["APPROVED", "COMPLETED"].includes(a.status?.toUpperCase())).length > 0 ? (
                 <div className="flex flex-col gap-6">
@@ -1157,6 +1284,9 @@ export default function ProjectDashboardPage() {
             )}
           </div>
         )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* Recent transactions */}
         <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
@@ -1179,11 +1309,16 @@ export default function ProjectDashboardPage() {
             </TableHeader>
             <TableBody>
               {isLoadingTransactions ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                    Loading recent transactions...
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <TableRow key={idx} className="border-b border-gray-100">
+                    <TableCell className="py-3"><Skeleton className="h-4 w-20 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-48 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-28 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-6 w-20 bg-gray-100 rounded-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : transactions && transactions.length > 0 ? (
                 transactions.slice(0, 6).map((tx: any, idx: number) => (
                   <TableRow key={idx} className="border-b border-gray-100 hover:bg-gray-50">

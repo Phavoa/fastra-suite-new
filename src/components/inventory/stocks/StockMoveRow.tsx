@@ -18,7 +18,13 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
   };
 
   const qty = Number(move.quantity) || 0;
-  const isPositive = qty >= 0;
+  const isOutgoing = 
+    move.move_type === "CONSUMPTION" || 
+    move.move_type === "Consumption" || 
+    move.move_type === "SCRAP" || 
+    move.move_type === "Scrap" || 
+    move.move_type === "OUTGOING" ||
+    qty < 0;
 
   return (
     <TableRow
@@ -70,12 +76,12 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
 
       {/* 5. Qty In */}
       <TableCell className="px-4 py-3.5 whitespace-nowrap font-mono text-sm text-right text-[#2BA24D] font-medium bg-[#FAFAFA]/50 border-l border-gray-100">
-        {isPositive ? qty : "—"}
+        {!isOutgoing ? Math.abs(qty) : "—"}
       </TableCell>
 
       {/* 6. Qty Out */}
       <TableCell className="px-4 py-3.5 whitespace-nowrap font-mono text-sm text-right text-[#E43D2B] font-medium bg-[#FAFAFA]/50 border-x border-gray-100">
-        {!isPositive ? Math.abs(qty) : "—"}
+        {isOutgoing ? Math.abs(qty) : "—"}
       </TableCell>
 
       {/* 7. Balance */}
