@@ -9,6 +9,24 @@ export interface VendorBankAccountRequest {
   branch_code: string;
 }
 
+/**
+ * Request body for confirming a vendor bank account.
+ * Matches the schema of POST /invoicing/vendors/{id}/bank-account/confirm/
+ */
+export interface ConfirmVendorBankAccountRequest {
+  vendor_name: string;
+  contact_name: string;
+  email: string;
+  phone_number: string;
+  address: string;
+  tax_id: string;
+  tax_registered: boolean;
+  tax_number: string;
+  vendor_type: "supplier" | string; // adjust union if you have a stricter type
+  status: "active" | string; // adjust union if you have a stricter type
+  payment_term: number;
+}
+
 const getTenantBaseUrl = (state: RootState): string => {
   const tenantSchemaName = state.auth.tenant_schema_name;
   const apiDomain =
@@ -92,6 +110,7 @@ export const vendorBankAccountsApi = createApi({
         body: data || {},
       }),
     }),
+
     updateVendorBankAccount: builder.mutation<
       VendorBankAccountRequest,
       { id: number; data: VendorBankAccountRequest }
@@ -102,10 +121,26 @@ export const vendorBankAccountsApi = createApi({
         body: data,
       }),
     }),
+
+    /**
+     * Confirm a vendor's bank account.
+     * POST /invoicing/vendors/{id}/bank-account/confirm/
+     */
+    confirmVendorBankAccount: builder.mutation<
+      VendorFull,
+      { id: number; data: ConfirmVendorBankAccountRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/invoicing/vendors/${id}/bank-account/confirm/`,
+        method: "POST",
+        body: data,
+      }),
+    }),
   }),
 });
 
 export const {
   useAddVendorBankAccountMutation,
   useUpdateVendorBankAccountMutation,
+  useConfirmVendorBankAccountMutation,
 } = vendorBankAccountsApi;

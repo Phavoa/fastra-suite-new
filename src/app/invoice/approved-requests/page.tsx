@@ -1,159 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 import { useGetApprovedProjectRequestsQuery } from "@/api/invoice/approvedProjectRequestsApi";
 import { useConvertRequestToPurchaseOrderMutation } from "@/api/invoice/projectPurchaseOrdersApi";
 import ConvertToPOModal from "@/components/invoice/ConvertToPOModal";
 import ConvertToPOSubcontractorModal from "@/components/invoice/subcontractor/ConvertToPOSubcontractorModal";
 import ConvertToInvoiceLabourModal from "@/components/invoice/labour-request/ConvertToInvoiceLabourReqModal";
 import CreateVendorBillLabourModal from "@/components/invoice/labour-request/CreateVendorBillLabourReqModal";
-import ConvertToInvoicePettyCashModal from "@/components/invoice/petty-cash/ConvertToInvoicePettyCashModal";
 import CreateDisbursementModal from "@/components/invoice/petty-cash/CreateDisbursementModal";
+import ConvertToPOPlantEquipmentModal from "@/components/invoice/plant-and-equipment/ConvertToPOPlantEquipmentModal";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
-import Link from "next/link";
-import { is } from "zod/v4/locales";
-
-// Mock data matching the design
-const mockRequests = [
-  {
-    id: "REQ-2024-0041",
-    type: "Purchase",
-    wbs: "WBS-Concrete Works",
-    approvalDate: "2025-05-15",
-    requestedAmount: 200000,
-    supplierName: "John Doe",
-    projectName: "Concrete Works",
-    paymentTerms: "One time payment",
-    products: [
-      {
-        productName: "Product 1",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-      {
-        productName: "Product 2",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-    ],
-  },
-  {
-    id: "REQ-2024-0041",
-    type: "Subcontractor",
-    wbs: "WBS-Concrete Works",
-    approvalDate: "2025-05-15",
-    requestedAmount: 200000,
-    supplierName: "John Doe",
-    projectName: "Concrete Works",
-    paymentTerms: "One time payment",
-    products: [
-      {
-        productName: "Product 1",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-      {
-        productName: "Product 2",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-    ],
-  },
-  {
-    id: "REQ-2024-0041",
-    type: "Plant and Equipment",
-    wbs: "WBS-Concrete Works",
-    approvalDate: "2025-05-15",
-    requestedAmount: 200000,
-    supplierName: "John Doe",
-    projectName: "Concrete Works",
-    paymentTerms: "One time payment",
-    products: [
-      {
-        productName: "Product 1",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-      {
-        productName: "Product 2",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-    ],
-  },
-  {
-    id: "REQ-2024-0041",
-    type: "Labour Request",
-    wbs: "WBS-Concrete Works",
-    approvalDate: "2025-05-15",
-    requestedAmount: 200000,
-    supplierName: "John Doe",
-    projectName: "Concrete Works",
-    paymentTerms: "One time payment",
-    products: [
-      {
-        productName: "Product 1",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-      {
-        productName: "Product 2",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-    ],
-  },
-  {
-    id: "REQ-2024-0041",
-    type: "Petty Cash Request",
-    wbs: "WBS-Concrete Works",
-    approvalDate: "2025-05-15",
-    requestedAmount: 200000,
-    supplierName: "John Doe",
-    projectName: "Concrete Works",
-    paymentTerms: "One time payment",
-    pettyCashId: "PET-2024-0041",
-    requesterName: "John Doe",
-    date: "2024-04-08",
-    purpose:
-      "There will be a short description of the purpose of the request here",
-    accountType: "Expenses",
-    products: [
-      {
-        productName: "Product 1",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-      {
-        productName: "Product 2",
-        unit: "KG",
-        qty: 4,
-        unitPrice: 600000,
-        total: 2400000,
-      },
-    ],
-  },
-];
+import { ToastNotification } from "@/components/shared/ToastNotification";
 
 const getTypeColor = (type: string) => {
   switch (type) {
@@ -179,7 +39,86 @@ const items: BreadcrumbItem[] = [
   },
 ];
 
+/** Safely extract a human-readable error message from any API shape */
+function extractErrorMessage(err: unknown): string {
+  if (!err) return "An unexpected error occurred.";
+
+  const data = (err as any)?.data ?? err;
+
+  if (typeof data === "string") return data;
+
+  if (data?.detail && typeof data.detail === "string") return data.detail;
+  if (data?.error && typeof data.error === "string") return data.error;
+
+  // {"error":[{"detail":"..."}]}
+  if (Array.isArray(data?.error) && data.error.length > 0) {
+    const first = data.error[0];
+    if (typeof first === "string") return first;
+    if (first?.detail && typeof first.detail === "string") return first.detail;
+    if (first?.error && typeof first.error === "string") return first.error;
+    if (first?.message && typeof first.message === "string")
+      return first.message;
+  }
+
+  if (Array.isArray(data) && data.length > 0) {
+    const first = data[0];
+    if (typeof first === "string") return first;
+    if (first?.detail) return String(first.detail);
+    if (first?.error) return String(first.error);
+  }
+
+  try {
+    return JSON.stringify(data).slice(0, 180);
+  } catch {
+    return "An unexpected error occurred.";
+  }
+}
+
+/** Format any date string to yyyy-mm-dd */
+function formatDateYYYYMMDD(dateStr: string | null | undefined): string {
+  if (!dateStr) return "N/A";
+  try {
+    return new Date(dateStr).toISOString().slice(0, 10);
+  } catch {
+    return dateStr.slice(0, 10);
+  }
+}
+
+/** Skeleton rows for the table */
+function TableSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={i} className="animate-pulse">
+          <td className="px-4 py-4">
+            <div className="h-4 w-24 bg-gray-200 rounded" />
+          </td>
+          <td className="px-4 py-4">
+            <div className="h-5 w-20 bg-gray-200 rounded-full" />
+          </td>
+          <td className="px-4 py-4">
+            <div className="h-4 w-32 bg-gray-200 rounded" />
+          </td>
+          <td className="px-4 py-4">
+            <div className="h-4 w-20 bg-gray-200 rounded" />
+          </td>
+          <td className="px-4 py-4">
+            <div className="h-4 w-16 bg-gray-200 rounded" />
+          </td>
+          <td className="px-4 py-4">
+            <div className="h-7 w-24 bg-gray-200 rounded" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function ApprovedRequestsPage() {
+  const router = useRouter();
+
+  const [isPlantEquipmentModalOpen, setIsPlantEquipmentModalOpen] =
+    useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -190,56 +129,150 @@ export default function ApprovedRequestsPage() {
     useState(false);
   const [isLabourCreateBillModalOpen, setIsLabourCreateBillModalOpen] =
     useState(false);
-  const [isPettyCashInvoiceModalOpen, setIsPettyCashInvoiceModalOpen] =
-    useState(false);
   const [
     isPettyCashDisbursementModalOpen,
     setIsPettyCashDisbursementModalOpen,
   ] = useState(false);
 
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
   const {
     data: apiRequests,
     isLoading,
     isError,
-    error,
     refetch,
   } = useGetApprovedProjectRequestsQuery();
 
-  const [convertRequestToPurchaseOrder] =
+  const [convertRequestToPurchaseOrder, { isLoading: isIssuing }] =
     useConvertRequestToPurchaseOrderMutation();
 
+  const showToast = useCallback(
+    (type: "success" | "error", message: string) => {
+      const safeMessage =
+        typeof message === "string" && message.trim()
+          ? message.trim()
+          : type === "success"
+            ? "PO created successfully"
+            : "Something went wrong. Please try again.";
+
+      setToast({ type, message: safeMessage });
+      setTimeout(() => setToast(null), 4500);
+    },
+    [],
+  );
+
+  // ---------- Petty Cash (PRD 9.3.2) ----------
+  const handleProcessDisbursement = (request: any) => {
+    setSelectedRequest(request);
+    setIsPettyCashDisbursementModalOpen(true);
+  };
+
+  const handleClosePettyCashDisbursementModal = () => {
+    setIsPettyCashDisbursementModalOpen(false);
+    setSelectedRequest(null);
+  };
+
+  const handlePettyCashSubmitDisbursement = async (payload: {
+    source_id: number;
+    company_bank_account_id: number;
+    disbursement_method: "bank_transfer" | "cash";
+    recipient_bank_name?: string;
+    recipient_account_number?: string;
+    recipient_bank?: string;
+    cash_recipient_name?: string;
+    cash_handover_confirmed?: boolean;
+  }) => {
+    console.log("Disbursement submitted →", {
+      request_id: selectedRequest?.backendId,
+      reference: selectedRequest?.id,
+      ...payload,
+    });
+
+    // TODO: call disbursement mutation when backend is ready
+    showToast(
+      "success",
+      "Disbursement submitted. It will appear in the Payment Queue.",
+    );
+    handleClosePettyCashDisbursementModal();
+    refetch();
+  };
+
+  // ---------- Plant & Equipment ----------
+  const handleConvertToPlantEquipment = (request: any) => {
+    setSelectedRequest(request);
+    setCurrentStep(1);
+    setIsPlantEquipmentModalOpen(true);
+  };
+
+  const handleClosePlantEquipmentModal = () => {
+    if (isIssuing) return;
+    setIsPlantEquipmentModalOpen(false);
+    setSelectedRequest(null);
+    setCurrentStep(1);
+  };
+
+  // ---------- Purchase ----------
   const handleConvertToPO = (request: any) => {
     setSelectedRequest(request);
     setCurrentStep(1);
     setIsModalOpen(true);
   };
 
+  const handleCloseModal = () => {
+    if (isIssuing) return;
+    setIsModalOpen(false);
+    setSelectedRequest(null);
+    setCurrentStep(1);
+  };
+
+  // ---------- Subcontractor → Vendor Bill ----------
   const handleConvertToSubcontractor = (request: any) => {
     setSelectedRequest(request);
     setCurrentStep(1);
     setIsSubcontractorModalOpen(true);
   };
 
-  const handleConvertToLabourInvoice = (request: any) => {
-    setSelectedRequest(request);
-    setIsLabourInvoiceModalOpen(true);
-  };
-
-  const handleConvertToPettyCashInvoice = (request: any) => {
-    setSelectedRequest(request);
-    setIsPettyCashInvoiceModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedRequest(null);
-    setCurrentStep(1);
-  };
-
   const handleCloseSubcontractorModal = () => {
     setIsSubcontractorModalOpen(false);
     setSelectedRequest(null);
     setCurrentStep(1);
+  };
+
+  const handleSubcontractorConvertToInvoice = async () => {
+    if (!selectedRequest?.backendId) {
+      showToast("error", "Invalid request selected.");
+      return;
+    }
+
+    console.log("Subcontractor → Vendor Bill", {
+      approved_request_id: selectedRequest.backendId,
+      reference_id: selectedRequest.id,
+      type: selectedRequest.originalType,
+    });
+
+    try {
+      // TODO: real mutation when backend is ready
+      showToast(
+        "success",
+        "Subcontractor request marked for Vendor Bill. Complete the bill in the Invoice module.",
+      );
+      handleCloseSubcontractorModal();
+      refetch();
+    } catch (err: unknown) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Subcontractor → Vendor Bill error →", err);
+      }
+      showToast("error", extractErrorMessage(err));
+    }
+  };
+
+  // ---------- Labour (PRD 9.3.1) ----------
+  const handleConvertToLabourInvoice = (request: any) => {
+    setSelectedRequest(request);
+    setIsLabourInvoiceModalOpen(true);
   };
 
   const handleCloseLabourInvoiceModal = () => {
@@ -252,90 +285,79 @@ export default function ApprovedRequestsPage() {
     setSelectedRequest(null);
   };
 
-  const handleClosePettyCashInvoiceModal = () => {
-    setIsPettyCashInvoiceModalOpen(false);
-    setSelectedRequest(null);
-  };
-
-  const handleClosePettyCashDisbursementModal = () => {
-    setIsPettyCashDisbursementModalOpen(false);
-    setSelectedRequest(null);
-  };
-
-  const handleNextStep = () => {
-    setCurrentStep(2);
-  };
-
-  const handleBackStep = () => {
-    setCurrentStep(1);
-  };
-
-  const handleIssuePO = async (payload: {
-    vendor: number;
-    payment_term: number | null;
-    expected_delivery_date: string;
-    currency: number;
-  }) => {
-    if (!selectedRequest || !selectedRequest.backendId) {
-      alert("Invalid request selected.");
-      return;
-    }
-
-    try {
-      // Map to the backend expected source_type
-      let mappedSourceType = selectedRequest.originalType;
-      if (mappedSourceType === "purchase")
-        mappedSourceType = "project_purchase_request";
-      if (mappedSourceType === "plant_equipment")
-        mappedSourceType = "plant_equipment_request";
-
-      const result = await convertRequestToPurchaseOrder({
-        data: {
-          source_type: mappedSourceType,
-          source_id: selectedRequest.sourceId,
-          vendor: payload.vendor,
-          currency: payload.currency,
-          wbs_element: selectedRequest.wbsId,
-          payment_term: payload.payment_term,
-          expected_delivery_date: payload.expected_delivery_date,
-        },
-      }).unwrap();
-
-      alert("Purchase Order Issued Successfully!");
-      handleCloseModal();
-      refetch(); // Refresh the list
-    } catch (err: any) {
-      alert(
-        err?.data?.error ||
-          err?.data?.detail ||
-          "Failed to issue Purchase Order. Please check your settings.",
-      );
-      console.error(err);
-    }
-  };
-
   const handleLabourCreateBill = () => {
     setIsLabourInvoiceModalOpen(false);
     setIsLabourCreateBillModalOpen(true);
   };
 
-  const handleLabourSubmitBill = () => {
-    alert("Vendor bill submitted successfully!");
+  const handleLabourSubmitBill = async (payload?: {
+    source_id: number;
+    company_bank_account_id: number;
+    invoice_amount: number;
+    discrepancy_acknowledged: boolean;
+    document?: File | null;
+  }) => {
+    console.log("Labour vendor bill →", payload);
+    // TODO: mutation when backend ready
+    showToast(
+      "success",
+      "Vendor bill submitted. It will appear in the Payment Queue.",
+    );
     setIsLabourCreateBillModalOpen(false);
     setSelectedRequest(null);
+    refetch();
   };
 
-  const handlePettyCashCreateBill = () => {
-    setIsPettyCashInvoiceModalOpen(false);
-    setIsPettyCashDisbursementModalOpen(true);
+  // ---------- Shared step nav (Purchase / PE / Subcontractor) ----------
+  const handleNextStep = () => setCurrentStep(2);
+  const handleBackStep = () => setCurrentStep(1);
+
+  // ---------- Convert to PO (Purchase + Plant & Equipment) ----------
+  const handleIssuePO = async (payload: {
+    vendor: number;
+    payment_term: number | null;
+    expected_delivery_date: string;
+    currency: number;
+    source_id: number;
+    source_type?: string;
+  }) => {
+    const finalPayload = {
+      source_type: payload.source_type || "project_purchase_request",
+      source_id: payload.source_id,
+      vendor: payload.vendor,
+      currency: payload.currency,
+      payment_term: payload.payment_term,
+      expected_delivery_date: payload.expected_delivery_date,
+    };
+
+    console.log("Convert to PO – final payload sent to API →", finalPayload);
+
+    try {
+      await convertRequestToPurchaseOrder({
+        data: finalPayload,
+      }).unwrap();
+
+      handleCloseModal();
+      handleClosePlantEquipmentModal();
+      refetch();
+      showToast("success", "PO created successfully");
+
+      setTimeout(() => {
+        router.push("/invoice/purchase-order");
+      }, 1200);
+    } catch (err: unknown) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Full Convert-to-PO error response →", err);
+      }
+      const message = extractErrorMessage(err);
+      showToast(
+        "error",
+        message || "Failed to create Purchase Order. Please try again.",
+      );
+    }
   };
 
-  const handlePettyCashSubmitDisbursement = () => {
-    alert("Disbursement submitted successfully!");
-    setIsPettyCashDisbursementModalOpen(false);
-    setSelectedRequest(null);
-  };
-
+  // ---------- Data mapping ----------
   const requests = (apiRequests ?? []).map((req: any) => {
     const typeMap: Record<string, string> = {
       purchase: "Purchase",
@@ -353,7 +375,7 @@ export default function ApprovedRequestsPage() {
       type: typeMap[req.request_type] || req.request_type,
       wbs: req.activity_name || req.phase_name || `Project #${req.id}`,
       wbsId: "",
-      approvalDate: req.approval_date || "N/A",
+      approvalDate: formatDateYYYYMMDD(req.approval_date),
       requestedAmount: isNaN(amount) ? 0 : amount,
       supplierName: "",
       projectName: req.activity_name || req.phase_name || "General Project",
@@ -361,7 +383,7 @@ export default function ApprovedRequestsPage() {
       products: [],
       pettyCashId: "",
       requesterName: "",
-      date: req.approval_date || "",
+      date: formatDateYYYYMMDD(req.approval_date),
       purpose: "",
       accountType: req.cost_category || "",
     };
@@ -375,36 +397,34 @@ export default function ApprovedRequestsPage() {
       request.approvalDate.includes(searchTerm),
   );
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-NG", {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-NG", {
       style: "currency",
       currency: "NGN",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
-  };
 
   return (
     <div className="p-6">
-      {/* Breadcrumbs */}
-      <Breadcrumbs items={items} className="pl-0 mb-6 " />
+      <Breadcrumbs items={items} className="pl-0 mb-6" />
 
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row gap-4 md:items-center mb-6 bg-white rounded px-4 py-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-gray-900">Invoicing</h1>
         </div>
 
-        {/* Search and Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-lg">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search ..."
+              placeholder="Search …"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+              aria-label="Search approved requests"
             />
           </div>
         </div>
@@ -431,127 +451,142 @@ export default function ApprovedRequestsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Requested Amount
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {searchTerm && filteredRequests.length === 0 && (
+              {isLoading ? (
+                <TableSkeleton rows={6} />
+              ) : isError ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-3 text-center text-sm text-gray-600"
-                  >
-                    No result found
-                  </td>
-                </tr>
-              )}
-
-              {filteredRequests.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-3 text-center text-sm text-gray-600"
-                  >
-                    No approved requests found
-                  </td>
-                </tr>
-              )}
-              {filteredRequests.map((request, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    {request.id}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getTypeColor(request.type)}`}
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <p className="text-sm text-red-600 mb-3">
+                      Failed to load requests.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => refetch()}
+                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      {request.type}
-                    </span>
+                      Retry
+                    </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {request.wbs}
+                </tr>
+              ) : filteredRequests.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-8 text-center text-sm text-gray-500"
+                  >
+                    {searchTerm
+                      ? "No results found"
+                      : "No approved requests found"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {request.approvalDate}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                    {formatCurrency(request.requestedAmount)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-start gap-2 flex-wrap">
-                      {request.type === "Purchase" && (
-                        <button
-                          type="button"
-                          onClick={() => handleConvertToPO(request)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                        >
-                          Convert to PO
-                        </button>
-                      )}
-
-                      {request.type === "Subcontractor" && (
-                        <span className="flex items-center gap-2">
-                          <Link
+                </tr>
+              ) : (
+                filteredRequests.map((request, index) => (
+                  <tr
+                    key={request.backendId || index}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {request.id}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTypeColor(
+                          request.type,
+                        )}`}
+                      >
+                        {request.type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[220px]">
+                      <span className="truncate block" title={request.wbs}>
+                        {request.wbs}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {request.approvalDate}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                      {formatCurrency(request.requestedAmount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-start gap-2 flex-wrap">
+                        {request.type === "Purchase" && (
+                          <button
+                            type="button"
+                            onClick={() => handleConvertToPO(request)}
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                            href={`/invoice/purchase-order/subcontractor/${request.id}`}
+                            aria-label={`Convert ${request.id} to Purchase Order`}
                           >
-                            View
-                          </Link>
+                            Convert to PO
+                          </button>
+                        )}
+
+                        {request.type === "Subcontractor" && (
                           <button
                             type="button"
                             onClick={() =>
                               handleConvertToSubcontractor(request)
                             }
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                            aria-label={`Convert ${request.id} to Vendor Bill`}
+                          >
+                            Convert to Invoice
+                          </button>
+                        )}
+
+                        {request.type === "Plant and Equipment" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleConvertToPlantEquipment(request)
+                            }
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                            aria-label={`Convert ${request.id} to Plant & Equipment PO`}
                           >
                             Convert to PO
                           </button>
-                        </span>
-                      )}
+                        )}
 
-                      {request.type === "Plant and Equipment" && (
-                        <button
-                          type="button"
-                          // onClick={() => handleConvertToPlantEquipment(request)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                        >
-                          Convert to PO
-                        </button>
-                      )}
+                        {request.type === "Labour Request" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleConvertToLabourInvoice(request)
+                            }
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                            aria-label={`Convert ${request.id} to Invoice`}
+                          >
+                            Convert to Invoice
+                          </button>
+                        )}
 
-                      {request.type === "Labour Request" && (
-                        <button
-                          type="button"
-                          onClick={() => handleConvertToLabourInvoice(request)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                        >
-                          Convert to Invoice
-                        </button>
-                      )}
-
-                      {request.type === "Petty Cash Request" && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleConvertToPettyCashInvoice(request)
-                          }
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                        >
-                          Convert to Invoice
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {request.type === "Petty Cash Request" && (
+                          <button
+                            type="button"
+                            onClick={() => handleProcessDisbursement(request)}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                            aria-label={`Process disbursement for ${request.id}`}
+                          >
+                            Process Disbursement
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Convert to PO Modal */}
+      {/* Purchase → PO */}
       <ConvertToPOModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
@@ -561,35 +596,44 @@ export default function ApprovedRequestsPage() {
         onBackStep={handleBackStep}
         onIssuePO={handleIssuePO}
         formatCurrency={formatCurrency}
+        isIssuing={isIssuing}
       />
 
-      {/* Convert to PO Subcontractor Modal */}
+      {/* Plant & Equipment → PO */}
+      <ConvertToPOPlantEquipmentModal
+        isOpen={isPlantEquipmentModalOpen}
+        onClose={handleClosePlantEquipmentModal}
+        request={selectedRequest}
+        currentStep={currentStep}
+        onNextStep={handleNextStep}
+        onBackStep={handleBackStep}
+        onIssuePO={handleIssuePO}
+        formatCurrency={formatCurrency}
+        isIssuing={isIssuing}
+      />
+
+      {/* Subcontractor → Vendor Bill */}
       <ConvertToPOSubcontractorModal
         isOpen={isSubcontractorModalOpen}
+        request={selectedRequest}
         onClose={handleCloseSubcontractorModal}
         currentStep={currentStep}
         onNextStep={handleNextStep}
         onBackStep={handleBackStep}
-        onIssuePO={() =>
-          handleIssuePO({
-            vendor: 0,
-            payment_term: null,
-            expected_delivery_date: "",
-            currency: 0,
-          })
-        }
+        onConvertToInvoice={handleSubcontractorConvertToInvoice}
         formatCurrency={formatCurrency}
+        isIssuing={false}
       />
 
-      {/* Convert to Invoice Labour Request Modal */}
+      {/* Labour → Vendor Bill (2 steps) */}
       <ConvertToInvoiceLabourModal
         isOpen={isLabourInvoiceModalOpen}
         onClose={handleCloseLabourInvoiceModal}
         request={selectedRequest}
         onConfirm={handleLabourCreateBill}
+        formatCurrency={formatCurrency}
       />
 
-      {/* Create Vendor Bill Labour Request Modal */}
       <CreateVendorBillLabourModal
         isOpen={isLabourCreateBillModalOpen}
         onClose={handleCloseLabourCreateBillModal}
@@ -598,16 +642,7 @@ export default function ApprovedRequestsPage() {
         formatCurrency={formatCurrency}
       />
 
-      {/* Convert to Invoice Petty Cash Modal */}
-      <ConvertToInvoicePettyCashModal
-        isOpen={isPettyCashInvoiceModalOpen}
-        onClose={handleClosePettyCashInvoiceModal}
-        request={selectedRequest}
-        onConfirm={handlePettyCashCreateBill}
-        formatCurrency={formatCurrency}
-      />
-
-      {/* Create Disbursement Petty Cash Modal */}
+      {/* Petty Cash → Disbursement */}
       <CreateDisbursementModal
         isOpen={isPettyCashDisbursementModalOpen}
         onClose={handleClosePettyCashDisbursementModal}
@@ -615,6 +650,18 @@ export default function ApprovedRequestsPage() {
         onSubmit={handlePettyCashSubmitDisbursement}
         formatCurrency={formatCurrency}
       />
+
+      {/* Global toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[70] max-w-sm">
+          <ToastNotification
+            show={true}
+            type={toast.type}
+            message={toast.message}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
