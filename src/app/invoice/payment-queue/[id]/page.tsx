@@ -1,64 +1,102 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
+import {
+  Download,
+  ExternalLink,
+  AlertTriangle,
+  Building2,
+  FileText,
+  CreditCard,
+  User,
+  Calendar,
+  Hash,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import BankSelectModal from "@/components/invoice/payment-queue/BankSelectModal";
 import SuccessModal from "@/components/invoice/payment-queue/SuccessModal";
-import { CircleCheck, Download, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-import { useParams } from "next/navigation";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   useGetVendorBillByIdQuery,
   usePayVendorBillMutation,
   useApproveVendorBillMutation,
   useRejectVendorBillMutation,
   useSubmitVendorBillMutation,
-  VendorBill,
-  CreateVendorBillRequest,
+  useCancelVendorBillMutation,
+  type CreateVendorBillRequest,
 } from "@/api/invoice/vendorBillsApi";
-import { ToastNotification } from "@/components/shared/ToastNotification";
 
-const getDaysUntilDue = (dueDate: string | null) => {
-  if (!dueDate) return 0;
+/* -------------------------------------------------------------------------- */
+/*                                   Helpers                                  */
+/* -------------------------------------------------------------------------- */
+
+const getDaysUntilDue = (dueDate: string | null): number | null => {
+  if (!dueDate) return null;
   const due = new Date(dueDate);
   const now = new Date();
-  const diffTime = due.getTime() - now.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  now.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const statusBadgeStyles: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
-  submitted: "bg-yellow-100 text-yellow-700",
-  approved: "bg-blue-100 text-blue-700",
-  rejected: "bg-red-100 text-red-700",
+  submitted: "bg-yellow-100 text-yellow-800",
+  approved: "bg-blue-100 text-blue-800",
+  rejected: "bg-red-100 text-red-800",
   cancelled: "bg-red-100 text-red-700",
-  paid: "bg-green-100 text-green-700",
-  partial: "bg-blue-100 text-blue-700",
+  paid: "bg-green-100 text-green-800",
+  partial: "bg-indigo-100 text-indigo-800",
 };
 
-const formatCurrency = (amount: number | string) => {
-  return new Intl.NumberFormat("en-NG", {
+const formatCurrency = (amount: number | string) =>
+  new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: "NGN",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Number(amount || 0));
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleDateString("en-NG", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return value;
+  }
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString("en-NG", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
 };
 
 /**
  * Safely turn any API error payload into a human-readable string.
- * Handles shapes like: "msg", { error: "..." }, { detail: "..." },
- * { error: [{ error: "..." }] }, arrays of strings, etc.
  */
-const extractErrorMessage = (err: any, fallback = "An unexpected error occurred"): string => {
+const extractErrorMessage = (
+  err: any,
+  fallback = "An unexpected error occurred",
+): string => {
   if (!err) return fallback;
-
   const data = err?.data;
   if (typeof data === "string") return data;
-
   if (data && typeof data === "object") {
-    // { error: "..." | [...] }
     if (Array.isArray(data.error)) {
       return data.error
         .map((e: any) =>
@@ -73,26 +111,90 @@ const extractErrorMessage = (err: any, fallback = "An unexpected error occurred"
     if (Array.isArray(data.detail)) {
       return data.detail
         .map((d: any) =>
-          typeof d === "string" ? d : d?.message || d?.error || JSON.stringify(d),
+          typeof d === "string"
+            ? d
+            : d?.message || d?.error || JSON.stringify(d),
         )
         .join("; ");
     }
   }
-
   return err?.data?.error || err?.data?.detail || err?.message || fallback;
 };
 
 const isDev = process.env.NODE_ENV === "development";
 
+/* -------------------------------------------------------------------------- */
+/*                                 Skeleton                                   */
+/* -------------------------------------------------------------------------- */
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="h-8 bg-gray-100 rounded w-48" />
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i}>
+              <div className="h-3 bg-gray-100 rounded w-20 mb-2" />
+              <div className="h-5 bg-gray-100 rounded w-32" />
+            </div>
+          ))}
+        </div>
+        <div className="h-24 bg-gray-50 rounded-xl border border-gray-100" />
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-gray-50 h-12" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-14 border-t border-gray-100 bg-white" />
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-end gap-3">
+        <div className="h-10 w-24 bg-gray-100 rounded-lg" />
+        <div className="h-10 w-28 bg-gray-100 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Info Field                                    */
+/* -------------------------------------------------------------------------- */
+
+function InfoField({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+        {icon}
+        {label}
+      </div>
+      <div className="text-sm font-medium text-gray-900 break-words">
+        {value ?? "—"}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Page                                     */
+/* -------------------------------------------------------------------------- */
+
 export default function PaymentQueueDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const id = params.id as string;
   const billId = Number(params?.id);
 
   const {
     data: invoice,
     isLoading,
+    isFetching,
     refetch,
   } = useGetVendorBillByIdQuery(billId, { skip: isNaN(billId) });
 
@@ -103,13 +205,12 @@ export default function PaymentQueueDetailPage() {
   const [submitVendorBill, { isLoading: isSubmitting }] =
     useSubmitVendorBillMutation();
   const [payVendorBill, { isLoading: isPaying }] = usePayVendorBillMutation();
+  const [cancelVendorBill, { isLoading: isCancelling }] =
+    useCancelVendorBillMutation();
 
   const [showBankModal, setShowBankModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  const [localStatus, setLocalStatus] = useState<string | null>(
-    invoice?.status || null,
-  );
+  const [localStatus, setLocalStatus] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState(false);
 
   const [toast, setToast] = useState<{
@@ -121,10 +222,27 @@ export default function PaymentQueueDetailPage() {
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ show: true, message, type });
   };
-
   const hideToast = () => setToast((prev) => ({ ...prev, show: false }));
 
-  const isActionLoading = isApproving || isRejecting || isPaying || isSubmitting;
+  const isActionLoading =
+    isApproving || isRejecting || isPaying || isSubmitting || isCancelling;
+
+  /* ----------------------------- Status helpers ---------------------------- */
+
+  const currentStatus = (localStatus || invoice?.status || "").toLowerCase();
+
+  const showSubmit = currentStatus === "draft";
+  const showApprove = currentStatus === "submitted";
+  const showReject = ["draft", "submitted"].includes(currentStatus);
+  const showCancel = ["draft", "submitted", "approved", "partial"].includes(
+    currentStatus,
+  );
+  const showPay = ["approved", "partial"].includes(currentStatus);
+  const isReadOnlyStatus = ["paid", "rejected", "cancelled"].includes(
+    currentStatus,
+  );
+
+  /* ----------------------------- Optimistic UI ----------------------------- */
 
   const optimisticUpdate = (newStatus: string) => {
     setActionPending(true);
@@ -136,11 +254,13 @@ export default function PaymentQueueDetailPage() {
     setActionPending(false);
   };
 
-  const finalizeStatusChange = async (newStatus: string, billNumber: string) => {
+  const finalizeStatusChange = async (newStatus: string) => {
     setActionPending(false);
     setLocalStatus(newStatus);
     await refetch();
   };
+
+  /* ------------------------------- Handlers -------------------------------- */
 
   const handleSubmit = async () => {
     if (!invoice) return;
@@ -148,17 +268,19 @@ export default function PaymentQueueDetailPage() {
     optimisticUpdate("submitted");
     try {
       await submitVendorBill({ id: invoice.id }).unwrap();
-      await finalizeStatusChange("submitted", billNumber);
+      await finalizeStatusChange("submitted");
       showToast(`Bill ${billNumber} submitted`, "success");
-     } catch (err: any) {
+    } catch (err: any) {
       if (isDev) console.error("[payment-queue] submit failed", err);
-      if (err?.status === 409) {
-        refetch();
-      } else if (err?.status === 403) {
+      if (err?.status === 409) refetch();
+      else if (err?.status === 403)
         showToast("You no longer have permission to act on this bill", "error");
-      } else {
+      else {
         revertStatus();
-        showToast(extractErrorMessage(err, "Failed to submit bill. Please try again."), "error");
+        showToast(
+          extractErrorMessage(err, "Failed to submit bill. Please try again."),
+          "error",
+        );
       }
     }
   };
@@ -169,24 +291,25 @@ export default function PaymentQueueDetailPage() {
     optimisticUpdate("approved");
     try {
       await approveVendorBill({ id: invoice.id }).unwrap();
-      await finalizeStatusChange("approved", billNumber);
+      await finalizeStatusChange("approved");
       showToast(`Bill ${billNumber} approved`, "success");
-     } catch (err: any) {
+    } catch (err: any) {
       if (isDev) console.error("[payment-queue] approve failed", err);
-      if (err?.status === 409) {
-        refetch();
-      } else if (err?.status === 403) {
+      if (err?.status === 409) refetch();
+      else if (err?.status === 403)
         showToast("You no longer have permission to act on this bill", "error");
-      } else {
+      else {
         revertStatus();
-        showToast(extractErrorMessage(err, "Failed to approve bill. Please try again."), "error");
+        showToast(
+          extractErrorMessage(err, "Failed to approve bill. Please try again."),
+          "error",
+        );
       }
     }
   };
 
   const handleReject = async () => {
     if (!invoice) return;
-
     const reason = window.prompt(
       "Enter a reason for rejecting this bill (optional):",
     );
@@ -201,49 +324,87 @@ export default function PaymentQueueDetailPage() {
           ? ({ reason } as unknown as CreateVendorBillRequest)
           : undefined,
       }).unwrap();
-      await finalizeStatusChange("rejected", billNumber);
+      await finalizeStatusChange("rejected");
       showToast(`Bill ${billNumber} rejected`, "success");
-     } catch (err: any) {
+    } catch (err: any) {
       if (isDev) console.error("[payment-queue] reject failed", err);
-      if (err?.status === 409) {
-        refetch();
-      } else if (err?.status === 403) {
+      if (err?.status === 409) refetch();
+      else if (err?.status === 403)
         showToast("You no longer have permission to act on this bill", "error");
-      } else {
+      else {
         revertStatus();
-        showToast(extractErrorMessage(err, "Failed to reject bill. Please try again."), "error");
+        showToast(
+          extractErrorMessage(err, "Failed to reject bill. Please try again."),
+          "error",
+        );
+      }
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!invoice) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel bill ${invoice.bill_number || invoice.id}? This action cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    const billNumber = invoice.bill_number || String(invoice.id);
+    optimisticUpdate("cancelled");
+    try {
+      await cancelVendorBill({ id: invoice.id }).unwrap();
+      await finalizeStatusChange("cancelled");
+      showToast(`Bill ${billNumber} cancelled`, "success");
+    } catch (err: any) {
+      if (isDev) console.error("[payment-queue] cancel failed", err);
+      if (err?.status === 409) refetch();
+      else if (err?.status === 403)
+        showToast("You no longer have permission to act on this bill", "error");
+      else {
+        revertStatus();
+        showToast(
+          extractErrorMessage(err, "Failed to cancel bill. Please try again."),
+          "error",
+        );
       }
     }
   };
 
   const handlePayBill = () => setShowBankModal(true);
 
-  const handleConfirmPayment = async (bankId: string) => {
+  const handleConfirmPayment = async (bankId: string | null) => {
     if (!invoice) return;
     const billNumber = invoice.bill_number || String(invoice.id);
     optimisticUpdate("paid");
     try {
+      const payload: Record<string, unknown> = {
+        amount: invoice.balance || invoice.amount || "0",
+      };
+
+      // Only send company_bank_account if the user explicitly changed it
+      if (bankId && Number(bankId) !== invoice.company_bank_account) {
+        payload.company_bank_account = Number(bankId);
+      }
+
       await payVendorBill({
         id: invoice.id,
-        data: {
-          amount_paid: invoice.balance || invoice.amount || "0",
-          payment_method: bankId,
-          notes: "Paid via Payment Queue",
-        } as unknown as CreateVendorBillRequest,
+        data: payload as unknown as CreateVendorBillRequest,
       }).unwrap();
-      await finalizeStatusChange("paid", billNumber);
+
+      await finalizeStatusChange("paid");
       setShowBankModal(false);
       setShowSuccessModal(true);
-      showToast(`Bill ${billNumber} paid`, "success");
-     } catch (err: any) {
+      showToast(`Bill ${billNumber} paid successfully`, "success");
+    } catch (err: any) {
       if (isDev) console.error("[payment-queue] pay failed", err);
-      if (err?.status === 409) {
-        refetch();
-      } else if (err?.status === 403) {
+      if (err?.status === 409) refetch();
+      else if (err?.status === 403)
         showToast("You no longer have permission to act on this bill", "error");
-      } else {
+      else {
         revertStatus();
-        showToast(extractErrorMessage(err, "Failed to pay bill. Please try again."), "error");
+        showToast(
+          extractErrorMessage(err, "Failed to pay bill. Please try again."),
+          "error",
+        );
       }
       setShowBankModal(false);
     }
@@ -254,19 +415,61 @@ export default function PaymentQueueDetailPage() {
     router.push("/invoice/payment-queue");
   };
 
-  const currentStatus = (localStatus || invoice?.status || "").toLowerCase();
-  const isReadOnlyStatus =
-    currentStatus === "rejected" ||
-    currentStatus === "cancelled" ||
-    currentStatus === "paid";
-  const showSubmit = currentStatus === "draft";
-  const showApprove = currentStatus === "submitted";
-  const showReject =
-    currentStatus === "draft" || currentStatus === "submitted";
-  const showPay = currentStatus === "approved" || currentStatus === "partial";
+  /* --------------------------- Derived display data ------------------------ */
+
+  const inv = invoice as any; // richer response shape from backend
+
+  const vendorName =
+    inv?.vendor_details?.vendor_name || inv?.vendor_name || "—";
+  const vendorCode = inv?.vendor_details?.vendor_code;
+  const vendorContact = inv?.vendor_details?.contact_name;
+  const vendorEmail = inv?.vendor_details?.email;
+  const vendorPhone = inv?.vendor_details?.phone_number;
+
+  const vendorBank = inv?.vendor_details?.bank_account;
+  const vendorBankLabel = vendorBank
+    ? `${vendorBank.bank_name} • ${vendorBank.bank_account_number}${
+        vendorBank.confirmed ? "" : " (unconfirmed)"
+      }`
+    : null;
+
+  const paymentTermName =
+    inv?.payment_term_details?.name ||
+    (inv?.payment_term ? `Term #${inv.payment_term}` : "—");
+
+  // Company bank – support both the nested details on the bill and the
+  // standalone company-bank-account list shape you provided.
+  const companyBank = inv?.company_bank_account_details;
+  const companyBankLabel = companyBank
+    ? `${companyBank.bank_name || companyBank.account_name || "Bank"} • ${
+        companyBank.account_number_display || companyBank.account_number || ""
+      }`
+    : null;
+
+  const projectName = inv?.source_details?.project?.name;
+  const projectCode = inv?.source_details?.project?.project_code;
+  const wbsName =
+    inv?.source_details?.activity?.name ||
+    inv?.source_details?.project_purchase_order?.wbs_element?.name;
+  const requestRef = inv?.source_details?.project_request?.reference_id;
+  const poNumber = inv?.source_details?.project_purchase_order?.po_number;
+  const sourceTypeDisplay = inv?.source_type_display || inv?.source_type || "—";
+
+  const approvedByName = inv?.approved_by_details
+    ? `${inv.approved_by_details.first_name || ""} ${
+        inv.approved_by_details.last_name || ""
+      }`.trim() || inv.approved_by_details.email
+    : null;
+
+  const daysUntilDue = getDaysUntilDue(inv?.due_date);
+  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+
+  const documentUrl = inv?.document_url || inv?.document;
+
+  /* -------------------------------- Render -------------------------------- */
 
   return (
-    <div className="p-6 min-h-screen">
+    <div className="p-4 sm:p-6 min-h-screen bg-gray-50">
       <ToastNotification
         show={toast.show}
         message={toast.message}
@@ -274,338 +477,467 @@ export default function PaymentQueueDetailPage() {
         onClose={hideToast}
       />
 
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+        <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
           <button
-            onClick={() => router.back()}
+            type="button"
+            onClick={() => router.push("/invoice/payment-queue")}
             className="hover:text-gray-700"
-            aria-label="Go back"
+            aria-label="Back to Payment Queue"
           >
             ←
           </button>
           <span>Home</span>
-          <span className="text-gray-400">›</span>
-          <span>Invoicing</span>
-          <span className="text-gray-400">›</span>
-          <span className="text-gray-700 font-medium">
-            {invoice?.bill_number || "Vendor Bill"}
+          <span className="text-gray-300">›</span>
+          <span>Invoice</span>
+          <span className="text-gray-300">›</span>
+          <button
+            type="button"
+            onClick={() => router.push("/invoice/payment-queue")}
+            className="hover:text-gray-700"
+          >
+            Payment Queue
+          </button>
+          <span className="text-gray-300">›</span>
+          <span className="text-gray-800 font-medium truncate max-w-[160px]">
+            {inv?.bill_number || "Vendor Bill"}
           </span>
-        </div>
+        </nav>
 
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-3xl font-semibold">
-              {invoice?.bill_number || "Loading..."}
-            </h1>
-            <p className="text-gray-500 mt-1">
-              Vendor Bill #{invoice?.id || "—"}
-            </p>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="text-center py-12 text-gray-500">
-            Loading invoice...
-          </div>
+        {isLoading || isFetching ? (
+          <DetailSkeleton />
         ) : !invoice ? (
-          <div className="text-center py-12 text-gray-500">
-            Invoice not found.
+          <div className="text-center py-20 text-gray-500">
+            Vendor bill not found.
           </div>
         ) : (
-          <div className="bg-white rounded border p-4 space-y-4">
-            {/* Read-only banner */}
-            {isReadOnlyStatus && (
-              <div
-                className={`p-4 rounded-lg border text-sm font-medium capitalize ${
-                  currentStatus === "rejected" || currentStatus === "cancelled"
-                    ? "bg-red-50 border-red-200 text-red-800"
-                    : "bg-green-50 border-green-200 text-green-800"
-                }`}
-              >
-                This bill is {currentStatus}. No further actions are available.
-              </div>
-            )}
-
-            {/* Info Sections */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
               <div>
-                <div className="text-gray-500 text-sm">Request Id</div>
-                <div className="font-medium mt-1">
-                  {invoice.request_id || "-"}
-                </div>
+                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
+                  {inv.bill_number || `VB-${inv.id}`}
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Vendor Bill · {sourceTypeDisplay}
+                </p>
               </div>
-              <div>
-                <div className="text-gray-500 text-sm">Vendor Bill ID</div>
-                <div className="font-medium mt-1">{invoice.bill_number}</div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm">Supplier Name</div>
-                <div className="font-medium mt-1">
-                  {invoice.vendor_name || `-`}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
-                <div className="text-gray-500 text-sm">Created Date</div>
-                <div className="font-medium mt-1">
-                  {invoice.invoice_date
-                    ? new Date(invoice.invoice_date).toLocaleDateString()
-                    : "-"}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm">Due Date</div>
-                <div className="font-medium mt-1">
-                  {invoice.due_date || "-"}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm">Payment Terms</div>
-                <div className="font-medium mt-1">
-                  {invoice.payment_term?.toString() || "-"}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <div className="text-gray-500 text-sm mb-1">Status</div>
+              <div className="flex flex-wrap items-center gap-2">
                 <span
-                  className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
+                  className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium capitalize ${
                     statusBadgeStyles[currentStatus] ||
                     "bg-gray-100 text-gray-700"
                   }`}
                 >
-                  {currentStatus || invoice.status}
+                  {inv.status_display || currentStatus}
                 </span>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm mb-1">Days Until Due</div>
-                <div className="font-medium text-orange-600">
-                  {getDaysUntilDue(invoice.due_date)} days
-                </div>
+                {inv.payment_status && (
+                  <span className="inline-flex px-3 py-1.5 rounded-full text-sm font-medium capitalize bg-gray-50 text-gray-700 border border-gray-200">
+                    {inv.payment_status_display || inv.payment_status}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Document */}
-            <div>
-              <div className="font-medium mb-3">Uploaded Document</div>
-              {invoice.document ? (
-                <div className="border border-gray-200 rounded-xl p-5 flex gap-4 bg-gray-50 items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="text-4xl">📄</div>
-                    <div>
-                      <div className="font-medium">Invoice Document</div>
-                      <div className="text-sm text-gray-500">
-                        Attached to vendor bill
+            {/* Read-only banner */}
+            {isReadOnlyStatus && (
+              <div
+                className={`mb-6 p-4 rounded-xl border text-sm font-medium ${
+                  currentStatus === "paid"
+                    ? "bg-green-50 border-green-200 text-green-800"
+                    : "bg-red-50 border-red-200 text-red-800"
+                }`}
+              >
+                This bill is <span className="capitalize">{currentStatus}</span>
+                . No further actions are available.
+              </div>
+            )}
+
+            {/* Main card */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-5 sm:p-6 space-y-8">
+                {/* Summary amounts */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <div className="text-xs text-gray-500 mb-1">Amount</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(inv.amount)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <div className="text-xs text-gray-500 mb-1">
+                      Amount Paid
+                    </div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(inv.amount_paid)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <div className="text-xs text-gray-500 mb-1">Balance</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(inv.balance)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <div className="text-xs text-gray-500 mb-1">
+                      Days Until Due
+                    </div>
+                    <div
+                      className={`text-lg font-semibold ${
+                        isOverdue ? "text-red-600" : "text-gray-900"
+                      }`}
+                    >
+                      {daysUntilDue === null
+                        ? "—"
+                        : isOverdue
+                          ? `${Math.abs(daysUntilDue)}d overdue`
+                          : `${daysUntilDue}d`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vendor & Source */}
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-gray-400" />
+                    Vendor & Source
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <InfoField
+                      label="Vendor"
+                      value={
+                        <span>
+                          {vendorName}
+                          {vendorCode && (
+                            <span className="text-gray-400 font-normal">
+                              {" "}
+                              ({vendorCode})
+                            </span>
+                          )}
+                        </span>
+                      }
+                      icon={<User className="w-3.5 h-3.5" />}
+                    />
+                    <InfoField
+                      label="Contact"
+                      value={
+                        vendorContact || vendorEmail || vendorPhone
+                          ? [vendorContact, vendorEmail, vendorPhone]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : "—"
+                      }
+                    />
+                    <InfoField
+                      label="Vendor Bank"
+                      value={
+                        vendorBankLabel || (
+                          <span className="text-amber-600 flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Not confirmed
+                          </span>
+                        )
+                      }
+                      icon={<CreditCard className="w-3.5 h-3.5" />}
+                    />
+                    <InfoField label="Source Type" value={sourceTypeDisplay} />
+                    {poNumber && (
+                      <InfoField
+                        label="Purchase Order"
+                        value={poNumber}
+                        icon={<Hash className="w-3.5 h-3.5" />}
+                      />
+                    )}
+                    {requestRef && (
+                      <InfoField
+                        label="Request Reference"
+                        value={requestRef}
+                        icon={<Hash className="w-3.5 h-3.5" />}
+                      />
+                    )}
+                    {(projectName || projectCode) && (
+                      <InfoField
+                        label="Project"
+                        value={
+                          projectCode
+                            ? `${projectName || ""} (${projectCode})`
+                            : projectName
+                        }
+                      />
+                    )}
+                    {wbsName && (
+                      <InfoField label="WBS / Activity" value={wbsName} />
+                    )}
+                  </div>
+                </div>
+
+                {/* Dates & Payment meta */}
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    Dates & Payment Details
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <InfoField
+                      label="Invoice Date"
+                      value={formatDate(inv.invoice_date)}
+                    />
+                    <InfoField
+                      label="Due Date"
+                      value={formatDate(inv.due_date)}
+                    />
+                    <InfoField label="Payment Terms" value={paymentTermName} />
+                    <InfoField
+                      label="Company Bank Account"
+                      value={companyBankLabel || "Not selected"}
+                      icon={<CreditCard className="w-3.5 h-3.5" />}
+                    />
+                    {approvedByName && (
+                      <InfoField label="Approved By" value={approvedByName} />
+                    )}
+                    {inv.approved_at && (
+                      <InfoField
+                        label="Approved At"
+                        value={formatDateTime(inv.approved_at)}
+                      />
+                    )}
+                    {inv.paid_at && (
+                      <InfoField
+                        label="Paid At"
+                        value={formatDateTime(inv.paid_at)}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Document */}
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-gray-400" />
+                    Uploaded Document
+                  </h2>
+                  {documentUrl ? (
+                    <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="text-3xl shrink-0">📄</div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900 truncate">
+                            Invoice Document
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Attached to this vendor bill
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href={documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-white transition-colors"
+                          title="View in new tab"
+                          aria-label="View document"
+                        >
+                          <ExternalLink className="w-5 h-5" />
+                        </a>
+                        <a
+                          href={documentUrl}
+                          download
+                          className="p-2 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-white transition-colors"
+                          title="Download"
+                          aria-label="Download document"
+                        >
+                          <Download className="w-5 h-5" />
+                        </a>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={invoice.document}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="View document"
-                      className="p-2 text-gray-600 hover:text-blue-700 rounded-lg hover:bg-gray-100 transition-colors"
-                      title="View in new tab"
-                    >
-                      <ExternalLink className="w-5 h-5" />
-                    </a>
-                    <a
-                      href={invoice.document}
-                      download
-                      aria-label="Download document"
-                      className="p-2 text-gray-600 hover:text-blue-700 rounded-lg hover:bg-gray-100 transition-colors"
-                      title="Download"
-                    >
-                      <Download className="w-5 h-5" />
-                    </a>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-gray-500">
+                      <div className="text-3xl">📄</div>
+                      <div>
+                        <div className="font-medium">No document</div>
+                        <div className="text-xs">
+                          No document was attached to this bill
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="border border-gray-200 rounded-xl p-5 flex gap-4 bg-gray-50">
-                  <div className="text-4xl">📄</div>
-                  <div>
-                    <div className="font-medium">No document</div>
-                    <div className="text-sm text-gray-500">
-                      No document attached
+
+                {/* Line items */}
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-3">
+                    Cost Items
+                  </h2>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[520px]">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Description
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Qty
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Unit Price
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {(inv.lines || []).length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={4}
+                                className="px-4 py-8 text-center text-sm text-gray-500"
+                              >
+                                No line items
+                              </td>
+                            </tr>
+                          ) : (
+                            inv.lines.map((line: any, idx: number) => {
+                              const qty = Number(line.quantity || 0);
+                              const price = Number(line.unit_price || 0);
+                              const total =
+                                line.line_total != null
+                                  ? Number(line.line_total)
+                                  : qty * price;
+                              const description =
+                                line.description ||
+                                line.source?.item_name ||
+                                line.source?.product?.product_name ||
+                                "—";
+
+                              return (
+                                <tr
+                                  key={line.id || idx}
+                                  className="hover:bg-gray-50/60"
+                                >
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                    {description}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                                    {line.quantity ?? "—"}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                                    {line.unit_price
+                                      ? formatCurrency(line.unit_price)
+                                      : "—"}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                                    {formatCurrency(total)}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-50 border-t border-gray-200">
+                            <td
+                              colSpan={3}
+                              className="px-4 py-3 text-sm font-semibold text-gray-900"
+                            >
+                              Grand Total
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                              {formatCurrency(inv.amount)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Cost Table */}
-            <div>
-              <div className="font-medium mb-4">Cost Items</div>
-              <table className="w-full border border-gray-200 rounded-2xl overflow-hidden">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-4 text-left">Product / Service</th>
-                    <th className="px-6 py-4 text-left">Quantity</th>
-                    <th className="px-6 py-4 text-left">Unit Price</th>
-                    <th className="px-6 py-4 text-left">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoice.lines?.map((item, idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="px-6 py-4 font-medium">
-                        {item.description || "-"}
-                      </td>
-                      <td className="px-6 py-4">{item.quantity || "-"}</td>
-                      <td className="px-6 py-4">
-                        {item.unit_price
-                          ? formatCurrency(item.unit_price)
-                          : "-"}
-                      </td>
-                      <td className="px-6 py-4">
-                        {item.quantity && item.unit_price
-                          ? formatCurrency(
-                              Number(item.quantity) * Number(item.unit_price),
-                            )
-                          : "-"}
-                      </td>
-                    </tr>
-                  ))}
-                  {(!invoice.lines || invoice.lines.length === 0) && (
-                    <tr className="border-b">
-                      <td
-                        colSpan={4}
-                        className="px-6 py-4 text-center text-gray-500"
-                      >
-                        No items found
-                      </td>
-                    </tr>
+            {/* Action buttons */}
+            <div className="flex flex-wrap items-center justify-end gap-3 mt-6">
+              {!isReadOnlyStatus && (
+                <>
+                  {showSubmit && (
+                    <Button
+                      variant="contained"
+                      onClick={handleSubmit}
+                      disabled={actionPending || isActionLoading}
+                      aria-label="Submit bill"
+                    >
+                      {isSubmitting || actionPending
+                        ? "Submitting…"
+                        : "Submit Bill"}
+                    </Button>
                   )}
-                  <tr className="bg-gray-50 font-semibold">
-                    <td className="px-6 py-4" colSpan={3}>
-                      Grand Total
-                    </td>
-                    <td className="px-6 py-4">
-                      {formatCurrency(invoice.amount || "0")}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
-        {/* Action Buttons */}
-        {!isLoading && invoice && (
-          <div className="flex flex-wrap gap-3 justify-end mt-8">
-            {!isReadOnlyStatus && (
-              <>
-                {showSubmit && (
-                  <Button
-                    variant={"contained"}
-                    onClick={handleSubmit}
-                    disabled={actionPending || isActionLoading}
-                    aria-label="Submit bill"
-                  >
-                    {isSubmitting || actionPending ? (
-                      <span className="flex items-center gap-2">
-                        <svg
-                          className="animate-spin h-4 w-4"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 818 8 8 8 0 01-8-8z"
-                          />
-                        </svg>
-                        Submitting...
-                      </span>
-                    ) : (
-                      "Submit Bill"
-                    )}
-                  </Button>
-                )}
-                {showApprove && (
-                  <Button
-                    variant={"contained"}
-                    onClick={handleApprove}
-                    disabled={actionPending || isActionLoading}
-                    aria-label="Approve bill"
-                  >
-                    {isApproving || actionPending ? (
-                      <span className="flex items-center gap-2">
-                        <svg
-                          className="animate-spin h-4 w-4"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 818 8 8 8 0 01-8-8z"
-                          />
-                        </svg>
-                        Approving...
-                      </span>
-                    ) : (
-                      "Approve Bill"
-                    )}
-                  </Button>
-                )}
-                {showReject && (
-                  <Button
-                    variant={"outline"}
-                    onClick={handleReject}
-                    disabled={actionPending || isActionLoading}
-                    aria-label="Reject bill"
-                  >
-                    {isRejecting || actionPending
-                      ? "Rejecting..."
-                      : "Reject Bill"}
-                  </Button>
-                )}
-                {showPay && (
-                  <Button
-                    variant={"contained"}
-                    onClick={handlePayBill}
-                    disabled={actionPending || isActionLoading}
-                    aria-label="Pay bill"
-                  >
-                    {isPaying || actionPending ? "Processing..." : "Pay Bill"}
-                  </Button>
-                )}
-              </>
-            )}
-            <Button
-              variant={"outline"}
-              onClick={() => router.push("/invoice/payment-queue")}
-              disabled={actionPending || isActionLoading}
-              aria-label="Back"
-            >
-              Back
-            </Button>
-          </div>
+                  {showApprove && (
+                    <Button
+                      variant="contained"
+                      onClick={handleApprove}
+                      disabled={actionPending || isActionLoading}
+                      aria-label="Approve bill"
+                    >
+                      {isApproving || actionPending
+                        ? "Approving…"
+                        : "Approve Bill"}
+                    </Button>
+                  )}
+
+                  {showReject && (
+                    <Button
+                      variant="outline"
+                      onClick={handleReject}
+                      disabled={actionPending || isActionLoading}
+                      aria-label="Reject bill"
+                      className="border-red-200 text-red-700 hover:bg-red-50"
+                    >
+                      {isRejecting || actionPending
+                        ? "Rejecting…"
+                        : "Reject Bill"}
+                    </Button>
+                  )}
+
+                  {showCancel && (
+                    <Button
+                      variant="outline"
+                      onClick={handleCancel}
+                      disabled={actionPending || isActionLoading}
+                      aria-label="Cancel bill"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      {isCancelling || actionPending
+                        ? "Cancelling…"
+                        : "Cancel Bill"}
+                    </Button>
+                  )}
+
+                  {showPay && (
+                    <Button
+                      variant="contained"
+                      onClick={handlePayBill}
+                      disabled={actionPending || isActionLoading}
+                      aria-label="Pay bill"
+                    >
+                      {isPaying || actionPending ? "Processing…" : "Pay Bill"}
+                    </Button>
+                  )}
+                </>
+              )}
+
+              <Button
+                variant="outline"
+                onClick={() => router.push("/invoice/payment-queue")}
+                disabled={actionPending || isActionLoading}
+                aria-label="Back to queue"
+              >
+                Back
+              </Button>
+            </div>
+          </>
         )}
 
         {/* Modals */}
@@ -613,7 +945,12 @@ export default function PaymentQueueDetailPage() {
           isOpen={showBankModal}
           onClose={() => setShowBankModal(false)}
           onConfirm={handleConfirmPayment}
+          currentBankAccountId={invoice?.company_bank_account}
+          currentBankLabel={
+            invoice?.company_bank_account_details?.bank_name ?? undefined
+          }
         />
+
         <SuccessModal
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}

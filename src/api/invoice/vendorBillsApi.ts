@@ -91,6 +91,8 @@ export interface VendorBill {
   payment_term: number | null;
   approved_by: number | null;
   request_id?: number | string | null;
+  vendor_details?: { vendor_name?: string | null };
+  company_bank_account_details?: { bank_name?: string | null }; // bank_name
 }
 
 /* ------------------------- Create / Update Payloads ----------------------- */

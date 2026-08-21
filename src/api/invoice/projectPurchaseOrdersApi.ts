@@ -62,7 +62,6 @@ export interface ConvertRequestToPurchaseOrderRequest {
   source_id: number;
   vendor: number;
   currency: number;
-  wbs_element: string;
   payment_term?: number | null;
   expected_delivery_date: string;
 }

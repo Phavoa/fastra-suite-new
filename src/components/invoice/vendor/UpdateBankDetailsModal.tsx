@@ -3,8 +3,10 @@
 import React, { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useForm } from "react-hook-form";
-import { Pencil } from "lucide-react";
-import { useUpdateVendorBankAccountMutation, useAddVendorBankAccountMutation } from "@/api/invoice/vendorBankAccountsApi";
+import {
+  useUpdateVendorBankAccountMutation,
+  useAddVendorBankAccountMutation,
+} from "@/api/invoice/vendorBankAccountsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 interface BankData {
@@ -19,6 +21,8 @@ interface Props {
   onClose: () => void;
   initialData: BankData;
   vendorId: number;
+  /** Called after a successful save so parent can refetch */
+  onSuccess?: () => void;
 }
 
 export function UpdateBankDetailsModal({
@@ -26,14 +30,16 @@ export function UpdateBankDetailsModal({
   onClose,
   initialData,
   vendorId,
+  onSuccess,
 }: Props) {
   const { register, handleSubmit, reset } = useForm<BankData>({
     defaultValues: initialData,
   });
 
-  const [updateBank, { isLoading: isUpdating }] = useUpdateVendorBankAccountMutation();
+  const [updateBank, { isLoading: isUpdating }] =
+    useUpdateVendorBankAccountMutation();
   const [addBank, { isLoading: isAdding }] = useAddVendorBankAccountMutation();
-  
+
   const [toast, setToast] = useState<{
     show: boolean;
     message: string;
@@ -55,7 +61,7 @@ export function UpdateBankDetailsModal({
         branch_code: data.branch,
       };
 
-      // If initial data had no account number, it's probably an add. Otherwise update.
+      // If initial data had no account number, treat as add; otherwise update
       if (initialData.accountNumber) {
         await updateBank({ id: vendorId, data: payload as any }).unwrap();
       } else {
@@ -64,16 +70,23 @@ export function UpdateBankDetailsModal({
 
       setToast({
         show: true,
-        message: "Bank details updated successfully",
+        message: "Bank details saved successfully",
         type: "success",
       });
+
+      onSuccess?.();
+
       setTimeout(() => {
         onClose();
-      }, 1000);
+      }, 800);
     } catch (err: any) {
       setToast({
         show: true,
-        message: err?.data?.message || err?.message || "Failed to update bank details",
+        message:
+          err?.data?.message ||
+          err?.data?.detail ||
+          err?.message ||
+          "Failed to save bank details",
         type: "error",
       });
     }
@@ -81,15 +94,12 @@ export function UpdateBankDetailsModal({
 
   const isSubmitting = isUpdating || isAdding;
 
-  // We can leave the audit log empty or remove it if not needed,
-  // but we will hide it since there is no audit log API yet.
-
   return (
-    <Dialog.Root open={isOpen} onOpenChange={onClose}>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-xl z-50">
-          <div className="p-8">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-3xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-xl focus:outline-none">
+          <div className="p-6 sm:p-8">
             <ToastNotification
               show={toast.show}
               message={toast.message}
@@ -98,64 +108,79 @@ export function UpdateBankDetailsModal({
             />
 
             <Dialog.Title className="text-xl font-semibold text-gray-900">
-              Update Bank Details
+              {initialData.accountNumber
+                ? "Update Bank Details"
+                : "Add Bank Details"}
             </Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-gray-500">
+              Bank Account Name, Number and Bank Name are required before any
+              payment can be processed to this vendor (PRD §9.8).
+            </Dialog.Description>
 
             <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Bank Account Name
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Bank Account Name <span className="text-red-500">*</span>
                   </label>
                   <input
-                    {...register("accountName")}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    {...register("accountName", { required: true })}
+                    placeholder="Account holder name"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Bank Account Number
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Bank Account Number <span className="text-red-500">*</span>
                   </label>
                   <input
-                    {...register("accountNumber")}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    {...register("accountNumber", { required: true })}
+                    placeholder="Account number"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Bank Name
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Bank Name <span className="text-red-500">*</span>
                   </label>
                   <input
-                    {...register("bankName")}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    {...register("bankName", { required: true })}
+                    placeholder="e.g. GTBank, Opay"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Branch
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Branch / Sort Code
                   </label>
                   <input
                     {...register("branch")}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Optional"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
+
+              <p className="text-xs text-gray-500">
+                After saving, the bank account may need to be explicitly
+                confirmed before payments can be made.
+              </p>
 
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
                   disabled={isSubmitting}
+                  className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
+                  className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"
                 >
-                  {isSubmitting ? "Updating..." : "Update"}
+                  {isSubmitting ? "Saving…" : "Save"}
                 </button>
               </div>
             </form>
