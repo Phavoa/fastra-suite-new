@@ -45,6 +45,7 @@ import { vendorImportApi } from "../../api/invoice/vendorImportApi";
 import authReducer from "./authSlice";
 import viewModeReducer from "../../components/Settings/viewModeSlice";
 
+import { stockLocationApi } from "@/api/inventory/stockLocationApi";
 import { incomingProductApi } from "@/api/inventory/incomingProductApi";
 import { deliveryOrderApi } from "@/api/inventory/deliveryOrderApi";
 import { deliveryOrderReturnApi } from "@/api/inventory/deliveryOrderReturnApi";
@@ -102,6 +103,7 @@ const rootReducer = combineReducers({
   [currencyApi.reducerPath]: currencyApi.reducer,
 
   [locationApi.reducerPath]: locationApi.reducer,
+  [stockLocationApi.reducerPath]: stockLocationApi.reducer,
   [multilocationApi.reducerPath]: multilocationApi.reducer,
   [stockAdjustmentApi.reducerPath]: stockAdjustmentApi.reducer,
   [scrapApi.reducerPath]: scrapApi.reducer,
@@ -172,6 +174,7 @@ export const store = configureStore({
       currencyApi.middleware,
 
       locationApi.middleware,
+      stockLocationApi.middleware,
       multilocationApi.middleware,
       stockAdjustmentApi.middleware,
       scrapApi.middleware,

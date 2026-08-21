@@ -35,12 +35,9 @@ export default function StockAdjustmentPage() {
   const items: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
-
     {
-      label: `${
-        selectedStatus !== "all" ? selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1) : "All"
-      } Adjustments`,
-      href: `/inventory/stocks/adjustment${selectedStatus !== "all" ? `?status=${selectedStatus}` : ""}`,
+      label: "Stock Adjustment",
+      href: "/inventory/stocks/adjustment",
       current: true,
     },
   ];
@@ -52,16 +49,26 @@ export default function StockAdjustmentPage() {
 
   const rows = useMemo(() => {
     if (!adjustmentsData) return [];
-    return adjustmentsData.map((adj: any) => ({
-      id: adj.id,
-      adjustmentType: adj.adjustment_type || "Stock Level Update",
-      location: adj.warehouse_location_details?.location_name || adj.warehouse_location || "N/A",
-      adjustedDate: adj.date_created ? new Date(adj.date_created).toISOString().split("T")[0] : "N/A",
-      status: adj.status?.toLowerCase() as StockAdjustmentStatus,
-      product: adj.stock_adjustment_items?.[0]?.product_details?.product_name || "Multiple Products",
-      quantity: adj.stock_adjustment_items?.[0]?.new_quantity || 0,
-    }));
-  }, [adjustmentsData]);
+    const list = Array.isArray(adjustmentsData)
+      ? adjustmentsData
+      : (adjustmentsData as any)?.results || (adjustmentsData as any)?.data || [];
+    const mapped = list.map((adj: any) => {
+      const normalizedStatus = (adj.status || "draft").toLowerCase();
+      const statusValue = normalizedStatus === "validated" || normalizedStatus === "done" ? "done" : "draft";
+      return {
+        id: adj.id,
+        adjustmentType: adj.adjustment_type || "Stock Level Update",
+        location: adj.warehouse_location_details?.location_name || adj.warehouse_location || "N/A",
+        adjustedDate: adj.date_created ? new Date(adj.date_created).toISOString().split("T")[0] : "N/A",
+        status: statusValue as StockAdjustmentStatus,
+        product: adj.stock_adjustment_items?.[0]?.product_details?.product_name || "Multiple Products",
+        quantity: adj.stock_adjustment_items?.[0]?.new_quantity || 0,
+      };
+    });
+
+    if (selectedStatus === "all") return mapped;
+    return mapped.filter((r: any) => r.status === selectedStatus);
+  }, [adjustmentsData, selectedStatus]);
 
   const handleViewChange = (view: "grid" | "list") => {
     setCurrentView(view);
@@ -126,7 +133,7 @@ export default function StockAdjustmentPage() {
             <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
               {[
                 { label: "All Records", value: "all" },
-                { label: "Validated / Done", value: "done" },
+                { label: "Validated", value: "done" },
                 { label: "Draft", value: "draft" },
               ].map((tab) => {
                 const isSelected = selectedStatus === tab.value;

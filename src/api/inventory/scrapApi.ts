@@ -19,6 +19,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const scrapApi = createApi({
   reducerPath: "scrapApi",
+  tagTypes: ["Scrap"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -90,22 +91,27 @@ export const scrapApi = createApi({
         url: "/inventory/scrap/",
         params,
       }),
+      providesTags: ["Scrap"],
     }),
 
     getScrap: builder.query<Scrap, string>({
       query: (id) => `/inventory/scrap/${id}/`,
+      providesTags: (result, error, id) => [{ type: "Scrap", id }],
     }),
 
     getScrapEditable: builder.query<Scrap, string>({
       query: (id) => `/inventory/scrap/${id}/check_editable/`,
+      providesTags: (result, error, id) => [{ type: "Scrap", id }],
     }),
 
     getActiveScraps: builder.query<Scrap[], void>({
       query: () => "/inventory/scrap/active_list/",
+      providesTags: ["Scrap"],
     }),
 
     getHiddenScraps: builder.query<Scrap[], void>({
       query: () => "/inventory/scrap/hidden_list/",
+      providesTags: ["Scrap"],
     }),
 
     // Mutation endpoints
@@ -115,6 +121,7 @@ export const scrapApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Scrap"],
     }),
 
     updateScrap: builder.mutation<
@@ -126,6 +133,10 @@ export const scrapApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "Scrap",
+        { type: "Scrap", id },
+      ],
     }),
 
     patchScrap: builder.mutation<
@@ -137,6 +148,10 @@ export const scrapApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "Scrap",
+        { type: "Scrap", id },
+      ],
     }),
 
     deleteScrap: builder.mutation<void, string>({
@@ -144,6 +159,7 @@ export const scrapApi = createApi({
         url: `/inventory/scrap/${id}/soft_delete/`,
         method: "DELETE",
       }),
+      invalidatesTags: ["Scrap"],
     }),
 
     validateScrap: builder.mutation<
@@ -155,6 +171,10 @@ export const scrapApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "Scrap",
+        { type: "Scrap", id },
+      ],
     }),
 
     toggleScrapHiddenStatus: builder.mutation<

@@ -149,6 +149,8 @@ export function normalizePermissionDetails(
             "edit_location": "change_location",
             "create_delivery_return": "add_returnincomingproduct",
             "edit_delivery_return": "change_returnincomingproduct",
+            "create_scrap": "add_scrap",
+            "edit_scrap": "change_scrap",
             // Add any other specific mappings here if needed
           };
 
