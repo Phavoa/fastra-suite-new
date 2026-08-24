@@ -1,9 +1,10 @@
+"use client";
+
 import React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusPill } from "./StatusPill";
-import { RequestRow } from "@/components/purchase/types";
 import { StockAdjustmentRow } from "../types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,13 @@ function StockAdjustmentCard({ request, index }: StockAdjustmentCardProps) {
     router.push(`/inventory/operation/scrap/${request.id}`);
   };
 
+  const formattedCause =
+    request.adjustmentType?.toUpperCase() === "DAMAGE"
+      ? "Damage / Spoilage"
+      : request.adjustmentType?.toUpperCase() === "LOSS"
+      ? "Loss"
+      : request.adjustmentType || "N/A";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -30,7 +38,7 @@ function StockAdjustmentCard({ request, index }: StockAdjustmentCardProps) {
       transition={{
         duration: 0.4,
         ease: "easeOut",
-        delay: index * 0.1,
+        delay: index * 0.05,
       }}
       whileHover={{
         y: -4,
@@ -39,54 +47,58 @@ function StockAdjustmentCard({ request, index }: StockAdjustmentCardProps) {
     >
       <Card
         className={cn(
-          "cursor-pointer transition-all duration-200 hover:shadow border-2 border-gray-200 hover:border-gray-300 shadow-none rounded"
+          "cursor-pointer transition-all duration-200 hover:shadow-md border border-gray-200 hover:border-[#3B7CED] bg-white rounded-lg overflow-hidden"
         )}
         onClick={handleCardClick}
       >
-        <CardHeader>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold text-gray-900 truncate">
-                {request.product}
-              </CardTitle>
-              <StatusPill status={request.status} />
-            </div>
+        <CardHeader className="p-4 pb-3 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-sm font-semibold text-[#32325D] truncate">
+              {request.id}
+            </CardTitle>
+            <StatusPill status={request.status} />
           </div>
         </CardHeader>
 
-        <CardContent>
-          <div className="space-y-3">
-            {/* Cause */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Cause:</span>
-              <span className="text-sm font-medium text-gray-900">
-                {request.adjustmentType}
-              </span>
-            </div>
+        <CardContent className="p-4 space-y-2.5">
+          {/* Product */}
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-xs text-[#8898AA] font-medium">Product:</span>
+            <span className="font-semibold text-[#32325D] text-right truncate max-w-[170px]">
+              {request.product || "Multiple Products"}
+            </span>
+          </div>
 
-            {/* Location */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Location:</span>
-              <span className="text-sm font-medium text-gray-900 truncate max-w-32">
-                {request.location}
-              </span>
-            </div>
+          {/* Cause */}
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-xs text-[#8898AA] font-medium">Cause:</span>
+            <span className="font-medium text-[#E43D2B] text-xs">
+              {formattedCause}
+            </span>
+          </div>
 
-            {/* Adjusted Date */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Date:</span>
-              <span className="text-sm font-medium text-gray-900">
-                {request.adjustedDate}
-              </span>
-            </div>
+          {/* Location */}
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-xs text-[#8898AA] font-medium">Location:</span>
+            <span className="text-sm font-medium text-[#525F7F] truncate max-w-[150px]">
+              {request.location}
+            </span>
+          </div>
 
-            {/* Stock Adjustment ID */}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-              <span className="text-xs text-gray-500">Adjustment ID:</span>
-              <span className="text-xs font-mono text-gray-600">
-                {request.id}
-              </span>
-            </div>
+          {/* Scrapped Quantity */}
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-xs text-[#8898AA] font-medium">Scrapped Qty:</span>
+            <span className="text-sm font-bold text-[#E43D2B] font-mono">
+              -{request.quantity || 0}
+            </span>
+          </div>
+
+          {/* Date */}
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+            <span className="text-[#8898AA]">Recorded:</span>
+            <span className="text-[#525F7F] font-medium">
+              {request.adjustedDate}
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -99,48 +111,25 @@ export function StockAdjustmentCards({
 }: StockAdjustmentCardsProps) {
   return (
     <motion.div
-      className="px-6 bg-white h-full mt-6 rounded-md"
+      className="bg-transparent h-full w-full"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      {/* Stock Adjustment Cards Grid */}
       {stockAdjustments.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 py-6">
-          {stockAdjustments.map((stockAdjustment, index) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {stockAdjustments.map((scrap, index) => (
             <StockAdjustmentCard
-              key={stockAdjustment.id}
-              request={stockAdjustment}
+              key={scrap.id}
+              request={scrap}
               index={index}
             />
           ))}
         </div>
       ) : (
-        <motion.div
-          className="flex items-center justify-center h-64"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 }}
-        >
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 text-gray-300">
-              <svg
-                className="w-full h-full"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-400 text-sm">No stock adjustments found</p>
-          </div>
-        </motion.div>
+        <div className="flex items-center justify-center h-64 text-center">
+          <p className="text-gray-400 text-sm">No scrap records found</p>
+        </div>
       )}
     </motion.div>
   );

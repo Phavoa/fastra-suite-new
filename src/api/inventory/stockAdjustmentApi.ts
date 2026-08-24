@@ -19,6 +19,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const stockAdjustmentApi = createApi({
   reducerPath: "stockAdjustmentApi",
+  tagTypes: ["StockAdjustment", "StockLocation"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -93,30 +94,37 @@ export const stockAdjustmentApi = createApi({
         url: "/inventory/stock-adjustment/",
         params,
       }),
+      providesTags: ["StockAdjustment"],
     }),
 
     getStockAdjustment: builder.query<StockAdjustment, string>({
       query: (id) => `/inventory/stock-adjustment/${id}/`,
+      providesTags: (result, error, id) => [{ type: "StockAdjustment", id }],
     }),
 
     getStockAdjustmentEditable: builder.query<StockAdjustment, string>({
       query: (id) => `/inventory/stock-adjustment/${id}/check_editable/`,
+      providesTags: (result, error, id) => [{ type: "StockAdjustment", id }],
     }),
 
     getActiveStockAdjustments: builder.query<StockAdjustment[], void>({
       query: () => "/inventory/stock-adjustment/active_list/",
+      providesTags: ["StockAdjustment"],
     }),
 
     getDoneStockAdjustments: builder.query<StockAdjustment[], void>({
       query: () => "/inventory/stock-adjustment/done_list/",
+      providesTags: ["StockAdjustment"],
     }),
 
     getDraftStockAdjustments: builder.query<StockAdjustment[], void>({
       query: () => "/inventory/stock-adjustment/draft_list/",
+      providesTags: ["StockAdjustment"],
     }),
 
     getHiddenStockAdjustments: builder.query<StockAdjustment[], void>({
       query: () => "/inventory/stock-adjustment/hidden_list/",
+      providesTags: ["StockAdjustment"],
     }),
 
     // Mutation endpoints
@@ -129,6 +137,7 @@ export const stockAdjustmentApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["StockAdjustment"],
     }),
 
     updateStockAdjustment: builder.mutation<
@@ -140,6 +149,10 @@ export const stockAdjustmentApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "StockAdjustment",
+        { type: "StockAdjustment", id },
+      ],
     }),
 
     patchStockAdjustment: builder.mutation<
@@ -151,6 +164,10 @@ export const stockAdjustmentApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "StockAdjustment",
+        { type: "StockAdjustment", id },
+      ],
     }),
 
     deleteStockAdjustment: builder.mutation<void, string>({
@@ -158,6 +175,7 @@ export const stockAdjustmentApi = createApi({
         url: `/inventory/stock-adjustment/${id}/soft_delete/`,
         method: "DELETE",
       }),
+      invalidatesTags: ["StockAdjustment"],
     }),
 
     validateStockAdjustment: builder.mutation<
@@ -169,6 +187,11 @@ export const stockAdjustmentApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        "StockAdjustment",
+        "StockLocation",
+        { type: "StockAdjustment", id },
+      ],
     }),
 
     toggleStockAdjustmentHiddenStatus: builder.mutation<

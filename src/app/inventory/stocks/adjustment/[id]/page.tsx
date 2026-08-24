@@ -22,7 +22,7 @@ export default function StockAdjustmentDetailPage() {
   const params = useParams();
   const id = (params?.id as string) || "";
 
-  const { data: adjData, isLoading, error } = useGetStockAdjustmentQuery(id, { skip: !id });
+  const { data: adjData, isLoading, error, refetch } = useGetStockAdjustmentQuery(id, { skip: !id });
   const [validateAdj, { isLoading: isValidating }] = useValidateStockAdjustmentMutation();
   const statusModal = useStatusModal();
 
@@ -41,6 +41,7 @@ export default function StockAdjustmentDetailPage() {
   const handleValidate = async () => {
     try {
       await validateAdj({ id }).unwrap();
+      await refetch();
       setModalState({
         isOpen: true,
         type: "success",
@@ -66,9 +67,9 @@ export default function StockAdjustmentDetailPage() {
     adjustment_type: adjData.adjustment_type || "Stock Level Update",
     warehouse_location: adjData.warehouse_location_details?.location_name || adjData.warehouse_location,
     date: (adjData as any).date_created ? new Date((adjData as any).date_created).toLocaleDateString() : "N/A",
-    status: adjData.status?.toLowerCase(),
-    notes: adjData.notes || adjData.reason,
-    created_by: "N/A",
+    status: (adjData.status || "DRAFT").toLowerCase(),
+    notes: adjData.notes || adjData.reason || "—",
+    created_by: (adjData as any).warehouse_location_details?.location_manager_details?.user?.first_name || (adjData as any).created_by || "System",
     items: adjData.stock_adjustment_items || [],
   } : null;
 
@@ -100,7 +101,7 @@ export default function StockAdjustmentDetailPage() {
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-semibold text-[#32325D]">Stock Adjustment: {record.id}</h1>
                 <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-md font-semibold ${record.status === "done" || record.status === "validated" ? "bg-green-50 text-green-700 border border-green-200/60" : "bg-blue-50 text-blue-700 border border-blue-200/60"}`}>
-                  {record.status === "done" || record.status === "validated" ? "Done" : "Draft"}
+                  {record.status === "done" || record.status === "validated" ? "Validated" : "Draft"}
                 </span>
               </div>
             </div>

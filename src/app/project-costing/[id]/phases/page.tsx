@@ -114,17 +114,53 @@ export default function WorkBreakdownStructurePage() {
   let customColumns: string[] = [];
   if (parsedPhases && parsedPhases.length > 0) {
     const colSet = new Set<string>();
-    const standardKeys = new Set(["id", "name", "quantity", "rate", "amount", "budget", "start_date", "end_date", "status", "cost_category", "sn", "displayName", "custom_values"]);
+    const standardKeys = new Set([
+      "id",
+      "name",
+      "quantity",
+      "qty",
+      "rate",
+      "amount",
+      "budget",
+      "total_amount",
+      "start_date",
+      "end_date",
+      "status",
+      "cost_category",
+      "sn",
+      "s/n",
+      "s_n",
+      "serial",
+      "serial_number",
+      "serial number",
+      "serial_no",
+      "serial no",
+      "phase",
+      "phase_name",
+      "phase_id",
+      "subphase",
+      "sub_phase",
+      "activity",
+      "activity_name",
+      "displayname",
+      "custom_values",
+    ]);
     parsedPhases.forEach((phase: any) => {
       if (phase.activities && Array.isArray(phase.activities)) {
         phase.activities.forEach((act: any) => {
-          Object.keys(act).forEach(key => {
-            if (!standardKeys.has(key)) {
+          Object.keys(act).forEach((key) => {
+            const lower = key.toLowerCase().trim();
+            if (!standardKeys.has(lower)) {
               colSet.add(key);
             }
           });
-          if (act.custom_values && typeof act.custom_values === 'object') {
-            Object.keys(act.custom_values).forEach(key => colSet.add(key));
+          if (act.custom_values && typeof act.custom_values === "object") {
+            Object.keys(act.custom_values).forEach((key) => {
+              const lower = key.toLowerCase().trim();
+              if (!standardKeys.has(lower)) {
+                colSet.add(key);
+              }
+            });
           }
         });
       }
@@ -202,7 +238,7 @@ export default function WorkBreakdownStructurePage() {
             <span className="text-sm font-medium text-green-500">Project Budget</span>
           </div>
           <div className="text-3xl font-semibold text-green-600">
-            N{projectBudget.toLocaleString()}
+            ₦{projectBudget.toLocaleString()}
           </div>
         </div>
 
@@ -211,117 +247,123 @@ export default function WorkBreakdownStructurePage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[25%]">WBS Elements</th>
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[20%]">Activities</th>
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[10%]">Quantity</th>
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[15%]">Rate</th>
-                <th className="py-3 px-4 font-medium text-sm text-gray-500 w-[15%]">Budget</th>
+                <th className="py-3 px-4 font-semibold text-sm text-gray-600 w-[80px] text-center">S/N</th>
+                <th className="py-3 px-4 font-semibold text-sm text-gray-600 min-w-[320px]">Activity</th>
+                <th className="py-3 px-4 font-semibold text-sm text-gray-600 w-[120px]">Quantity</th>
+                <th className="py-3 px-4 font-semibold text-sm text-gray-600 w-[140px]">Rate</th>
+                <th className="py-3 px-4 font-semibold text-sm text-gray-600 w-[160px]">Amount</th>
                 {customColumns.map(col => (
-                  <th key={col} className="py-3 px-4 font-medium text-sm text-gray-500 whitespace-nowrap">{col}</th>
+                  <th key={col} className="py-3 px-4 font-semibold text-sm text-gray-600 whitespace-nowrap">{col}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {groupedPhases.map((phase, pIndex) => {
-                const isExpanded = expandedPhases[phase.id] !== false; // default true
-                
-                return (
-                  <React.Fragment key={phase.id}>
-                    {/* Phase Row */}
-                    <tr 
-                      className="bg-[#EEF2FB] border-b border-white cursor-pointer hover:bg-[#e4ebf9] transition-colors"
-                      onClick={() => togglePhase(phase.id)}
-                    >
-                      <td className="py-3 px-4 text-sm font-medium text-gray-800 flex items-center gap-2">
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        {phase.name}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-600"></td>
-                      <td className="py-3 px-4 text-sm text-gray-600"></td>
-                      <td className="py-3 px-4 text-sm text-gray-600"></td>
-                      <td className="py-3 px-4 text-sm font-semibold text-gray-800">
-                        {phase.budget.toLocaleString()}
-                      </td>
-                      {customColumns.map(col => <td key={col} className="py-3 px-4"></td>)}
-                    </tr>
+              {(() => {
+                let serialCounter = 1;
+                return groupedPhases.map((phase, pIndex) => {
+                  const isExpanded = expandedPhases[phase.id] !== false; // default true
+                  
+                  return (
+                    <React.Fragment key={phase.id}>
+                      {/* Phase Row */}
+                      <tr 
+                        className="bg-[#EEF2FB] border-b border-white cursor-pointer hover:bg-[#e4ebf9] transition-colors"
+                        onClick={() => togglePhase(phase.id)}
+                      >
+                        <td colSpan={4} className="py-3 px-4 text-sm font-bold text-gray-800">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-[#3B7CED]" /> : <ChevronRight className="h-4 w-4 text-[#3B7CED]" />}
+                            <span className="text-[#3B7CED] text-sm font-bold uppercase tracking-wide">Phase:</span>
+                            <span className="font-bold text-base text-gray-900">{phase.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-base font-bold text-gray-900 bg-[#EEF2FB]">
+                          ₦{phase.budget.toLocaleString()}
+                        </td>
+                        {customColumns.map(col => <td key={col} className="py-3 px-4 bg-[#EEF2FB]"></td>)}
+                      </tr>
 
-                    {/* Phase Content */}
-                    {isExpanded && (
-                      <>
-                        {/* Direct Activities */}
-                        {phase.directActivities.map((act, aIndex) => (
-                          <tr key={`dir-${phase.id}-${act.id || aIndex}`} className="border-b border-gray-100">
-                            <td className="py-3 px-4 relative">
-                              <div className="absolute left-6 top-0 bottom-1/2 w-px bg-gray-300"></div>
-                              <div className="absolute left-6 top-1/2 w-4 h-px bg-gray-300"></div>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-gray-600">{act.displayName}</td>
-                            <td className="py-3 px-4 text-sm text-gray-600">{act.quantity || 1}</td>
-                            <td className="py-3 px-4 text-sm text-gray-600">{Number(act.rate || Number(act.amount || 0) / Number(act.quantity || 1) || 0).toLocaleString()}</td>
-                            <td className="py-3 px-4 text-sm text-gray-600">
-                              {Number(act.amount || 0).toLocaleString()}
-                            </td>
-                            {customColumns.map(col => (
-                              <td key={col} className="py-3 px-4 text-sm text-gray-600">{act[col] || act.custom_values?.[col] || ""}</td>
-                            ))}
-                          </tr>
-                        ))}
-
-                        {/* Subphases */}
-                        {phase.subphases.map((sub, sIndex) => {
-                          const subId = `${phase.id}-${sub.name}`;
-                          const isSubExpanded = expandedSubphases[subId] !== false; // default true
-
-                          return (
-                            <React.Fragment key={subId}>
-                              <tr 
-                                className="bg-[#EEF2FB] border-b border-white cursor-pointer hover:bg-[#e4ebf9] transition-colors"
-                                onClick={() => toggleSubphase(subId)}
-                              >
-                                <td className="py-3 px-4 text-sm font-medium text-gray-700 flex items-center pl-10 relative">
-                                  <div className="absolute left-6 top-0 bottom-1/2 w-px bg-gray-300"></div>
-                                  <div className="absolute left-6 top-1/2 w-4 h-px bg-gray-300"></div>
-                                  {isSubExpanded ? <ChevronDown className="h-4 w-4 mr-2 text-gray-500" /> : <ChevronRight className="h-4 w-4 mr-2 text-gray-500" />}
-                                  {sub.name}
+                      {/* Phase Content */}
+                      {isExpanded && (
+                        <>
+                          {/* Direct Activities */}
+                          {phase.directActivities.map((act, aIndex) => {
+                            const currentSn = serialCounter++;
+                            return (
+                              <tr key={`dir-${phase.id}-${act.id || aIndex}`} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                <td className="py-3 px-4 text-sm font-medium text-gray-500 text-center">
+                                  {currentSn}
                                 </td>
-                                <td className="py-3 px-4 text-sm text-gray-600"></td>
-                                <td className="py-3 px-4 text-sm text-gray-600"></td>
-                                <td className="py-3 px-4 text-sm text-gray-600"></td>
-                                <td className="py-3 px-4 text-sm font-semibold text-gray-700">
-                                  {sub.budget.toLocaleString()}
+                                <td className="py-3 px-4 text-sm font-medium text-gray-800">{act.displayName}</td>
+                                <td className="py-3 px-4 text-sm text-gray-600">{act.quantity || 1}</td>
+                                <td className="py-3 px-4 text-sm text-gray-600">₦{Number(act.rate || Number(act.amount || 0) / Number(act.quantity || 1) || 0).toLocaleString()}</td>
+                                <td className="py-3 px-4 text-sm font-medium text-gray-800">
+                                  ₦{Number(act.amount || 0).toLocaleString()}
                                 </td>
-                                {customColumns.map(col => <td key={col} className="py-3 px-4"></td>)}
+                                {customColumns.map(col => (
+                                  <td key={col} className="py-3 px-4 text-sm text-gray-600">{act[col] || act.custom_values?.[col] || ""}</td>
+                                ))}
                               </tr>
+                            );
+                          })}
 
-                              {isSubExpanded && sub.activities.map((act, saIndex) => (
-                                <tr key={`subact-${subId}-${act.id || saIndex}`} className="border-b border-gray-100">
-                                  <td className="py-3 px-4 relative">
-                                    <div className="absolute left-6 top-0 bottom-full w-px bg-gray-300"></div>
+                          {/* Subphases */}
+                          {phase.subphases.map((sub, sIndex) => {
+                            const subId = `${phase.id}-${sub.name}`;
+                            const isSubExpanded = expandedSubphases[subId] !== false; // default true
+
+                            return (
+                              <React.Fragment key={subId}>
+                                <tr 
+                                  className="bg-[#F4F7FC] border-b border-white cursor-pointer hover:bg-[#eef2f9] transition-colors"
+                                  onClick={() => toggleSubphase(subId)}
+                                >
+                                  <td colSpan={4} className="py-3 px-4 text-sm font-semibold text-gray-700">
+                                    <div className="flex items-center gap-2 pl-4">
+                                      {isSubExpanded ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+                                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wide">Sub Phase:</span>
+                                      <span className="font-semibold text-sm text-gray-800">{sub.name}</span>
+                                    </div>
                                   </td>
-                                  <td className="py-3 px-4 text-sm text-gray-600">{act.displayName}</td>
-                                  <td className="py-3 px-4 text-sm text-gray-600">{act.quantity || 1}</td>
-                                  <td className="py-3 px-4 text-sm text-gray-600">{Number(act.rate || Number(act.amount || 0) / Number(act.quantity || 1) || 0).toLocaleString()}</td>
-                                  <td className="py-3 px-4 text-sm text-gray-600">
-                                    {Number(act.amount || 0).toLocaleString()}
+                                  <td className="py-3 px-4 text-sm font-bold text-gray-800 bg-[#F4F7FC]">
+                                    ₦{sub.budget.toLocaleString()}
                                   </td>
-                                  {customColumns.map(col => (
-                                    <td key={col} className="py-3 px-4 text-sm text-gray-600">{act[col] || act.custom_values?.[col] || ""}</td>
-                                  ))}
+                                  {customColumns.map(col => <td key={col} className="py-3 px-4 bg-[#F4F7FC]"></td>)}
                                 </tr>
-                              ))}
-                            </React.Fragment>
-                          );
-                        })}
-                      </>
-                    )}
-                  </React.Fragment>
-                );
-              })}
+
+                                {isSubExpanded && sub.activities.map((act, saIndex) => {
+                                  const currentSn = serialCounter++;
+                                  return (
+                                    <tr key={`subact-${subId}-${act.id || saIndex}`} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                      <td className="py-3 px-4 text-sm font-medium text-gray-500 text-center">
+                                        {currentSn}
+                                      </td>
+                                      <td className="py-3 px-4 text-sm font-medium text-gray-800 pl-8">{act.displayName}</td>
+                                      <td className="py-3 px-4 text-sm text-gray-600">{act.quantity || 1}</td>
+                                      <td className="py-3 px-4 text-sm text-gray-600">₦{Number(act.rate || Number(act.amount || 0) / Number(act.quantity || 1) || 0).toLocaleString()}</td>
+                                      <td className="py-3 px-4 text-sm font-medium text-gray-800">
+                                        ₦{Number(act.amount || 0).toLocaleString()}
+                                      </td>
+                                      {customColumns.map(col => (
+                                        <td key={col} className="py-3 px-4 text-sm text-gray-600">{act[col] || act.custom_values?.[col] || ""}</td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                              </React.Fragment>
+                            );
+                          })}
+                        </>
+                      )}
+                    </React.Fragment>
+                  );
+                });
+              })()}
             </tbody>
             <tfoot>
               <tr>
                 <td colSpan={5 + customColumns.length} className="py-4 px-6 text-right font-medium text-gray-600">
-                  Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">{projectBudget.toLocaleString()}</span>
+                  Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">₦{projectBudget.toLocaleString()}</span>
                 </td>
               </tr>
             </tfoot>

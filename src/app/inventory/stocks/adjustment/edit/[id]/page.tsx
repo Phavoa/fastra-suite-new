@@ -67,8 +67,20 @@ export default function EditStockAdjustmentPage() {
   const [items, setItems] = useState<StockAdjustmentLineItem[]>([]);
 
   const { data: record, isLoading: isLoadingRecord } = useGetStockAdjustmentQuery(id);
-  const { data: locations = [], isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
-  const { data: products = [], isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+  const { data: rawLocations, isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
+  const { data: rawProducts, isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+
+  const locations = React.useMemo(() => {
+    return Array.isArray(rawLocations)
+      ? rawLocations
+      : (rawLocations as any)?.results || (rawLocations as any)?.data || [];
+  }, [rawLocations]);
+
+  const products = React.useMemo(() => {
+    return Array.isArray(rawProducts)
+      ? rawProducts
+      : (rawProducts as any)?.results || (rawProducts as any)?.data || [];
+  }, [rawProducts]);
   
   const [updateStockAdjustment] = useUpdateStockAdjustmentMutation();
   const [validateStockAdjustment] = useValidateStockAdjustmentMutation();
@@ -148,9 +160,9 @@ export default function EditStockAdjustmentPage() {
     }
   }, [record]);
 
-  const productOptions: Option[] = products.map((p) => ({
+  const productOptions: Option[] = products.map((p: any) => ({
     value: String(p.id),
-    label: `${p.product_name} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
+    label: `${p.product_name || p.name || `Product #${p.id}`} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
   }));
 
   const locationOptions: Option[] = locations.map((l: any) => ({
@@ -163,14 +175,14 @@ export default function EditStockAdjustmentPage() {
       setToastState({ show: true, message: "Product already selected.", type: "error" });
       return;
     }
-    const foundProduct = products.find((p) => String(p.id) === productId);
+    const foundProduct = products.find((p: any) => String(p.id) === productId);
     setItems((prev) =>
       prev.map((it) =>
         it.id === itemId
           ? {
               ...it,
               product: productId,
-              product_description: foundProduct?.description || "",
+              product_description: foundProduct?.description || foundProduct?.product_description || "",
               unit_of_measure: foundProduct?.unit_of_measure_details?.unit_symbol || "",
               current_quantity: "0",
               new_quantity: "0",

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Search, Hammer } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,20 +17,56 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { useGetMaterialConsumptionsQuery } from "@/api/requests/materialConsumptionRequestApi";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 const STATUS_TABS = [
-  { label: "All Requisitions", value: "all" },
-  { label: "Within Budget Queue", value: "normal" },
-  { label: "Overrun Queue (Action Req.)", value: "overrun" },
+  { label: "All Records", value: "all" },
+  { label: "Released", value: "released" },
+  { label: "Approved", value: "approved" },
+  { label: "Pending", value: "pending" },
+  { label: "Draft", value: "draft" },
 ];
-
-import { useRouter } from "next/navigation";
 
 const ITEMS_PER_PAGE = 10;
 
-export default function MaterialConsumptionApprovalsPage() {
+const getStatusBadge = (status: string, releaseStatus?: string) => {
+  const rel = (releaseStatus || "").toUpperCase();
+  const s = (status || "").toLowerCase().trim();
+
+  if (rel === "RELEASED" || s === "released") {
+    return {
+      label: "Released",
+      className: "bg-[#EAFDF0] text-[#2BA24D]",
+    };
+  }
+  if (s === "approved" || s === "validated") {
+    return {
+      label: "Approved",
+      className: "bg-[#DBEAFE] text-[#1D4ED8]",
+    };
+  }
+  if (s === "draft") {
+    return {
+      label: "Draft",
+      className: "bg-[#EEF4FF] text-[#1A73E8]",
+    };
+  }
+  if (s === "rejected") {
+    return {
+      label: "Rejected",
+      className: "bg-[#FCE8E6] text-[#E43D2B]",
+    };
+  }
+  return {
+    label: "Pending",
+    className: "bg-[#FFFDF0] text-[#F0B401]",
+  };
+};
+
+export default function MaterialConsumptionPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
@@ -43,8 +79,6 @@ export default function MaterialConsumptionApprovalsPage() {
     
     // Map API data to UI structure
     const mapped = rawList.map((req: any) => {
-      const isOverrun = req.status === "held_overrun" || req.status === "rejected";
-      
       let wbsActivity = "N/A";
       if (req.activity_details?.name) {
         wbsActivity = req.activity_details.name;
@@ -52,6 +86,20 @@ export default function MaterialConsumptionApprovalsPage() {
         wbsActivity = req.project_details.name;
       } else if (req.project) {
         wbsActivity = `Project #${req.project}`;
+      }
+
+      const rel = (req.release_status || "").toUpperCase();
+      const st = (req.status || "pending").toLowerCase();
+      let normalizedGroup = "pending";
+
+      if (rel === "RELEASED" || st === "released") {
+        normalizedGroup = "released";
+      } else if (st === "approved" || st === "validated") {
+        normalizedGroup = "approved";
+      } else if (st === "draft") {
+        normalizedGroup = "draft";
+      } else {
+        normalizedGroup = "pending";
       }
 
       return {
@@ -63,14 +111,13 @@ export default function MaterialConsumptionApprovalsPage() {
         numberOfItems: (req.lines ?? []).length,
         status: req.status || "pending",
         releaseStatus: req.release_status || "PENDING",
-        queue: isOverrun ? "overrun" : "normal",
-        isOverrun: isOverrun,
+        group: normalizedGroup,
       };
     });
 
     return mapped.filter((item: any) => {
       const matchesTab =
-        selectedTab === "all" || item.queue === selectedTab;
+        selectedTab === "all" || item.group === selectedTab;
 
       const lowerQuery = query.toLowerCase();
       const matchesSearch =
@@ -133,9 +180,9 @@ export default function MaterialConsumptionApprovalsPage() {
             {/* Top Bar: title + search + actions */}
             <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
               <div className="flex items-center gap-4">
-                <h2 className="text-xl font-semibold text-[#32325D] shrink-0">
-                  Material Consumption Approvals
-                </h2>
+                <h1 className="text-xl font-semibold text-[#32325D] shrink-0">
+                  Material Consumption
+                </h1>
                 <div className="relative w-[240px] md:w-[320px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -150,6 +197,13 @@ export default function MaterialConsumptionApprovalsPage() {
               </div>
 
               <div className="flex items-center gap-3 self-end sm:self-auto">
+                <PermissionGuard module="inventory" entitlement="add_materialconsumptionrequest">
+                  <Link href="/inventory/operation/material-consumption/new">
+                    <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
+                      <Plus className="w-4 h-4 mr-1.5" /> New Material Consumption
+                    </Button>
+                  </Link>
+                </PermissionGuard>
               </div>
             </div>
 
@@ -197,7 +251,7 @@ export default function MaterialConsumptionApprovalsPage() {
                       NUMBER OF ITEMS
                     </TableHead>
                     <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] text-center">
-                      RELEASE STATUS
+                      STATUS
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -226,56 +280,51 @@ export default function MaterialConsumptionApprovalsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedRequests.map((req: any) => (
-                      <TableRow
-                        key={req.id}
-                        className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/inventory/operation/material-consumption/${req.realId}`)}
-                      >
-                        <TableCell className="px-4 py-3.5 font-mono text-xs font-semibold">
-                          <Link
-                            href={`/inventory/operation/material-consumption/${req.realId}`}
-                            className="text-[#3B7CED] hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {req.id}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="px-4 py-3.5">
-                          <span className="text-[#32325D] text-sm font-medium">
-                            {req.wbsActivity}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-4 py-3.5">
-                          <span className="text-[#32325D] text-sm font-medium">
-                            {req.requester}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-4 py-3.5">
-                          <span className="text-[#525F7F] text-sm">
-                            {req.requestDate}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-4 py-3.5 text-center font-semibold text-[#32325D] text-sm">
-                          {req.numberOfItems}
-                        </TableCell>
-                        <TableCell className="px-4 py-3.5 text-center">
-                          <span
-                            className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize ${
-                              req.status === "draft"
-                                ? "bg-[#EEF4FF] text-[#3B7CED]"
-                                : req.isOverrun
-                                ? "bg-[#FCE8E6] text-[#E43D2B]"
-                                : req.status === "approved"
-                                ? "bg-[#EAFDF0] text-[#2BA24D]"
-                                : "bg-[#FFFDF0] text-[#F0B401]"
-                            }`}
-                          >
-                            {req.isOverrun ? "Held: Overrun" : req.status}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    paginatedRequests.map((req: any) => {
+                      const badge = getStatusBadge(req.status, req.releaseStatus);
+                      return (
+                        <TableRow
+                          key={req.id}
+                          className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
+                          onClick={() => router.push(`/inventory/operation/material-consumption/${req.realId}`)}
+                        >
+                          <TableCell className="px-4 py-3.5 text-sm font-semibold">
+                            <Link
+                              href={`/inventory/operation/material-consumption/${req.realId}`}
+                              className="text-[#3B7CED] hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {req.id}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5">
+                            <span className="text-[#32325D] text-sm font-medium">
+                              {req.wbsActivity}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5">
+                            <span className="text-[#32325D] text-sm font-medium">
+                              {req.requester}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5">
+                            <span className="text-[#525F7F] text-sm">
+                              {req.requestDate}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5 text-center font-semibold text-[#32325D] text-sm">
+                            {req.numberOfItems}
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5 text-center">
+                            <span
+                              className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize ${badge.className}`}
+                            >
+                              {badge.label}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

@@ -214,6 +214,18 @@ export default function CreateIncomingProductFromPOPage() {
       statusModal.showError("Validation Error", "Please enter at least one valid product line with received quantity > 0");
       return;
     }
+
+    for (const it of validItems) {
+      const exp = Number(it.po_quantity) || 0;
+      const rec = Number(it.received_quantity) || 0;
+      if (exp > 0 && rec > exp) {
+        statusModal.showError(
+          "Validation Error",
+          `Quantity received (${rec}) cannot exceed the expected quantity (${exp}) for "${it.product_name || 'selected item'}".`
+        );
+        return;
+      }
+    }
     
     setIsSubmitting(true);
     try {
@@ -253,6 +265,18 @@ export default function CreateIncomingProductFromPOPage() {
     if (validItems.length === 0) {
       statusModal.showError("Validation Error", "Please enter at least one valid product line with received quantity > 0");
       return;
+    }
+
+    for (const it of validItems) {
+      const exp = Number(it.po_quantity) || 0;
+      const rec = Number(it.received_quantity) || 0;
+      if (exp > 0 && rec > exp) {
+        statusModal.showError(
+          "Validation Error",
+          `Quantity received (${rec}) cannot exceed the expected quantity (${exp}) for "${it.product_name || 'selected item'}".`
+        );
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -401,7 +425,7 @@ export default function CreateIncomingProductFromPOPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
+                  <Label className="text-gray-700 font-medium">Vendor</Label>
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
                     {purchaseOrder?.vendor_details?.company_name || "N/A"}
                   </div>
@@ -444,10 +468,10 @@ export default function CreateIncomingProductFromPOPage() {
                         Unit
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Expected Qty (PO)
+                        Expected Quantity (PO)
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Received Qty
+                        Received Quantity
                       </TableHead>
                       <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                         Action

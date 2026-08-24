@@ -1,4 +1,4 @@
-export type StockAdjustmentStatus = "draft" | "done" | "unknown";
+export type StockAdjustmentStatus = "draft" | "done" | "validated" | "pending" | "unknown";
 
 export interface StatusInfo {
   label: string;
@@ -10,7 +10,7 @@ export interface StatusInfo {
 const mapLegacyStatus = (
   status: string | null | undefined,
 ): StockAdjustmentStatus => {
-  if (!status) return "unknown";
+  if (!status) return "draft";
 
   const s = status
     .toString()
@@ -22,10 +22,16 @@ const mapLegacyStatus = (
   // direct mappings and common legacy synonyms
   const mapping: Record<string, StockAdjustmentStatus> = {
     draft: "draft",
+    pending: "draft",
+    in_progress: "draft",
     done: "done",
+    validated: "done",
+    complete: "done",
+    completed: "done",
+    approved: "done",
   };
 
-  return mapping[s] ?? "unknown";
+  return mapping[s] ?? (s.includes("draft") ? "draft" : s.includes("done") || s.includes("valid") ? "done" : "draft");
 };
 
 export const getStatusInfo = (
@@ -40,17 +46,29 @@ export const getStatusInfo = (
       color: "text-[#3B7CED]",
       bgColor: "bg-[#3B7CED]",
     },
+    pending: {
+      label: "Pending",
+      description: "Pending",
+      color: "text-[#3B7CED]",
+      bgColor: "bg-[#3B7CED]",
+    },
     done: {
-      label: "Done",
-      description: "Completed",
+      label: "Validated",
+      description: "Validated",
+      color: "text-[#2BA24D]",
+      bgColor: "bg-[#2BA24D]",
+    },
+    validated: {
+      label: "Validated",
+      description: "Validated",
       color: "text-[#2BA24D]",
       bgColor: "bg-[#2BA24D]",
     },
     unknown: {
-      label: "Unknown",
-      description: "Unknown Status",
-      color: "text-gray-500",
-      bgColor: "bg-gray-500",
+      label: "Draft",
+      description: "Draft",
+      color: "text-[#3B7CED]",
+      bgColor: "bg-[#3B7CED]",
     },
   };
 

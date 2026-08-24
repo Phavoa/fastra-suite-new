@@ -60,7 +60,7 @@ const getProjectBudget = (project: any) => {
     typeof amount === "string"
       ? parseFloat(amount.replace(/[^0-9.-]+/g, ""))
       : Number(amount);
-  return `N${(isNaN(num) ? 0 : num).toLocaleString("en-US", {
+  return `₦${(isNaN(num) ? 0 : num).toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;

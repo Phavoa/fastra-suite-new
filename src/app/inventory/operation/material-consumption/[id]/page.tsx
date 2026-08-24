@@ -336,11 +336,6 @@ export default function MaterialConsumptionDetailPage() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="px-6 py-3 text-right">
-                          <span className="font-mono text-sm text-[#525F7F]">
-                            ₦{(item.requestedQty * item.unitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </span>
-                        </TableCell>
                       </TableRow>
                     );
                   })}

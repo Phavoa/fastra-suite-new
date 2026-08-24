@@ -121,22 +121,29 @@ export default function NewProjectPage() {
           return;
         }
 
-        // Identify extra columns
-        const mandatoryLower = new Set(mandatory);
-        const extraCols = headers.filter(
-          (h) => h && !mandatoryLower.has(h.toLowerCase())
-        );
+        // Identify extra columns (exclude all standard columns including serial number variations)
+        const isSnCol = (h: string) => ["s/n", "sn", "serial", "serial number", "serial_number", "serial no", "serial_no"].includes(h.toLowerCase().trim());
+        const isPhaseCol = (h: string) => ["phase", "phase name", "phase_name"].includes(h.toLowerCase().trim());
+        const isActivityCol = (h: string) => ["activity", "activity name", "activity_name", "name"].includes(h.toLowerCase().trim());
+        const isQuantityCol = (h: string) => ["quantity", "qty"].includes(h.toLowerCase().trim());
+        const isRateCol = (h: string) => ["rate", "unit rate", "unit_rate"].includes(h.toLowerCase().trim());
+        const isAmountCol = (h: string) => ["amount", "budget", "total amount", "total_amount"].includes(h.toLowerCase().trim());
+
+        const isStandardCol = (h: string) =>
+          isSnCol(h) || isPhaseCol(h) || isActivityCol(h) || isQuantityCol(h) || isRateCol(h) || isAmountCol(h);
+
+        const extraCols = headers.filter((h) => h && !isStandardCol(h));
         setExtraColumns(extraCols);
 
         // Map column header name to matching state keys
         const headerToKey = (headerName: string) => {
-          const lower = headerName.toLowerCase();
-          if (lower === "s/n") return "sn";
-          if (lower === "phase") return "phase";
-          if (lower === "activity") return "name";
-          if (lower === "quantity") return "quantity";
-          if (lower === "rate") return "rate";
-          if (lower === "amount") return "budget";
+          const lower = headerName.toLowerCase().trim();
+          if (isSnCol(lower)) return "sn";
+          if (isPhaseCol(lower)) return "phase";
+          if (isActivityCol(lower)) return "name";
+          if (isQuantityCol(lower)) return "quantity";
+          if (isRateCol(lower)) return "rate";
+          if (isAmountCol(lower)) return "budget";
           return headerName; // custom column name
         };
 

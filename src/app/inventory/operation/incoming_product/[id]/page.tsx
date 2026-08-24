@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
-import { useParams } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -11,30 +13,53 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, RotateCcw, Package } from "lucide-react";
+import { RotateCcw, Package, Loader2, Check, XCircle } from "lucide-react";
 import Link from "next/link";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { AutoSaveIcon } from "@/components/shared/icons";
 import { BreadcrumbItem } from "@/types/purchase";
 
-import { useGetIncomingProductQuery, useValidateIncomingProductReceiptMutation } from "@/api/inventory/incomingProductApi";
-import { Loader2, Check } from "lucide-react";
+import {
+  useGetIncomingProductQuery,
+  useValidateIncomingProductReceiptMutation,
+  useUpdateIncomingProductMutation,
+  usePatchIncomingProductMutation,
+  useDeleteIncomingProductMutation,
+} from "@/api/inventory/incomingProductApi";
 import StatusModal, { useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
 import { DiscrepancyDialog, type DiscrepancyType } from "@/components/shared/DiscrepancyDialog";
 
+interface LineItemState {
+  id: string;
+  product: number;
+  product_name: string;
+  unit_symbol: string;
+  expected_quantity: string;
+  received_quantity: string;
+}
+
 export default function IncomingProductDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = (params?.id as string) || "";
+  const decodedId = decodeURIComponent(id);
 
   const { data: incomingProduct, isLoading, error, refetch } = useGetIncomingProductQuery(id, { skip: !id });
   const [validateIncomingProduct] = useValidateIncomingProductReceiptMutation();
-  const [isValidating, setIsValidating] = React.useState(false);
-  
-  const [discrepancyState, setDiscrepancyState] = React.useState<{
+  const [updateIncomingProduct] = useUpdateIncomingProductMutation();
+  const [patchIncomingProduct] = usePatchIncomingProductMutation();
+  const [deleteIncomingProduct] = useDeleteIncomingProductMutation();
+
+  const [isValidating, setIsValidating] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [items, setItems] = useState<LineItemState[]>([]);
+  const [notes, setNotes] = useState<string>("");
+
+  const [discrepancyState, setDiscrepancyState] = useState<{
     isOpen: boolean;
     type: DiscrepancyType | null;
     ipId: string | null;
@@ -46,19 +71,81 @@ export default function IncomingProductDetailPage() {
 
   const statusModal = useStatusModal();
 
+  useEffect(() => {
+    if (incomingProduct) {
+      setNotes(incomingProduct.notes || "");
+      if (incomingProduct.incoming_product_items) {
+        setItems(
+          incomingProduct.incoming_product_items.map((item, index) => ({
+            id: item.id?.toString() || index.toString(),
+            product: typeof item.product === "number" ? item.product : Number(item.product) || 0,
+            product_name: item.product_details?.product_name || (item as any).product_name || `Product ${item.product}`,
+            unit_symbol: item.product_details?.unit_of_measure_details?.unit_symbol || "Units",
+            expected_quantity: item.expected_quantity?.toString() || "0",
+            received_quantity: item.quantity_received?.toString() || "0",
+          }))
+        );
+      }
+    }
+  }, [incomingProduct]);
+
+  const updateItemReceivedQty = (itemId: string, val: string) => {
+    setItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, received_quantity: val } : it))
+    );
+  };
+
   const handleValidate = async () => {
+    const hasEmptyQty = items.some(
+      (it) => it.received_quantity === "" || it.received_quantity === undefined || it.received_quantity === null
+    );
+    if (hasEmptyQty || items.length === 0) {
+      statusModal.showError(
+        "Validation Error",
+        "Please enter a valid quantity received for every product line."
+      );
+      return;
+    }
+
+    for (const it of items) {
+      const exp = Number(it.expected_quantity) || 0;
+      const rec = Number(it.received_quantity) || 0;
+      if (exp > 0 && rec > exp) {
+        statusModal.showError(
+          "Validation Error",
+          `Quantity received (${rec}) cannot exceed the expected quantity (${exp}) for "${it.product_name}".`
+        );
+        return;
+      }
+    }
+
     setIsValidating(true);
+    statusModal.showInfo("Validating...", "Please wait while we validate the receipt.");
     try {
+      await updateIncomingProduct({
+        id,
+        data: {
+          notes,
+          incoming_product_items: items.map((it) => ({
+            id: it.id,
+            product: it.product,
+            expected_quantity: it.expected_quantity,
+            quantity_received: it.received_quantity,
+          })),
+        },
+      }).unwrap();
+
       await validateIncomingProduct({ id }).unwrap();
       statusModal.showSuccess(
-        "GRN Validated",
-        "Stock received into Inventory Ledger."
+        "Receipt Validated",
+        "Stock on hand has been updated by confirmed received quantities."
       );
       refetch();
     } catch (err: any) {
-      const isBackorderError = err?.data?.requires_backorder_confirmation || 
-                               err?.data?.error?.[0]?.error === "Short quantity detected. Please confirm backorder creation." ||
-                               err?.data?.error?.[0]?.requires_backorder_confirmation === true;
+      const isBackorderError =
+        err?.data?.requires_backorder_confirmation ||
+        err?.data?.error?.[0]?.error === "Short quantity detected. Please confirm backorder creation." ||
+        err?.data?.error?.[0]?.requires_backorder_confirmation === true;
 
       if (isBackorderError) {
         statusModal.close();
@@ -70,12 +157,57 @@ export default function IncomingProductDetailPage() {
       } else {
         statusModal.showError(
           "Validation Failed",
-          extractErrorMessage(err, "Failed to validate GRN.")
+          extractErrorMessage(err, "Failed to validate receipt.")
         );
       }
     } finally {
       setIsValidating(false);
     }
+  };
+
+  const handleCancelReceipt = () => {
+    statusModal.showConfirm(
+      "Cancel Incoming Product Receipt",
+      "Are you sure you want to cancel this incoming product receipt? Stock on hand will not be affected.",
+      async () => {
+        setIsCancelling(true);
+        statusModal.showInfo("Cancelling...", "Please wait while the receipt is being cancelled.");
+        try {
+          await patchIncomingProduct({
+            id,
+            data: { status: "canceled" },
+          }).unwrap();
+          statusModal.showSuccess(
+            "Receipt Cancelled",
+            "The incoming product receipt has been cancelled.",
+            "Go to Operations",
+            () => router.push("/inventory/operation")
+          );
+          refetch();
+        } catch (err: any) {
+          try {
+            await deleteIncomingProduct(id).unwrap();
+            statusModal.showSuccess(
+              "Receipt Cancelled",
+              "The incoming product receipt has been cancelled.",
+              "Go to Operations",
+              () => router.push("/inventory/operation")
+            );
+            refetch();
+          } catch (err2: any) {
+            statusModal.showError(
+              "Cancellation Failed",
+              extractErrorMessage(err, "Failed to cancel receipt.")
+            );
+          }
+        } finally {
+          setIsCancelling(false);
+        }
+      },
+      "Yes, Cancel Receipt",
+      "Keep Receipt",
+      "destructive"
+    );
   };
 
   const handleCreateBackorder = async () => {
@@ -91,7 +223,7 @@ export default function IncomingProductDetailPage() {
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
       statusModal.showSuccess(
         "Backorder Created",
-        "GRN Validated & Backorder created for remaining pending balance!"
+        "Receipt validated & backorder created for remaining pending balance!"
       );
       refetch();
     } catch (error: any) {
@@ -117,7 +249,7 @@ export default function IncomingProductDetailPage() {
       setDiscrepancyState({ isOpen: false, type: null, ipId: null });
       statusModal.showSuccess(
         "Delivery Closed",
-        "GRN Validated! PO closed without backorder."
+        "Receipt validated! Delivery closed without backorder."
       );
       refetch();
     } catch (error: any) {
@@ -130,11 +262,13 @@ export default function IncomingProductDetailPage() {
     }
   };
 
+  const receiptCode = incomingProduct?.incoming_product_id || decodedId;
+
   const breadcrumbsItem: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
     { label: "Inventory", href: "/inventory" },
     { label: "Operation", href: "/inventory/operation" },
-    { label: `Receipt ${id}`, href: `/inventory/operation/incoming_product/${id}`, current: true },
+    { label: `Receipt ${receiptCode}`, href: `/inventory/operation/incoming_product/${encodeURIComponent(decodedId)}`, current: true },
   ];
 
   if (isLoading) {
@@ -180,22 +314,18 @@ export default function IncomingProductDetailPage() {
   }
 
   const displayData = {
-    incoming_product_id: incomingProduct.incoming_product_id,
+    incoming_product_id: receiptCode,
     receipt_type: incomingProduct.receipt_type || "vendor_receipt",
     status: incomingProduct.status || "draft",
-    related_po: incomingProduct.related_po || incomingProduct.related_ppo_details?.po_number || "N/A",
+    related_po:
+      incomingProduct.related_po ||
+      incomingProduct.related_ppo_details?.po_number ||
+      (incomingProduct.related_ppo ? `PO-${incomingProduct.related_ppo}` : "N/A"),
     created_at: incomingProduct.date_created ? new Date(incomingProduct.date_created).toLocaleString() : "N/A",
-    supplier_name: incomingProduct.supplier_details?.vendor_name || incomingProduct.supplier_details?.company_name || "Unknown Supplier",
+    supplier_name: incomingProduct.supplier_details?.vendor_name || incomingProduct.supplier_details?.company_name || "Unknown Vendor",
     destination_location: incomingProduct.destination_location_details?.location_name || incomingProduct.destination_location || "Unknown Location",
     has_backorder: incomingProduct.is_backorder || !!incomingProduct.backorder_of,
     backorder_id: incomingProduct.backorder_of_details?.incoming_product_id || incomingProduct.backorder_of,
-    items: incomingProduct.incoming_product_items?.map((item, index) => ({
-      id: item.id?.toString() || index.toString(),
-      product_name: item.product_details?.product_name || `Product ${item.product}`,
-      unit_symbol: item.product_details?.unit_of_measure_details?.unit_symbol || "Units",
-      expected_quantity: item.expected_quantity,
-      received_quantity: item.quantity_received,
-    })) || [],
   };
 
   return (
@@ -206,23 +336,23 @@ export default function IncomingProductDetailPage() {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className="flex flex-col flex-1 min-h-[calc(100vh-64px)] bg-[#F6F9FC] relative pb-20"
       >
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        type={statusModal.type}
-        title={statusModal.title}
-        message={statusModal.message}
-        actionText={statusModal.actionText}
-        onAction={statusModal.onAction}
-        onClose={statusModal.close}
-      />
-      <DiscrepancyDialog
-        isOpen={discrepancyState.isOpen}
-        type={discrepancyState.type}
-        onClose={() => setDiscrepancyState({ isOpen: false, type: null, ipId: null })}
-        onConfirm={handleCreateBackorder}
-        onDecline={handleCloseWithoutBackorder}
-      />
-      
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText}
+          onAction={statusModal.onAction}
+          onClose={statusModal.close}
+        />
+        <DiscrepancyDialog
+          isOpen={discrepancyState.isOpen}
+          type={discrepancyState.type}
+          onClose={() => setDiscrepancyState({ isOpen: false, type: null, ipId: null })}
+          onConfirm={handleCreateBackorder}
+          onDecline={handleCloseWithoutBackorder}
+        />
+        
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6">
           {/* Breadcrumbs */}
           <Breadcrumbs
@@ -252,12 +382,12 @@ export default function IncomingProductDetailPage() {
                     className={`inline-block px-3 py-1 text-xs rounded-full font-semibold capitalize ${
                       displayData.status === "validated"
                         ? "bg-[#E2F2E9] text-[#2BA24D]"
-                        : displayData.status === "canceled"
+                        : displayData.status === "canceled" || displayData.status === "cancelled"
                         ? "bg-[#FCE8E6] text-[#C5221F]"
                         : "bg-[#E8F0FE] text-[#1A73E8]"
                     }`}
                   >
-                    {displayData.status}
+                    {displayData.status === "canceled" ? "Cancelled" : displayData.status}
                   </span>
                   {displayData.has_backorder && displayData.backorder_id && (
                     <span className="inline-block px-3 py-1 text-xs rounded-full font-semibold bg-amber-100 text-amber-800">
@@ -266,8 +396,7 @@ export default function IncomingProductDetailPage() {
                   )}
                 </div>
                 <p className="text-xs text-[#8898AA] mt-1">
-                  Created on {displayData.created_at} • Source PO:{" "}
-                  <strong className="text-[#3B7CED]">{displayData.related_po}</strong>
+                  Created on {displayData.created_at}
                 </p>
               </div>
             </div>
@@ -276,27 +405,31 @@ export default function IncomingProductDetailPage() {
               {displayData.status === "draft" && (
                 <>
                   <PermissionGuard module="inventory" entitlement="change_incomingproduct">
-                    <Link href={`/inventory/operation/incoming_product/edit/${encodeURIComponent(decodeURIComponent(id))}`}>
-                      <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
-                        <Edit className="w-4 h-4 mr-1.5" /> Edit
-                      </Button>
-                    </Link>
+                    <Button 
+                      variant="outline"
+                      onClick={handleCancelReceipt}
+                      disabled={isValidating || isCancelling}
+                      className="border-red-200 text-[#E43D2B] hover:bg-red-50 h-9 px-4 rounded-md font-medium text-sm transition-all cursor-pointer"
+                    >
+                      {isCancelling ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <XCircle className="w-4 h-4 mr-1.5" />}
+                      Cancel
+                    </Button>
                   </PermissionGuard>
                   <PermissionGuard module="inventory" entitlement="change_incomingproduct">
                     <Button 
                       onClick={handleValidate} 
-                      disabled={isValidating}
-                      className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all"
+                      disabled={isValidating || isCancelling}
+                      className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-5 rounded-md font-medium text-sm shadow-2xs transition-all cursor-pointer"
                     >
                       {isValidating ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Check className="w-4 h-4 mr-1.5" />}
-                      Confirm Quantities
+                      Validate
                     </Button>
                   </PermissionGuard>
                 </>
               )}
               {displayData.status === "validated" && (
                 <PermissionGuard module="inventory" entitlement="add_returnincomingproduct">
-                  <Link href={`/inventory/operation/supplier_return/new?receiptId=${encodeURIComponent(decodeURIComponent(id))}`}>
+                  <Link href={`/inventory/operation/supplier_return/new?receiptId=${encodeURIComponent(decodedId)}`}>
                     <Button variant="outline" className="border-red-300 text-[#E43D2B] hover:bg-red-50 h-9 px-4 rounded-md font-medium text-sm transition-all">
                       <RotateCcw className="w-4 h-4 mr-1.5" /> Return to Supplier
                     </Button>
@@ -330,7 +463,7 @@ export default function IncomingProductDetailPage() {
               </div>
               <div>
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
-                  Source Document (PO)
+                  Purchase Order
                 </span>
                 <span className="text-[#3B7CED] font-semibold text-sm">
                   {displayData.related_po}
@@ -338,7 +471,7 @@ export default function IncomingProductDetailPage() {
               </div>
               <div>
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
-                  Supplier / Vendor
+                  Vendor
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
                   {displayData.supplier_name}
@@ -357,10 +490,15 @@ export default function IncomingProductDetailPage() {
 
           {/* Line Items Table Card */}
           <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
-            <div className="p-5 border-b border-gray-100">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-base font-semibold text-[#32325D]">
                 Product Lines
               </h2>
+              {displayData.status === "draft" && (
+                <span className="text-xs text-[#8898AA]">
+                  Enter the actual quantities received below before validating
+                </span>
+              )}
             </div>
             <div className="overflow-x-auto">
               <Table>
@@ -381,7 +519,7 @@ export default function IncomingProductDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayData.items.map((item) => (
+                  {items.map((item) => (
                     <TableRow
                       key={item.id}
                       className="hover:bg-gray-50/50 border-b border-[#E9ECEF] transition-colors"
@@ -395,14 +533,46 @@ export default function IncomingProductDetailPage() {
                       <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap text-center">
                         {item.expected_quantity}
                       </TableCell>
-                      <TableCell className="text-[#32325D] font-semibold text-sm py-3.5 px-6 whitespace-nowrap text-center">
-                        {item.received_quantity}
+                      <TableCell className="text-center py-2 px-6">
+                        {displayData.status === "draft" ? (
+                          <Input
+                            type="number"
+                            value={item.received_quantity}
+                            onChange={(e) => updateItemReceivedQty(item.id, e.target.value)}
+                            min="0"
+                            className="h-9 w-28 text-center mx-auto bg-white border-gray-200 focus:ring-[#3B7CED] font-medium"
+                          />
+                        ) : (
+                          <span className="text-[#32325D] font-semibold text-sm">
+                            {item.received_quantity}
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
+          </div>
+
+          {/* Comments & Delivery Notes Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6">
+            <h2 className="text-base font-semibold text-[#32325D] mb-3">
+              Comments & Delivery Notes
+            </h2>
+            {displayData.status === "draft" ? (
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Enter delivery note, inspection comments, or remarks..."
+                className="bg-white border-gray-200 rounded-md text-sm text-[#32325D] focus:ring-[#3B7CED] min-h-[80px]"
+                rows={3}
+              />
+            ) : (
+              <div className="text-sm text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-100 min-h-[50px]">
+                {notes || "No comments recorded."}
+              </div>
+            )}
           </div>
         </main>
       </motion.div>

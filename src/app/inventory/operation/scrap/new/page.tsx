@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +19,10 @@ import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { useGetLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 import { useCreateScrapMutation } from "@/api/inventory/scrapApi";
+import {
+  useGetStockLocationsQuery,
+  useGetStockLocationsByLocationQuery,
+} from "@/api/inventory/stockLocationApi";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -53,14 +57,12 @@ const scrapSchema = z.object({
   adjustment_type: z.enum(["DAMAGE", "LOSS"], {
     message: "Cause is required",
   }),
-  project: z.string().min(1, "Project is required"),
+  project: z.string().optional(),
   location: z.string().min(1, "Location is required"),
   notes: z.string().optional(),
 });
 
 type ScrapFormData = z.infer<typeof scrapSchema>;
-
-
 
 export default function CreateScrapPage() {
   const router = useRouter();
@@ -113,13 +115,39 @@ export default function CreateScrapPage() {
       },
     ]);
 
-  const removeRow = (id: string) =>
-    setItems((prev) => prev.filter((p) => p.id !== id));
+  const removeRow = (id: string) => {
+    if (items.length > 1) {
+      setItems((prev) => prev.filter((p) => p.id !== id));
+    }
+  };
 
   const [createScrap] = useCreateScrapMutation();
-  const { data: projects = [], isLoading: isLoadingProjects } = useGetProjectCostingProjectsQuery({ status: "ACTIVE" });
-  const { data: locations = [], isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
-  const { data: products = [], isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+  const { data: rawProjects, isLoading: isLoadingProjects } = useGetProjectCostingProjectsQuery({});
+  const { data: rawLocations, isLoading: isLoadingLocations } = useGetLocationsQuery({});
+  const { data: rawProducts, isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+
+  // Safely extract arrays from paginated API responses
+  const projects = useMemo(() => {
+    const list = Array.isArray(rawProjects)
+      ? rawProjects
+      : (rawProjects as any)?.results || (rawProjects as any)?.data || [];
+    return list.filter((p: any) => {
+      const st = String(p.status || "").toUpperCase();
+      return st === "APPROVED" || st === "ACTIVE" || p.is_approved === true || !p.status;
+    });
+  }, [rawProjects]);
+
+  const locations = useMemo(() => {
+    return Array.isArray(rawLocations)
+      ? rawLocations
+      : (rawLocations as any)?.results || (rawLocations as any)?.data || [];
+  }, [rawLocations]);
+
+  const products = useMemo(() => {
+    return Array.isArray(rawProducts)
+      ? rawProducts
+      : (rawProducts as any)?.results || (rawProducts as any)?.data || [];
+  }, [rawProducts]);
 
   const {
     register,
@@ -136,36 +164,102 @@ export default function CreateScrapPage() {
     },
   });
 
-  const productOptions: Option[] = products.map((p) => ({
-    value: String(p.id),
-    label: `${p.product_name} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
-  }));
+  const selectedLocation = watch("location");
+  const { data: rawStockLevels } = useGetStockLocationsByLocationQuery(selectedLocation, {
+    skip: !selectedLocation,
+  });
+  const { data: rawStockLocationsList } = useGetStockLocationsQuery(
+    selectedLocation ? { location__id: selectedLocation } : undefined,
+    { skip: !selectedLocation }
+  );
 
-  const projectOptions: Option[] = projects.map((p: any) => ({
-    value: String(p.id),
-    label: p.name || p.project_code || `Project #${p.id}`,
-  }));
+  // Map product stock by product id for the selected location
+  const stockByProductId = useMemo(() => {
+    const rawList = [
+      ...(Array.isArray(rawStockLevels) ? rawStockLevels : (rawStockLevels as any)?.results || (rawStockLevels as any)?.data || []),
+      ...(Array.isArray(rawStockLocationsList) ? rawStockLocationsList : (rawStockLocationsList as any)?.results || (rawStockLocationsList as any)?.data || []),
+    ];
+    const map: Record<string, string> = {};
+    rawList.forEach((item: any) => {
+      const pId = String(item.product?.id || item.product_id || item.product || item.id || "");
+      if (pId && item.quantity !== undefined) {
+        map[pId] = String(item.quantity ?? item.current_stock ?? item.available_quantity ?? "0");
+      }
+    });
+    return map;
+  }, [rawStockLevels, rawStockLocationsList]);
 
-  const locationOptions: Option[] = locations.map((l: any) => ({
-    value: String(l.id),
-    label: l.location_name || l.location_code || `Location #${l.id}`,
-  }));
+  // Keep line items current stock in sync if location or stockByProductId changes
+  useEffect(() => {
+    if (!selectedLocation) return;
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!it.product) return it;
+        const stock = stockByProductId[it.product] ?? "0";
+        return { ...it, current_quantity: stock };
+      })
+    );
+  }, [stockByProductId, selectedLocation]);
+
+  const productOptions: Option[] = useMemo(() => {
+    return products.map((p: any) => {
+      const uom =
+        p.unit_of_measure_details?.unit_symbol ||
+        p.unit_of_measure_details?.unit_name ||
+        p.unit_of_measure?.unit_symbol ||
+        "Unit";
+      const stock = stockByProductId[String(p.id)];
+      const stockLabel = stock !== undefined ? ` • ${stock} in stock` : "";
+      return {
+        value: String(p.id),
+        label: `${p.product_name || p.name || `Product #${p.id}`} (${uom})${stockLabel}`,
+      };
+    });
+  }, [products, stockByProductId]);
+
+  const projectOptions: Option[] = useMemo(() => {
+    return projects.map((p: any) => ({
+      value: String(p.id),
+      label: p.name || p.project_name || p.project_code || `Project #${p.id}`,
+    }));
+  }, [projects]);
+
+  const locationOptions: Option[] = useMemo(() => {
+    return locations.map((l: any) => ({
+      value: String(l.id),
+      label: l.location_name || l.location_code || `Location #${l.id}`,
+    }));
+  }, [locations]);
 
   const updateItemWithProductDetails = (id: string, productId: string) => {
     if (items.some((it) => it.id !== id && it.product === productId)) {
       setToastState({ show: true, message: "Product already selected.", type: "error" });
       return;
     }
-    const p = products.find((item) => String(item.id) === productId);
+    const p = products.find((item: any) => String(item.id) === productId);
+    const stockVal =
+      stockByProductId[productId] ??
+      p?.available_product_quantity ??
+      p?.available_stock ??
+      p?.stock_quantity ??
+      p?.current_stock ??
+      p?.quantity ??
+      "0";
+    const uomVal =
+      p?.unit_of_measure_details?.unit_symbol ||
+      p?.unit_of_measure_details?.unit_name ||
+      p?.unit_of_measure?.unit_symbol ||
+      "Units";
+
     setItems((prev) =>
       prev.map((it) =>
         it.id === id
           ? {
               ...it,
               product: productId,
-              product_description: p?.description || "",
-              unit_of_measure: p?.unit_of_measure_details?.unit_symbol || "",
-              current_quantity: "0",
+              product_description: p?.description || p?.product_description || "",
+              unit_of_measure: uomVal,
+              current_quantity: String(stockVal),
             }
           : it,
       ),
@@ -173,7 +267,7 @@ export default function CreateScrapPage() {
   };
 
   const updateScrapQty = (id: string, qty: string) => {
-    if (qty.startsWith('-') || Number(qty) < 0) {
+    if (qty.startsWith("-") || Number(qty) < 0) {
       setToastState({ show: true, message: "Quantity cannot be negative.", type: "error" });
       return;
     }
@@ -191,7 +285,7 @@ export default function CreateScrapPage() {
     if (validItems.length === 0) {
       setToastState({
         message:
-          "Please add at least one valid item with product and scrap quantity greater than 0",
+          "Please add at least one valid item with a selected product and scrap quantity greater than 0",
         type: "error",
         show: true,
       });
@@ -200,16 +294,27 @@ export default function CreateScrapPage() {
 
     setIsSubmitting(true);
     try {
-      await createScrap({
-        cause: data.adjustment_type as any,
+      const payload: any = {
+        cause: data.adjustment_type,
+        adjustment_type: data.adjustment_type,
         warehouse_location: data.location,
-        project: data.project,
-        notes: data.notes,
-        items: validItems.map(item => ({
-          product: Number(item.product) || 1, // backend requires number
+        warehouse_location_id: data.location,
+        notes: data.notes || "",
+        items: validItems.map((item) => ({
+          product: Number(item.product) || item.product,
           scrap_quantity: item.scrap_quantity,
         })),
-      }).unwrap();
+        scrap_items: validItems.map((item) => ({
+          product: Number(item.product) || item.product,
+          scrap_quantity: item.scrap_quantity,
+        })),
+      };
+
+      if (data.project) {
+        payload.project = isNaN(Number(data.project)) ? data.project : Number(data.project);
+      }
+
+      await createScrap(payload).unwrap();
       
       setModalState({
         isOpen: true,
@@ -253,8 +358,6 @@ export default function CreateScrapPage() {
       current: true,
     },
   ];
-
-
 
   return (
     <PageGuard module="inventory" entitlement="add_scrap">
@@ -305,7 +408,7 @@ export default function CreateScrapPage() {
                   <Select
                     value={watch("adjustment_type")}
                     onValueChange={(value) =>
-                      setValue("adjustment_type", value as any)
+                      setValue("adjustment_type", value as any, { shouldValidate: true })
                     }
                   >
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
@@ -325,44 +428,16 @@ export default function CreateScrapPage() {
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Project <span className="text-[#E43D2B]">*</span>
-                  </Label>
-                  <Select
-                    value={watch("project")}
-                    onValueChange={(value) =>
-                      setValue("project", value)
-                    }
-                  >
-                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                      <SelectValue placeholder={isLoadingProjects ? "Loading..." : "Select project"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projectOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.project && (
-                    <p className="text-[11px] text-[#E43D2B]">
-                      {errors.project.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label className="text-xs font-semibold text-[#525F7F]">
                     Location <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("location")}
                     onValueChange={(value) =>
-                      setValue("location", value)
+                      setValue("location", value, { shouldValidate: true })
                     }
                   >
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                      <SelectValue placeholder={isLoadingLocations ? "Loading..." : "Select location"} />
+                      <SelectValue placeholder={isLoadingLocations ? "Loading locations..." : "Select location"} />
                     </SelectTrigger>
                     <SelectContent>
                       {locationOptions.map((option) => (
@@ -379,9 +454,37 @@ export default function CreateScrapPage() {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-2 sm:col-span-1">
+                <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Notes
+                    Project (Optional)
+                  </Label>
+                  <Select
+                    value={watch("project") || ""}
+                    onValueChange={(value) =>
+                      setValue("project", value, { shouldValidate: true })
+                    }
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder={isLoadingProjects ? "Loading projects..." : "Select project (optional)"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.project && (
+                    <p className="text-[11px] text-[#E43D2B]">
+                      {errors.project.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2 sm:col-span-3">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Notes / Reason
                   </Label>
                   <Input
                     {...register("notes")}
@@ -441,7 +544,7 @@ export default function CreateScrapPage() {
                               }
                             >
                               <SelectTrigger className="h-11 w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0 px-4">
-                                <SelectValue placeholder={isLoadingProducts ? "Loading..." : "Select product"} />
+                                <SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select product"} />
                               </SelectTrigger>
                               <SelectContent>
                                 {productOptions.map((option) => (
