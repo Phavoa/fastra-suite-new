@@ -7,7 +7,6 @@ import { useGetApprovedProjectRequestsQuery } from "@/api/invoice/approvedProjec
 import { useConvertRequestToPurchaseOrderMutation } from "@/api/invoice/projectPurchaseOrdersApi";
 import ConvertToPOModal from "@/components/invoice/ConvertToPOModal";
 import ConvertToPOSubcontractorModal from "@/components/invoice/subcontractor/ConvertToPOSubcontractorModal";
-import ConvertToInvoiceLabourModal from "@/components/invoice/labour-request/ConvertToInvoiceLabourReqModal";
 import CreateVendorBillLabourModal from "@/components/invoice/labour-request/CreateVendorBillLabourReqModal";
 import CreateDisbursementModal from "@/components/invoice/petty-cash/CreateDisbursementModal";
 import ConvertToPOPlantEquipmentModal from "@/components/invoice/plant-and-equipment/ConvertToPOPlantEquipmentModal";
@@ -124,8 +123,6 @@ export default function ApprovedRequestsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubcontractorModalOpen, setIsSubcontractorModalOpen] =
-    useState(false);
-  const [isLabourInvoiceModalOpen, setIsLabourInvoiceModalOpen] =
     useState(false);
   const [isLabourCreateBillModalOpen, setIsLabourCreateBillModalOpen] =
     useState(false);
@@ -272,40 +269,12 @@ export default function ApprovedRequestsPage() {
   // ---------- Labour (PRD 9.3.1) ----------
   const handleConvertToLabourInvoice = (request: any) => {
     setSelectedRequest(request);
-    setIsLabourInvoiceModalOpen(true);
-  };
-
-  const handleCloseLabourInvoiceModal = () => {
-    setIsLabourInvoiceModalOpen(false);
-    setSelectedRequest(null);
+    setIsLabourCreateBillModalOpen(true);
   };
 
   const handleCloseLabourCreateBillModal = () => {
     setIsLabourCreateBillModalOpen(false);
     setSelectedRequest(null);
-  };
-
-  const handleLabourCreateBill = () => {
-    setIsLabourInvoiceModalOpen(false);
-    setIsLabourCreateBillModalOpen(true);
-  };
-
-  const handleLabourSubmitBill = async (payload?: {
-    source_id: number;
-    company_bank_account_id: number;
-    invoice_amount: number;
-    discrepancy_acknowledged: boolean;
-    document?: File | null;
-  }) => {
-    console.log("Labour vendor bill →", payload);
-    // TODO: mutation when backend ready
-    showToast(
-      "success",
-      "Vendor bill submitted. It will appear in the Payment Queue.",
-    );
-    setIsLabourCreateBillModalOpen(false);
-    setSelectedRequest(null);
-    refetch();
   };
 
   // ---------- Shared step nav (Purchase / PE / Subcontractor) ----------
@@ -625,20 +594,11 @@ export default function ApprovedRequestsPage() {
         isIssuing={false}
       />
 
-      {/* Labour → Vendor Bill (2 steps) */}
-      <ConvertToInvoiceLabourModal
-        isOpen={isLabourInvoiceModalOpen}
-        onClose={handleCloseLabourInvoiceModal}
-        request={selectedRequest}
-        onConfirm={handleLabourCreateBill}
-        formatCurrency={formatCurrency}
-      />
-
+      {/* Labour → Vendor Bill */}
       <CreateVendorBillLabourModal
         isOpen={isLabourCreateBillModalOpen}
         onClose={handleCloseLabourCreateBillModal}
         request={selectedRequest}
-        onSubmit={handleLabourSubmitBill}
         formatCurrency={formatCurrency}
       />
 
