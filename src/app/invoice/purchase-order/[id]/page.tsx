@@ -12,6 +12,10 @@ import {
   useFullyReceivePurchaseOrderMutation,
 } from "@/api/invoice/projectPurchaseOrdersApi";
 import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
+import { useCreateIncomingProductMutation } from "@/api/inventory/incomingProductApi";
+import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
+import { useGetInventoryUnitOfMeasuresQuery } from "@/api/inventory/unitOfMeasureApi";
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
@@ -29,10 +33,26 @@ export default function PurchaseOrderDetailPage() {
     skip: !poId || isNaN(poId),
   });
 
+  const { data: locationsResponse = [] } = useGetLocationsQuery({});
+  const locationsData = Array.isArray(locationsResponse)
+    ? locationsResponse
+    : (locationsResponse as any)?.results || [];
+
+  const { data: productsResponse = [] } = useGetInventoryProductsQuery({});
+  const productsData = Array.isArray(productsResponse)
+    ? productsResponse
+    : (productsResponse as any)?.results || [];
+
+  const { data: uomResponse = [] } = useGetInventoryUnitOfMeasuresQuery({});
+  const uomData = Array.isArray(uomResponse)
+    ? uomResponse
+    : (uomResponse as any)?.results || [];
+
   const [issuePurchaseOrder, { isLoading: isIssuing }] =
     useIssuePurchaseOrderMutation();
   const [fullyReceivePurchaseOrder, { isLoading: isReceiving }] =
     useFullyReceivePurchaseOrderMutation();
+  const [createIncomingProduct] = useCreateIncomingProductMutation();
 
   const handleIssuePO = async () => {
     try {
@@ -50,16 +70,65 @@ export default function PurchaseOrderDetailPage() {
   };
 
   const handleReceiveGoods = async () => {
+    if (!poDetail) return;
+
     if (
       !confirm(
-        "Are you sure you want to fully receive all goods for this Purchase Order?",
+        "Are you sure you want to receive goods for this Purchase Order and generate a draft Incoming Product in Inventory Operations?",
       )
     )
       return;
 
     try {
+      // 1. Mark the PO as received
       await fullyReceivePurchaseOrder(poId).unwrap();
-      alert("Goods Received Successfully!");
+
+      // 2. Create the corresponding draft Incoming Product in Inventory
+      const defaultLoc = locationsData[0]?.id || "";
+      const defaultUomId = uomData[0]?.id || 1;
+
+      const payload: any = {
+        receipt_type: "vendor_receipt",
+        supplier: poDetail.vendor,
+        related_ppo: poDetail.id,
+        source_location: defaultLoc,
+        destination_location: defaultLoc,
+        status: "draft",
+        notes: `Draft GRN from Purchase Order ${poDetail.po_number}`,
+        incoming_product_items: (poDetail.lines || []).map((line) => {
+          const matchedProd = productsData.find(
+            (p: any) => p.id?.toString() === line.product?.toString(),
+          );
+          const uom =
+            matchedProd?.unit_of_measure ||
+            matchedProd?.unit_of_measure_details?.id ||
+            defaultUomId;
+
+          return {
+            product: line.product,
+            expected_quantity: line.qty || "0",
+            quantity_received: line.qty || "0",
+            ppo_line: line.id,
+            unit_of_measure: uom,
+          };
+        }),
+      };
+
+      try {
+        await createIncomingProduct(payload).unwrap();
+        alert(
+          "Goods received! A draft Goods Receipt Note (GRN) has been created in Inventory Operations. You can now view and complete it under Inventory > Operations.",
+        );
+      } catch (grnErr: any) {
+        console.warn("Draft GRN creation notice:", grnErr);
+        const errMsg =
+          grnErr?.data?.error?.[0]?.incoming_product_items?.unit_of_measure?.[0] ||
+          grnErr?.data?.detail ||
+          grnErr?.data?.error ||
+          "Purchase Order marked as received! Please check Inventory > Operations to review incoming products.";
+        alert(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
+      }
+
       refetch();
     } catch (err: any) {
       alert(

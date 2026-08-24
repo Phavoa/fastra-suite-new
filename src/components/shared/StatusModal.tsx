@@ -333,6 +333,7 @@ export function extractErrorMessage(
 
       const cleanKey =
         key === "non_field_errors" ||
+        key === "__all__" ||
         key === "detail" ||
         key === "message" ||
         key === "error"

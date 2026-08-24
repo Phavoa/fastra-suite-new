@@ -103,7 +103,7 @@ export default function WBSPage() {
               <span className="text-sm font-medium text-green-500">Project Budget</span>
             </div>
             <div className="text-3xl font-semibold text-green-500 mt-2">
-              N{budgetNum.toLocaleString()}
+              ₦{budgetNum.toLocaleString()}
             </div>
           </div>
 

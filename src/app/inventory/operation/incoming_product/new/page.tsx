@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -65,10 +66,10 @@ const receiptTypes = ["vendor_receipt", "returns", "scrap"] as const;
 const incomingProductSchema = z.object({
   receipt_type: z.enum(receiptTypes),
   related_po: z.string().optional(),
-  supplier: z.string().min(1, "Supplier is required"),
+  supplier: z.string().min(1, "Vendor is required"),
   source_location: z.string().min(1, "Source location is required"),
   destination_location: z.string().min(1, "Destination location is required"),
-  delivery_note: z.string().min(1, "Delivery note / Waybill number is required"),
+  delivery_note: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -76,6 +77,8 @@ type IncomingProductFormData = z.infer<typeof incomingProductSchema>;
 
 export default function NewIncomingProductPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const poIdParam = searchParams.get("poId") || searchParams.get("ppoId");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: productsResponse = [] } = useGetInventoryProductsQuery({});
@@ -153,14 +156,20 @@ export default function NewIncomingProductPage() {
     resolver: zodResolver(incomingProductSchema) as Resolver<IncomingProductFormData>,
     defaultValues: {
       receipt_type: "vendor_receipt",
-      related_po: "",
+      related_po: poIdParam || "",
       supplier: "",
       source_location: "",
       destination_location: "",
       delivery_note: "",
-      notes: "Direct site procurement delivery inspection.",
+      notes: "",
     },
   });
+
+  useEffect(() => {
+    if (poIdParam) {
+      setValue("related_po", poIdParam);
+    }
+  }, [poIdParam, setValue]);
 
   const relatedPoValue = watch("related_po");
   
@@ -225,6 +234,12 @@ export default function NewIncomingProductPage() {
       prev.map((it) => {
         if (it.id !== itemId) return it;
         const updated = { ...it, [field]: val };
+        if (field === "received_quantity") {
+          // If expected_quantity is empty or 0 and not linked to PO lines, auto-sync expected
+          if ((!it.expected_quantity || it.expected_quantity === "0") && !relatedPoValue) {
+            updated.expected_quantity = val;
+          }
+        }
         const rec = Number(updated.received_quantity) || 0;
         if (field === "received_quantity" || field === "accepted_quantity") {
           const acc = Number(updated.accepted_quantity) || 0;
@@ -240,19 +255,30 @@ export default function NewIncomingProductPage() {
   };
 
   async function onSaveDraft(data: IncomingProductFormData) {
+    const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
+    if (validItems.length === 0) {
+      statusModal.showError(
+        "Validation Error",
+        "Please enter at least one valid product line with received quantity > 0"
+      );
+      return;
+    }
+
+    for (const it of validItems) {
+      const exp = Number(it.expected_quantity) || 0;
+      const rec = Number(it.received_quantity) || 0;
+      if (rec > exp) {
+        statusModal.showError(
+          "Validation Error",
+          `Quantity received (${rec}) cannot exceed the expected quantity (${exp}) for "${it.product_name || 'selected item'}".`
+        );
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     statusModal.showInfo("Saving Draft...", "Please wait while your draft is being saved.");
     try {
-      const validItems = items.filter((it) => it.product && Number(it.received_quantity) > 0);
-      if (validItems.length === 0) {
-        statusModal.showError(
-          "Validation Error",
-          "Please enter at least one valid product line with received quantity > 0"
-        );
-        setIsSubmitting(false);
-        return;
-      }
-      
       const selectedPoId = data.related_po ? Number(data.related_po) : null;
       let selectedPo: any = null;
       if (selectedPoId) {
@@ -264,7 +290,7 @@ export default function NewIncomingProductPage() {
         supplier: Number(data.supplier),
         source_location: data.source_location, 
         destination_location: data.destination_location,
-        notes: data.notes || data.delivery_note,
+        notes: data.delivery_note || data.notes || "Direct site procurement delivery inspection.",
         status: "draft",
         incoming_product_items: validItems.map((it) => {
           let ppo_line: number | undefined = undefined;
@@ -318,6 +344,18 @@ export default function NewIncomingProductPage() {
       return;
     }
 
+    for (const it of validItems) {
+      const exp = Number(it.expected_quantity) || 0;
+      const rec = Number(it.received_quantity) || 0;
+      if (rec > exp) {
+        statusModal.showError(
+          "Validation Error",
+          `Quantity received (${rec}) cannot exceed the expected quantity (${exp}) for "${it.product_name || 'selected item'}".`
+        );
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     statusModal.showInfo("Validating...", "Please wait while we validate the GRN.");
     let createdProductId: string | null = null;
@@ -334,7 +372,7 @@ export default function NewIncomingProductPage() {
         supplier: Number(data.supplier),
         source_location: data.source_location,
         destination_location: data.destination_location,
-        notes: data.notes || data.delivery_note,
+        notes: data.delivery_note || data.notes || "Direct site procurement delivery inspection.",
         status: "draft",
         incoming_product_items: validItems.map((it) => {
           let ppo_line: number | undefined = undefined;
@@ -504,26 +542,26 @@ export default function NewIncomingProductPage() {
           </div>
 
           <form className="flex flex-col gap-6">
-            {/* Delivery & Supplier Information Card */}
+            {/* Delivery & Vendor Information Card */}
             <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6">
               <h2 className="text-base font-semibold text-[#32325D] mb-4 pb-3 border-b border-gray-100">
-                Delivery & Supplier Information
+                Delivery & Vendor Information
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Related PO
+                    Purchase Order
                   </Label>
                   <Select
                     value={watch("related_po")}
                     onValueChange={(val) => setValue("related_po", val)}
                   >
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                      <SelectValue placeholder="Select PO" />
+                      <SelectValue placeholder="Select Purchase Order" />
                     </SelectTrigger>
                     <SelectContent>
                       {purchaseOrdersData.length === 0 ? (
-                        <SelectItem value="no-data" disabled>No POs found</SelectItem>
+                        <SelectItem value="no-data" disabled>No purchase orders found</SelectItem>
                       ) : (
                         purchaseOrdersData.map((po: any) => (
                           <SelectItem key={po.id} value={po.id.toString()}>
@@ -537,18 +575,18 @@ export default function NewIncomingProductPage() {
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Supplier / Vendor <span className="text-[#E43D2B]">*</span>
+                    Vendor <span className="text-[#E43D2B]">*</span>
                   </Label>
                   <Select
                     value={watch("supplier")}
                     onValueChange={(val) => setValue("supplier", val)}
                   >
                     <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
-                      <SelectValue placeholder="Select Supplier" />
+                      <SelectValue placeholder="Select Vendor" />
                     </SelectTrigger>
                     <SelectContent>
                       {suppliersData.length === 0 ? (
-                        <SelectItem value="no-data" disabled>No suppliers found</SelectItem>
+                        <SelectItem value="no-data" disabled>No vendors found</SelectItem>
                       ) : (
                         suppliersData.map((s: any) => (
                           <SelectItem key={s.id} value={s.id.toString()}>
@@ -613,14 +651,15 @@ export default function NewIncomingProductPage() {
                   {errors.destination_location && <p className="text-[11px] text-[#E43D2B]">{errors.destination_location.message}</p>}
                 </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4">
                   <Label className="text-xs font-semibold text-[#525F7F]">
-                    Delivery Note / Waybill <span className="text-[#E43D2B]">*</span>
+                    Delivery Note
                   </Label>
-                  <Input
+                  <Textarea
                     {...register("delivery_note")}
-                    placeholder="e.g. DN-90124"
-                    className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
+                    placeholder="Enter delivery note, reference, or remarks..."
+                    className="bg-white border-gray-200 rounded-md text-sm text-[#32325D] focus:ring-[#3B7CED] min-h-[60px]"
+                    rows={2}
                   />
                   {errors.delivery_note && <p className="text-[11px] text-[#E43D2B]">{errors.delivery_note.message}</p>}
                 </div>
@@ -648,10 +687,10 @@ export default function NewIncomingProductPage() {
                         Unit
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Expected Qty
+                        Expected Quantity
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Received Qty
+                        Received Quantity
                       </TableHead>
                       <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                         Action

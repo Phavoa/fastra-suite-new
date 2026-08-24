@@ -273,7 +273,7 @@ export default function EditIncomingProductPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label className="text-gray-700 font-medium">Supplier / Vendor</Label>
+                  <Label className="text-gray-700 font-medium">Vendor</Label>
                   {/* Pre-filled from PO - not editable */}
                   <div className="p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
                     {incomingProduct?.supplier_details?.vendor_name || incomingProduct?.supplier_details?.company_name || "N/A"}
@@ -303,10 +303,10 @@ export default function EditIncomingProductPage() {
                         Unit
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Expected Qty (PO)
+                        Expected Quantity (PO)
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Received Qty
+                        Received Quantity
                       </TableHead>
                     </TableRow>
                   </TableHeader>

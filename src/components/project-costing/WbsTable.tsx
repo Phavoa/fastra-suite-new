@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 export function WbsTable() {
   return (
@@ -15,139 +15,72 @@ export function WbsTable() {
       <Table>
         <TableHeader className="bg-gray-50 border-b border-gray-200">
           <TableRow className="hover:bg-gray-50 border-0">
-            <TableHead className="w-[50%] font-medium text-gray-500 py-3">WBS Elements</TableHead>
-            <TableHead className="w-[30%] font-medium text-gray-500 py-3">Activities</TableHead>
-            <TableHead className="w-[20%] font-medium text-gray-500 py-3">Budget</TableHead>
+            <TableHead className="w-[80px] font-semibold text-gray-600 py-3 text-center pl-4">S/N</TableHead>
+            <TableHead className="min-w-[320px] font-semibold text-gray-600 py-3">Activity</TableHead>
+            <TableHead className="w-[120px] font-semibold text-gray-600 py-3">Quantity</TableHead>
+            <TableHead className="w-[140px] font-semibold text-gray-600 py-3">Rate</TableHead>
+            <TableHead className="w-[160px] font-semibold text-gray-600 py-3">Amount</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {/* Phase 1 - 1 */}
-          <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white cursor-pointer">
-            <TableCell className="font-medium py-3 text-sm flex items-center gap-2">
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-              Phase 1
+          {/* Phase 1 */}
+          <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white">
+            <TableCell colSpan={4} className="py-3 px-4 bg-[#EEF2FB]">
+              <div className="flex items-center gap-2">
+                <span className="text-[#3B7CED] text-sm font-bold uppercase tracking-wide">Phase:</span>
+                <span className="font-bold text-base text-gray-900">Phase 1</span>
+              </div>
             </TableCell>
-            <TableCell></TableCell>
-            <TableCell className="font-medium text-sm">3,000,000</TableCell>
+            <TableCell className="py-3 font-bold text-base bg-[#EEF2FB] text-gray-900">
+              ₦2,000,000
+            </TableCell>
           </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="border-l border-gray-400 ml-6 relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 1</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
+          <TableRow className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+            <TableCell className="py-3 text-sm font-medium text-gray-500 text-center pl-4">1</TableCell>
+            <TableCell className="py-3 text-sm font-medium text-gray-800">Activity 1</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">1</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">₦1,000,000</TableCell>
+            <TableCell className="py-3 font-medium text-sm text-gray-800">₦1,000,000</TableCell>
           </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="border-l border-gray-400 ml-6 relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 2</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="bg-[#F4F7FC] hover:bg-[#F4F7FC] border-b border-white cursor-pointer">
-            <TableCell className="py-3 pl-[3rem] text-sm font-medium relative flex items-center gap-2">
-              <div className="absolute left-[1.6rem] top-0 bottom-1/2 w-px bg-gray-300"></div>
-              <div className="absolute left-[1.6rem] top-1/2 w-4 h-px bg-gray-300"></div>
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-              Sub Phase 1
-            </TableCell>
-            <TableCell></TableCell>
-            <TableCell className="font-medium text-sm">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 2</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
+          <TableRow className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+            <TableCell className="py-3 text-sm font-medium text-gray-500 text-center pl-4">2</TableCell>
+            <TableCell className="py-3 text-sm font-medium text-gray-800">Activity 2</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">1</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">₦1,000,000</TableCell>
+            <TableCell className="py-3 font-medium text-sm text-gray-800">₦1,000,000</TableCell>
           </TableRow>
 
-          {/* Phase 1 - 2 */}
-          <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white cursor-pointer">
-            <TableCell className="font-medium py-3 text-sm flex items-center gap-2">
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-              Phase 1
+          {/* Phase 2 */}
+          <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white">
+            <TableCell colSpan={4} className="py-3 px-4 bg-[#EEF2FB]">
+              <div className="flex items-center gap-2">
+                <span className="text-[#3B7CED] text-sm font-bold uppercase tracking-wide">Phase:</span>
+                <span className="font-bold text-base text-gray-900">Phase 2</span>
+              </div>
             </TableCell>
-            <TableCell></TableCell>
-            <TableCell className="font-medium text-sm">3,000,000</TableCell>
+            <TableCell className="py-3 font-bold text-base bg-[#EEF2FB] text-gray-900">
+              ₦2,000,000
+            </TableCell>
           </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 1</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
+          <TableRow className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+            <TableCell className="py-3 text-sm font-medium text-gray-500 text-center pl-4">3</TableCell>
+            <TableCell className="py-3 text-sm font-medium text-gray-800">Activity 3</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">1</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">₦1,000,000</TableCell>
+            <TableCell className="py-3 font-medium text-sm text-gray-800">₦1,000,000</TableCell>
           </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 2</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="bg-[#F4F7FC] hover:bg-[#F4F7FC] border-b border-white cursor-pointer">
-            <TableCell className="py-3 pl-[3rem] text-sm font-medium relative flex items-center gap-2">
-              <div className="absolute left-[1.6rem] top-0 bottom-1/2 w-px bg-gray-300"></div>
-              <div className="absolute left-[1.6rem] top-1/2 w-4 h-px bg-gray-300"></div>
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-              Sub Phase 1
-            </TableCell>
-            <TableCell></TableCell>
-            <TableCell className="font-medium text-sm">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 2</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
-          </TableRow>
-
-          {/* Phase 1 - 3 */}
-          <TableRow className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white cursor-pointer">
-            <TableCell className="font-medium py-3 text-sm flex items-center gap-2">
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-              Phase 1
-            </TableCell>
-            <TableCell></TableCell>
-            <TableCell className="font-medium text-sm">3,000,000</TableCell>
-          </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 1</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="border-b border-gray-100 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 2</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="bg-[#F4F7FC] hover:bg-[#F4F7FC] border-b border-white cursor-pointer">
-            <TableCell className="py-3 pl-[3rem] text-sm font-medium relative flex items-center gap-2">
-              <div className="absolute left-[1.6rem] top-0 bottom-1/2 w-px bg-gray-300"></div>
-              <div className="absolute left-[1.6rem] top-1/2 w-4 h-px bg-gray-300"></div>
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-              Sub Phase 1
-            </TableCell>
-            <TableCell></TableCell>
-            <TableCell className="font-medium text-sm">1,000,000</TableCell>
-          </TableRow>
-          <TableRow className="border-0 hover:bg-transparent">
-            <TableCell className="relative">
-              <div className="absolute left-[1.6rem] top-0 bottom-0 w-px bg-gray-300"></div>
-            </TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">Activities 2</TableCell>
-            <TableCell className="py-3 text-sm text-gray-600">1,000,000</TableCell>
+          <TableRow className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+            <TableCell className="py-3 text-sm font-medium text-gray-500 text-center pl-4">4</TableCell>
+            <TableCell className="py-3 text-sm font-medium text-gray-800">Activity 4</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">1</TableCell>
+            <TableCell className="py-3 text-sm text-gray-600">₦1,000,000</TableCell>
+            <TableCell className="py-3 font-medium text-sm text-gray-800">₦1,000,000</TableCell>
           </TableRow>
         </TableBody>
       </Table>
       <div className="flex items-center justify-end p-6 border-t border-gray-100 bg-white">
         <div className="text-gray-500 font-medium">
-          Total Project Budget: <span className="text-xl font-bold text-gray-800 ml-2">3,000,000</span>
+          Total Project Budget: <span className="text-xl font-bold text-gray-800 ml-2">₦4,000,000</span>
         </div>
       </div>
     </div>
