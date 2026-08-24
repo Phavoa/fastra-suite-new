@@ -366,7 +366,9 @@ export default function OperationPage() {
                           </TableCell>
                           <TableCell className="text-[#525F7F] font-normal text-sm py-3.5 px-6 whitespace-nowrap">
                             {highlightText(
-                              item.related_po || item.related_ppo_details?.po_number || "N/A",
+                              item.related_po ||
+                                item.related_ppo_details?.po_number ||
+                                (item.related_ppo ? `PO-${item.related_ppo}` : "N/A"),
                               query,
                             )}
                           </TableCell>

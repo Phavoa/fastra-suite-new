@@ -13,6 +13,7 @@ import { BreadcrumbItem } from "@/types/purchase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetScrapQuery, useGetScrapEditableQuery, useValidateScrapMutation } from "@/api/inventory/scrapApi";
+import StatusModal, { extractErrorMessage, useStatusModal } from "@/components/shared/StatusModal";
 import {
   Table,
   TableBody,
@@ -25,28 +26,31 @@ import {
 export default function ScrapDetailPage() {
   const params = useParams();
   const id = (params?.id as string) || "";
+  const statusModal = useStatusModal();
 
-  const { data: scrapData, isLoading } = useGetScrapQuery(id, { skip: !id });
+  const { data: scrapData, isLoading, refetch } = useGetScrapQuery(id, { skip: !id });
   const { data: editableData } = useGetScrapEditableQuery(id, { skip: !id });
   const [validateScrap, { isLoading: isValidating }] = useValidateScrapMutation();
 
   const handleValidate = async () => {
     try {
       await validateScrap({ id }).unwrap();
+      statusModal.showSuccess("Validated", "Scrap record has been validated and inventory updated.");
+      refetch();
     } catch (error) {
-      console.error("Failed to validate scrap:", error);
+      statusModal.showError("Validation Failed", extractErrorMessage(error, "Failed to validate scrap."));
     }
   };
 
   const record = scrapData ? {
     id: scrapData.id,
     cause: (scrapData as any).cause || scrapData.adjustment_type || "N/A",
-    project: "N/A",
+    project: (scrapData as any).project_details?.name || (scrapData as any).project || "N/A",
     warehouse_location: scrapData.warehouse_location_details?.location_name || scrapData.warehouse_location,
     date: (scrapData as any).date_created ? new Date((scrapData as any).date_created).toLocaleDateString() : "N/A",
     status: scrapData.status?.toLowerCase(),
-    notes: scrapData.notes,
-    recorded_by: "N/A",
+    notes: scrapData.notes || "—",
+    recorded_by: (scrapData as any).recorded_by_details?.user?.first_name || (scrapData as any).created_by || "System",
     items: (scrapData as any).items || scrapData.scrap_items || [],
   } : null;
 
@@ -256,6 +260,15 @@ export default function ScrapDetailPage() {
           </>
           )}
         </main>
+
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={statusModal.close}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          onAction={statusModal.close}
+        />
       </motion.div>
     </PageGuard>
   );

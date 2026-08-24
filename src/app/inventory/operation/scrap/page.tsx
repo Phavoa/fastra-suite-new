@@ -27,6 +27,7 @@ import { ScrapStatus } from "@/types/scrap";
 const STATUS_TABS = [
   { label: "All Records", value: "all" },
   { label: "Validated", value: "done" },
+  { label: "Draft", value: "draft" },
 ];
 
 const ITEMS_PER_PAGE = 10;
@@ -59,16 +60,26 @@ export default function ScrapPage() {
 
   const filteredScraps = useMemo(() => {
     if (!scrapsResponse) return [];
-    return scrapsResponse.map((scrap: any) => ({
-      id: scrap.id,
-      adjustmentType: scrap.cause || scrap.adjustment_type || "N/A",
-      location: scrap.warehouse_location_details?.location_name || scrap.warehouse_location || "N/A",
-      adjustedDate: scrap.date_created ? new Date(scrap.date_created).toISOString().split("T")[0] : "N/A",
-      status: scrap.status?.toLowerCase(),
-      product: scrap.items?.[0]?.product_details?.product_name || scrap.scrap_items?.[0]?.product_details?.product_name || "Multiple Products",
-      quantity: scrap.items?.[0]?.scrap_quantity || scrap.scrap_items?.[0]?.scrap_quantity || 0,
-    }));
-  }, [scrapsResponse]);
+    const list = Array.isArray(scrapsResponse)
+      ? scrapsResponse
+      : (scrapsResponse as any)?.results || (scrapsResponse as any)?.data || [];
+    const mapped = list.map((scrap: any) => {
+      const rawStatus = (scrap.status || "draft").toLowerCase();
+      const statusValue = rawStatus === "validated" || rawStatus === "done" ? "done" : "draft";
+      return {
+        id: scrap.id,
+        adjustmentType: scrap.cause || scrap.adjustment_type || "N/A",
+        location: scrap.warehouse_location_details?.location_name || scrap.warehouse_location || "N/A",
+        adjustedDate: scrap.date_created ? new Date(scrap.date_created).toISOString().split("T")[0] : "N/A",
+        status: statusValue,
+        product: scrap.items?.[0]?.product_details?.product_name || scrap.scrap_items?.[0]?.product_details?.product_name || "Multiple Products",
+        quantity: scrap.items?.[0]?.scrap_quantity || scrap.scrap_items?.[0]?.scrap_quantity || 0,
+      };
+    });
+
+    if (selectedStatus === "all") return mapped;
+    return mapped.filter((r: any) => r.status === selectedStatus);
+  }, [scrapsResponse, selectedStatus]);
 
   const totalPages = Math.max(1, Math.ceil(filteredScraps.length / ITEMS_PER_PAGE));
   const paginatedScraps = useMemo(() => {
@@ -231,7 +242,7 @@ export default function ScrapPage() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        paginatedScraps.map((scrap) => (
+                        paginatedScraps.map((scrap: any) => (
                           <TableRow
                             key={scrap.id}
                             className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
@@ -269,14 +280,14 @@ export default function ScrapPage() {
                             <TableCell className="px-4 py-3.5 text-center">
                               <span
                                 className={`inline-block min-w-[80px] px-2.5 py-1 text-[11px] rounded-full font-semibold capitalize ${
-                                  scrap.status === "done"
+                                  scrap.status === "done" || scrap.status === "validated"
                                     ? "bg-[#E2F2E9] text-[#2BA24D]"
-                                    : scrap.status === "draft"
+                                    : scrap.status === "draft" || scrap.status === "pending"
                                       ? "bg-[#E8F0FE] text-[#1A73E8]"
-                                      : "bg-[#FCE8E6] text-[#E43D2B]"
+                                      : "bg-[#E2F2E9] text-[#2BA24D]"
                                 }`}
                               >
-                                {scrap.status === "done" ? "Validated" : scrap.status}
+                                {scrap.status === "done" || scrap.status === "validated" ? "Validated" : "Draft"}
                               </span>
                             </TableCell>
                           </TableRow>

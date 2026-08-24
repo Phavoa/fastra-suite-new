@@ -31,6 +31,33 @@ export function WBSTable({
   const [isExpanded, setIsExpanded] = useState(false);
   const [newColName, setNewColName] = useState("");
 
+  const filteredExtraColumns = useMemo(() => {
+    const standardLower = new Set([
+      "sn",
+      "s/n",
+      "s_n",
+      "serial",
+      "serial number",
+      "serial_number",
+      "serial no",
+      "serial_no",
+      "phase",
+      "phase name",
+      "phase_name",
+      "activity",
+      "activity name",
+      "name",
+      "quantity",
+      "qty",
+      "rate",
+      "unit rate",
+      "amount",
+      "budget",
+      "total amount",
+    ]);
+    return extraColumns.filter((c) => !standardLower.has(c.toLowerCase().trim()));
+  }, [extraColumns]);
+
   // Compute total budget
   const totalBudget = useMemo(() => {
     let total = 0;
@@ -198,7 +225,7 @@ export function WBSTable({
             <col className="w-[100px]" />
             <col className="w-[130px]" />
             <col className="w-[140px]" />
-            {extraColumns.map((col) => (
+            {filteredExtraColumns.map((col) => (
               <col key={col} className="min-w-[150px]" />
             ))}
             <col className="w-[80px]" />
@@ -206,7 +233,7 @@ export function WBSTable({
           <TableHeader className="bg-gray-50 border-b border-gray-200 sticky top-0 z-20 shadow-xs">
             <TableRow className="hover:bg-gray-50 border-0 bg-gray-50">
               <TableHead className="font-semibold text-gray-600 py-3 pl-4 text-left sticky top-0 bg-gray-50 z-20">
-                Phase / S/N
+                S/N
               </TableHead>
               <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
                 Activity
@@ -220,7 +247,7 @@ export function WBSTable({
               <TableHead className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20">
                 Amount
               </TableHead>
-              {extraColumns.map((col) => (
+              {filteredExtraColumns.map((col) => (
                 <TableHead
                   key={col}
                   className="font-semibold text-gray-600 py-3 sticky top-0 bg-gray-50 z-20"
@@ -247,7 +274,7 @@ export function WBSTable({
             {phases.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6 + extraColumns.length}
+                  colSpan={6 + filteredExtraColumns.length}
                   className="text-center py-16 text-gray-400 bg-gray-50/20 border-b border-gray-100"
                 >
                   <div className="flex flex-col items-center justify-center text-center gap-1.5 py-4 w-full">
@@ -275,7 +302,7 @@ export function WBSTable({
                   key={phase.id}
                   phase={phase}
                   phaseBudget={getPhaseBudget(phase)}
-                  extraColumns={extraColumns}
+                  extraColumns={filteredExtraColumns}
                   onUpdatePhaseName={(name) => updatePhaseName(phase.id, name)}
                   onAddPhaseActivity={() => addPhaseActivity(phase.id)}
                   onUpdateActivity={(activityId, updates) =>
@@ -304,7 +331,7 @@ export function WBSTable({
         <div className="text-gray-600 text-sm font-medium">
           Total Project Budget:{" "}
           <span className="text-xl font-bold text-gray-800 ml-2">
-            N {totalBudget.toLocaleString()}
+            ₦{totalBudget.toLocaleString()}
           </span>
         </div>
       </div>
@@ -329,8 +356,8 @@ export function WBSTable({
                   <span className="bg-blue-50 text-[#3B7CED] px-2.5 py-1 rounded">
                     Activities: {totalActivities}
                   </span>
-                  <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded font-semibold">
-                    Total Budget: N {totalBudget.toLocaleString()}
+                  <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded font-semibold">
+                    Total Budget: ₦{totalBudget.toLocaleString()}
                   </span>
                 </div>
               </div>

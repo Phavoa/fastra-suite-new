@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { useGetLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 import { useCreateStockAdjustmentMutation } from "@/api/inventory/stockAdjustmentApi";
+import { useGetStockLocationsByLocationQuery } from "@/api/inventory/stockLocationApi";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -70,8 +71,65 @@ export default function CreateStockAdjustmentPage() {
   ]);
 
   const [createStockAdjustment] = useCreateStockAdjustmentMutation();
-  const { data: locations = [], isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
-  const { data: products = [], isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+  const { data: rawLocations, isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
+  const { data: rawProducts, isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+
+  const locations = React.useMemo(() => {
+    return Array.isArray(rawLocations)
+      ? rawLocations
+      : (rawLocations as any)?.results || (rawLocations as any)?.data || [];
+  }, [rawLocations]);
+
+  const products = React.useMemo(() => {
+    return Array.isArray(rawProducts)
+      ? rawProducts
+      : (rawProducts as any)?.results || (rawProducts as any)?.data || [];
+  }, [rawProducts]);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<StockAdjustmentFormData>({
+    resolver: zodResolver(stockAdjustmentSchema),
+    defaultValues: {
+      warehouse_location: "",
+      notes: "",
+    },
+  });
+
+  const selectedLocation = watch("warehouse_location");
+  const { data: rawStockLevels } = useGetStockLocationsByLocationQuery(selectedLocation, {
+    skip: !selectedLocation,
+  });
+
+  const stockByProductId = React.useMemo(() => {
+    const list = Array.isArray(rawStockLevels)
+      ? rawStockLevels
+      : (rawStockLevels as any)?.results || (rawStockLevels as any)?.data || [];
+    const map: Record<string, string> = {};
+    list.forEach((item: any) => {
+      const pId = String(item.product_id || item.product?.id || item.product || item.id || "");
+      if (pId) {
+        map[pId] = String(item.quantity ?? item.current_stock ?? item.available_quantity ?? "0");
+      }
+    });
+    return map;
+  }, [rawStockLevels]);
+
+  // Keep line items current stock in sync if location or stockByProductId changes
+  React.useEffect(() => {
+    if (!selectedLocation) return;
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!it.product) return it;
+        const stock = stockByProductId[it.product] ?? "0";
+        return { ...it, current_quantity: stock };
+      })
+    );
+  }, [stockByProductId, selectedLocation]);
 
   const [modalState, setModalState] = React.useState<{
     isOpen: boolean;
@@ -119,7 +177,14 @@ export default function CreateStockAdjustmentPage() {
       setToastState({ show: true, message: "Product already selected.", type: "error" });
       return;
     }
-    const foundProduct = products.find((p) => String(p.id) === productId);
+    const foundProduct = products.find((p: any) => String(p.id) === productId);
+    const stockVal = stockByProductId[productId] ?? "0";
+    const uomVal =
+      foundProduct?.unit_of_measure_details?.unit_symbol ||
+      foundProduct?.unit_of_measure_details?.unit_name ||
+      foundProduct?.unit_of_measure?.unit_symbol ||
+      "Units";
+
     setItems((prev) =>
       prev.map((it) => {
         if (it.id === id) {
@@ -127,10 +192,10 @@ export default function CreateStockAdjustmentPage() {
             ...it,
             product: productId,
             product_description: foundProduct
-              ? foundProduct.description || ""
+              ? foundProduct.description || foundProduct.product_description || ""
               : "",
-            unit_of_measure: foundProduct?.unit_of_measure_details?.unit_symbol || "",
-            current_quantity: "0", // Inventory Product doesn't have available_product_quantity directly
+            unit_of_measure: uomVal,
+            current_quantity: String(stockVal),
           };
         }
         return it;
@@ -148,24 +213,19 @@ export default function CreateStockAdjustmentPage() {
     );
   };
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<StockAdjustmentFormData>({
-    resolver: zodResolver(stockAdjustmentSchema),
-    defaultValues: {
-      warehouse_location: "WH-MAIN",
-      notes: "",
-    },
+  const productOptions: Option[] = products.map((p: any) => {
+    const uom =
+      p.unit_of_measure_details?.unit_symbol ||
+      p.unit_of_measure_details?.unit_name ||
+      p.unit_of_measure?.unit_symbol ||
+      "Unit";
+    const stock = stockByProductId[String(p.id)];
+    const stockLabel = stock !== undefined ? ` • ${stock} in stock` : "";
+    return {
+      value: String(p.id),
+      label: `${p.product_name || p.name || `Product #${p.id}`} (${uom})${stockLabel}`,
+    };
   });
-
-  const productOptions: Option[] = products.map((p) => ({
-    value: String(p.id),
-    label: `${p.product_name} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
-  }));
 
   const locationOptions: Option[] = locations.map((l: any) => ({
     value: String(l.id),

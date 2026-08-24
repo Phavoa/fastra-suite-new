@@ -367,17 +367,53 @@ export default function ProjectDashboardPage() {
   let customColumns: string[] = [];
   if (parsedPhases && parsedPhases.length > 0) {
     const colSet = new Set<string>();
-    const standardKeys = new Set(["id", "name", "quantity", "rate", "amount", "budget", "start_date", "end_date", "status", "cost_category", "sn", "displayName", "custom_values"]);
+    const standardKeys = new Set([
+      "id",
+      "name",
+      "quantity",
+      "qty",
+      "rate",
+      "amount",
+      "budget",
+      "total_amount",
+      "start_date",
+      "end_date",
+      "status",
+      "cost_category",
+      "sn",
+      "s/n",
+      "s_n",
+      "serial",
+      "serial_number",
+      "serial number",
+      "serial_no",
+      "serial no",
+      "phase",
+      "phase_name",
+      "phase_id",
+      "subphase",
+      "sub_phase",
+      "activity",
+      "activity_name",
+      "displayname",
+      "custom_values",
+    ]);
     parsedPhases.forEach((phase: any) => {
       if (phase.activities && Array.isArray(phase.activities)) {
         phase.activities.forEach((act: any) => {
-          Object.keys(act).forEach(key => {
-            if (!standardKeys.has(key)) {
+          Object.keys(act).forEach((key) => {
+            const lower = key.toLowerCase().trim();
+            if (!standardKeys.has(lower)) {
               colSet.add(key);
             }
           });
-          if (act.custom_values && typeof act.custom_values === 'object') {
-            Object.keys(act.custom_values).forEach(key => colSet.add(key));
+          if (act.custom_values && typeof act.custom_values === "object") {
+            Object.keys(act.custom_values).forEach((key) => {
+              const lower = key.toLowerCase().trim();
+              if (!standardKeys.has(lower)) {
+                colSet.add(key);
+              }
+            });
           }
         });
       }
@@ -501,42 +537,56 @@ export default function ProjectDashboardPage() {
 
   const renderPhaseRows = (phases: any[]): React.ReactNode => {
     if (!phases || !Array.isArray(phases)) return null;
+    let serialCounter = 1;
+
     return phases.flatMap((phase, pIndex) => {
       const phaseName = phase.name || `Phase ${pIndex + 1}`;
       let phaseBudget = 0;
       
       if (phase.activities && Array.isArray(phase.activities)) {
-        phaseBudget = phase.activities.reduce((sum: number, act: any) => sum + Number(act.amount || 0), 0);
+        phaseBudget = phase.activities.reduce((sum: number, act: any) => sum + Number(act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || 0), 0);
       }
 
       const rows = [
         <TableRow key={`phase-${phase.id || pIndex}`} className="bg-[#EEF2FB] hover:bg-[#EEF2FB] border-b border-white">
-          <TableCell className="py-3 text-sm font-medium pl-4">{phaseName}</TableCell>
-          <TableCell className="py-3 text-sm text-gray-600"></TableCell>
-          <TableCell className="py-3 text-sm text-gray-600"></TableCell>
-          <TableCell className="py-3 text-sm text-gray-600"></TableCell>
-          <TableCell className="font-medium text-sm text-gray-600">{phaseBudget > 0 ? phaseBudget.toLocaleString() : ""}</TableCell>
-          {customColumns.map(col => <TableCell key={col} />)}
+          <TableCell colSpan={4} className="py-3 px-4 bg-[#EEF2FB]">
+            <div className="flex items-center gap-2">
+              <span className="text-[#3B7CED] text-sm font-bold uppercase tracking-wide">Phase:</span>
+              <span className="font-bold text-base text-gray-900">{phaseName}</span>
+            </div>
+          </TableCell>
+          <TableCell className="py-3 font-bold text-base bg-[#EEF2FB] text-gray-900">
+            {phaseBudget > 0 ? `₦${phaseBudget.toLocaleString()}` : "₦0"}
+          </TableCell>
+          {customColumns.map(col => <TableCell key={col} className="bg-[#EEF2FB]" />)}
         </TableRow>
       ];
 
       if (phase.activities && Array.isArray(phase.activities)) {
         phase.activities.forEach((act: any, aIndex: number) => {
           const actName = act.name || `Activity ${aIndex + 1}`;
-          const actBudget = Number(act.amount || 0);
           const quantity = Number(act.quantity || 1);
-          const rate = Number(act.rate || (actBudget / quantity) || 0);
+          const rate = Number(act.rate || 0);
+          const actBudget = Number(act.amount || (quantity * rate) || 0);
+          const currentSn = serialCounter++;
 
           rows.push(
-            <TableRow key={`act-${phase.id || pIndex}-${act.id || aIndex}`} className="border-b border-gray-100 hover:bg-transparent">
-              <TableCell className="py-3 text-sm font-medium relative pl-10">
-                <div className="absolute left-6 top-0 bottom-1/2 w-px bg-gray-300"></div>
-                <div className="absolute left-6 top-1/2 w-4 h-px bg-gray-300"></div>
+            <TableRow key={`act-${phase.id || pIndex}-${act.id || aIndex}`} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+              <TableCell className="py-3 text-sm font-medium text-gray-500 text-center pl-4">
+                {currentSn}
               </TableCell>
-              <TableCell className="py-3 text-sm text-gray-600">{actName}</TableCell>
-              <TableCell className="py-3 text-sm text-gray-600">{quantity}</TableCell>
-              <TableCell className="py-3 text-sm text-gray-600">{rate.toLocaleString()}</TableCell>
-              <TableCell className="font-medium text-sm text-gray-600">{actBudget > 0 ? actBudget.toLocaleString() : ""}</TableCell>
+              <TableCell className="py-3 text-sm font-medium text-gray-800">
+                {actName}
+              </TableCell>
+              <TableCell className="py-3 text-sm text-gray-600">
+                {quantity}
+              </TableCell>
+              <TableCell className="py-3 text-sm text-gray-600">
+                ₦{rate.toLocaleString()}
+              </TableCell>
+              <TableCell className="py-3 font-medium text-sm text-gray-800">
+                ₦{actBudget.toLocaleString()}
+              </TableCell>
               {customColumns.map(col => (
                 <TableCell key={col} className="py-3 text-sm text-gray-600">
                   {act[col] || act.custom_values?.[col] || ""}
@@ -711,19 +761,19 @@ export default function ProjectDashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-5 bg-white rounded shadow-sm border border-gray-100">
               <div className="p-4 border-r border-gray-100">
                 <div className="text-xs text-gray-500 font-medium mb-1">Budget</div>
-                <div className="text-lg font-semibold text-gray-800">N{budgetNum.toLocaleString()}</div>
+                <div className="text-lg font-semibold text-gray-800">₦{budgetNum.toLocaleString()}</div>
               </div>
               <div className="p-4 border-r border-gray-100">
                 <div className="text-xs text-gray-500 font-medium mb-1">Actual Spend</div>
-                <div className="text-lg font-semibold text-gray-800">N{actualSpend.toLocaleString()}</div>
+                <div className="text-lg font-semibold text-gray-800">₦{actualSpend.toLocaleString()}</div>
               </div>
               <div className="p-4 border-r border-gray-100">
                 <div className="text-xs text-gray-500 font-medium mb-1">Committed</div>
-                <div className="text-lg font-semibold text-gray-800">N{committed.toLocaleString()}</div>
+                <div className="text-lg font-semibold text-gray-800">₦{committed.toLocaleString()}</div>
               </div>
               <div className="p-4 border-r border-gray-100">
                 <div className="text-xs text-gray-500 font-medium mb-1">Remaining</div>
-                <div className="text-lg font-semibold text-gray-800">N{remaining.toLocaleString()}</div>
+                <div className="text-lg font-semibold text-gray-800">₦{remaining.toLocaleString()}</div>
               </div>
               <div className="p-4">
                 <div className="text-xs text-gray-500 font-medium mb-1">Variance</div>
@@ -751,7 +801,7 @@ export default function ProjectDashboardPage() {
                   <LineChart data={dynamicLineChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} tickFormatter={(val) => val === 0 ? "N0" : `N${val/1000}k`} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} tickFormatter={(val) => val === 0 ? "₦0" : `₦${val/1000}k`} />
                     <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 1}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
                     {showActual && <Line type="monotone" dataKey="actual" stroke="#2BA24D" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />}
                     {showPlanned && <Line type="monotone" dataKey="planned" stroke="#3B7CED" strokeWidth={2} dot={false} strokeDasharray="5 5" />}
@@ -785,7 +835,7 @@ export default function ProjectDashboardPage() {
                 )}
               </div>
 
-              <div className="text-right text-xs text-gray-500 mb-2">{actualSpend.toLocaleString()} / {budgetNum.toLocaleString()}({(finPercent * 100).toFixed(1)}%)</div>
+              <div className="text-right text-xs text-gray-500 mb-2">₦{actualSpend.toLocaleString()} / ₦{budgetNum.toLocaleString()} ({(finPercent * 100).toFixed(1)}%)</div>
               
               {/* Stacked Progress Bar */}
               <div className="w-full h-8 flex rounded overflow-hidden mb-6">
@@ -813,7 +863,7 @@ export default function ProjectDashboardPage() {
 
             {/* Pending Requests */}
             <div className="bg-white p-6 rounded shadow-sm border border-gray-100">
-              <h3 className="text-lg font-medium text-[#3B7CED] mb-6">Pending Requests {fin ? `(fin keys: ${Object.keys(fin).filter(k => k.toLowerCase().includes('pending') || k.toLowerCase().includes('await') || k.toLowerCase().includes('req')).join(', ')})` : ''}</h3>
+              <h3 className="text-lg font-medium text-[#3B7CED] mb-6">Pending Requests</h3>
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Awaiting Approval</div>
@@ -821,7 +871,7 @@ export default function ProjectDashboardPage() {
                 </div>
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Total Value</div>
-                  <div className="text-2xl font-bold text-gray-800">N{pendingAdjsTotal.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-800">₦{pendingAdjsTotal.toLocaleString()}</div>
                 </div>
               </div>
             </div>
@@ -915,13 +965,13 @@ export default function ProjectDashboardPage() {
             <Table>
               <TableHeader className="bg-gray-50 border-b border-gray-200">
                 <TableRow className="hover:bg-gray-50 border-0">
-                  <TableHead className="w-[40%] font-medium text-gray-500 py-3">Phase</TableHead>
-                  <TableHead className="w-[20%] font-medium text-gray-500 py-3">Activities</TableHead>
-                  <TableHead className="w-[10%] font-medium text-gray-500 py-3">Qty</TableHead>
-                  <TableHead className="w-[15%] font-medium text-gray-500 py-3">Rate</TableHead>
-                  <TableHead className="w-[15%] font-medium text-gray-500 py-3">Budget</TableHead>
+                  <TableHead className="w-[80px] font-semibold text-gray-600 py-3 text-center pl-4">S/N</TableHead>
+                  <TableHead className="min-w-[320px] font-semibold text-gray-600 py-3">Activity</TableHead>
+                  <TableHead className="w-[120px] font-semibold text-gray-600 py-3">Quantity</TableHead>
+                  <TableHead className="w-[140px] font-semibold text-gray-600 py-3">Rate</TableHead>
+                  <TableHead className="w-[160px] font-semibold text-gray-600 py-3">Amount</TableHead>
                   {customColumns.map(col => (
-                    <TableHead key={col} className="font-medium text-gray-500 py-3 whitespace-nowrap">{col}</TableHead>
+                    <TableHead key={col} className="font-semibold text-gray-600 py-3 whitespace-nowrap">{col}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -939,7 +989,7 @@ export default function ProjectDashboardPage() {
             </Table>
             <div className="flex items-center justify-end p-4 bg-gray-50 border-t border-gray-200">
               <div className="text-gray-600 text-sm">
-                Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">{budgetNum.toLocaleString()}</span>
+                Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">₦{budgetNum.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -951,7 +1001,7 @@ export default function ProjectDashboardPage() {
             {/* Original Budget Box */}
             <div className="border border-gray-200 rounded-lg p-6 bg-white shadow-sm mb-2">
               <div className="text-sm font-medium text-gray-800 mb-2">Original Approved Budget</div>
-              <div className="text-3xl font-normal text-[#3B7CED]">N{budgetNum.toLocaleString()}</div>
+              <div className="text-3xl font-normal text-[#3B7CED]">₦{budgetNum.toLocaleString()}</div>
             </div>
 
             {/* Pending Approval Section */}
@@ -1006,7 +1056,7 @@ export default function ProjectDashboardPage() {
                             <div className="text-right">
                               <div className="text-xs text-gray-500 mb-0.5">Total Adjustment</div>
                               <div className={`text-xl font-bold ${totalAdj >= 0 ? "text-green-600" : "text-red-500"}`}>
-                                {totalAdj >= 0 ? "+" : ""}N{totalAdj.toLocaleString()}
+                                {totalAdj >= 0 ? "+" : ""}₦{totalAdj.toLocaleString()}
                               </div>
                             </div>
                           </div>
@@ -1025,11 +1075,23 @@ export default function ProjectDashboardPage() {
                               <div className="flex flex-col gap-3">
                                 {lines.map((line: any, idx: number) => {
                                   const lineAmt = Number(line.adjustment_amount || line.amount || totalAdj);
+                                  const linePhase =
+                                    line.phase_name ||
+                                    line.phase ||
+                                    (parsedPhases.find((p: any) =>
+                                      p.activities?.some(
+                                        (a: any) =>
+                                          String(a.id) === String(line.activity) ||
+                                          String(a.name) === String(line.activity_name)
+                                      )
+                                    )?.name) ||
+                                    "General Phase";
+
                                   return (
                                     <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white">
                                       <div className="flex justify-between items-center mb-2">
                                         <div className="flex items-center gap-2.5">
-                                          <span className="text-sm font-semibold text-gray-800">Planning Phase</span>
+                                          <span className="text-sm font-semibold text-gray-800">{linePhase}</span>
                                           <Badge variant="outline" className="text-[11px] font-normal text-gray-500 border-gray-200 px-2.5 py-0.5 rounded-full">
                                             {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
                                           </Badge>
@@ -1040,7 +1102,7 @@ export default function ProjectDashboardPage() {
                                           {line.activity_name || "LAB-001"} {line.reason ? `• ${line.reason}` : ""}
                                         </span>
                                         <span className={`text-sm font-bold ${lineAmt >= 0 ? "text-green-600" : "text-red-500"}`}>
-                                          {lineAmt >= 0 ? "+" : ""}N{lineAmt.toLocaleString()}
+                                          {lineAmt >= 0 ? "+" : ""}₦{lineAmt.toLocaleString()}
                                         </span>
                                       </div>
                                     </div>
@@ -1054,15 +1116,15 @@ export default function ProjectDashboardPage() {
                           <div className="p-6 border-b border-gray-100 bg-gray-50/40 text-xs text-gray-600 flex flex-col gap-3">
                             <div className="flex justify-between items-center">
                               <span>Original Budget:</span>
-                              <span className="font-semibold text-gray-800">N{budgetNum.toLocaleString()}.00</span>
+                              <span className="font-semibold text-gray-800">₦{budgetNum.toLocaleString()}.00</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span>Proposed Budget Change:</span>
-                              <span className="font-semibold text-gray-800">N{totalAdj.toLocaleString()}.00</span>
+                              <span className="font-semibold text-gray-800">₦{totalAdj.toLocaleString()}.00</span>
                             </div>
                             <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-sm font-bold text-[#3B7CED]">
                               <span>Proposed Total Budget:</span>
-                              <span>N{(budgetNum + totalAdj).toLocaleString()}.00</span>
+                              <span>₦{(budgetNum + totalAdj).toLocaleString()}.00</span>
                             </div>
                           </div>
 
@@ -1157,7 +1219,7 @@ export default function ProjectDashboardPage() {
                             <div className="text-right">
                               <div className="text-xs text-gray-500 mb-0.5">Total Adjustment</div>
                               <div className={`text-xl font-bold ${totalAdj >= 0 ? "text-green-600" : "text-red-500"}`}>
-                                {totalAdj >= 0 ? "+" : ""}N{totalAdj.toLocaleString()}
+                                {totalAdj >= 0 ? "+" : ""}₦{totalAdj.toLocaleString()}
                               </div>
                             </div>
                           </div>
@@ -1176,11 +1238,23 @@ export default function ProjectDashboardPage() {
                               <div className="flex flex-col gap-3">
                                 {lines.map((line: any, idx: number) => {
                                   const lineAmt = Number(line.adjustment_amount || line.amount || totalAdj);
+                                  const linePhase =
+                                    line.phase_name ||
+                                    line.phase ||
+                                    (parsedPhases.find((p: any) =>
+                                      p.activities?.some(
+                                        (a: any) =>
+                                          String(a.id) === String(line.activity) ||
+                                          String(a.name) === String(line.activity_name)
+                                      )
+                                    )?.name) ||
+                                    "General Phase";
+
                                   return (
                                     <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white">
                                       <div className="flex justify-between items-center mb-2">
                                         <div className="flex items-center gap-2.5">
-                                          <span className="text-sm font-semibold text-gray-800">Planning Phase</span>
+                                          <span className="text-sm font-semibold text-gray-800">{linePhase}</span>
                                           <Badge variant="outline" className="text-[11px] font-normal text-gray-500 border-gray-200 px-2.5 py-0.5 rounded-full">
                                             {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
                                           </Badge>
@@ -1191,7 +1265,7 @@ export default function ProjectDashboardPage() {
                                           {line.activity_name || "LAB-001"} {line.reason ? `• ${line.reason}` : ""}
                                         </span>
                                         <span className={`text-sm font-bold ${lineAmt >= 0 ? "text-green-600" : "text-red-500"}`}>
-                                          {lineAmt >= 0 ? "+" : ""}N{lineAmt.toLocaleString()}
+                                          {lineAmt >= 0 ? "+" : ""}₦{lineAmt.toLocaleString()}
                                         </span>
                                       </div>
                                     </div>
@@ -1205,15 +1279,15 @@ export default function ProjectDashboardPage() {
                           <div className="p-6 border-b border-gray-100 bg-gray-50/40 text-xs text-gray-600 flex flex-col gap-3">
                             <div className="flex justify-between items-center">
                               <span>Original Budget:</span>
-                              <span className="font-semibold text-gray-800">N{budgetNum.toLocaleString()}.00</span>
+                              <span className="font-semibold text-gray-800">₦{budgetNum.toLocaleString()}.00</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span>Current Budget:</span>
-                              <span className="font-semibold text-gray-800">N{(budgetNum + totalAdj).toLocaleString()}.00</span>
+                              <span className="font-semibold text-gray-800">₦{(budgetNum + totalAdj).toLocaleString()}.00</span>
                             </div>
                             <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-sm font-bold text-[#3B7CED]">
                               <span>New Calculated Budget:</span>
-                              <span>N{(budgetNum + totalAdj).toLocaleString()}.00</span>
+                              <span>₦{(budgetNum + totalAdj).toLocaleString()}.00</span>
                             </div>
                           </div>
 
@@ -1335,7 +1409,7 @@ export default function ProjectDashboardPage() {
                       {tx.cost_category || tx.cost_category_code || tx.cost_code || tx.costCat || "-"}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-gray-800 font-semibold">
-                      N{Number(tx.amount || tx.detail?.total_amount || tx.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      ₦{Number(tx.amount || tx.detail?.total_amount || tx.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="py-3 text-sm">
                       {(() => {

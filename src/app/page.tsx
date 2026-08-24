@@ -96,6 +96,7 @@ const MODULES: Module[] = [
     isFunctional: true,
   },
   // --- Non-Functional Modules (Coming Soon) ---
+  /*
   {
     id: "sales",
     title: "Sales",
@@ -178,6 +179,7 @@ const MODULES: Module[] = [
     Icon: AppIcon,
     isFunctional: false,
   },
+  */
 ];
 
 const colorMap: Record<
@@ -250,11 +252,11 @@ function ModuleCard({ module }: { module: Module }): ReactElement {
         >
           <Icon className="w-10 h-10" />
         </div>
-        {!isFunctional && (
+        {/* {!isFunctional && (
           <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase tracking-wider">
             Coming Soon
           </span>
-        )}
+        )} */}
       </div>
 
       <div className="flex-1 min-w-0">
