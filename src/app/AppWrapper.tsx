@@ -6,6 +6,7 @@ import { store, persistor } from "@/lib/store/store";
 import { PersistGate } from "redux-persist/integration/react";
 import { usePathname } from "next/navigation";
 import { PermissionProvider } from "@/contexts/PermissionContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import Sidebar from "@/components/shared/Sidebar";
 import SessionTimeoutWrapper from "@/components/SessionTimeoutWrapper";
 import DatabaseInitializer from "@/components/DatabaseInitializer";
@@ -61,39 +62,41 @@ export default function AppWrapper({
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <PermissionProvider>
-          <SidebarContext.Provider
-            value={{ toggleSidebar, isOpen: sidebarOpen, isExpanded: sidebarExpanded, toggleExpanded }}
-          >
-            <SessionTimeoutWrapper>
-              <DatabaseInitializer />
-              <div className="flex bg-gray-100 min-h-screen">
-                {!isAuthPage && (
-                  <Sidebar
-                    isOpen={sidebarOpen}
-                    onClose={closeSidebar}
-                    onToggle={toggleSidebar}
-                    isExpanded={sidebarExpanded}
-                    onToggleExpanded={toggleExpanded}
-                  />
-                )}
+          <NotificationProvider>
+            <SidebarContext.Provider
+              value={{ toggleSidebar, isOpen: sidebarOpen, isExpanded: sidebarExpanded, toggleExpanded }}
+            >
+              <SessionTimeoutWrapper>
+                <DatabaseInitializer />
+                <div className="flex bg-gray-100 min-h-screen">
+                  {!isAuthPage && (
+                    <Sidebar
+                      isOpen={sidebarOpen}
+                      onClose={closeSidebar}
+                      onToggle={toggleSidebar}
+                      isExpanded={sidebarExpanded}
+                      onToggleExpanded={toggleExpanded}
+                    />
+                  )}
 
-                {/* Overlay for mobile when sidebar is open */}
-                {!isAuthPage && sidebarOpen && (
+                  {/* Overlay for mobile when sidebar is open */}
+                  {!isAuthPage && sidebarOpen && (
+                    <div
+                      className="fixed inset-0 bg-black/30 z-30 md:hidden"
+                      onClick={closeSidebar}
+                      aria-hidden="true"
+                    />
+                  )}
+
                   <div
-                    className="fixed inset-0 bg-black/30 z-30 md:hidden"
-                    onClick={closeSidebar}
-                    aria-hidden="true"
-                  />
-                )}
-
-                <div
-                  className={`flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ${!isAuthPage ? (sidebarExpanded ? "md:ml-64" : "md:ml-16") : ""}`}
-                >
-                  {children}
+                    className={`flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ${!isAuthPage ? (sidebarExpanded ? "md:ml-64" : "md:ml-16") : ""}`}
+                  >
+                    {children}
+                  </div>
                 </div>
-              </div>
-            </SessionTimeoutWrapper>
-          </SidebarContext.Provider>
+              </SessionTimeoutWrapper>
+            </SidebarContext.Provider>
+          </NotificationProvider>
         </PermissionProvider>
       </PersistGate>
     </Provider>
