@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProtectedComponent } from "@/components/ProtectedComponent";
 import { useSidebarContext } from "@/app/AppWrapper";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface NavItem {
   label: string;
@@ -327,15 +328,8 @@ export function NavBar({
         </nav>
 
         <div className="flex items-center gap-2 md:gap-4">
-          {/* Notification Bell icon button*/}
-          {showNotify && (
-            <button
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="Notifications"
-            >
-              <Bell size={24} className="text-gray-600" />
-            </button>
-          )}
+          {/* Notification Bell with interactive popover */}
+          {showNotify && <NotificationBell />}
 
           <div className="relative" ref={dropdownRef}>
             <button
