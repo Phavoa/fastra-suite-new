@@ -15,7 +15,10 @@ import PaymentTermsSelect from "../shared/PaymentTermsSelect";
 import { useGetVendorsQuery } from "@/api/invoice/vendorsApi";
 import { useGetActiveCurrenciesQuery } from "@/api/invoice/invoiceCurrencyApi";
 import { useGetPaymentTermsQuery } from "@/api/invoice/paymentTermsApi";
-import { useGetApprovedProjectRequestDetailsQuery } from "@/api/invoice/approvedProjectRequestsApi";
+import {
+  useGetApprovedProjectRequestDetailsQuery,
+  useGetApprovedProjectRequestByIdQuery,
+} from "@/api/invoice/approvedProjectRequestsApi";
 import { ToastNotification } from "../shared/ToastNotification";
 
 interface Product {
@@ -171,6 +174,24 @@ export default function ConvertToPOModal({
       setToast(null);
     }
   }, [isOpen]);
+
+  // Autofill delivery address from backend location fields (prefer site_location)
+  useEffect(() => {
+    if (!detailsData || !isOpen) return;
+
+    const loc =
+      (detailsData as any).site_location ??
+      (detailsData as any).location ??
+      (detailsData as any).delivery_address ??
+      (detailsData as any).delivery_location ??
+      (detailsData as any).project_details?.site_location ??
+      (detailsData as any).project_details?.location ??
+      "";
+
+    if (loc && String(loc).trim()) {
+      setDeliveryAddress(String(loc).trim());
+    }
+  }, [detailsData, isOpen]);
 
   if (!isOpen && !isVisible) return null;
 
@@ -476,14 +497,23 @@ export default function ConvertToPOModal({
               <textarea
                 id="delivery-address"
                 value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                placeholder="Enter complete delivery address"
+                readOnly
                 rows={3}
-                disabled={isIssuing}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white resize-none disabled:opacity-60"
+                placeholder={
+                  isDetailsLoading
+                    ? "Loading location…"
+                    : "Location will be filled from the request"
+                }
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-800 resize-none cursor-default focus:outline-none focus:ring-0"
+                aria-readonly="true"
               />
               <MapPin className="absolute right-3 top-3 text-gray-400 w-4 h-4 pointer-events-none" />
             </div>
+            {deliveryAddress && (
+              <p className="mt-1 text-xs text-gray-500">
+                Auto-filled from request location (read-only)
+              </p>
+            )}
           </div>
         </div>
       </div>

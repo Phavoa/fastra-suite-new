@@ -281,7 +281,6 @@ export default function ApprovedRequestsPage() {
   const handleNextStep = () => setCurrentStep(2);
   const handleBackStep = () => setCurrentStep(1);
 
-  // ---------- Convert to PO (Purchase + Plant & Equipment) ----------
   const handleIssuePO = async (payload: {
     vendor: number;
     payment_term: number | null;
@@ -302,18 +301,31 @@ export default function ApprovedRequestsPage() {
     console.log("Convert to PO – final payload sent to API →", finalPayload);
 
     try {
-      await convertRequestToPurchaseOrder({
+      const created = await convertRequestToPurchaseOrder({
         data: finalPayload,
       }).unwrap();
+
+      if (process.env.NODE_ENV === "development")
+        console.log("Convert to PO response →", created);
+
+      // Capture the new PO id from the response (common shapes)
+      const newId = (created as any)?.purchase_order?.id ?? null;
 
       handleCloseModal();
       handleClosePlantEquipmentModal();
       refetch();
-      showToast("success", "PO created successfully");
 
+      showToast("success", "Purchase Order created successfully");
+
+      // Give the toast a moment to appear, then go to the detail page
       setTimeout(() => {
-        router.push("/invoice/purchase-order");
-      }, 1200);
+        if (newId) {
+          router.push(`/invoice/purchase-order/${newId}`);
+        } else {
+          // Fallback if response shape is unexpected
+          router.push("/invoice/purchase-order");
+        }
+      }, 900);
     } catch (err: unknown) {
       if (process.env.NODE_ENV === "development") {
         console.error("Full Convert-to-PO error response →", err);

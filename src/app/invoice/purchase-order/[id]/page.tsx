@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, FileText, CheckCircle, Loader2, ArrowLeft } from "lucide-react";
 import CreateVendorBillModal from "@/components/invoice/CreateVendorBillModal";
@@ -10,13 +10,9 @@ import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   useGetPurchaseOrderByIdQuery,
   useIssuePurchaseOrderMutation,
-  useFullyReceivePurchaseOrderMutation,
 } from "@/api/invoice/projectPurchaseOrdersApi";
 import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
-import { useCreateIncomingProductMutation } from "@/api/inventory/incomingProductApi";
-import { useGetLocationsQuery } from "@/api/inventory/locationApi";
-import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
-import { useGetInventoryUnitOfMeasuresQuery } from "@/api/inventory/unitOfMeasureApi";
+import { useGetAccountingSettingsQuery } from "@/api/invoice/accountingSettingsApi";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Helpers                                  */
@@ -67,20 +63,15 @@ const statusBadgeClass = (status?: string) => {
   return "bg-gray-100 text-gray-700";
 };
 
-/** Goods-based source types that should be pushed to Inventory after Issue */
-const GOODS_SOURCE_TYPES = new Set(["project_purchase_request"]);
-
 /* -------------------------------------------------------------------------- */
 /*                                   Page                                     */
 /* -------------------------------------------------------------------------- */
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const poId = Number(params?.id);
 
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
-  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
   const [toast, setToast] = useState<{
     show: boolean;
     message: string;
@@ -96,76 +87,55 @@ export default function PurchaseOrderDetailPage() {
     skip: !poId || isNaN(poId),
   });
 
-  const { data: locationsResponse = [] } = useGetLocationsQuery({});
-  const locationsData = Array.isArray(locationsResponse)
-    ? locationsResponse
-    : (locationsResponse as any)?.results || [];
-
-  const { data: productsResponse = [] } = useGetInventoryProductsQuery({});
-  const productsData = Array.isArray(productsResponse)
-    ? productsResponse
-    : (productsResponse as any)?.results || [];
-
-  const { data: uomResponse = [] } = useGetInventoryUnitOfMeasuresQuery({});
-  const uomData = Array.isArray(uomResponse)
-    ? uomResponse
-    : (uomResponse as any)?.results || [];
-
   const [issuePurchaseOrder, { isLoading: isIssuing }] =
     useIssuePurchaseOrderMutation();
-  const [fullyReceivePurchaseOrder, { isLoading: isReceiving }] =
-    useFullyReceivePurchaseOrderMutation();
-  const [createIncomingProduct] = useCreateIncomingProductMutation();
 
-  const isActionLoading = isIssuing || isReceiving;
+  const { data: settingsList, isLoading: isSettingsLoading } =
+    useGetAccountingSettingsQuery();
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ show: true, message, type });
   };
 
-  const sourceTypeRaw = (
-    poDetail?.source_request_type ||
-    (poDetail as any)?.request_type ||
-    ""
-  ).toLowerCase();
-  console.log("sourceTypeRaw", sourceTypeRaw);
-  console.log("poDetail", poDetail);
-
-  const isGoodsPurchase = GOODS_SOURCE_TYPES.has(sourceTypeRaw);
-  // Plant & Equipment hire / subcontractor → issue only (no fully-receive)
-  const shouldPushToInventory = isGoodsPurchase;
-
   const status = (poDetail?.status || "").toLowerCase();
   const isDraft = status === "draft";
-  const canCreateBill =
-    !isDraft && status !== "cancelled" && status !== "canceled";
+  const isCancelled = status === "cancelled" || status === "canceled";
+  const isFullybilled = status === "fully_billed";
 
-  /* ----------------------------- Issue (+ receive) ------------------------ */
+  const canPayWithoutReceived =
+    !!settingsList && !!settingsList[0]?.can_pay_without_receiving;
+
+  const hasReceivedQuantity = !!poDetail?.lines?.some(
+    (line) => Number(line.quantity_received) > 0,
+  );
+
+  const canCreateBill = !isDraft && !isCancelled && !isFullybilled;
+  const isCreateBillEnabled =
+    !isSettingsLoading &&
+    canCreateBill &&
+    (canPayWithoutReceived || hasReceivedQuantity);
+
+  const showCreateBillHelper =
+    canCreateBill &&
+    !isSettingsLoading &&
+    !canPayWithoutReceived &&
+    !hasReceivedQuantity;
+  const showSettingNotice =
+    canCreateBill &&
+    !isSettingsLoading &&
+    canPayWithoutReceived &&
+    !hasReceivedQuantity;
+
+  const showReceivedColumn = !isDraft;
+
+  /* ------------------------------- Issue PO -------------------------------- */
 
   const handleIssuePO = async () => {
     if (!poId) return;
 
     try {
       await issuePurchaseOrder(poId).unwrap();
-
-      if (shouldPushToInventory) {
-        try {
-          await fullyReceivePurchaseOrder(poId).unwrap();
-          showToast("PO issued and sent to Inventory.", "success");
-        } catch (receiveErr: unknown) {
-          // Issue succeeded; receive failed — still usable, but warn
-          showToast(
-            extractErrorMessage(
-              receiveErr,
-              "PO issued, but could not send to Inventory. Ask the storekeeper or retry from Inventory.",
-            ),
-            "error",
-          );
-        }
-      } else {
-        showToast("Purchase Order issued successfully.", "success");
-      }
-
+      showToast("Purchase Order issued successfully.", "success");
       await refetch();
     } catch (err: unknown) {
       showToast(
@@ -176,114 +146,7 @@ export default function PurchaseOrderDetailPage() {
     }
   };
 
-  /* ----------------------------- Line selection --------------------------- */
-  const handleReceiveGoods = async () => {
-    if (!poDetail) return;
-
-    if (
-      !confirm(
-        "Are you sure you want to receive goods for this Purchase Order and generate a draft Incoming Product in Inventory Operations?",
-      )
-    )
-      return;
-
-    try {
-      // 1. Mark the PO as received
-      await fullyReceivePurchaseOrder(poId).unwrap();
-
-      // 2. Create the corresponding draft Incoming Product in Inventory
-      const defaultLoc = locationsData[0]?.id || "";
-      const defaultUomId = uomData[0]?.id || 1;
-
-      const payload: any = {
-        receipt_type: "vendor_receipt",
-        supplier: poDetail.vendor,
-        related_ppo: poDetail.id,
-        source_location: defaultLoc,
-        destination_location: defaultLoc,
-        status: "draft",
-        notes: `Draft GRN from Purchase Order ${poDetail.po_number}`,
-        incoming_product_items: (poDetail.lines || []).map((line) => {
-          const matchedProd = productsData.find(
-            (p: any) => p.id?.toString() === line.product?.toString(),
-          );
-          const uom =
-            matchedProd?.unit_of_measure ||
-            matchedProd?.unit_of_measure_details?.id ||
-            defaultUomId;
-
-          return {
-            product: line.product,
-            expected_quantity: line.qty || "0",
-            quantity_received: line.qty || "0",
-            ppo_line: line.id,
-            unit_of_measure: uom,
-          };
-        }),
-      };
-
-      try {
-        await createIncomingProduct(payload).unwrap();
-        alert(
-          "Goods received! A draft Goods Receipt Note (GRN) has been created in Inventory Operations. You can now view and complete it under Inventory > Operations.",
-        );
-      } catch (grnErr: any) {
-        console.warn("Draft GRN creation notice:", grnErr);
-        const errMsg =
-          grnErr?.data?.error?.[0]?.incoming_product_items
-            ?.unit_of_measure?.[0] ||
-          grnErr?.data?.detail ||
-          grnErr?.data?.error ||
-          "Purchase Order marked as received! Please check Inventory > Operations to review incoming products.";
-        alert(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
-      }
-
-      refetch();
-    } catch (err: any) {
-      alert(
-        err?.data?.error || err?.data?.detail || "Failed to receive goods.",
-      );
-      console.error(err);
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const totalAmount = Number(poDetail?.total_amount || 0);
-
-  const formatToSentenceCase = (text: string) =>
-    text
-      .split("_")
-      .join(" ")
-      .replace(/^./, (char) => char.toUpperCase());
-
-  const toggleLineSelection = (lineId: number) => {
-    setSelectedLineIds((prev) =>
-      prev.includes(lineId)
-        ? prev.filter((id) => id !== lineId)
-        : [...prev, lineId],
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (!poDetail?.lines) return;
-    const allIds = poDetail.lines.map((line) => line.id);
-    setSelectedLineIds((prev) => (prev.length === allIds.length ? [] : allIds));
-  };
-
-  const selectedLines =
-    poDetail?.lines?.filter((line) => selectedLineIds.includes(line.id)) || [];
-
-  const allSelected =
-    !!poDetail?.lines?.length &&
-    selectedLineIds.length === poDetail.lines.length;
 
   /* -------------------------------- Render -------------------------------- */
 
@@ -313,12 +176,14 @@ export default function PurchaseOrderDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
-      <ToastNotification
-        show={toast.show}
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
-      />
+      <div className="fixed bottom-6 right-6 z-60 max-w-sm">
+        <ToastNotification
+          show={toast.show}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+        />
+      </div>
 
       {/* Breadcrumb */}
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-gray-500">
@@ -368,13 +233,13 @@ export default function PurchaseOrderDetailPage() {
             <button
               type="button"
               onClick={handleIssuePO}
-              disabled={isActionLoading}
+              disabled={isIssuing}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isActionLoading ? (
+              {isIssuing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {isIssuing ? "Issuing…" : "Sending to Inventory…"}
+                  Issuing…
                 </>
               ) : (
                 <>
@@ -389,25 +254,26 @@ export default function PurchaseOrderDetailPage() {
             <button
               type="button"
               onClick={() => setIsBillModalOpen(true)}
-              disabled={selectedLines.length === 0 || isActionLoading}
+              disabled={!isCreateBillEnabled}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileText className="h-4 w-4" />
               Create Bill
-              {selectedLines.length > 0 && (
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                  {selectedLines.length}
-                </span>
-              )}
             </button>
           )}
         </div>
       </div>
 
-      {isDraft && shouldPushToInventory && (
-        <div className="mb-6 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Issuing this PO will also send it to <strong>Inventory</strong> for
-          the storekeeper to inspect and confirm received quantities.
+      {showSettingNotice && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Bills can be created without goods receipt (setting enabled).
+        </div>
+      )}
+
+      {showCreateBillHelper && (
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          Receive quantity on at least one line or enable &quot;Can Pay Without
+          Received&quot; in Accounting Settings.
         </div>
       )}
 
@@ -430,9 +296,7 @@ export default function PurchaseOrderDetailPage() {
               WBS Element
             </p>
             <p className="text-sm font-medium text-gray-900">
-              {typeof poDetail.wbs_element === "object"
-                ? (poDetail.wbs_element as any)?.name || "—"
-                : poDetail.wbs_element || "—"}
+              {poDetail?.wbs_element_details?.name || "—"}
             </p>
           </div>
           <div>
@@ -489,23 +353,13 @@ export default function PurchaseOrderDetailPage() {
         <div className="border-b border-gray-100 px-5 py-3">
           <h2 className="text-sm font-semibold text-gray-800">Line Items</h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Select lines to include when creating a vendor bill.
+            All line items on this purchase order.
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <th className="w-12 px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleSelectAll}
-                    disabled={!canCreateBill}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
-                    aria-label="Select all lines"
-                  />
-                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Product / Description
                 </th>
@@ -515,6 +369,11 @@ export default function PurchaseOrderDetailPage() {
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                   Qty
                 </th>
+                {showReceivedColumn && (
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Quantity received
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                   Unit Price
                 </th>
@@ -527,20 +386,8 @@ export default function PurchaseOrderDetailPage() {
               {poDetail.lines?.map((line: PurchaseOrderLine) => (
                 <tr
                   key={line.id}
-                  className={`transition-colors hover:bg-gray-50/80 ${
-                    selectedLineIds.includes(line.id) ? "bg-blue-50/50" : ""
-                  }`}
+                  className="transition-colors hover:bg-gray-50/80"
                 >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedLineIds.includes(line.id)}
-                      onChange={() => toggleLineSelection(line.id)}
-                      disabled={!canCreateBill}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
-                      aria-label={`Select ${line.item_name || line.description}`}
-                    />
-                  </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {line.item_name || line.description || "—"}
                   </td>
@@ -550,6 +397,11 @@ export default function PurchaseOrderDetailPage() {
                   <td className="px-4 py-3 text-right text-sm text-gray-600">
                     {line.qty ?? "—"}
                   </td>
+                  {showReceivedColumn && (
+                    <td className="px-4 py-3 text-right text-sm text-gray-600">
+                      {line.quantity_received ?? "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right text-sm text-gray-600">
                     {formatCurrency(Number(line.unit_price || 0))}
                   </td>
@@ -561,7 +413,7 @@ export default function PurchaseOrderDetailPage() {
               {(!poDetail.lines || poDetail.lines.length === 0) && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={showReceivedColumn ? 6 : 5}
                     className="px-4 py-10 text-center text-sm text-gray-500"
                   >
                     No line items on this purchase order.
@@ -572,7 +424,7 @@ export default function PurchaseOrderDetailPage() {
             <tfoot className="border-t border-gray-200 bg-gray-50">
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={showReceivedColumn ? 5 : 4}
                   className="px-4 py-3 text-right text-sm font-semibold text-gray-900"
                 >
                   Total
@@ -593,10 +445,11 @@ export default function PurchaseOrderDetailPage() {
         sourceId={poDetail.id}
         vendorId={poDetail.vendor}
         paymentTerm={poDetail.payment_term}
-        lines={selectedLines.map((line) => ({
+        lines={poDetail.lines.map((line: PurchaseOrderLine) => ({
           id: line.id,
           description: line.description || line.item_name || "",
           qty: line.qty,
+          quantity_received: line.quantity_received,
           unit_price: line.unit_price,
           line_total: line.line_total,
           item_name: line.item_name,
@@ -604,7 +457,6 @@ export default function PurchaseOrderDetailPage() {
         formatCurrency={formatCurrency}
         subtitle={`PO ${poDetail.po_number}`}
         onCreated={() => {
-          setSelectedLineIds([]);
           refetch();
         }}
       />

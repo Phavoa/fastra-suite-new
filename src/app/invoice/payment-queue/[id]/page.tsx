@@ -470,14 +470,16 @@ export default function PaymentQueueDetailPage() {
 
   return (
     <div className="p-4 sm:p-6 min-h-screen bg-gray-50">
-      <ToastNotification
-        show={toast.show}
-        message={toast.message}
-        type={toast.type}
-        onClose={hideToast}
-      />
+      <div className="fixed bottom-6 right-6 z-60 max-w-sm">
+        <ToastNotification
+          show={toast.show}
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      </div>
 
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
           <button
@@ -555,7 +557,7 @@ export default function PaymentQueueDetailPage() {
             )}
 
             {/* Main card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-5 sm:p-6 space-y-8">
                 {/* Summary amounts */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
