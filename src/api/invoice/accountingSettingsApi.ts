@@ -7,6 +7,7 @@ export interface AccountingSettings {
   inventory_account: number;
   default_expense_account: number;
   bank_account: number;
+  can_pay_without_receiving: boolean;
 }
 
 export interface CreateAccountingSettingsRequest {
@@ -14,6 +15,7 @@ export interface CreateAccountingSettingsRequest {
   inventory_account: number;
   default_expense_account: number;
   bank_account: number;
+  can_pay_without_receiving: boolean;
 }
 
 export interface GetAccountingSettingsParams {

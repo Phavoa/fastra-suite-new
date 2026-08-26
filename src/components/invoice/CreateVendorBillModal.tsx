@@ -299,12 +299,14 @@ export default function CreateVendorBillModal({
 
   return (
     <>
-      <ToastNotification
-        show={toast.show}
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
-      />
+      <div className="fixed bottom-6 right-6 z-60 max-w-sm">
+        <ToastNotification
+          show={toast.show}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+        />
+      </div>
 
       <div
         className="fixed inset-0 z-50 bg-black/50"

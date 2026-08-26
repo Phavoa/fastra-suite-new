@@ -43,6 +43,22 @@ export interface ProjectPurchaseOrder {
   updated_at: string;
   lines: PurchaseOrderLine[];
   site_location?: string;
+  wbs_element_details?: {
+    id: string;
+    serial_number: number;
+    name: string;
+    quantity: string;
+    rate: string;
+    amount: string;
+    current_budget: string;
+    total_budget: string;
+    phase: {
+      id: string;
+      name: string;
+      code: string;
+      sequence: number;
+    };
+  };
 }
 
 export interface CreatePurchaseOrderRequest {
