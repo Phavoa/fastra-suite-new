@@ -108,6 +108,8 @@ export interface CreateStockAdjustmentRequest {
   reason?: string;
   status?: StockAdjustmentStatus;
   is_hidden?: boolean;
+  project?: number;
+  adjustment_date?: string;
   stock_adjustment_items: {
     product: number;
     new_quantity: string;

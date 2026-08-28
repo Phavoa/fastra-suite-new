@@ -61,11 +61,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (process.env.NEXT_PUBLIC_WS_URL) {
       candidateUrls.push(process.env.NEXT_PUBLIC_WS_URL);
     }
+    
     if (tenantSchemaName) {
+      // 1. Try tenant-specific WebSocket (Standard for this app's API)
       candidateUrls.push(`wss://${tenantSchemaName}.${apiDomain}/ws/notifications/`);
     }
+    
+    // 2. Try exactly what the backend docs/user suggested
     candidateUrls.push(`wss://${apiDomain}/ws/notifications/`);
-    candidateUrls.push(`wss://app.${apiDomain}/ws/notifications/`);
+    
+    // 3. Try with www prefix just in case
+    candidateUrls.push(`wss://www.${apiDomain}/ws/notifications/`);
 
     const selectedBaseUrl = candidateUrls[urlIndexRef.current % candidateUrls.length];
     
@@ -87,10 +93,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       socket.onopen = () => {
         setIsConnected(true);
-        reconnectAttemptsRef.current = 0;
+        reconnectAttemptsRef.current = 0; // Reset backoff delay
+        (socket as any)._connectedAt = Date.now(); // Track how long it stays open
+
         if (process.env.NODE_ENV === "development") {
           console.log(`🟢 [Notification WebSocket] Connected successfully to ${selectedBaseUrl}`);
         }
+
+        // Setup Heartbeat to prevent 1006 idle timeout drops by proxies (e.g. NGINX/Cloudflare)
+        const heartbeatInterval = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: "ping" }));
+          }
+        }, 25000); // 25s ping
+
+        (socket as any)._heartbeatInterval = heartbeatInterval;
       };
 
       socket.onmessage = (event) => {
@@ -138,16 +155,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       };
 
       socket.onclose = (event) => {
+        if ((socket as any)._heartbeatInterval) {
+          clearInterval((socket as any)._heartbeatInterval);
+        }
+        
         setIsConnected(false);
         socketRef.current = null;
         if (process.env.NODE_ENV === "development") {
-          console.log("🔴 [Notification WebSocket] Connection closed (code:", event.code, ")");
+          console.log(`🔴 [Notification WebSocket] Connection closed (code: ${event.code}) for ${selectedBaseUrl}`);
         }
 
         // Attempt reconnection if token still exists
         if (token) {
-          // Rotate to next candidate URL on failure
-          urlIndexRef.current += 1;
+          const connectedAt = (socket as any)._connectedAt;
+          const uptime = connectedAt ? Date.now() - connectedAt : 0;
+
+          // If the connection dropped within 5 seconds, it's a bad URL. Move to the next candidate.
+          if (!connectedAt || uptime < 5000) {
+            urlIndexRef.current += 1;
+          }
+
           const delay = Math.min(
             1000 * Math.pow(2, reconnectAttemptsRef.current),
             maxReconnectDelay
@@ -176,6 +203,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (socketRef.current) {
+        if ((socketRef.current as any)._heartbeatInterval) {
+          clearInterval((socketRef.current as any)._heartbeatInterval);
+        }
         socketRef.current.close();
         socketRef.current = null;
       }

@@ -186,7 +186,7 @@ export default function EditSubcontractorRequestPage() {
         fields: [
           {
             name: "justification_notes",
-            label: "Notes / Justification",
+            label: "Note",
             type: "text",
             placeholder: "Enter note",
           },

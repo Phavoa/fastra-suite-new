@@ -12,6 +12,7 @@ import {
   useDeleteProjectPurchaseRequestMutation,
   usePatchProjectPurchaseRequestMutation,
 } from "@/api/requests/projectPurchaseRequestApi";
+import { StatusModal } from "@/components/shared/StatusModal";
 import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { motion, AnimatePresence } from "framer-motion";
@@ -46,20 +47,26 @@ interface PurchaseRequestItem {
 
 const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   let parsedProject = req.project_details?.name || (typeof (req as any).project_request === "object" ? (req as any).project_request?.project_details?.name : null) || (typeof req.project === "number" ? `Project #${req.project}` : req.project) || "Project";
-  let parsedPhase = req.phase || "Phase";
-  let parsedTask = req.activity ? `Activity ${req.activity}` : (req.task || "Task");
+  let parsedPhase = req.phase_details?.name || req.phase || "Phase";
+  let parsedTask = req.activity_details?.name || req.activity ? `Activity ${req.activity}` : (req.task || "Task");
   const rawNotes = req.notes || req.purpose || "";
   let parsedNotes = rawNotes;
 
   if (rawNotes && typeof rawNotes === "string" && rawNotes.includes(" | ")) {
-    const parts = rawNotes.split(" | ");
-    parts.forEach((part: string) => {
-      if (part.startsWith("Project: ")) parsedProject = part.replace("Project: ", "");
-      if (part.startsWith("Phase: ")) parsedPhase = part.replace("Phase: ", "");
-      if (part.startsWith("Task: ")) parsedTask = part.replace("Task: ", "");
-      if (part.startsWith("Activity: ")) parsedTask = part.replace("Activity: ", "");
-      if (part.startsWith("Notes: ")) parsedNotes = part.replace("Notes: ", "");
-    });
+    // Extract actual user notes securely even if it contains pipe characters
+    const notesMatch = rawNotes.match(/Notes:\s*(.*)/);
+    if (notesMatch) {
+      parsedNotes = notesMatch[1];
+    } else {
+      const parts = rawNotes.split(" | ");
+      parts.forEach((part: string) => {
+        if (part.startsWith("Project: ")) parsedProject = part.replace("Project: ", "");
+        if (part.startsWith("Phase: ")) parsedPhase = part.replace("Phase: ", "");
+        if (part.startsWith("Task: ")) parsedTask = part.replace("Task: ", "");
+        if (part.startsWith("Activity: ")) parsedTask = part.replace("Activity: ", "");
+        if (part.startsWith("Notes: ")) parsedNotes = part.replace("Notes: ", "");
+      });
+    }
   }
 
   const rawLines = req.lines || req.items || [];
@@ -67,7 +74,7 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     const qty = Number(it.quantity || it.qty || 0);
     const cost = Number(it.estimated_unit_cost || it.estimated_unit_price || 0);
     const total = Number(it.line_total || (qty * cost) || 0);
-    const name = it.product_details?.product_name || (typeof it.product === "number" ? `Product #${it.product}` : it.productName || "Product");
+    const name = it.product_name || it.product_details?.product_name || (typeof it.product === "number" ? `Product #${it.product}` : it.productName || "Product");
     return {
       id: it.id || idx,
       productName: name,
@@ -82,7 +89,11 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   const totalAmount = Number(req.total_amount || req.pr_total_price || req.amount || mappedLines.reduce((sum, item) => sum + item.lineTotal, 0));
 
   let requesterName = "Requester";
-  if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
+  if (req.created_by_details && typeof req.created_by_details === "object") {
+    requesterName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim() || req.created_by_details.username || "Requester";
+  } else if (req.created_by_id) {
+    requesterName = `User #${req.created_by_id}`;
+  } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
     requesterName = req.requester;
   } else if (req.requester_details?.user) {
     requesterName = `${req.requester_details.user.first_name || ""} ${req.requester_details.user.last_name || ""}`.trim() || req.requester_details.user.username;
@@ -97,8 +108,8 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     year: "numeric",
   });
 
-  const refId = req.reference_id || (typeof (req as any).project_request === "object" ? (req as any).project_request?.reference_id : null) || String(req.id || "PR-REQ");
-  const statusVal = req.request_status || req.status || (typeof (req as any).project_request === "object" ? (req as any).project_request?.status : null) || "pending";
+  const refId = req.project_request?.reference_id || req.reference_id || String(req.id || "PR-REQ");
+  const statusVal = req.project_request?.status || req.request_status || req.status || "pending";
   const locationVal = req.site_location || req.requesting_location_details?.location_name || req.requesting_location || req.location || "Lagos Site";
   const reqDateVal = req.required_by_date || req.requiredDate || (req.date_updated ? new Date(req.date_updated).toISOString().split("T")[0] : "");
 
@@ -128,6 +139,17 @@ export default function PurchaseRequestDetailPage() {
   const { id } = useParams();
   const [request, setRequest] = useState<PurchaseRequestItem | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [statusModal, setStatusModal] = useState<{
+    isOpen: boolean;
+    type: "success" | "error";
+    title: string;
+    description: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    description: "",
+  });
 
   const { data: apiData, isLoading: isApiLoading } = useGetProjectPurchaseRequestQuery(
     id as string,
@@ -143,7 +165,12 @@ export default function PurchaseRequestDetailPage() {
       await deleteRequest(id as string).unwrap();
       router.push("/project-request/purchase-request");
     } catch (error) {
-      alert("Failed to delete purchase request. Please try again.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        title: "Delete Failed",
+        description: "Failed to delete purchase request. Please try again.",
+      });
     }
   };
 
@@ -167,9 +194,65 @@ export default function PurchaseRequestDetailPage() {
         setRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
       await patchRequest({ id: id as string, data: { status: newStatus } }).unwrap();
-    } catch (error) {
-      console.error(error);
-      alert("Failed to update status on server.");
+    } catch (error: any) {
+      console.error("API Error Response:", error);
+      
+      let errorMsg = "Failed to update status on server.";
+      
+      // Try parsing complex error formats
+      if (error?.data) {
+        if (error.data.error && Array.isArray(error.data.error)) {
+          // Format: { error: [{ error: "...", available: "...", requested: "..." }] }
+          const errs = error.data.error.map((errObj: any) => {
+            if (typeof errObj === 'string') return errObj;
+            if (errObj && errObj.error) {
+              let msg = errObj.error;
+              if (errObj.available !== undefined && errObj.requested !== undefined) {
+                msg += ` (Available: ₦${Number(errObj.available).toLocaleString('en-NG', {minimumFractionDigits: 2})}, Requested: ₦${Number(errObj.requested).toLocaleString('en-NG', {minimumFractionDigits: 2})})`;
+              }
+              return msg;
+            }
+            return JSON.stringify(errObj);
+          });
+          if (errs.length > 0) {
+            errorMsg = errs.join(" | ");
+          }
+        } else if (Array.isArray(error.data)) {
+          // Format: [{ error: "..." }]
+          const errs = error.data.map((errObj: any) => {
+            if (typeof errObj === 'string') return errObj;
+            if (errObj && errObj.error) {
+              let msg = errObj.error;
+              if (errObj.available !== undefined && errObj.requested !== undefined) {
+                msg += ` (Available: ₦${Number(errObj.available).toLocaleString('en-NG', {minimumFractionDigits: 2})}, Requested: ₦${Number(errObj.requested).toLocaleString('en-NG', {minimumFractionDigits: 2})})`;
+              }
+              return msg;
+            }
+            return JSON.stringify(errObj);
+          });
+          if (errs.length > 0) {
+            errorMsg = errs.join(" | ");
+          }
+        } else if (error.data.error && typeof error.data.error === 'string') {
+          errorMsg = error.data.error;
+        } else if (error.data.message) {
+          errorMsg = error.data.message;
+        } else if (typeof error.data === 'string') {
+          errorMsg = error.data;
+        }
+      }
+      
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        title: "Status Update Failed",
+        description: errorMsg,
+      });
+      
+      // Revert local state update on failure
+      if (apiData) {
+        setRequest(mapApiRequestToUi(apiData));
+      }
     }
   };
 
@@ -412,8 +495,8 @@ export default function PurchaseRequestDetailPage() {
 
           {request.notes && (
             <div className="pt-3 border-t border-gray-100">
-              <span className="block text-xs font-semibold text-gray-500 mb-1">Notes / Justification</span>
-              <p className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
+              <span className="block text-xs font-semibold text-gray-500 mb-1">Note</span>
+              <p className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100 ">
                 "{request.notes}"
               </p>
             </div>
@@ -451,15 +534,17 @@ export default function PurchaseRequestDetailPage() {
           ) : (
             <>
               <div className="flex items-center gap-2">
-                <PermissionGuard module="project_request" entitlement="delete">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsConfirmingDelete(true)}
-                    className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-                  >
-                    <Trash2 size={16} /> Delete
-                  </Button>
-                </PermissionGuard>
+                {request.status !== "pending" && (
+                  <PermissionGuard module="project_request" entitlement="delete">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                    >
+                      <Trash2 size={16} /> Delete
+                    </Button>
+                  </PermissionGuard>
+                )}
                 
                 {request.status === "draft" && (
                   <PermissionGuard module="project_request" entitlement="edit">
@@ -491,6 +576,14 @@ export default function PurchaseRequestDetailPage() {
           )}
         </div>
       </div>
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        type={statusModal.type as any}
+        title={statusModal.title}
+        message={statusModal.description}
+        onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+        onAction={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </motion.div>
   );
 }

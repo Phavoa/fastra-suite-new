@@ -241,7 +241,7 @@ export default function EditLabourRequestPage() {
         fields: [
           {
             name: "justification",
-            label: "Notes / Justification",
+            label: "Note",
             type: "textarea",
             placeholder: "Enter note",
             rows: 4,

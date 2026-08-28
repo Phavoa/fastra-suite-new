@@ -48,10 +48,7 @@ export default function NewSubcontractorRequestPage() {
     return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
   }, [loggedInUser]);
 
-  const [requestId] = React.useState(() => {
-    const num = Math.floor(Math.random() * 90000) + 10000;
-    return `SC${num}`;
-  });
+  const [requestId] = React.useState("Auto-generated");
 
   const vendorOptions = useMemo(() => {
     return vendors.map((vendor) => ({
@@ -170,7 +167,7 @@ export default function NewSubcontractorRequestPage() {
         fields: [
           {
             name: "justification_notes",
-            label: "Notes / Justification",
+            label: "Note",
             type: "text",
             placeholder: "Enter note",
           },

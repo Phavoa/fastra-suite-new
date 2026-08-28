@@ -6,10 +6,6 @@ import {
   Briefcase,
   Settings,
   Bell,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-  XCircle,
   LucideIcon,
 } from "lucide-react";
 
@@ -31,10 +27,10 @@ export function getModuleConfig(moduleName?: string): ModuleConfig {
     case "requests":
       return {
         label: "Project Request",
-        badgeBg: "bg-purple-100",
-        badgeText: "text-purple-800 border-purple-200",
-        iconBg: "bg-purple-50",
-        iconColor: "text-purple-600",
+        badgeBg: "bg-[#F3E8FF]",
+        badgeText: "text-[#7C3AED]",
+        iconBg: "bg-[#F3E8FF]",
+        iconColor: "text-[#7C3AED]",
         Icon: ClipboardList,
       };
 
@@ -44,10 +40,10 @@ export function getModuleConfig(moduleName?: string): ModuleConfig {
     case "rfq":
       return {
         label: "Purchase",
-        badgeBg: "bg-blue-100",
-        badgeText: "text-blue-800 border-blue-200",
-        iconBg: "bg-blue-50",
-        iconColor: "text-blue-600",
+        badgeBg: "bg-[#E8F0FE]",
+        badgeText: "text-[#1A73E8]",
+        iconBg: "bg-[#E8F0FE]",
+        iconColor: "text-[#1A73E8]",
         Icon: ShoppingCart,
       };
 
@@ -56,10 +52,10 @@ export function getModuleConfig(moduleName?: string): ModuleConfig {
     case "delivery_order":
       return {
         label: "Inventory",
-        badgeBg: "bg-emerald-100",
-        badgeText: "text-emerald-800 border-emerald-200",
-        iconBg: "bg-emerald-50",
-        iconColor: "text-emerald-600",
+        badgeBg: "bg-[#E2F2E9]",
+        badgeText: "text-[#2BA24D]",
+        iconBg: "bg-[#E2F2E9]",
+        iconColor: "text-[#2BA24D]",
         Icon: Package,
       };
 
@@ -69,10 +65,10 @@ export function getModuleConfig(moduleName?: string): ModuleConfig {
     case "vendor_bill":
       return {
         label: "Invoice",
-        badgeBg: "bg-teal-100",
-        badgeText: "text-teal-800 border-teal-200",
-        iconBg: "bg-teal-50",
-        iconColor: "text-teal-600",
+        badgeBg: "bg-[#E6FFFA]",
+        badgeText: "text-[#0D9488]",
+        iconBg: "bg-[#E6FFFA]",
+        iconColor: "text-[#0D9488]",
         Icon: Receipt,
       };
 
@@ -80,10 +76,10 @@ export function getModuleConfig(moduleName?: string): ModuleConfig {
     case "project":
       return {
         label: "Project Costing",
-        badgeBg: "bg-amber-100",
-        badgeText: "text-amber-800 border-amber-200",
-        iconBg: "bg-amber-50",
-        iconColor: "text-amber-600",
+        badgeBg: "bg-[#FFF2CC]",
+        badgeText: "text-[#D97706]",
+        iconBg: "bg-[#FFF2CC]",
+        iconColor: "text-[#D97706]",
         Icon: Briefcase,
       };
 
@@ -92,20 +88,20 @@ export function getModuleConfig(moduleName?: string): ModuleConfig {
     case "tenant":
       return {
         label: "Settings",
-        badgeBg: "bg-gray-100",
-        badgeText: "text-gray-800 border-gray-200",
-        iconBg: "bg-gray-50",
-        iconColor: "text-gray-600",
+        badgeBg: "bg-[#E9ECEF]",
+        badgeText: "text-[#495057]",
+        iconBg: "bg-[#E9ECEF]",
+        iconColor: "text-[#495057]",
         Icon: Settings,
       };
 
     default:
       return {
-        label: moduleName || "Notification",
-        badgeBg: "bg-blue-50",
-        badgeText: "text-blue-700 border-blue-200",
-        iconBg: "bg-blue-50",
-        iconColor: "text-blue-600",
+        label: moduleName || "System",
+        badgeBg: "bg-[#E8F0FE]",
+        badgeText: "text-[#1A73E8]",
+        iconBg: "bg-[#E8F0FE]",
+        iconColor: "text-[#1A73E8]",
         Icon: Bell,
       };
   }
@@ -144,4 +140,65 @@ export function formatTimeAgo(dateString: string): string {
   } catch {
     return dateString;
   }
+}
+
+export function resolveNotificationUrl(notification: { action_url?: string; module?: string; object_id?: string; title?: string; message?: string }): string {
+  let url = notification.action_url || "";
+  
+  if (!url) {
+    return "#";
+  }
+
+  // 1. Project Costing Fix
+  // Backend gives: /project-costing/projects/13
+  // Frontend route: /project-costing/13
+  if (url.startsWith("/project-costing/projects/")) {
+    return url.replace("/project-costing/projects/", "/project-costing/");
+  }
+
+  // 2. Project Request Fix
+  // Backend gives: /project-requests/25 or /project_request/25
+  // Frontend route requires the specific sub-module: /project-request/purchase-request/25
+  if (url.startsWith("/project_request/") || url.startsWith("/project-requests/")) {
+    const idMatch = url.match(/\/(?:project_request|project-requests)\/(\d+)/);
+    const id = idMatch ? idMatch[1] : notification.object_id;
+
+    if (id) {
+      const title = (notification.title || "").toLowerCase();
+      const message = (notification.message || "").toLowerCase();
+      
+      let subModule = "";
+      if (title.includes("purchase") || message.includes("purchase")) subModule = "purchase-request";
+      else if (title.includes("labour") || message.includes("labour")) subModule = "labour-request";
+      else if (title.includes("material") || message.includes("material")) subModule = "material-consumption-request";
+      else if (title.includes("petty") || message.includes("petty")) subModule = "petty-cash-request";
+      else if (title.includes("plant") || title.includes("equipment") || message.includes("equipment")) subModule = "plant-equipment-request";
+      else if (title.includes("subcontractor") || message.includes("subcontractor")) subModule = "subcontractor-request";
+
+      if (subModule) {
+        return `/project-request/${subModule}/${id}`;
+      }
+    }
+    
+    return url.replace("/project-requests/", "/project-request/").replace("/project_request/", "/project-request/");
+  }
+
+  // 3. Purchase Request Fix
+  if (url.startsWith("/purchase_request/")) {
+    return url.replace("/purchase_request/", "/purchase/");
+  }
+
+  // 4. Fallback for completely invalid API routes
+  if (url.includes("/api/") || url.includes("fastrasuiteapi")) {
+    const mod = (notification.module || "").toLowerCase();
+    const id = notification.object_id;
+    if (id) {
+      if (mod.includes("project_costing")) return `/project-costing/${id}`;
+      if (mod.includes("project_request")) return `/project-request/${id}`;
+      if (mod.includes("inventory")) return `/inventory/operation/${id}`;
+      if (mod.includes("purchase")) return `/purchase/${id}`;
+    }
+  }
+
+  return url;
 }

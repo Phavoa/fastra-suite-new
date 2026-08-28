@@ -207,11 +207,12 @@ export default function RequestDetailsPage() {
   };
 
   const handleApprove = async () => {
+    const displayRequestId = isMaterialConsumption ? subRequestId || `MCR-${numericId}` : request?.reference_id || `REQ-${numericId}`;
     try {
       await approveRequest({ id: numericId }).unwrap();
       statusModal.showSuccess(
         "Request Approved",
-        `Project request ${request?.reference_id || `ID ${numericId}`} has been successfully approved.`
+        `Project request ${displayRequestId} has been successfully approved.`
       );
     } catch (err: any) {
       const errMsg = err?.data?.message || err?.data?.detail || "An error occurred while approving the request.";
@@ -220,11 +221,12 @@ export default function RequestDetailsPage() {
   };
 
   const handleReject = async () => {
+    const displayRequestId = isMaterialConsumption ? subRequestId || `MCR-${numericId}` : request?.reference_id || `REQ-${numericId}`;
     try {
       await rejectRequest({ id: numericId }).unwrap();
       statusModal.showSuccess(
         "Request Rejected",
-        `Project request ${request?.reference_id || `ID ${numericId}`} has been successfully rejected.`
+        `Project request ${displayRequestId} has been successfully rejected.`
       );
     } catch (err: any) {
       const errMsg = err?.data?.message || err?.data?.detail || "An error occurred while rejecting the request.";
@@ -457,7 +459,7 @@ export default function RequestDetailsPage() {
                       );
                     })
                   ) : (
-                    <p className="text-sm text-gray-500 italic">No material lines recorded.</p>
+                    <p className="text-sm text-gray-500 ">No material lines recorded.</p>
                   )}
                 </div>
                 <div className="mt-6">
@@ -542,7 +544,7 @@ export default function RequestDetailsPage() {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500 italic">No products listed.</p>
+                    <p className="text-sm text-gray-500 ">No products listed.</p>
                   )}
                 </div>
                 <div className="mt-6">

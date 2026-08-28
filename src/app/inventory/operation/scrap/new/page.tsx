@@ -60,6 +60,7 @@ const scrapSchema = z.object({
   project: z.string().optional(),
   location: z.string().min(1, "Location is required"),
   notes: z.string().optional(),
+  scrap_date: z.string().optional(),
 });
 
 type ScrapFormData = z.infer<typeof scrapSchema>;
@@ -161,8 +162,23 @@ export default function CreateScrapPage() {
       project: "",
       location: "",
       notes: "",
+      scrap_date: new Date().toISOString().split("T")[0],
     },
   });
+
+  const selectedProject = watch("project");
+
+  // Automatically fill location with the project's location
+  useEffect(() => {
+    if (!selectedProject) return;
+    const proj = projects.find((p: any) => String(p.id) === selectedProject);
+    if (proj) {
+      const locId = proj.site_location || proj.location;
+      if (locId) {
+        setValue("location", String(locId), { shouldValidate: true });
+      }
+    }
+  }, [selectedProject, projects, setValue]);
 
   const selectedLocation = watch("location");
   const { data: rawStockLevels } = useGetStockLocationsByLocationQuery(selectedLocation, {
@@ -276,7 +292,7 @@ export default function CreateScrapPage() {
     );
   };
 
-  async function onSave(data: ScrapFormData): Promise<void> {
+  async function onSubmit(data: ScrapFormData, status: "draft" | "done"): Promise<void> {
     const validItems = items.filter(
       (item) =>
         item.product && item.scrap_quantity && Number(item.scrap_quantity) > 0,
@@ -300,6 +316,7 @@ export default function CreateScrapPage() {
         warehouse_location: data.location,
         warehouse_location_id: data.location,
         notes: data.notes || "",
+        status: status,
         items: validItems.map((item) => ({
           product: Number(item.product) || item.product,
           scrap_quantity: item.scrap_quantity,
@@ -320,7 +337,9 @@ export default function CreateScrapPage() {
         isOpen: true,
         type: "success",
         title: "Success",
-        message: "Scrap order saved successfully!",
+        message: status === "draft" 
+          ? "Scrap order saved as draft successfully."
+          : "Scrap order validated and recorded successfully.",
       });
 
       setTimeout(() => {
@@ -384,7 +403,7 @@ export default function CreateScrapPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-[#32325D]">
-                  Record Scrap (Damage / Spoilage / Loss)
+                  Record Scrap (Damage / Loss)
                 </h1>
                 <p className="text-xs text-[#8898AA] mt-0.5">
                   Document unusable inventory write-offs and automatically
@@ -415,7 +434,7 @@ export default function CreateScrapPage() {
                       <SelectValue placeholder="Select cause" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="DAMAGE">Damage / Spoilage</SelectItem>
+                      <SelectItem value="DAMAGE">Damage</SelectItem>
                       <SelectItem value="LOSS">Loss</SelectItem>
                     </SelectContent>
                   </Select>
@@ -482,6 +501,18 @@ export default function CreateScrapPage() {
                   )}
                 </div>
 
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Scrap Date
+                  </Label>
+                  <Input
+                    type="date"
+                    readOnly
+                    {...register("scrap_date")}
+                    className="bg-gray-50 border-gray-200 rounded-md h-9 text-sm text-[#525F7F] cursor-not-allowed"
+                  />
+                </div>
+
                 <div className="flex flex-col gap-2 sm:col-span-3">
                   <Label className="text-xs font-semibold text-[#525F7F]">
                     Notes / Reason
@@ -503,23 +534,17 @@ export default function CreateScrapPage() {
                 </h2>
               </div>
               <div className="overflow-x-auto">
-                <Table className="min-w-[900px] table-fixed">
+                <Table className="min-w-[700px] table-fixed">
                   <TableHeader className="bg-[#F6F7F8]">
                     <TableRow>
                       <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Product
-                      </TableHead>
-                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Unit
+                        Product Name
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Current Stock
+                        Unit of Measure
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Scrap Qty
-                      </TableHead>
-                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Remaining
+                        Scrap Quantity
                       </TableHead>
                       <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                         Action
@@ -528,9 +553,6 @@ export default function CreateScrapPage() {
                   </TableHeader>
                   <TableBody className="bg-white">
                     {items.map((it) => {
-                      const remaining =
-                        (Number(it.current_quantity) || 0) -
-                        (Number(it.scrap_quantity) || 0);
                       return (
                         <TableRow
                           key={it.id}
@@ -563,10 +585,6 @@ export default function CreateScrapPage() {
                             {it.unit_of_measure || "—"}
                           </TableCell>
 
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center text-sm font-semibold text-[#32325D]">
-                            {it.current_quantity}
-                          </TableCell>
-
                           <TableCell className="border border-gray-200 align-middle text-center p-0">
                             <Input
                               type="number"
@@ -579,14 +597,6 @@ export default function CreateScrapPage() {
                               placeholder="0"
                               className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0 bg-red-50/30 text-[#E43D2B] font-medium"
                             />
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            <span
-                              className={`text-sm font-bold font-mono ${remaining < 0 ? "text-[#E43D2B]" : "text-[#2BA24D]"}`}
-                            >
-                              {it.product ? remaining.toFixed(2) : "—"}
-                            </span>
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4 align-middle text-center">
@@ -608,7 +618,7 @@ export default function CreateScrapPage() {
                   </TableBody>
                   <TableFooter className="bg-white border-t border-gray-200">
                     <TableRow>
-                      <TableCell colSpan={6} className="py-3 px-4 border-b border-gray-200">
+                      <TableCell colSpan={4} className="py-3 px-4 border-b border-gray-200">
                         <Button
                           type="button"
                           variant="ghost"
@@ -641,10 +651,18 @@ export default function CreateScrapPage() {
             <Button
               type="button"
               disabled={isSubmitting}
-              onClick={handleSubmit(onSave)}
+              onClick={handleSubmit((data) => onSubmit(data, "draft"))}
+              className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm h-9 px-4 font-semibold shadow-2xs"
+            >
+              Save as Draft
+            </Button>
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubmit((data) => onSubmit(data, "done"))}
               className="bg-[#3B7CED] hover:bg-[#3065c3] text-white text-sm h-9 px-4 font-semibold shadow-2xs"
             >
-              {isSubmitting ? "Saving..." : "Save Scrap"}
+              {isSubmitting ? "Validating..." : "Validate"}
             </Button>
           </PermissionGuard>
         </div>

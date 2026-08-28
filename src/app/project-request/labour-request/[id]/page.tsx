@@ -488,7 +488,7 @@ export default function LabourRequestDetailPage() {
                     {new Date(request.updated_at).toLocaleString("en-GB")}
                   </p>
                   {approvalNotes && (
-                    <p className="text-green-700 mt-1 italic font-medium">
+                    <p className="text-green-700 mt-1  font-medium">
                       "{approvalNotes}"
                     </p>
                   )}
@@ -507,7 +507,7 @@ export default function LabourRequestDetailPage() {
                     {new Date(request.updated_at).toLocaleString("en-GB")}
                   </p>
                   {rejectionReason && (
-                    <p className="text-red-600 mt-1 italic font-medium">
+                    <p className="text-red-600 mt-1  font-medium">
                       "{rejectionReason}"
                     </p>
                   )}

@@ -203,7 +203,7 @@ export default function ScrapPage() {
                     <TableHeader>
                       <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                          SCRAP RECORD ID
+                          Record ID
                         </TableHead>
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
                           PRODUCT
@@ -212,7 +212,7 @@ export default function ScrapPage() {
                           QUANTITY
                         </TableHead>
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
-                          CAUSE
+                          Cause
                         </TableHead>
                         <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px]">
                           LOCATION

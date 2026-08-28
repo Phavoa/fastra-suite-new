@@ -171,6 +171,32 @@ export default function MaterialConsumptionRequestDetailPage() {
     );
   }
 
+  if (request.status?.toLowerCase() !== "draft" && !statusModal.isOpen) {
+    return (
+      <PageGuard module="project_request" entitlement="view">
+        <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
+          <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-sm w-full space-y-4">
+            <div className="w-12 h-12 bg-blue-50 text-[#3B7CED] rounded-full flex items-center justify-center mx-auto">
+              <Package size={24} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-gray-800 font-bold">Request Already Submitted</p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                This material consumption request has already been submitted and cannot be viewed or edited here.
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push("/project-request/material-consumption-request")}
+              className="w-full bg-[#3B7CED] text-white hover:bg-blue-600 font-bold h-11 rounded-xl border-none shadow-none"
+            >
+              Go to Request List
+            </Button>
+          </div>
+        </div>
+      </PageGuard>
+    );
+  }
+
   const rawReq: any = request;
   const requestId = rawReq.request_id || (rawReq.reference_id || `MCR-${request.id}`);
   const projectName = rawReq.project_details?.name || rawReq.project_name || (rawReq.project ? `Project #${rawReq.project}` : "-");
@@ -290,16 +316,12 @@ export default function MaterialConsumptionRequestDetailPage() {
 
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1.5 border-b border-gray-50">
-                <span className="text-gray-500 font-semibold">Target Project</span>
+                <span className="text-gray-500 font-semibold">Project</span>
                 <span className="font-bold text-gray-900">{projectName}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-50">
-                <span className="text-gray-500 font-semibold">Warehouse / Location</span>
+                <span className="text-gray-500 font-semibold">Location</span>
                 <span className="font-bold text-gray-900">{locationName}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-50">
-                <span className="text-gray-500 font-semibold">Date Consumed</span>
-                <span className="font-bold text-gray-900">{formattedDate}</span>
               </div>
               <div className="flex justify-between py-1.5">
                 <span className="text-gray-500 font-semibold">Total Line Items</span>
@@ -398,8 +420,8 @@ export default function MaterialConsumptionRequestDetailPage() {
               </div>
               {request.notes && (
                 <div className="pt-3">
-                  <span className="block text-gray-400 font-semibold mb-1">Notes / Justification</span>
-                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-200 leading-relaxed italic">
+                  <span className="block text-gray-400 font-semibold mb-1">Note</span>
+                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-200 leading-relaxed ">
                     {request.notes}
                   </p>
                 </div>

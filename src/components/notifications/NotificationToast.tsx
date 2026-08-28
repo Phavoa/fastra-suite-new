@@ -2,10 +2,10 @@
 
 import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, ArrowRight } from "lucide-react";
+import { X, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AppNotification } from "@/types/notification";
-import { getModuleConfig, formatTimeAgo } from "@/utils/notificationHelpers";
+import { getModuleConfig, formatTimeAgo, resolveNotificationUrl } from "@/utils/notificationHelpers";
 
 interface NotificationToastProps {
   notification: AppNotification | null;
@@ -36,10 +36,11 @@ export function NotificationToast({
 
   const handleClick = () => {
     if (notification.action_url) {
+      const resolvedUrl = resolveNotificationUrl(notification);
       if (onNavigate) {
-        onNavigate(notification.action_url);
+        onNavigate(resolvedUrl);
       } else {
-        router.push(notification.action_url);
+        router.push(resolvedUrl);
       }
     }
     onClose();
@@ -53,13 +54,13 @@ export function NotificationToast({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
-          className="fixed top-5 right-5 z-50 max-w-sm w-full shadow-2xl rounded-xl bg-white border border-gray-100 overflow-hidden ring-1 ring-black/5"
+          className="fixed top-5 right-5 z-50 max-w-sm w-full shadow-xl rounded-lg bg-white border border-gray-100 overflow-hidden font-sans"
         >
           <div className="p-4 flex items-start gap-3.5">
             <div
-              className={`p-2.5 rounded-xl ${config.iconBg} ${config.iconColor} shrink-0 mt-0.5`}
+              className={`p-2 rounded-lg ${config.iconBg} ${config.iconColor} shrink-0 mt-0.5 shadow-2xs flex items-center justify-center`}
             >
-              <Icon size={20} />
+              <Icon size={18} />
             </div>
 
             <div
@@ -68,26 +69,26 @@ export function NotificationToast({
             >
               <div className="flex items-center gap-2 mb-1">
                 <span
-                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${config.badgeBg} ${config.badgeText}`}
+                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${config.badgeBg} ${config.badgeText}`}
                 >
                   {config.label}
                 </span>
-                <span className="text-[11px] text-gray-600">
+                <span className="text-[11.5px] text-[#8898AA]">
                   {formatTimeAgo(notification.created_at)}
                 </span>
               </div>
 
-              <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
+              <h4 className="text-sm font-semibold text-[#32325D] line-clamp-1">
                 {notification.title || "New Notification"}
               </h4>
 
-              <p className="text-xs text-gray-600 line-clamp-2 mt-0.5 leading-relaxed">
+              <p className="text-xs text-[#8898AA] line-clamp-2 mt-0.5 leading-relaxed">
                 {notification.message}
               </p>
 
               {notification.actor_name && (
-                <p className="text-[11px] text-gray-600 mt-1">
-                  By <span className="font-medium text-gray-700">{notification.actor_name}</span>
+                <p className="text-[11px] text-[#8898AA] mt-1">
+                  By <span className="font-medium text-[#32325D]">{notification.actor_name}</span>
                 </p>
               )}
 
@@ -104,19 +105,19 @@ export function NotificationToast({
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1 rounded-lg text-gray-600 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0 -mr-1 -mt-1"
+              className="p-1 rounded-md text-[#8898AA] hover:text-[#32325D] hover:bg-gray-100 transition-colors shrink-0 -mr-1 -mt-1"
               aria-label="Close notification"
             >
               <X size={16} />
             </button>
           </div>
           
-          {/* Subtle animated progress bar */}
+          {/* Progress bar */}
           <motion.div
             initial={{ width: "100%" }}
             animate={{ width: "0%" }}
             transition={{ duration: duration / 1000, ease: "linear" }}
-            className="h-1 bg-[#3B7CED]/60"
+            className="h-0.5 bg-[#3B7CED]"
           />
         </motion.div>
       )}

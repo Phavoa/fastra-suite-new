@@ -15,6 +15,7 @@ import { useGetLocationsQuery } from "@/api/inventory/locationApi";
 import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
 import { useCreateStockAdjustmentMutation } from "@/api/inventory/stockAdjustmentApi";
 import { useGetStockLocationsByLocationQuery } from "@/api/inventory/stockLocationApi";
+import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -48,6 +49,8 @@ interface StockAdjustmentLineItem {
 const stockAdjustmentSchema = z.object({
   warehouse_location: z.string().min(1, "Warehouse location is required"),
   notes: z.string().min(1, "Reason/Notes is required"),
+  project: z.string().optional(),
+  adjustment_date: z.string().optional(),
 });
 
 type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>;
@@ -73,6 +76,7 @@ export default function CreateStockAdjustmentPage() {
   const [createStockAdjustment] = useCreateStockAdjustmentMutation();
   const { data: rawLocations, isLoading: isLoadingLocations } = useGetLocationsQuery({ location_type: "internal" });
   const { data: rawProducts, isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
+  const { data: rawProjects, isLoading: isLoadingProjects } = useGetProjectCostingProjectsQuery({});
 
   const locations = React.useMemo(() => {
     return Array.isArray(rawLocations)
@@ -86,6 +90,12 @@ export default function CreateStockAdjustmentPage() {
       : (rawProducts as any)?.results || (rawProducts as any)?.data || [];
   }, [rawProducts]);
 
+  const projects = React.useMemo(() => {
+    return Array.isArray(rawProjects)
+      ? rawProjects
+      : (rawProjects as any)?.results || (rawProjects as any)?.data || [];
+  }, [rawProjects]);
+
   const {
     register,
     handleSubmit,
@@ -97,10 +107,26 @@ export default function CreateStockAdjustmentPage() {
     defaultValues: {
       warehouse_location: "",
       notes: "",
+      project: "",
+      adjustment_date: new Date().toISOString().split('T')[0],
     },
   });
 
   const selectedLocation = watch("warehouse_location");
+  const selectedProject = watch("project");
+
+  // Automatically fill location with the project's location
+  React.useEffect(() => {
+    if (!selectedProject) return;
+    const proj = projects.find((p: any) => String(p.id) === selectedProject);
+    if (proj) {
+      const locId = proj.site_location || proj.location;
+      if (locId) {
+        setValue("warehouse_location", String(locId), { shouldValidate: true });
+      }
+    }
+  }, [selectedProject, projects, setValue]);
+
   const { data: rawStockLevels } = useGetStockLocationsByLocationQuery(selectedLocation, {
     skip: !selectedLocation,
   });
@@ -223,7 +249,7 @@ export default function CreateStockAdjustmentPage() {
     const stockLabel = stock !== undefined ? ` • ${stock} in stock` : "";
     return {
       value: String(p.id),
-      label: `${p.product_name || p.name || `Product #${p.id}`} (${uom})${stockLabel}`,
+      label: `${p.product_name || p.name || `Product #${p.id}`}${stockLabel}`,
     };
   });
 
@@ -231,6 +257,13 @@ export default function CreateStockAdjustmentPage() {
     value: String(l.id),
     label: l.location_name || l.location_code || `Location #${l.id}`,
   }));
+
+  const projectOptions: Option[] = React.useMemo(() => {
+    return projects.map((p: any) => ({
+      value: String(p.id),
+      label: p.name || p.project_name || `Project #${p.id}`,
+    }));
+  }, [projects]);
 
   async function onSave(data: StockAdjustmentFormData) {
     await submitForm(data, "draft");
@@ -273,6 +306,8 @@ export default function CreateStockAdjustmentPage() {
         notes: data.notes,
         reason: data.notes,
         status: status,
+        ...(data.project ? { project: Number(data.project) } : {}),
+        ...(data.adjustment_date ? { adjustment_date: data.adjustment_date } : {}),
         stock_adjustment_items: validItems.map((item) => ({
           product: Number(item.product) || 1,
           new_quantity: item.new_quantity,
@@ -350,9 +385,6 @@ export default function CreateStockAdjustmentPage() {
                     readOnly
                     className="bg-gray-50 border-gray-200 h-9 text-sm text-[#525F7F] cursor-not-allowed rounded-md font-medium"
                   />
-                  <p className="text-[11px] text-[#8898AA]">
-                    Fixed to Stock Level Update{" "}
-                  </p>
                 </div>
 
                 {/* Warehouse Location */}
@@ -382,6 +414,42 @@ export default function CreateStockAdjustmentPage() {
                       {errors.warehouse_location.message}
                     </p>
                   )}
+                </div>
+
+                {/* Project Field */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Project
+                  </Label>
+                  <Select
+                    value={watch("project")}
+                    onValueChange={(value) =>
+                      setValue("project", value)
+                    }
+                  >
+                    <SelectTrigger className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]">
+                      <SelectValue placeholder={isLoadingProjects ? "Loading..." : "Select project (optional)"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Adjustment Date */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Adjustment Date
+                  </Label>
+                  <Input
+                    type="date"
+                    {...register("adjustment_date")}
+                    className="bg-white border-gray-200 rounded-md h-9 text-sm text-[#32325D] focus:ring-[#3B7CED]"
+                  />
                 </div>
 
                 {/* Notes (Mandatory Reason per PRD) */}
@@ -424,7 +492,7 @@ export default function CreateStockAdjustmentPage() {
                         Unit
                       </TableHead>
                       <TableHead className="py-3.5 px-6 font-medium text-gray-600 text-sm whitespace-nowrap text-center w-36">
-                        Current System Qty
+                        Current Quantity
                       </TableHead>
                       <TableHead className="py-3.5 px-6 font-medium text-gray-600 text-sm whitespace-nowrap text-center w-36">
                         New Physical Count

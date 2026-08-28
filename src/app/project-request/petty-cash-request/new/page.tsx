@@ -35,10 +35,7 @@ export default function NewPettyCashRequestPage() {
     return `${anyUser.first_name || ""} ${anyUser.last_name || ""}`.trim() || loggedInUser.username || "Current User";
   }, [loggedInUser]);
 
-  const [requestId] = React.useState(() => {
-    const num = Math.floor(Math.random() * 90000) + 10000;
-    return `PC${num}`;
-  });
+  const [requestId] = React.useState("Auto-generated");
 
   const [currentDate] = React.useState(() =>
     new Date().toLocaleDateString("en-GB", {
@@ -134,7 +131,7 @@ export default function NewPettyCashRequestPage() {
         fields: [
           {
             name: "notes",
-            label: "Notes / Justification",
+            label: "Note",
             type: "text",
             placeholder: "Enter note",
           },

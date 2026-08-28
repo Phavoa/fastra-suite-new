@@ -124,7 +124,7 @@ export default function NewLabourRequestPage() {
 
   const config: RequestFormConfig<FormValues> = {
     title: "Labour Request",
-    requestId: "LR00001",
+    requestId: "Auto-generated",
     requesterName: loggedInUserName,
     date: new Date().toLocaleDateString("en-GB", {
       day: "numeric",
@@ -224,7 +224,7 @@ export default function NewLabourRequestPage() {
         fields: [
           {
             name: "justification",
-            label: "Notes / Justification",
+            label: "Note",
             type: "textarea",
             placeholder: "Enter note",
             rows: 4,

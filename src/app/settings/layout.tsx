@@ -178,7 +178,7 @@ export default function SettingsLayout({
         onNew={handleNew}
         initialView="grid"
         onShowArchivedUsers={
-          activeSection === "user" || activeSection === "permissiontemplates"
+          activeSection === "permissiontemplates"
             ? handleShowArchived
             : undefined
         }

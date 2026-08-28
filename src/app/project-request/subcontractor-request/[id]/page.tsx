@@ -335,7 +335,7 @@ export default function SubcontractorRequestDetailsPage() {
               <span className="block text-gray-500 font-semibold mb-1">
                 Scope of Work
               </span>
-              <p className="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed italic">
+              <p className="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed ">
                 "{request.scope_of_work || "N/A"}"
               </p>
             </div>
@@ -456,7 +456,7 @@ export default function SubcontractorRequestDetailsPage() {
                 <div>
                   <p className="font-bold text-gray-900">Request Approved</p>
                   <p className="text-gray-400 text-[11px]">Just now</p>
-                  <p className="text-green-700 mt-1 italic font-medium">
+                  <p className="text-green-700 mt-1  font-medium">
                     "Budget validation passed. Ready for processing."
                   </p>
                 </div>
@@ -471,7 +471,7 @@ export default function SubcontractorRequestDetailsPage() {
                 <div>
                   <p className="font-bold text-gray-900">Request Rejected</p>
                   <p className="text-gray-400 text-[11px]">Just now</p>
-                  <p className="text-red-600 mt-1 italic font-medium">
+                  <p className="text-red-600 mt-1  font-medium">
                     "Reason: Exceeds budget allocation."
                   </p>
                 </div>

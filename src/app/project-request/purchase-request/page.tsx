@@ -25,12 +25,7 @@ interface PurchaseRequestItem {
   requester: string;
   date: string;
   project: string;
-  location: string;
-  requiredDate: string;
-  phase: string;
-  task: string;
-  notes: string;
-  lineCount?: number;
+  productName: string;
 }
 
 const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
@@ -43,27 +38,19 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
       ? `Project #${req.project}`
       : req.project) ||
     "Project";
-  let parsedPhase = req.phase || "Phase";
-  let parsedTask = req.activity
-    ? `Activity ${req.activity}`
-    : req.task || "Task";
-  const rawNotes = req.notes || req.purpose || "";
-  let parsedNotes = rawNotes;
-
-  if (rawNotes && typeof rawNotes === "string" && rawNotes.includes(" | ")) {
-    const parts = rawNotes.split(" | ");
-    parts.forEach((part: string) => {
-      if (part.startsWith("Project: "))
-        parsedProject = part.replace("Project: ", "");
-      if (part.startsWith("Phase: ")) parsedPhase = part.replace("Phase: ", "");
-      if (part.startsWith("Task: ")) parsedTask = part.replace("Task: ", "");
-      if (part.startsWith("Activity: "))
-        parsedTask = part.replace("Activity: ", "");
-      if (part.startsWith("Notes: ")) parsedNotes = part.replace("Notes: ", "");
-    });
-  }
 
   const rawLines = req.lines || req.items || [];
+  
+  let parsedProductName = "Product";
+  if (req.product_name) {
+    parsedProductName = req.product_name;
+  } else if (req.product?.name) {
+    parsedProductName = req.product.name;
+  } else if (rawLines.length > 0) {
+    const firstLine = rawLines[0];
+    parsedProductName = firstLine.product_name || firstLine.item_name || firstLine.product?.name || firstLine.name || firstLine.description || "Product";
+  }
+
   const totalQty =
     rawLines.reduce(
       (sum: number, item: any) => sum + Number(item.quantity || item.qty || 0),
@@ -86,7 +73,7 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
       ),
   );
 
-  let requesterName = "Requester";
+  let requesterName = "";
   if (
     req.requester &&
     typeof req.requester === "string" &&
@@ -105,6 +92,10 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
       `${(req as any).project_request.created_by_details.first_name || ""} ${(req as any).project_request.created_by_details.last_name || ""}`.trim() ||
       (req as any).project_request.created_by_details.username;
   }
+  
+  if (!requesterName) {
+    requesterName = "Unknown";
+  }
 
   const dateValue =
     req.created_at || req.date_created || req.date || Date.now();
@@ -119,7 +110,8 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     (typeof req.project_request === "object"
       ? (req as any).project_request?.reference_id
       : null) ||
-    String(req.id || "PR-REQ");
+    (req.id ? `PR-${String(req.id).padStart(5, "0")}` : "PR-REQ");
+    
   const statusVal =
     req.request_status ||
     req.status ||
@@ -127,41 +119,18 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
       ? (req as any).project_request?.status
       : null) ||
     "pending";
-  const locationVal =
-    req.site_location ||
-    req.requesting_location_details?.location_name ||
-    req.requesting_location ||
-    req.location ||
-    "Lagos Site";
-  const reqDateVal =
-    req.required_by_date ||
-    req.requiredDate ||
-    (req.date_updated
-      ? new Date(req.date_updated).toISOString().split("T")[0]
-      : "");
-
-  const titleVal =
-    req.title ||
-    (parsedProject && parsedProject !== "Project"
-      ? `Purchase Request - ${parsedProject}`
-      : `Purchase Request #${req.id || refId}`);
 
   return {
     id: String(req.id),
     reference_id: refId,
-    title: titleVal,
+    title: parsedProject,
     status: (statusVal.toLowerCase() as any) || "pending",
     quantity: totalQty,
     amount: totalAmount,
     requester: requesterName,
     date: formattedDate,
     project: parsedProject,
-    location: locationVal,
-    requiredDate: reqDateVal,
-    phase: parsedPhase,
-    task: parsedTask,
-    notes: parsedNotes,
-    lineCount: rawLines.length || 1,
+    productName: parsedProductName,
   };
 };
 
@@ -169,8 +138,12 @@ export default function PurchaseRequestsDashboard() {
   const router = useRouter();
   const [requests, setRequests] = useState<PurchaseRequestItem[]>([]);
 
-  const { data: apiRequests, isLoading: isApiLoading } =
-    useGetProjectPurchaseRequestsQuery({});
+  const { data: apiRequests, isLoading: isApiLoading, refetch } =
+    useGetProjectPurchaseRequestsQuery(undefined, { refetchOnMountOrArgChange: true });
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
 
   useEffect(() => {
     let apiList: PurchaseRequestItem[] = [];
@@ -278,12 +251,7 @@ export default function PurchaseRequestsDashboard() {
           {req.title}
         </h3>
         <div className="text-xs text-gray-500 mb-4 flex items-center gap-2">
-          <span className="font-semibold text-[#3B7CED]">
-            {req.lineCount || 1} Line Item
-            {(req.lineCount || 1) > 1 ? "s" : ""}
-          </span>
-          &bull;
-          <span>{req.location}</span>
+          <span>{req.productName}</span>
         </div>
 
         <div className="grid grid-cols-3 text-xs gap-2 border-t border-gray-50 pt-3">

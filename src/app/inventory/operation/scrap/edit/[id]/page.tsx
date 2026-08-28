@@ -419,7 +419,7 @@ export default function EditScrapPage() {
                       <SelectValue placeholder="Select cause" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="DAMAGE">Damage / Spoilage</SelectItem>
+                      <SelectItem value="DAMAGE">Damage</SelectItem>
                       <SelectItem value="LOSS">Loss</SelectItem>
                     </SelectContent>
                   </Select>
@@ -507,23 +507,17 @@ export default function EditScrapPage() {
                 </h2>
               </div>
               <div className="overflow-x-auto">
-                <Table className="min-w-[900px] table-fixed">
+                <Table className="min-w-[700px] table-fixed">
                   <TableHeader className="bg-[#F6F7F8]">
                     <TableRow>
                       <TableHead className="w-64 border border-gray-200 px-4 py-3 text-left text-sm text-gray-600 font-medium">
-                        Product
-                      </TableHead>
-                      <TableHead className="w-24 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Unit
+                        Product Name
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Current Stock
+                        Unit of Measure
                       </TableHead>
                       <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Scrap Qty
-                      </TableHead>
-                      <TableHead className="w-32 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                        Remaining
+                        Scrap Quantity
                       </TableHead>
                       <TableHead className="w-16 border border-gray-200 px-4 py-3 text-center text-sm text-gray-600 font-medium">
                         Action
@@ -532,9 +526,6 @@ export default function EditScrapPage() {
                   </TableHeader>
                   <TableBody className="bg-white">
                     {items.map((it) => {
-                      const remaining =
-                        (Number(it.current_quantity) || 0) -
-                        (Number(it.scrap_quantity) || 0);
                       return (
                         <TableRow
                           key={it.id}
@@ -567,10 +558,6 @@ export default function EditScrapPage() {
                             {it.unit_of_measure || "—"}
                           </TableCell>
 
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center text-sm font-semibold text-[#32325D]">
-                            {it.current_quantity}
-                          </TableCell>
-
                           <TableCell className="border border-gray-200 align-middle text-center p-0">
                             <Input
                               type="number"
@@ -583,14 +570,6 @@ export default function EditScrapPage() {
                               placeholder="0"
                               className="h-11 w-full text-center rounded-none border-0 focus:ring-0 focus:ring-offset-0 bg-red-50/30 text-[#E43D2B] font-medium"
                             />
-                          </TableCell>
-
-                          <TableCell className="border border-gray-200 px-4 align-middle text-center">
-                            <span
-                              className={`text-sm font-bold font-mono ${remaining < 0 ? "text-[#E43D2B]" : "text-[#2BA24D]"}`}
-                            >
-                              {it.product ? remaining.toFixed(2) : "—"}
-                            </span>
                           </TableCell>
 
                           <TableCell className="border border-gray-200 px-4 align-middle text-center">
@@ -612,7 +591,7 @@ export default function EditScrapPage() {
                   </TableBody>
                   <TableFooter className="bg-white border-t border-gray-200">
                     <TableRow>
-                      <TableCell colSpan={6} className="py-3 px-4 border-b border-gray-200">
+                      <TableCell colSpan={4} className="py-3 px-4 border-b border-gray-200">
                         <Button
                           type="button"
                           variant="ghost"

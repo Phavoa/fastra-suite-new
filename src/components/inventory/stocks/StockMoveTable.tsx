@@ -42,7 +42,7 @@ export function StockMoveTable({ moves, query = "" }: StockMoveTableProps) {
                 DATE
               </TableHead>
               <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                MOVE ID / REF
+                REFERENCE
               </TableHead>
               <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
                 TYPE
@@ -58,6 +58,15 @@ export function StockMoveTable({ moves, query = "" }: StockMoveTableProps) {
               </TableHead>
               <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
                 BALANCE
+              </TableHead>
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                WBS PHASE
+              </TableHead>
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                WBS ACTIVITY
+              </TableHead>
+              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                USER
               </TableHead>
             </TableRow>
           </TableHeader>

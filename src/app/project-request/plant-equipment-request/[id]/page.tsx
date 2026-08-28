@@ -339,8 +339,8 @@ export default function PlantEquipmentRequestDetailPage() {
             </div>
             {request.notes && (
               <div className="pt-3">
-                <span className="block text-gray-400 font-semibold mb-1">Notes / Justification</span>
-                <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-200 leading-relaxed italic">
+                <span className="block text-gray-400 font-semibold mb-1">Note</span>
+                <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-200 leading-relaxed ">
                   {request.notes}
                 </p>
               </div>

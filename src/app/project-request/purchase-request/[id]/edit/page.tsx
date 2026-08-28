@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CreateProductModal } from "@/components/shared/CreateProductModal";
 import {
   useGetAvailableBudgetQuery,
 } from "@/api/projectApi";
@@ -133,23 +134,30 @@ export default function EditPurchaseRequestPage() {
 
   useEffect(() => {
     if (requestData) {
-      if (requestData.project) setSelectedProjectId(String(requestData.project));
+      const projectId = requestData.project_details?.id || requestData.project;
+      if (projectId) setSelectedProjectId(String(projectId));
       
-      let parsedPhase = "";
-      let parsedTask = "";
+      let parsedPhase = requestData.phase_details?.id || requestData.phase || "";
+      let parsedTask = requestData.activity_details?.id || requestData.activity || "";
       let parsedNotes = requestData.notes || requestData.purpose || "";
+      
       if (parsedNotes && typeof parsedNotes === "string" && parsedNotes.includes(" | ")) {
         const parts = parsedNotes.split(" | ");
         parts.forEach((part: string) => {
-          if (part.startsWith("Phase: ")) parsedPhase = part.replace("Phase: ", "");
-          if (part.startsWith("Activity: ")) parsedTask = part.replace("Activity: ", "");
+          if (part.startsWith("Phase: ") && !parsedPhase) parsedPhase = part.replace("Phase: ", "");
+          if (part.startsWith("Activity: ") && !parsedTask) parsedTask = part.replace("Activity: ", "");
           if (part.startsWith("Notes: ")) parsedNotes = part.replace("Notes: ", "");
         });
       }
+      
       setNotes(parsedNotes);
 
-      if (requestData.activity) {
-        setSelectedTaskId(String(requestData.activity));
+      if (parsedPhase) {
+        setSelectedPhaseId(String(parsedPhase));
+      }
+
+      if (parsedTask) {
+        setSelectedTaskId(String(parsedTask));
       }
       
       if (requestData.site_location) {
@@ -1031,7 +1039,7 @@ export default function EditPurchaseRequestPage() {
                     </div>
 
                     {item.description && (
-                      <p className="text-xs text-gray-500 italic mt-1">
+                      <p className="text-xs text-gray-500  mt-1">
                         {item.description}
                       </p>
                     )}
@@ -1077,7 +1085,7 @@ export default function EditPurchaseRequestPage() {
 
           <div className="space-y-1.5 pt-2">
             <Label className="text-xs font-semibold text-gray-700">
-              Notes / Justification
+              Note
             </Label>
             <Textarea
               placeholder="Enter note"
@@ -1165,6 +1173,8 @@ function ItemEditForm({
     );
   }, [allProducts, searchQuery]);
 
+  const [isCreateProductModalOpen, setIsCreateProductModalOpen] = useState(false);
+
   const handleSelect = (name: string, id: string) => {
     const selectedProd = allProducts.find((p) => p.id === id || p.name.toLowerCase() === name.toLowerCase());
     onUpdate({
@@ -1179,9 +1189,20 @@ function ItemEditForm({
   };
 
   const handleAddNew = (name: string) => {
-    onUpdate({ productName: name, productId: `custom-${Date.now()}`, error: undefined });
-    setSearchQuery(name);
+    setIsCreateProductModalOpen(true);
     setIsOpen(false);
+  };
+
+  const handleProductCreated = (product: { id: string | number; name: string; standardCost?: string | number; description?: string }) => {
+    onUpdate({ 
+      productName: product.name, 
+      productId: String(product.id), 
+      ...(product.standardCost ? { unitCost: Number(product.standardCost) } : {}),
+      ...(product.description ? { description: product.description } : {}),
+      error: undefined 
+    });
+    setSearchQuery(product.name);
+    setIsCreateProductModalOpen(false);
   };
 
   return (
@@ -1331,6 +1352,14 @@ function ItemEditForm({
       >
         Done
       </button>
+
+      {/* Create Product Modal */}
+      <CreateProductModal
+        isOpen={isCreateProductModalOpen}
+        onClose={() => setIsCreateProductModalOpen(false)}
+        initialProductName={searchQuery.trim()}
+        onSuccess={handleProductCreated}
+      />
     </div>
   );
 }

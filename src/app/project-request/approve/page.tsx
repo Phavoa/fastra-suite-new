@@ -63,11 +63,31 @@ export default function ApproveRequestPage() {
   };
 
   const handleApprove = async (id: number) => {
+    const request = apiRequests.find((r: any) => r.id === id);
+    let displayId = `REQ-${id}`;
+    if (request) {
+      if (request.request_type === "material_consumption") {
+        let detail = {};
+        if (request.detail) {
+          if (typeof request.detail === "string") {
+            try {
+              detail = JSON.parse(request.detail);
+            } catch (e) {}
+          } else {
+            detail = request.detail;
+          }
+        }
+        displayId = (detail as any)?.request_id || request.reference_id || `MCR-${id}`;
+      } else {
+        displayId = request.reference_id || `REQ-${id}`;
+      }
+    }
+
     try {
       await approveRequest({ id }).unwrap();
       statusModal.showSuccess(
         "Request Approved",
-        `Project request ID ${id} has been successfully approved.`
+        `Project request ${displayId} has been successfully approved.`
       );
       refetch();
     } catch (err: any) {
@@ -77,11 +97,31 @@ export default function ApproveRequestPage() {
   };
 
   const handleReject = async (id: number) => {
+    const request = apiRequests.find((r: any) => r.id === id);
+    let displayId = `REQ-${id}`;
+    if (request) {
+      if (request.request_type === "material_consumption") {
+        let detail = {};
+        if (request.detail) {
+          if (typeof request.detail === "string") {
+            try {
+              detail = JSON.parse(request.detail);
+            } catch (e) {}
+          } else {
+            detail = request.detail;
+          }
+        }
+        displayId = (detail as any)?.request_id || request.reference_id || `MCR-${id}`;
+      } else {
+        displayId = request.reference_id || `REQ-${id}`;
+      }
+    }
+
     try {
       await rejectRequest({ id }).unwrap();
       statusModal.showSuccess(
         "Request Rejected",
-        `Project request ID ${id} has been successfully rejected.`
+        `Project request ${displayId} has been successfully rejected.`
       );
       refetch();
     } catch (err: any) {
