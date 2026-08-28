@@ -42,8 +42,10 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
     const fetchProfile = async () => {
       try {
+        const domain = process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
+        const protocol = (domain.includes("localhost") || domain.includes("127.0.0.1")) ? "http" : "https";
         const res = await fetch(
-          `https://${tenant_schema_name}.${process.env.NEXT_PUBLIC_API_DOMAIN}/users/tenant-users/${tenant_user_id}/`,
+          `${protocol}://${tenant_schema_name}.${domain}/users/tenant-users/${tenant_user_id}/`,
           {
             headers: {
               Authorization: `Bearer ${access_token}`,

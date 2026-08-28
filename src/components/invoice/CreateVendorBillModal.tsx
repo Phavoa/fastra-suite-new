@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Upload, File, Trash2, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Upload, File, Trash2, ChevronRight, Loader2 } from "lucide-react";
 
 import { useCreateVendorBillMutation } from "@/api/invoice/vendorBillsApi";
-import { useGetCompanyBankAccountsQuery } from "@/api/invoice/companyBankAccountsApi";
-import { CompanyBankAccount } from "@/api/invoice/companyBankAccountsApi";
+import {
+  useGetCompanyBankAccountsQuery,
+  type CompanyBankAccount,
+} from "@/api/invoice/companyBankAccountsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 import {
   Select,
@@ -19,7 +22,10 @@ import {
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
 
-export type VendorBillSourceType = "PROJECT_PO" | "LABOUR" | "SUBCONTRACTOR";
+export type VendorBillSourceType =
+  | "PROJECT_PO"
+  | "PLANT_AND_EQUIPMENT"
+  | "SUBCONTRACTOR";
 
 export type SubcontractorLineType = "milestone" | "lump_sum";
 
@@ -29,14 +35,13 @@ export interface VendorBillLineItem {
   qty?: number | string;
   unit_price?: number | string;
   line_total?: number | string;
-  item_name?: string; // optional fallback
+  item_name?: string;
 }
 
 interface CreateVendorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
 
-  /** Required for all source types */
   sourceType: VendorBillSourceType;
   /** project_purchase_order id OR project_request id */
   sourceId: number;
@@ -52,9 +57,43 @@ interface CreateVendorBillModalProps {
    */
   subcontractorLineType?: SubcontractorLineType;
 
-  /** Optional UI helpers */
   title?: string;
   subtitle?: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Helpers                                  */
+/* -------------------------------------------------------------------------- */
+
+function extractErrorMessage(err: unknown): string {
+  if (!err) return "An unexpected error occurred.";
+  const data = (err as any)?.data ?? err;
+  if (typeof data === "string") return data;
+  if (typeof data?.detail === "string") return data.detail;
+  if (typeof data?.error === "string") return data.error;
+  if (Array.isArray(data?.error) && data.error.length > 0) {
+    const first = data.error[0];
+    if (typeof first === "string") return first;
+    if (typeof first?.detail === "string") return first.detail;
+    if (typeof first?.message === "string") return first.message;
+    if (typeof first === "object") {
+      const parts = Object.entries(first).map(([key, val]) => {
+        if (typeof val === "string") return `${key}: ${val}`;
+        if (Array.isArray(val)) return `${key}: ${val.join(", ")}`;
+        try {
+          return `${key}: ${JSON.stringify(val)}`;
+        } catch {
+          return key;
+        }
+      });
+      if (parts.length) return parts.join("; ");
+    }
+  }
+  try {
+    return JSON.stringify(data).slice(0, 200);
+  } catch {
+    return "Failed to create vendor bill.";
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -75,6 +114,8 @@ export default function CreateVendorBillModal({
   title = "Create Vendor Bill",
   subtitle,
 }: CreateVendorBillModalProps) {
+  const router = useRouter();
+
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [companyBankAccount, setCompanyBankAccount] = useState<number | null>(
@@ -88,7 +129,8 @@ export default function CreateVendorBillModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: bankAccounts } = useGetCompanyBankAccountsQuery();
+  const { data: bankAccounts, isLoading: isBanksLoading } =
+    useGetCompanyBankAccountsQuery(undefined, { skip: !isOpen });
   const [createVendorBill, { isLoading: isSubmitting }] =
     useCreateVendorBillMutation();
 
@@ -96,9 +138,25 @@ export default function CreateVendorBillModal({
     bankAccounts?.filter((account: CompanyBankAccount) => account.is_active) ||
     [];
 
-  /* ------------------------------ Helpers --------------------------------- */
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ show: true, message, type });
+  };
+
+  /* ------------------------------ File helpers ---------------------------- */
 
   const handleFileUpload = (file: File) => {
+    const ok =
+      ["application/pdf", "image/png", "image/jpeg", "image/jpg"].includes(
+        file.type,
+      ) || /\.(pdf|png|jpe?g)$/i.test(file.name);
+    if (!ok) {
+      showToast("Only PDF, PNG, or JPG files are allowed", "error");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      showToast("File must be under 20 MB", "error");
+      return;
+    }
     setUploadedFile(file);
   };
 
@@ -119,18 +177,10 @@ export default function CreateVendorBillModal({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ show: true, message, type });
-  };
-
   /* ------------------------------ Submit ---------------------------------- */
 
   const handleSubmit = async () => {
-    if (!uploadedFile) {
-      showToast("Please upload the vendor invoice document", "error");
-      return;
-    }
-
+    // PRD: vendor invoice upload is optional and never blocks submission
     if (!companyBankAccount) {
       showToast("Please select a company bank account", "error");
       return;
@@ -142,7 +192,12 @@ export default function CreateVendorBillModal({
     }
 
     if (!paymentTerm) {
-      showToast("Payment term is missing", "error");
+      showToast("Payment term is missing on this purchase order", "error");
+      return;
+    }
+
+    if (!vendorId) {
+      showToast("Vendor is missing on this purchase order", "error");
       return;
     }
 
@@ -159,20 +214,24 @@ export default function CreateVendorBillModal({
     formData.append("invoice_date", invoiceDate);
     formData.append("payment_term", String(paymentTerm));
     formData.append("company_bank_account", String(companyBankAccount));
-    formData.append("document", uploadedFile);
+    if (uploadedFile) {
+      formData.append("document", uploadedFile);
+    }
 
-    // Top-level ID field
     if (sourceType === "PROJECT_PO") {
       formData.append("project_purchase_order", String(sourceId));
     } else {
-      // LABOUR and SUBCONTRACTOR both use project_request
+      // PLANT_AND_EQUIPMENT and SUBCONTRACTOR use project_request
       formData.append("project_request", String(sourceId));
     }
 
-    // Line items – map the correct ID field based on source type
     const mappedLines = lines.map((line) => {
       const base = {
         description: line.description || line.item_name || "",
+        ...(line.qty != null ? { quantity: String(line.qty) } : {}),
+        ...(line.unit_price != null
+          ? { unit_price: String(line.unit_price) }
+          : {}),
       };
 
       if (sourceType === "PROJECT_PO") {
@@ -182,10 +241,10 @@ export default function CreateVendorBillModal({
         };
       }
 
-      if (sourceType === "LABOUR") {
+      if (sourceType === "PLANT_AND_EQUIPMENT") {
         return {
           ...base,
-          labour_request: line.id,
+          plant_and_equipment: line.id,
         };
       }
 
@@ -197,7 +256,6 @@ export default function CreateVendorBillModal({
         };
       }
 
-      // default: milestone
       return {
         ...base,
         subcontractor_milestone: line.id,
@@ -208,33 +266,36 @@ export default function CreateVendorBillModal({
 
     try {
       await createVendorBill(formData).unwrap();
-      showToast("Vendor bill created successfully!", "success");
+      showToast(
+        "Vendor bill created successfully. Redirecting to Payment Queue…",
+        "success",
+      );
       onCreated?.();
+
       setTimeout(() => {
         onClose();
+        router.push("/invoice/payment-queue");
       }, 1200);
-    } catch (err: any) {
-      showToast(
-        err?.data?.error ||
-          err?.data?.detail ||
-          "Failed to create vendor bill.",
-        "error",
-      );
-      console.error(err);
+    } catch (err: unknown) {
+      showToast(extractErrorMessage(err), "error");
+      console.error("[CreateVendorBill]", err);
     }
   };
 
   if (!isOpen) return null;
 
-  /* ------------------------------- Render --------------------------------- */
-
   const displaySubtitle =
     subtitle ||
     (sourceType === "PROJECT_PO"
       ? `PO #${sourceId}`
-      : sourceType === "LABOUR"
-        ? `Labour Request #${sourceId}`
+      : sourceType === "PLANT_AND_EQUIPMENT"
+        ? `Plant & Equipment #${sourceId}`
         : `Subcontractor Request #${sourceId}`);
+
+  const linesTotal = lines.reduce(
+    (sum, l) => sum + Number(l.line_total || 0),
+    0,
+  );
 
   return (
     <>
@@ -245,41 +306,56 @@ export default function CreateVendorBillModal({
         onClose={() => setToast((prev) => ({ ...prev, show: false }))}
       />
 
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div
+        className="fixed inset-0 z-50 bg-black/50"
+        onClick={isSubmitting ? undefined : onClose}
+        aria-hidden
+      />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-bill-title"
+          className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-              <p className="text-sm text-gray-500 mt-0.5">{displaySubtitle}</p>
+              <h2
+                id="create-bill-title"
+                className="text-xl font-semibold text-gray-900"
+              >
+                {title}
+              </h2>
+              <p className="mt-0.5 text-sm text-gray-500">{displaySubtitle}</p>
             </div>
             <button
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+              disabled={isSubmitting}
+              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            {/* File Upload */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {/* File Upload — optional per PRD */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Upload Vendor Invoice Document
+              <h3 className="mb-1 text-sm font-medium text-gray-700">
+                Vendor Invoice Document{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
               </h3>
-              <p className="text-xs text-gray-500 mb-3">
-                PDF or image required. Stored permanently as audit evidence
-                against this invoice record.
+              <p className="mb-3 text-xs text-gray-500">
+                PDF or image up to 20 MB. Upload does not block submission.
               </p>
 
               {!uploadedFile ? (
                 <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
                     isDragging
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-300 hover:border-gray-400"
@@ -292,18 +368,18 @@ export default function CreateVendorBillModal({
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+                  <Upload className="mx-auto mb-3 h-8 w-8 text-gray-400" />
                   <p className="text-sm text-gray-600">
                     Drop your invoice document here
                   </p>
-                  <p className="text-sm text-blue-600 font-medium mt-1">
+                  <p className="mt-1 text-sm font-medium text-blue-600">
                     or click to browse files
                   </p>
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="mt-2 text-xs text-gray-400">
                     PDF, PNG, JPG up to 20 MB
                   </p>
                   <input
-                    aria-label="upload file"
+                    aria-label="Upload file"
                     ref={fileInputRef}
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg"
@@ -312,11 +388,11 @@ export default function CreateVendorBillModal({
                   />
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded-lg p-4 flex items-center justify-between bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <File className="w-8 h-8 text-blue-600" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
+                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <File className="h-8 w-8 shrink-0 text-blue-600" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900">
                         {uploadedFile.name}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -326,11 +402,12 @@ export default function CreateVendorBillModal({
                   </div>
                   <button
                     type="button"
-                    aria-label="remove file"
+                    aria-label="Remove file"
                     onClick={removeFile}
-                    className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors text-gray-400 hover:text-red-600"
+                    disabled={isSubmitting}
+                    className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-red-600 disabled:opacity-50"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               )}
@@ -338,78 +415,88 @@ export default function CreateVendorBillModal({
 
             {/* Company Bank Account */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Select Company Bank Account
+              <h3 className="mb-1 text-sm font-medium text-gray-700">
+                Company Bank Account <span className="text-red-500">*</span>
               </h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Choose the company bank account this vendor bill will be paid
-                from.
+              <p className="mb-3 text-xs text-gray-500">
+                Account this vendor bill will be paid from.
               </p>
-              <Select
-                value={companyBankAccount ? String(companyBankAccount) : ""}
-                onValueChange={(value) => setCompanyBankAccount(Number(value))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select company bank account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeBankAccounts.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No active bank accounts
-                    </SelectItem>
-                  ) : (
-                    activeBankAccounts.map((account) => (
+              {isBanksLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading accounts…
+                </div>
+              ) : activeBankAccounts.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  No active company bank accounts found. Add one under Invoice
+                  settings before submitting.
+                </div>
+              ) : (
+                <Select
+                  value={companyBankAccount ? String(companyBankAccount) : ""}
+                  onValueChange={(value) =>
+                    setCompanyBankAccount(Number(value))
+                  }
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select company bank account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeBankAccounts.map((account) => (
                       <SelectItem key={account.id} value={String(account.id)}>
-                        {account.bank_name} • {account.account_number_display}
+                        {account.bank_name} •{" "}
+                        {account.account_number_display ||
+                          account.account_number}
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
-            {/* Line Items Table */}
+            {/* Line Items */}
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
+              <h3 className="mb-2 text-sm font-medium text-gray-700">
                 Line Items
               </h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-hidden rounded-lg border border-gray-200">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[480px]">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-30">
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                           Description
                         </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20">
+                        <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                           Qty
                         </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
+                        <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                           Unit Price
                         </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-25">
+                        <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                           Total
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-gray-100">
                       {lines.map((line, index) => (
                         <tr
-                          key={index}
-                          className="hover:bg-gray-50 transition-colors"
+                          key={line.id ?? index}
+                          className="hover:bg-gray-50/80"
                         >
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {line.description || line.item_name}
+                            {line.description || line.item_name || "—"}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-600">
+                          <td className="px-4 py-3 text-right text-sm text-gray-600">
                             {line.qty ?? "—"}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-600">
+                          <td className="px-4 py-3 text-right text-sm text-gray-600">
                             {line.unit_price != null
                               ? formatCurrency(Number(line.unit_price))
                               : "—"}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                          <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
                             {line.line_total != null
                               ? formatCurrency(Number(line.line_total))
                               : "—"}
@@ -417,21 +504,16 @@ export default function CreateVendorBillModal({
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-gray-50 border-t border-gray-200">
+                    <tfoot className="border-t border-gray-200 bg-gray-50">
                       <tr>
                         <td
                           colSpan={3}
-                          className="px-4 py-3 text-sm font-semibold text-gray-900 text-right"
+                          className="px-4 py-3 text-right text-sm font-semibold text-gray-900"
                         >
                           Total
                         </td>
-                        <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
-                          {formatCurrency(
-                            lines.reduce(
-                              (sum, l) => sum + Number(l.line_total || 0),
-                              0,
-                            ),
-                          )}
+                        <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">
+                          {formatCurrency(linesTotal)}
                         </td>
                       </tr>
                     </tfoot>
@@ -442,20 +524,37 @@ export default function CreateVendorBillModal({
           </div>
 
           {/* Footer */}
-          <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 shrink-0">
+          <div className="flex shrink-0 flex-col-reverse items-center justify-between gap-3 border-t border-gray-200 px-6 py-4 sm:flex-row">
             <button
+              type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              disabled={isSubmitting}
+              className="w-full rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={
+                isSubmitting ||
+                isBanksLoading ||
+                activeBankAccounts.length === 0 ||
+                lines.length === 0
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              {isSubmitting ? "Submitting..." : "Submit Vendor Bill"}
-              {!isSubmitting && <ChevronRight className="w-4 h-4" />}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Submitting…
+                </>
+              ) : (
+                <>
+                  Submit Vendor Bill
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </div>
         </div>

@@ -27,7 +27,8 @@ export interface CreatePettyCashRequest {
 const getTenantBaseUrl = (state: RootState): string => {
   const tenantSchemaName = state.auth.tenant_schema_name;
   const apiDomain = process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
-  return `https://${tenantSchemaName}.${apiDomain}`;
+  const protocol = (apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")) ? "http" : "https";
+  return `${protocol}://${tenantSchemaName}.${apiDomain}`;
 };
 
 export const pettyCashRequestApi = createApi({

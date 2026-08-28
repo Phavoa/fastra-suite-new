@@ -16,17 +16,17 @@ import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { useStatusModal, StatusModal } from "@/components/shared/StatusModal";
-import { useGetIncomingProductReturnQuery } from "@/api/inventory/incomingProductReturns";
+import { useGetIncomingProductReturnQuery, useConfirmIncomingProductReturnMutation } from "@/api/inventory/incomingProductReturns";
 import { Loader2 } from "lucide-react";
 
 export default function SupplierReturnDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmReturn, { isLoading: isValidating }] = useConfirmIncomingProductReturnMutation();
   const statusModal = useStatusModal();
 
-  const safeId = encodeURIComponent(decodeURIComponent(id));
-  const { data: returnData, isLoading } = useGetIncomingProductReturnQuery(safeId);
+  const decodedId = decodeURIComponent(id);
+  const { data: returnData, isLoading, refetch } = useGetIncomingProductReturnQuery(decodedId);
 
   const isDraft = (returnData?.status || "draft").toLowerCase() === "draft";
 
@@ -35,20 +35,25 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
     { label: "Inventory", href: "/inventory" },
     { label: "Operation", href: "/inventory/operation" },
     { label: "Supplier Returns", href: "/inventory/operation/supplier_return" },
-    { label: id, href: "#", current: true },
+    { label: decodedId, href: "#", current: true },
   ];
 
   const handleValidate = async () => {
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await confirmReturn(decodedId).unwrap();
+      refetch();
       statusModal.showSuccess(
         "Return Validated",
-        "Supplier return validated and stock deducted.",
+        "Supplier return validated and stock deducted successfully.",
         "Go to Supplier Returns",
         () => router.push("/inventory/operation/supplier_return")
       );
-    }, 1000);
+    } catch (error: any) {
+      statusModal.showError(
+        "Validation Failed",
+        error?.data?.detail || error?.data?.message || "Failed to validate supplier return."
+      );
+    }
   };
 
   if (isLoading) {
@@ -97,7 +102,7 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Vendor</label>
-                  <div className="text-sm font-semibold text-gray-400 italic">N/A</div>
+                  <div className="text-sm font-semibold text-gray-800">{returnData.vendor || (returnData as any).source_document_details?.supplier_name || "N/A"}</div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-gray-700 font-medium text-sm">Date</label>
@@ -169,11 +174,11 @@ export default function SupplierReturnDetailPage({ params }: { params: Promise<{
             <PermissionGuard module="inventory" entitlement="change_returnincomingproduct">
               <Button
                 type="button"
-                disabled={isSubmitting}
+                disabled={isValidating}
                 onClick={handleValidate}
                 className="bg-[#3B7CED] hover:bg-[#3065c3] text-white"
               >
-                {isSubmitting ? "Validating..." : "Validate Return"}
+                {isValidating ? "Validating..." : "Validate Return"}
               </Button>
             </PermissionGuard>
           )}

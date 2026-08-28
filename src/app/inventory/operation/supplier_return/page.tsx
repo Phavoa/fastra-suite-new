@@ -187,8 +187,8 @@ export default function SupplierReturnPage() {
                           {ret.returned_date ? new Date(ret.returned_date).toLocaleDateString() : "N/A"}
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
-                          <span className="text-[#32325D] text-sm font-medium text-gray-400 italic">
-                            N/A
+                          <span className="text-[#32325D] text-sm font-medium">
+                            {ret.vendor || (ret as any).source_document_details?.supplier_name || "N/A"}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-3.5">
