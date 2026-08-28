@@ -569,10 +569,10 @@ export default function EditPlantEquipmentRequestPage() {
           </div>
         </div>
 
-        {/* Notes/Justification */}
+        {/* Note */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-gray-700">Notes / Justification</Label>
+            <Label className="text-xs font-semibold text-gray-700">Note</Label>
             <Textarea
               placeholder="Enter note"
               value={notes}

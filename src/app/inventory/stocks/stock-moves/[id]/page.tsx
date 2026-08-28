@@ -3,6 +3,7 @@
 import React from "react";
 import { useParams } from "next/navigation";
 import { FileText } from "lucide-react";
+import Link from "next/link";
 import { BreadcrumbItem } from "@/components/shared/types";
 import {
   Table,
@@ -40,17 +41,63 @@ export default function StockMoveDetailPage() {
     { label: `Move ${id}`, href: `/inventory/stocks/stock-moves/${id}`, current: true },
   ];
 
-  const summaryItems: SummaryCardItem[] = moveData
-    ? [
-        { label: "Move ID", value: String(moveData.id) },
-        { label: "Transaction Type", value: moveData.move_type || "Move" },
-        { label: "Reference Document", value: <span className="text-[#3B7CED] font-semibold">{moveData.reference || "N/A"}</span> },
-        { label: "Recorded By User", value: moveData.moved_by_details?.first_name ? `${moveData.moved_by_details.first_name} ${moveData.moved_by_details.last_name || ''}` : "System Admin" },
-        { label: "Source Location", value: moveData.source_location_details?.location_name || "External/Unknown" },
-        { label: "Destination Store", value: moveData.destination_location_details?.location_name || "External/Unknown" },
-        { label: "Notes", value: moveData.notes || "No notes available", fullWidth: true },
-      ]
-    : [];
+  const getSourceDocumentUrl = (move: any) => {
+    const type = String(move.source_document_type || move.move_type || "").toLowerCase();
+    const id = move.source_document_id || move.id;
+
+    if (move.source_document_id) {
+      if (type.includes("consumption")) {
+        return `/inventory/operation/material-consumption/${move.source_document_id}`;
+      }
+      if (type.includes("receipt") || type.includes("incoming")) {
+        return `/inventory/operation/incoming_product/${move.source_document_id}`;
+      }
+      if (type.includes("scrap")) {
+        return `/inventory/operation/scrap/${move.source_document_id}`;
+      }
+      if (type.includes("adjustment")) {
+        return `/inventory/stocks/adjustment/${move.source_document_id}`;
+      }
+      if (type.includes("return") || type.includes("supplier")) {
+        return `/inventory/operation/supplier_return/${move.source_document_id}`;
+      }
+    }
+    return null;
+  };
+
+  const summaryItems: SummaryCardItem[] = React.useMemo(() => {
+    if (!moveData) return [];
+
+    const sourceDocUrl = getSourceDocumentUrl(moveData);
+
+    const items: SummaryCardItem[] = [
+      { label: "Move ID", value: String(moveData.id) },
+      { label: "Transaction Type", value: moveData.move_type || "Move" },
+      {
+        label: "Reference Document",
+        value: sourceDocUrl ? (
+          <Link href={sourceDocUrl} className="text-[#3B7CED] hover:underline font-semibold">
+            {moveData.reference || "N/A"}
+          </Link>
+        ) : (
+          <span className="text-[#3B7CED] font-semibold">{moveData.reference || "N/A"}</span>
+        ),
+      },
+      { label: "Recorded By User", value: moveData.moved_by_details?.first_name ? `${moveData.moved_by_details.first_name} ${moveData.moved_by_details.last_name || ''}` : "System Admin" },
+      { label: "Source Location", value: moveData.source_location_details?.location_name || "External/Unknown" },
+      { label: "Destination Store", value: moveData.destination_location_details?.location_name || "External/Unknown" },
+    ];
+
+    if (moveData.move_type?.toUpperCase() === "CONSUMPTION" || moveData.wbs_phase || moveData.wbs_activity) {
+      items.push(
+        { label: "WBS Phase", value: typeof moveData.wbs_phase === "object" ? moveData.wbs_phase?.name || moveData.wbs_phase?.id || "—" : moveData.wbs_phase || "—" },
+        { label: "WBS Activity", value: typeof moveData.wbs_activity === "object" ? moveData.wbs_activity?.name || moveData.wbs_activity?.id || "—" : moveData.wbs_activity || "—" }
+      );
+    }
+
+    items.push({ label: "Notes", value: moveData.notes || "No notes available", fullWidth: true });
+    return items;
+  }, [moveData]);
 
   return (
     <InventoryPageShell
@@ -77,7 +124,23 @@ export default function StockMoveDetailPage() {
             status={moveData.move_type || "Move"}
             subtitle={
               <>
-                Recorded on {new Date(moveData.date_moved || moveData.created_at || "").toLocaleDateString() || moveData.date_moved} • Source Document:{" "}
+                Recorded on {moveData.date_moved ? (() => {
+                  try {
+                    const date = new Date(moveData.date_moved);
+                    return isNaN(date.getTime()) 
+                      ? moveData.date_moved 
+                      : date.toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true
+                        });
+                  } catch {
+                    return moveData.date_moved;
+                  }
+                })() : "N/A"} • Source Document:{" "}
                 <strong className="text-[#3B7CED]">{moveData.reference || "N/A"}</strong>
               </>
             }

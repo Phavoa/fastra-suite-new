@@ -161,7 +161,7 @@ export default function ScrapDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <span className="font-semibold text-[#8898AA] text-[11.5px] block mb-1">
-                  Scrap ID
+                  Record ID
                 </span>
                 <span className="text-[#32325D] font-semibold text-sm">
                   {record.id}

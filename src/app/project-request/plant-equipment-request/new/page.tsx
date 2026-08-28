@@ -59,10 +59,7 @@ export default function NewPlantEquipmentRequestPage() {
     description: "",
   });
 
-  const [requestId] = useState(() => {
-    const num = Math.floor(Math.random() * 90000) + 10000;
-    return `PE${num}`;
-  });
+  const [requestId] = useState("Auto-generated");
 
   const calculateTotalCost = (data: Partial<FormValues>) => {
     const qty = Number(data.quantity) || 1;
@@ -207,7 +204,7 @@ export default function NewPlantEquipmentRequestPage() {
         fields: [
           {
             name: "justification",
-            label: "Notes / Justification",
+            label: "Note",
             type: "textarea",
             placeholder: "Enter note",
             rows: 4,

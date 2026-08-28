@@ -26,12 +26,15 @@ import {
   useReleaseMaterialConsumptionMutation
 } from "@/api/requests/materialConsumptionRequestApi";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function MaterialConsumptionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const reqId = (params?.id as string) || "";
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+  const [releaseNotes, setReleaseNotes] = useState("");
   
   const { data: apiData, isLoading, isError, refetch } = useGetMaterialConsumptionQuery(Number(reqId), {
     skip: !reqId || isNaN(Number(reqId)),
@@ -72,14 +75,17 @@ export default function MaterialConsumptionDetailPage() {
       availableBudget: (apiData as any).available_budget ? parseFloat((apiData as any).available_budget) : undefined,
       costCode: (apiData as any).cost_code || "-",
       parentRequestId: (apiData as any).project_request?.id || (apiData as any).project_request,
+      location: (apiData as any).location_details?.location_name || (apiData as any).location_details?.location_code || apiData.location || "-",
     };
   }, [apiData]);
+
+  const hasShortage = req?.itemsList?.some((item: any) => item.availableStock < item.requestedQty);
 
   const [reason, setReason] = useState<string>("");
 
   const statusModal = useStatusModal();
 
-  const handleAction = async (action: "release") => {
+  const handleRelease = async () => {
     if (!req || !apiData) return;
 
     try {
@@ -88,10 +94,11 @@ export default function MaterialConsumptionDetailPage() {
         body: {
           location: apiData.location || "LAGS00001",
           date_consumed: apiData.date_consumed || new Date().toISOString().split("T")[0],
-          notes: apiData.notes || "Material released from inventory."
+          notes: releaseNotes || "Material released from inventory."
         }
       }).unwrap();
 
+      setIsReleaseModalOpen(false);
       statusModal.showSuccess(
         "Material Released",
         `Material Consumption ${req.id} released successfully.`
@@ -170,7 +177,7 @@ export default function MaterialConsumptionDetailPage() {
             </Link>
             <div>
               <h1 className="text-lg font-medium text-gray-800">
-                Site Requisition Note: {req.id}
+                Material Consumption Request: {req.id}
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <span
@@ -193,18 +200,29 @@ export default function MaterialConsumptionDetailPage() {
           <div className="flex items-center gap-3">
             {req.status === "approved" && (
               <>
-                <Button
-                  className="bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs h-9 shadow-sm"
-                  onClick={() => handleAction("release")}
-                  disabled={isReleasing}
-                >
-                  {isReleasing ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-block">
+                      <Button
+                        className="bg-[#3B7CED] hover:bg-[#2d63c7] text-white text-xs h-9 shadow-sm"
+                        onClick={() => setIsReleaseModalOpen(true)}
+                        disabled={isReleasing || hasShortage}
+                      >
+                        {isReleasing ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        {isReleasing ? "Releasing..." : "Release Material"}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {hasShortage && (
+                    <TooltipContent>
+                      <p>Cannot release due to stock shortage</p>
+                    </TooltipContent>
                   )}
-                  {isReleasing ? "Releasing..." : "Release Material"}
-                </Button>
+                </Tooltip>
               </>
             )}
           </div>
@@ -214,35 +232,13 @@ export default function MaterialConsumptionDetailPage() {
         <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
 
 
-          {/* Requisition Summary Section */}
-          <section>
-            <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Requisition Summary</h2>
-            
-            {/* Budget Gate Verification Banner */}
-            {req.availableBudget !== undefined && (
-              <div className={`mb-6 p-4 rounded border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${req.isOverrun ? "bg-red-50 border-red-300" : "bg-green-50/60 border-green-200"}`}>
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-full ${req.isOverrun ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
-                    {req.isOverrun ? <AlertCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <h4 className={`text-sm font-semibold ${req.isOverrun ? "text-red-900" : "text-green-900"}`}>
-                      Budget Validation Gate: {req.isOverrun ? "HELD IN OVERRUN QUEUE" : "PASSED (WITHIN BUDGET)"}
-                    </h4>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      Cost Code: <strong className="font-mono">{req.costCode || "CC-1020"}</strong> | Available WBS Budget: <strong className="font-mono">₦{req.availableBudget.toLocaleString()}</strong>
-                    </p>
-                  </div>
-                </div>
-                {req.isOverrun && (
-                  <div className="bg-white px-3 py-1.5 rounded border border-red-200 text-xs text-red-700 font-bold self-start sm:self-auto">
-                    Overrun Variance: +₦{(req.totalCost - req.availableBudget).toLocaleString()}
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Material Consumption Details Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 p-6">
+            <h2 className="text-base font-semibold text-[#32325D] mb-4 pb-3 border-b border-gray-100">
+              Material Consumption Details
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-gray-50 p-6 rounded border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div>
                 <span className="text-xs text-gray-400 block mb-1">Requisition ID</span>
                 <span className="text-sm font-semibold text-gray-800">{req.id}</span>
@@ -254,6 +250,10 @@ export default function MaterialConsumptionDetailPage() {
               <div>
                 <span className="text-xs text-gray-400 block mb-1">WBS Phase & Activity</span>
                 <span className="text-sm font-semibold text-gray-800">{req.wbsPhase} → {req.wbsActivity}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-400 block mb-1">Location</span>
+                <span className="text-sm font-semibold text-gray-800">{req.location}</span>
               </div>
               <div>
                 <span className="text-xs text-gray-400 block mb-1">Total Valuation</span>
@@ -288,18 +288,22 @@ export default function MaterialConsumptionDetailPage() {
               )}
 
               {req.notes && (
-                <div className="md:col-span-4 border-t border-gray-200 pt-4 mt-2">
+                <div className="md:col-span-5 border-t border-gray-200 pt-4 mt-2">
                   <span className="text-xs text-gray-400 block mb-1">Field Engineer Notes</span>
                   <span className="text-sm text-gray-700">{req.notes}</span>
                 </div>
               )}
             </div>
-          </section>
+          </div>
 
-          {/* Line Items & Warehouse Stock Verification Table */}
-          <section>
-            <h2 className="text-[#3B7CED] text-xl mb-6 font-medium">Requested Material Lines & Warehouse Stock Verification</h2>
-            <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+          {/* Requested Material Lines Card */}
+          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-[#32325D]">
+                Requested Material Lines
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-[#F8F9FA] border-b-gray-100">
@@ -307,7 +311,7 @@ export default function MaterialConsumptionDetailPage() {
                     <TableHead>Description</TableHead>
                     <TableHead className="text-center">Unit</TableHead>
                     <TableHead className="text-center">Requested QTY</TableHead>
-                    <TableHead className="text-center">Warehouse Stock</TableHead>
+                    <TableHead className="text-center">Stock Available</TableHead>
                     <TableHead className="text-right">Unit Cost (₦)</TableHead>
                     <TableHead className="text-right">Total Line Cost (₦)</TableHead>
                     <TableHead className="pr-4 text-center">Audit Status</TableHead>
@@ -351,14 +355,14 @@ export default function MaterialConsumptionDetailPage() {
                   </div>
                   <div className="flex justify-between items-center py-3">
                     <span className="text-sm font-bold text-gray-700">Total Approved Cost</span>
-                    <span className="text-lg font-bold text-[#32325D] font-mono">
+                    <span className="text-lg font-bold text-[#32325D]">
                       ₦{req.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-          </section>
+          </div>
         </div>
 
         {/* Fixed Action Bar for Draft Status */}
@@ -420,6 +424,44 @@ export default function MaterialConsumptionDetailPage() {
         )}
 
         </>
+        )}
+
+        {/* Release Confirmation Dialog */}
+        {isReleaseModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5 text-[#3B7CED]" /> Confirm Release
+              </h3>
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date Consumed</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
+                    value={apiData?.date_consumed || new Date().toISOString().split("T")[0]}
+                    disabled
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Date is automatically recorded upon release.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Release Remarks (Optional)</label>
+                  <Textarea
+                    placeholder="Enter any notes regarding this release..."
+                    value={releaseNotes}
+                    onChange={(e) => setReleaseNotes(e.target.value)}
+                    className="resize-none h-24"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={() => setIsReleaseModalOpen(false)} disabled={isReleasing}>Cancel</Button>
+                <Button onClick={handleRelease} disabled={isReleasing} className="bg-[#3B7CED] hover:bg-blue-600">
+                  {isReleasing ? "Confirming..." : "Confirm Release"}
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         <StatusModal

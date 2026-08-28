@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CreateProductModal } from "@/components/shared/CreateProductModal";
 import {
   useGetAvailableBudgetQuery,
 } from "@/api/projectApi";
@@ -654,19 +655,6 @@ export default function NewPurchaseRequestPage() {
               Purchase Request
             </h1>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button className="p-2 rounded-lg hover:bg-gray-50 transition-colors">
-              <Bell size={20} className="text-gray-800" />
-            </button>
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
-              <img
-                src="https://api.dicebear.com/7.x/pixel-art/svg?seed=user123"
-                alt="User Profile"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
         </div>
       </header>
 
@@ -675,7 +663,6 @@ export default function NewPurchaseRequestPage() {
         {/* Request Details Section */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
           <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            {/* <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" /> */}
             Request Details
           </h2>
 
@@ -685,7 +672,7 @@ export default function NewPurchaseRequestPage() {
                 Request ID
               </Label>
               <Input
-                value={requestId}
+                value="Auto-generated"
                 readOnly
                 className="bg-gray-50 border-gray-200 text-gray-500 h-11"
               />
@@ -718,7 +705,6 @@ export default function NewPurchaseRequestPage() {
         {/* Purchase Details Section */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
           <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            {/* <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" /> */}
             Purchase Details
           </h2>
 
@@ -758,7 +744,7 @@ export default function NewPurchaseRequestPage() {
                 <SelectContent>
                   {approvedProjects.map((p: any) => (
                     <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name} {p.project_code ? `(${p.project_code})` : ""}
+                      {p.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -949,7 +935,7 @@ export default function NewPurchaseRequestPage() {
                     </div>
 
                     {item.description && (
-                      <p className="text-xs text-gray-500 italic mt-1">
+                      <p className="text-xs text-gray-500  mt-1">
                         {item.description}
                       </p>
                     )}
@@ -995,7 +981,7 @@ export default function NewPurchaseRequestPage() {
 
           <div className="space-y-1.5 pt-2">
             <Label className="text-xs font-semibold text-gray-700">
-              Notes / Justification
+              Note
             </Label>
             <Textarea
               placeholder="Enter note"
@@ -1082,6 +1068,8 @@ function ItemEditForm({
     );
   }, [allProducts, searchQuery]);
 
+  const [isCreateProductModalOpen, setIsCreateProductModalOpen] = useState(false);
+
   const handleSelect = (name: string, id: string) => {
     const selectedProd = allProducts.find((p) => p.id === id || p.name.toLowerCase() === name.toLowerCase());
     onUpdate({
@@ -1096,9 +1084,20 @@ function ItemEditForm({
   };
 
   const handleAddNew = (name: string) => {
-    onUpdate({ productName: name, productId: `custom-${Date.now()}`, error: undefined });
-    setSearchQuery(name);
+    setIsCreateProductModalOpen(true);
     setIsOpen(false);
+  };
+
+  const handleProductCreated = (product: { id: string | number; name: string; standardCost?: string | number; description?: string }) => {
+    onUpdate({ 
+      productName: product.name, 
+      productId: String(product.id), 
+      ...(product.standardCost ? { unitCost: Number(product.standardCost) } : {}),
+      ...(product.description ? { description: product.description } : {}),
+      error: undefined 
+    });
+    setSearchQuery(product.name);
+    setIsCreateProductModalOpen(false);
   };
 
   return (
@@ -1248,6 +1247,14 @@ function ItemEditForm({
       >
         Done
       </button>
+
+      {/* Create Product Modal */}
+      <CreateProductModal
+        isOpen={isCreateProductModalOpen}
+        onClose={() => setIsCreateProductModalOpen(false)}
+        initialProductName={searchQuery.trim()}
+        onSuccess={handleProductCreated}
+      />
     </div>
   );
 }

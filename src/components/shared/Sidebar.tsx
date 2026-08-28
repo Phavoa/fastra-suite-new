@@ -51,6 +51,7 @@ const middleItems = [
   },
   { id: "contact", icon: ContactIcon, label: "Contact", route: "/contact" },
   // --- Non-Functional Modules (Coming Soon) ---
+  /*
   { id: "sales", icon: SalesIcon, label: "Sales", route: "/sales" },
   { id: "finance", icon: FinanceIcon, label: "Finance", route: "/finance" },
   { id: "hr", icon: HRIcon, label: "HR", route: "/hr" },
@@ -59,7 +60,7 @@ const middleItems = [
     icon: LogisticsIcon,
     label: "Logistics",
     route: "/logistics",
-  },
+  */
 ];
 
 const bottomItems = [
@@ -69,7 +70,7 @@ const bottomItems = [
     label: "Settings",
     route: "/settings/company/1",
   },
-  { id: "app", icon: AppIcon, label: "App", route: "/app" },
+  // { id: "app", icon: AppIcon, label: "App", route: "/app" },
 ];
 
 interface SidebarProps {

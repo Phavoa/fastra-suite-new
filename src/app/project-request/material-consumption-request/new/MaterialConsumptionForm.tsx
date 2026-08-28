@@ -487,15 +487,6 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                 {requestId ? "Edit Material Consumption" : "Material Consumption"}
               </h1>
             </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                type="button"
-              >
-                <Bell size={20} className="text-gray-800" />
-              </button>
-            </div>
           </div>
         </header>
 
@@ -508,7 +499,7 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <FormLabel className="text-xs font-semibold text-gray-700">Request ID</FormLabel>
-                <Input value={requestData?.request_id || "MCR-AUTO"} readOnly className="bg-gray-50 border-gray-200 text-gray-500 h-11" />
+                <Input value={requestData?.request_id || "Auto-generated"} readOnly className="bg-gray-50 border-gray-200 text-gray-500 h-11" />
               </div>
               <div className="space-y-1.5">
                 <FormLabel className="text-xs font-semibold text-gray-700">Date</FormLabel>
@@ -1045,7 +1036,7 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-semibold text-gray-700">
-                      Notes / Justification
+                      Note
                     </FormLabel>
                     <FormControl>
                       <Textarea
