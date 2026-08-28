@@ -89,12 +89,21 @@ export interface Scrap {
   url: string;
   id: string;
   adjustment_type: AdjustmentType;
+  cause?: AdjustmentType;
   warehouse_location: string;
   warehouse_location_details: WarehouseLocationDetails;
+  project?: number;
+  project_details?: {
+    id: number;
+    project_code: string;
+    name: string;
+    status: string;
+  };
   notes: string;
   status: ScrapStatus;
   is_hidden: boolean;
   scrap_items: ScrapItem[];
+  items?: ScrapItem[];
   is_done: boolean;
   can_edit: boolean;
 }

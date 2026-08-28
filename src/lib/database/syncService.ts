@@ -59,7 +59,8 @@ class SyncService {
   private getTenantBaseUrl(): string {
     const tenant = localStorage.getItem('tenant_schema_name') || 'default';
     const apiDomain = process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
-    return `https://${tenant}.${apiDomain}`;
+    const protocol = (apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")) ? "http" : "https";
+    return `${protocol}://${tenant}.${apiDomain}`;
   }
 
   private getHeaders(): Headers {

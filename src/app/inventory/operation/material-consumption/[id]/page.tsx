@@ -63,7 +63,7 @@ export default function MaterialConsumptionDetailPage() {
         description: line.product_details?.description || "-",
         unit: line.product_details?.unit_of_measure_details?.unit_symbol || line.unit_of_measure_details?.unit_symbol || "Units",
         requestedQty: parseFloat(line.quantity) || 0,
-        availableStock: line.product_details?.available_stock || 0,
+        availableStock: line.available_stock ?? line.product_details?.available_stock ?? 0,
         unitCost: parseFloat(line.unit_cost) || 0,
       })) || [],
       status: apiData.status || "pending",

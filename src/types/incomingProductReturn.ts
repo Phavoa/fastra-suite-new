@@ -15,7 +15,10 @@ export interface IncomingProductReturn {
   source_document: string;
   source_document_details?: {
     incoming_product_id: string;
+    supplier?: number;
+    supplier_name?: string;
   };
+  vendor?: string;
   returned_date: string;
   reason_for_return: string;
   status: string;

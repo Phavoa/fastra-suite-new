@@ -56,6 +56,7 @@ import { backOrderApi } from "@/api/inventory/backOrderApi";
 import { inventoryProductsApi } from "@/api/inventory/productsApi";
 import { inventoryUnitOfMeasureApi } from "@/api/inventory/unitOfMeasureApi";
 import { productCategoryApi } from "@/api/inventory/productCategoryApi";
+import { stockOnHandApi } from "@/api/inventory/stockOnHandApi";
 
 import { subcontractorRequestApi } from "@/api/subcontractorRequestApi";
 import { projectApi } from "@/api/projectApi";
@@ -119,6 +120,7 @@ const rootReducer = combineReducers({
   [inventoryProductsApi.reducerPath]: inventoryProductsApi.reducer,
   [inventoryUnitOfMeasureApi.reducerPath]: inventoryUnitOfMeasureApi.reducer,
   [productCategoryApi.reducerPath]: productCategoryApi.reducer,
+  [stockOnHandApi.reducerPath]: stockOnHandApi.reducer,
 
   [subcontractorRequestApi.reducerPath]: subcontractorRequestApi.reducer,
 
@@ -190,6 +192,7 @@ export const store = configureStore({
       inventoryProductsApi.middleware,
       inventoryUnitOfMeasureApi.middleware,
       productCategoryApi.middleware,
+      stockOnHandApi.middleware,
 
       subcontractorRequestApi.middleware,
       projectApi.middleware,

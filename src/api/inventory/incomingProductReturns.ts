@@ -9,7 +9,8 @@ const getTenantBaseUrl = (state: RootState): string => {
   const tenantSchemaName = state.auth.tenant_schema_name;
   const apiDomain =
     process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
-  return `https://${tenantSchemaName}.${apiDomain}`;
+  const protocol = (apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")) ? "http" : "https";
+  return `${protocol}://${tenantSchemaName}.${apiDomain}`;
 };
 
 export const incomingProductReturnsApi = createApi({
@@ -111,6 +112,34 @@ export const incomingProductReturnsApi = createApi({
       }),
       invalidatesTags: ["IncomingProductReturn"],
     }),
+
+    confirmIncomingProductReturn: builder.mutation<
+      IncomingProductReturn,
+      string
+    >({
+      query: (id) => ({
+        url: `/inventory/return-incoming-product/${id}/confirm-return/`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "IncomingProductReturn", id },
+        "IncomingProductReturn",
+      ],
+    }),
+
+    cancelIncomingProductReturn: builder.mutation<
+      IncomingProductReturn,
+      string
+    >({
+      query: (id) => ({
+        url: `/inventory/return-incoming-product/${id}/cancel/`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "IncomingProductReturn", id },
+        "IncomingProductReturn",
+      ],
+    }),
   }),
 });
 
@@ -118,4 +147,7 @@ export const {
   useGetIncomingProductReturnsQuery,
   useGetIncomingProductReturnQuery,
   useCreateIncomingProductReturnMutation,
+  useConfirmIncomingProductReturnMutation,
+  useCancelIncomingProductReturnMutation,
 } = incomingProductReturnsApi;
+

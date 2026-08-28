@@ -34,6 +34,12 @@ export default function InventoryLayout({
       label: "Stocks",
       children: [
         { 
+          label: "Stock on Hand", 
+          href: "/inventory/stock-on-hand",
+          application: "inventory",
+          module: "stockonhand",
+        },
+        { 
           label: "Stock Adjustment", 
           href: "/inventory/stocks/adjustment",
           application: "inventory",
