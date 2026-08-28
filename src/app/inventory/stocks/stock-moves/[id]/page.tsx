@@ -90,8 +90,8 @@ export default function StockMoveDetailPage() {
 
     if (moveData.move_type?.toUpperCase() === "CONSUMPTION" || moveData.wbs_phase || moveData.wbs_activity) {
       items.push(
-        { label: "WBS Phase", value: typeof moveData.wbs_phase === "object" ? moveData.wbs_phase?.name || moveData.wbs_phase?.id || "—" : moveData.wbs_phase || "—" },
-        { label: "WBS Activity", value: typeof moveData.wbs_activity === "object" ? moveData.wbs_activity?.name || moveData.wbs_activity?.id || "—" : moveData.wbs_activity || "—" }
+        { label: "WBS Phase", value: typeof moveData.wbs_phase === "object" ? (moveData.wbs_phase as any)?.name || (moveData.wbs_phase as any)?.id || "—" : moveData.wbs_phase || "—" },
+        { label: "WBS Activity", value: typeof moveData.wbs_activity === "object" ? (moveData.wbs_activity as any)?.name || (moveData.wbs_activity as any)?.id || "—" : moveData.wbs_activity || "—" }
       );
     }
 

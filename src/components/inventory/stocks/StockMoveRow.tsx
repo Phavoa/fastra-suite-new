@@ -102,12 +102,12 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
 
       {/* 8. WBS Phase */}
       <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
-        {typeof move.wbs_phase === "object" ? move.wbs_phase?.name || move.wbs_phase?.id || "—" : move.wbs_phase || "—"}
+        {typeof move.wbs_phase === "object" ? (move.wbs_phase as any)?.name || (move.wbs_phase as any)?.id || "—" : move.wbs_phase || "—"}
       </TableCell>
 
       {/* 9. WBS Activity */}
       <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
-        {typeof move.wbs_activity === "object" ? move.wbs_activity?.name || move.wbs_activity?.id || "—" : move.wbs_activity || "—"}
+        {typeof move.wbs_activity === "object" ? (move.wbs_activity as any)?.name || (move.wbs_activity as any)?.id || "—" : move.wbs_activity || "—"}
       </TableCell>
 
       {/* 10. User */}
