@@ -82,7 +82,7 @@ export default function NewVendorPage() {
         type: "success",
       });
       setTimeout(() => {
-        router.push("/invoice/vendor");
+        router.push("/invoice/settings?tab=vendor");
       }, 1500);
     } catch (err: any) {
       setToast({

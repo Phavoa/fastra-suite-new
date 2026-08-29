@@ -252,6 +252,23 @@ export const vendorBillsApi = createApi({
           : [{ type: "VendorBill", id: "LIST" }],
     }),
 
+    getPaymentQueueVendorBills: builder.query<
+      VendorBill[],
+      GetVendorBillsParams | void
+    >({
+      query: (params) => ({
+        url: "/invoicing/vendor-bills/payment_queue/",
+        params,
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: "VendorBill" as const, id })),
+              { type: "VendorBill", id: "LIST" },
+            ]
+          : [{ type: "VendorBill", id: "LIST" }],
+    }),
+
     /* ---------------------------------------------------------------------- */
     /*                               Retrieve                                 */
     /* ---------------------------------------------------------------------- */
@@ -372,21 +389,6 @@ export const vendorBillsApi = createApi({
       ],
     }),
 
-    queuePaymentVendorBill: builder.mutation<
-      VendorBill,
-      { id: number; data?: CreateVendorBillRequest | FormData }
-    >({
-      query: ({ id, data }) => ({
-        url: `/invoicing/vendor-bills/${id}/queue_payment/`,
-        method: "POST",
-        body: data,
-      }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "VendorBill", id },
-        { type: "VendorBill", id: "LIST" },
-      ],
-    }),
-
     rejectVendorBill: builder.mutation<
       VendorBill,
       { id: number; data?: CreateVendorBillRequest | FormData }
@@ -426,6 +428,7 @@ export const vendorBillsApi = createApi({
 export const {
   // Queries
   useGetVendorBillsQuery,
+  useGetPaymentQueueVendorBillsQuery,
   useGetVendorBillByIdQuery,
   useLazyGetVendorBillsQuery,
   useLazyGetVendorBillByIdQuery,
@@ -438,7 +441,6 @@ export const {
   useApproveVendorBillMutation,
   useCancelVendorBillMutation,
   usePayVendorBillMutation,
-  useQueuePaymentVendorBillMutation,
   useRejectVendorBillMutation,
   useSubmitVendorBillMutation,
 } = vendorBillsApi;

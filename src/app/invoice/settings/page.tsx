@@ -6,8 +6,9 @@ import { AccountingSettingsTab } from "@/components/invoice/settings/AccountingS
 import { CurrenciesTab } from "@/components/invoice/settings/CurrenciesTab";
 import { PaymentTermsTab } from "@/components/invoice/settings/PaymentTermsTab";
 import { RequestAccountMappingsTab } from "@/components/invoice/settings/RequestAccountMappingsTab";
+import { VendorTab } from "@/components/invoice/settings/VendorTab";
 
-type Tab = "accounting" | "bank-accounts" | "request-mappings" | "currencies" | "payment-terms";
+type Tab = "accounting" | "bank-accounts" | "request-mappings" | "currencies" | "payment-terms" | "vendor";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("accounting");
@@ -82,6 +83,16 @@ export default function SettingsPage() {
           >
             Payment Terms
           </button>
+          <button
+            onClick={() => setActiveTab("vendor")}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === "vendor"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            Vendor
+          </button>
         </nav>
       </div>
 
@@ -92,6 +103,7 @@ export default function SettingsPage() {
         {activeTab === "request-mappings" && <RequestAccountMappingsTab />}
         {activeTab === "currencies" && <CurrenciesTab />}
         {activeTab === "payment-terms" && <PaymentTermsTab />}
+        {activeTab === "vendor" && <VendorTab />}
       </div>
     </div>
   );
