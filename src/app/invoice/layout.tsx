@@ -33,12 +33,6 @@ export default function InvoiceLayout({
       module: "invoice",
     },
     {
-      label: "Vendor",
-      href: "/invoice/vendor",
-      application: "invoice",
-      module: "invoice",
-    },
-    {
       label: "Account Ledger",
       href: "/invoice/account-ledger",
       application: "invoice",

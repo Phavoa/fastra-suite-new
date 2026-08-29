@@ -78,7 +78,7 @@ export default function EditVendorPage() {
         type: "success",
       });
       setTimeout(() => {
-        router.push(`/invoice/vendor/${vendorId}`);
+        router.push(`/invoice/settings?tab=vendor`);
       }, 1500);
     } catch (err: any) {
       setToast({

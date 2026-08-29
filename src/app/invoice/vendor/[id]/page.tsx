@@ -184,7 +184,7 @@ export default function VendorInfoPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push("/invoice/vendor")}
+            onClick={() => router.push("/invoice/settings?tab=vendor")}
             className="rounded-lg p-1.5 transition-colors hover:bg-gray-100"
             aria-label="Back to vendors"
           >
