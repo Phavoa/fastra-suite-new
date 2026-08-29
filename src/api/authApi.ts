@@ -98,6 +98,9 @@ export interface ResendVerificationResponse {
   message?: string;
 }
 
+const getAuthDomain = () => process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
+const getAuthProtocol = () => (getAuthDomain().includes("localhost") || getAuthDomain().includes("127.0.0.1") ? "http" : "https");
+
 export const authApi = createApi({
   reducerPath: "authApi",
   baseQuery: fetchBaseQuery({ baseUrl: process.env.NEXT_PUBLIC_API_URL }),
@@ -121,14 +124,14 @@ export const authApi = createApi({
       ForgetPasswordRequest
     >({
       query: ({ email, tenant }) => ({
-        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/request-forgotten-password/`,
+        url: `${getAuthProtocol()}://${tenant}.${getAuthDomain()}/request-forgotten-password/`,
         method: "POST",
         body: { email },
       }),
     }),
     verifyOtp: builder.mutation<VerifyOtpResponse, VerifyOtpRequest>({
       query: ({ email, otp, tenant }) => ({
-        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/verify-otp/`,
+        url: `${getAuthProtocol()}://${tenant}.${getAuthDomain()}/verify-otp/`,
         method: "POST",
         body: { email, otp },
       }),
@@ -138,14 +141,14 @@ export const authApi = createApi({
       ResetPasswordRequest
     >({
       query: (body) => ({
-        url: `https://${process.env.NEXT_PUBLIC_API_DOMAIN}/reset-password/`,
+        url: `${getAuthProtocol()}://${getAuthDomain()}/reset-password/`,
         method: "POST",
         body,
       }),
     }),
     verifyEmail: builder.query<VerifyEmailResponse, VerifyEmailRequest>({
       query: ({ token, tenant }) => ({
-        url: `https://${tenant}.${process.env.NEXT_PUBLIC_API_DOMAIN}/company/email-verify?token=${token}`,
+        url: `${getAuthProtocol()}://${tenant}.${getAuthDomain()}/company/email-verify?token=${token}`,
         method: "GET",
       }),
     }),
@@ -154,7 +157,7 @@ export const authApi = createApi({
       ResendVerificationRequest
     >({
       query: ({ tenant }) => ({
-        url: `https://${tenant}.fastrasuiteapi.com.ng/company/resend-verification-email/`,
+        url: `${getAuthProtocol()}://${tenant}.${getAuthDomain()}/company/resend-verification-email/`,
         method: "POST",
         body: {},
       }),

@@ -138,6 +138,12 @@ export default function OperationPage() {
   const { data: incomingProductsData = [], isLoading } = useGetIncomingProductsQuery({
     search: query || undefined,
     status: selectedStatus !== "all" ? (selectedStatus as any) : undefined,
+    is_backorder: false,
+  });
+
+  const { data: pendingIncomingData = [] } = useGetIncomingProductsQuery({
+    status: "draft",
+    is_backorder: false,
   });
 
   const { data: returnsData = [] } = useGetIncomingProductReturnsQuery({});
@@ -217,7 +223,7 @@ export default function OperationPage() {
 
           {/* StatusCards-style tiles */}
           <OperationsNavigationTiles
-            incomingCount={incomingProductsData.length}
+            incomingCount={pendingIncomingData.length}
             returnsCount={returnsData.length}
             backordersCount={backOrdersData.length}
           />
