@@ -49,12 +49,8 @@ interface CreateVendorBillModalProps {
   paymentTerm: number | null;
   lines: VendorBillLineItem[];
   formatCurrency: (amount: number) => string;
-  onCreated?: () => void;
+  onCreated?: (billId?: number) => void;
 
-  /**
-   * Only needed when sourceType === "SUBCONTRACTOR".
-   * Determines whether to send `subcontractor_milestone` or `subcontractor_request`.
-   */
   subcontractorLineType?: SubcontractorLineType;
 
   title?: string;
@@ -265,16 +261,28 @@ export default function CreateVendorBillModal({
     formData.append("lines", JSON.stringify(mappedLines));
 
     try {
-      await createVendorBill(formData).unwrap();
+      const result = await createVendorBill(formData).unwrap();
+      console.log("[CreateVendorBill] - API result: ", result);
+
+      const billId = result?.id;
+      console.log("[CreateVendorBill] - billId: ", billId);
+
       showToast(
         "Vendor bill created successfully. Redirecting to Payment Queue…",
         "success",
       );
-      onCreated?.();
+
+      onCreated?.(billId);
 
       setTimeout(() => {
         onClose();
-        router.push("/invoice/payment-queue");
+
+        // Fallback logic: use ID if exists, else base payment queue path
+        const targetPath = billId
+          ? `/invoice/payment-queue/${billId}`
+          : `/invoice/payment-queue/`;
+
+        router.push(targetPath);
       }, 1200);
     } catch (err: unknown) {
       showToast(extractErrorMessage(err), "error");
@@ -287,7 +295,7 @@ export default function CreateVendorBillModal({
   const displaySubtitle =
     subtitle ||
     (sourceType === "PROJECT_PO"
-      ? `PO #${sourceId}`
+      ? `${sourceId}`
       : sourceType === "PLANT_AND_EQUIPMENT"
         ? `Plant & Equipment #${sourceId}`
         : `Subcontractor Request #${sourceId}`);
@@ -319,7 +327,7 @@ export default function CreateVendorBillModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-bill-title"
-          className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+          className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded bg-white shadow-2xl"
         >
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">

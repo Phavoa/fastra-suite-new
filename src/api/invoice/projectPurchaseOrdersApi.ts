@@ -21,7 +21,17 @@ export interface PurchaseOrderLine {
   quantity_received: string;
   quantity_billed: string;
   item_name: string;
-  unit?: string;
+  unit?: string | null;
+}
+
+export interface EquipmentHire {
+  id: number;
+  equipment_description: string;
+  vendor: number;
+  hire_start_date: string;
+  expected_return_date: string;
+  returned_at: string | null;
+  status: "on_hire" | "returned" | "overdue";
 }
 
 export interface ProjectPurchaseOrder {
@@ -35,6 +45,8 @@ export interface ProjectPurchaseOrder {
   wbs_element: string;
   payment_term: number | null;
   expected_delivery_date: string;
+  required_date?: string;
+  expected_return_date?: string | null;
   status: PurchaseOrderStatus;
   issued_at: string | null;
   created_by: number;
@@ -43,6 +55,7 @@ export interface ProjectPurchaseOrder {
   updated_at: string;
   lines: PurchaseOrderLine[];
   site_location?: string;
+  equipment_hire?: EquipmentHire | null;
   wbs_element_details?: {
     id: string;
     serial_number: number;
@@ -79,7 +92,8 @@ export interface ConvertRequestToPurchaseOrderRequest {
   vendor: number;
   currency: number;
   payment_term?: number | null;
-  expected_delivery_date: string;
+  expected_delivery_date?: string;
+  expected_return_date?: string;
 }
 
 export interface GetPurchaseOrdersParams {
@@ -234,6 +248,12 @@ export const projectPurchaseOrdersApi = createApi({
         method: "POST",
       }),
     }),
+    returnHiredEquipment: builder.mutation<ProjectPurchaseOrder, number>({
+      query: (id) => ({
+        url: `/invoicing/project-purchase-orders/${id}/equipment-hire/return/`,
+        method: "POST",
+      }),
+    }),
     partiallyReceivePurchaseOrder: builder.mutation<
       ProjectPurchaseOrder,
       number
@@ -267,6 +287,7 @@ export const {
   useClosePurchaseOrderMutation,
   useFullyReceivePurchaseOrderMutation,
   useIssuePurchaseOrderMutation,
+  useReturnHiredEquipmentMutation,
   usePartiallyReceivePurchaseOrderMutation,
   useConvertRequestToPurchaseOrderMutation,
 } = projectPurchaseOrdersApi;

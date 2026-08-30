@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   useGetVendorBillsQuery,
+  useGetPaymentQueueVendorBillsQuery,
   type VendorBill,
 } from "@/api/invoice/vendorBillsApi";
 
@@ -124,6 +125,12 @@ export default function PaymentQueuePage() {
     isLoading,
     isFetching,
   } = useGetVendorBillsQuery();
+
+  // const {
+  //   data: invoices = [],
+  //   isLoading,
+  //   isFetching,
+  // } = useGetPaymentQueueVendorBillsQuery();
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();

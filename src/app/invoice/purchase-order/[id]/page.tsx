@@ -3,15 +3,26 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, FileText, CheckCircle, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Mail,
+  FileText,
+  CheckCircle,
+  Loader2,
+  ArrowLeft,
+  Calendar,
+  Wrench,
+} from "lucide-react";
 import CreateVendorBillModal from "@/components/invoice/CreateVendorBillModal";
+import ReturnHiredEquipmentModal from "@/components/invoice/ReturnHiredEquipmentModal";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 import {
   useGetPurchaseOrderByIdQuery,
   useIssuePurchaseOrderMutation,
+  useReturnHiredEquipmentMutation,
+  type PurchaseOrderLine,
+  type ProjectPurchaseOrder,
 } from "@/api/invoice/projectPurchaseOrdersApi";
-import { PurchaseOrderLine } from "@/api/invoice/projectPurchaseOrdersApi";
 import { useGetAccountingSettingsQuery } from "@/api/invoice/accountingSettingsApi";
 
 /* -------------------------------------------------------------------------- */
@@ -72,6 +83,7 @@ export default function PurchaseOrderDetailPage() {
   const poId = Number(params?.id);
 
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [toast, setToast] = useState<{
     show: boolean;
     message: string;
@@ -90,6 +102,9 @@ export default function PurchaseOrderDetailPage() {
   const [issuePurchaseOrder, { isLoading: isIssuing }] =
     useIssuePurchaseOrderMutation();
 
+  const [returnHiredEquipment, { isLoading: isReturning }] =
+    useReturnHiredEquipmentMutation();
+
   const { data: settingsList, isLoading: isSettingsLoading } =
     useGetAccountingSettingsQuery();
 
@@ -102,6 +117,11 @@ export default function PurchaseOrderDetailPage() {
   const isCancelled = status === "cancelled" || status === "canceled";
   const isFullybilled = status === "fully_billed";
 
+  const isPlantAndEquipment =
+    poDetail?.source_request_type === "plant_and_equipment";
+  const isHire = !!poDetail?.equipment_hire;
+  const equipmentHire = poDetail?.equipment_hire;
+
   const canPayWithoutReceived =
     !!settingsList && !!settingsList[0]?.can_pay_without_receiving;
 
@@ -110,23 +130,29 @@ export default function PurchaseOrderDetailPage() {
   );
 
   const canCreateBill = !isDraft && !isCancelled && !isFullybilled;
-  const isCreateBillEnabled =
-    !isSettingsLoading &&
-    canCreateBill &&
-    (canPayWithoutReceived || hasReceivedQuantity);
+
+  const isCreateBillEnabled = isPlantAndEquipment
+    ? !isSettingsLoading && canCreateBill
+    : !isSettingsLoading &&
+      canCreateBill &&
+      (canPayWithoutReceived || hasReceivedQuantity);
 
   const showCreateBillHelper =
     canCreateBill &&
     !isSettingsLoading &&
     !canPayWithoutReceived &&
-    !hasReceivedQuantity;
+    !hasReceivedQuantity &&
+    !isPlantAndEquipment;
   const showSettingNotice =
     canCreateBill &&
     !isSettingsLoading &&
     canPayWithoutReceived &&
-    !hasReceivedQuantity;
+    !hasReceivedQuantity &&
+    !isPlantAndEquipment;
 
-  const showReceivedColumn = !isDraft;
+  const showReceivedColumn = !isDraft && !isPlantAndEquipment;
+
+  const showEquipmentHireSection = isPlantAndEquipment && !!poDetail;
 
   /* ------------------------------- Issue PO -------------------------------- */
 
@@ -143,6 +169,23 @@ export default function PurchaseOrderDetailPage() {
         "error",
       );
       console.error("[PO Issue]", err);
+    }
+  };
+
+  const handleReturnEquipment = async () => {
+    if (!poId) return;
+
+    try {
+      await returnHiredEquipment(poId).unwrap();
+      showToast("Hired equipment marked as returned successfully.", "success");
+      await refetch();
+      setIsReturnModalOpen(false);
+    } catch (err: unknown) {
+      showToast(
+        extractErrorMessage(err, "Failed to mark equipment as returned."),
+        "error",
+      );
+      console.error("[Return Hired Equipment]", err);
     }
   };
 
@@ -250,6 +293,24 @@ export default function PurchaseOrderDetailPage() {
             </button>
           )}
 
+          {equipmentHire &&
+            equipmentHire.status !== "returned" &&
+            status === "issued" && (
+              <button
+                type="button"
+                onClick={() => setIsReturnModalOpen(true)}
+                disabled={isReturning || !equipmentHire}
+                className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isReturning ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowLeft className="h-4 w-4 rotate-180" />
+                )}
+                Mark Returned
+              </button>
+            )}
+
           {canCreateBill && (
             <button
               type="button"
@@ -278,8 +339,8 @@ export default function PurchaseOrderDetailPage() {
       )}
 
       {/* Basic Information */}
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
-        <h2 className="mb-4 text-sm font-semibold text-gray-800">
+      <div className="mb-4 rounded border border-gray-200 bg-white p-5 sm:p-6">
+        <h2 className="mb-4 text-sm font-semibold text-blue-600">
           Basic Information
         </h2>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -307,16 +368,20 @@ export default function PurchaseOrderDetailPage() {
               {(poDetail.status || "—").replace(/_/g, " ")}
             </p>
           </div>
-          <div>
-            <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
-              Expected Delivery
-            </p>
-            <p className="text-sm font-medium text-gray-900">
-              {poDetail.expected_delivery_date
-                ? new Date(poDetail.expected_delivery_date).toLocaleDateString()
-                : "—"}
-            </p>
-          </div>
+          {poDetail.expected_delivery_date && (
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
+                Expected Delivery
+              </p>
+              <p className="text-sm font-medium text-gray-900">
+                {poDetail.expected_delivery_date
+                  ? new Date(
+                      poDetail.expected_delivery_date,
+                    ).toLocaleDateString()
+                  : "—"}
+              </p>
+            </div>
+          )}
           <div>
             <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
               Issued Date
@@ -348,10 +413,77 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
+      {/* Equipment Hire Section - Plant & Equipment only */}
+      {showEquipmentHireSection && equipmentHire && (
+        <div className="mb-4 rounded border border-gray-200 bg-white p-5 sm:p-6">
+          <h2 className="mb-4 text-sm font-semibold text-blue-600">
+            Equipment Hire Tracking
+          </h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
+                Equipment Description
+              </p>
+              <p className="text-sm font-medium text-gray-900">
+                {equipmentHire.equipment_description || "—"}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
+                Hire Start Date
+              </p>
+              <p className="text-sm font-medium text-gray-900">
+                {equipmentHire.hire_start_date
+                  ? new Date(equipmentHire.hire_start_date).toLocaleDateString()
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
+                Expected Return Date
+              </p>
+              <p className="text-sm font-medium text-gray-900">
+                {equipmentHire.expected_return_date
+                  ? new Date(
+                      equipmentHire.expected_return_date,
+                    ).toLocaleDateString()
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
+                Status
+              </p>
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                  equipmentHire.status === "returned"
+                    ? "bg-green-100 text-green-800"
+                    : equipmentHire.status === "overdue"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-blue-100 text-blue-800"
+                }`}
+              >
+                {equipmentHire.status?.replace(/_/g, " ") || "—"}
+              </span>
+            </div>
+            {equipmentHire.returned_at && (
+              <div>
+                <p className="mb-1 text-xs uppercase tracking-wider text-gray-500">
+                  Returned At
+                </p>
+                <p className="text-sm font-medium text-gray-900">
+                  {new Date(equipmentHire.returned_at).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Line items */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded border border-gray-200 bg-white">
         <div className="border-b border-gray-100 px-5 py-3">
-          <h2 className="text-sm font-semibold text-gray-800">Line Items</h2>
+          <h2 className="text-sm font-semibold text-blue-600">Line Items</h2>
           <p className="mt-0.5 text-xs text-gray-500">
             All line items on this purchase order.
           </p>
@@ -363,9 +495,11 @@ export default function PurchaseOrderDetailPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Product / Description
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Unit
-                </th>
+                {!isPlantAndEquipment && (
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Unit
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                   Qty
                 </th>
@@ -391,9 +525,11 @@ export default function PurchaseOrderDetailPage() {
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {line.item_name || line.description || "—"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {line.unit || "—"}
-                  </td>
+                  {!isPlantAndEquipment && (
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {line.unit || "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right text-sm text-gray-600">
                     {line.qty ?? "—"}
                   </td>
@@ -413,7 +549,15 @@ export default function PurchaseOrderDetailPage() {
               {(!poDetail.lines || poDetail.lines.length === 0) && (
                 <tr>
                   <td
-                    colSpan={showReceivedColumn ? 6 : 5}
+                    colSpan={
+                      showReceivedColumn
+                        ? isPlantAndEquipment
+                          ? 5
+                          : 6
+                        : isPlantAndEquipment
+                          ? 4
+                          : 5
+                    }
                     className="px-4 py-10 text-center text-sm text-gray-500"
                   >
                     No line items on this purchase order.
@@ -424,7 +568,15 @@ export default function PurchaseOrderDetailPage() {
             <tfoot className="border-t border-gray-200 bg-gray-50">
               <tr>
                 <td
-                  colSpan={showReceivedColumn ? 5 : 4}
+                  colSpan={
+                    showReceivedColumn
+                      ? isPlantAndEquipment
+                        ? 4
+                        : 5
+                      : isPlantAndEquipment
+                        ? 3
+                        : 4
+                  }
                   className="px-4 py-3 text-right text-sm font-semibold text-gray-900"
                 >
                   Total
@@ -459,6 +611,16 @@ export default function PurchaseOrderDetailPage() {
         onCreated={() => {
           refetch();
         }}
+      />
+
+      <ReturnHiredEquipmentModal
+        isOpen={isReturnModalOpen}
+        onClose={() => setIsReturnModalOpen(false)}
+        onConfirm={handleReturnEquipment}
+        equipmentDescription={equipmentHire?.equipment_description || ""}
+        expectedReturnDate={equipmentHire?.expected_return_date || undefined}
+        hireStatus={equipmentHire?.status || "on_hire"}
+        isReturning={isReturning}
       />
     </div>
   );
