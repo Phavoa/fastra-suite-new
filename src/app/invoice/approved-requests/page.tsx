@@ -199,6 +199,7 @@ export default function ApprovedRequestsPage() {
 
   // ---------- Plant & Equipment ----------
   const handleConvertToPlantEquipment = (request: any) => {
+    console.log("Convert to Plant & Equipment →", request);
     setSelectedRequest(request);
     setCurrentStep(1);
     setIsPlantEquipmentModalOpen(true);
@@ -284,7 +285,8 @@ export default function ApprovedRequestsPage() {
   const handleIssuePO = async (payload: {
     vendor: number;
     payment_term: number | null;
-    expected_delivery_date: string;
+    expected_delivery_date?: string;
+    expected_return_date?: string;
     currency: number;
     source_id: number;
     source_type?: string;
@@ -295,7 +297,8 @@ export default function ApprovedRequestsPage() {
       vendor: payload.vendor,
       currency: payload.currency,
       payment_term: payload.payment_term,
-      expected_delivery_date: payload.expected_delivery_date,
+      expected_delivery_date: payload?.expected_delivery_date,
+      expected_return_date: payload?.expected_return_date,
     };
 
     console.log("Convert to PO – final payload sent to API →", finalPayload);

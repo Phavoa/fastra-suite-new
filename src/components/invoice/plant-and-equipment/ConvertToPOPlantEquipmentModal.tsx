@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   X,
   ChevronRight,
@@ -9,6 +9,7 @@ import {
   InfoIcon,
   Loader2,
   Wrench,
+  AlertCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import PaymentTermsSelect from "@/components/shared/PaymentTermsSelect";
@@ -36,7 +37,7 @@ interface ConvertToPOPlantEquipmentModalProps {
   onIssuePO: (payload: {
     vendor: number;
     payment_term: number | null;
-    expected_delivery_date: string;
+    expected_return_date: string;
     currency: number;
     source_id: number;
     source_type: string;
@@ -81,6 +82,30 @@ function formatLabel(value?: string | null) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function toDateOnly(value?: string | null): string {
+  if (!value) return "";
+  try {
+    return value.slice(0, 10);
+  } catch {
+    return "";
+  }
+}
+
+function formatDisplayDate(value?: string | null): string {
+  if (!value) return "—";
+  try {
+    return new Date(
+      value + (value.length === 10 ? "T00:00:00" : ""),
+    ).toLocaleDateString("en-NG", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return value;
+  }
+}
+
 export default function ConvertToPOPlantEquipmentModal({
   isOpen,
   onClose,
@@ -121,7 +146,11 @@ export default function ConvertToPOPlantEquipmentModal({
 
   const [selectedVendor, setSelectedVendor] = useState("");
   const [selectedPaymentTerms, setSelectedPaymentTerms] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
+  /** Processor-editable expected return date (hire only) */
+  const [returnDate, setReturnDate] = useState("");
+  /** Original value from the approved request — used to detect change */
+  const [originalReturnDate, setOriginalReturnDate] = useState("");
+  const [dateError, setDateError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [toast, setToast] = useState<{
     type: "success" | "error";
@@ -129,6 +158,7 @@ export default function ConvertToPOPlantEquipmentModal({
   } | null>(null);
 
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
+  const hasPrefillApplied = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -140,37 +170,59 @@ export default function ConvertToPOPlantEquipmentModal({
     }
   }, [isOpen]);
 
-  // Prefill delivery date from required_date when details load
+  // Prefill expected return date from request details (once per open)
   useEffect(() => {
-    if (detailsData?.required_date && !deliveryDate) {
-      setDeliveryDate(detailsData.required_date.slice(0, 10));
+    if (!isOpen || !detailsData || hasPrefillApplied.current) return;
+
+    const fromRequest = toDateOnly(detailsData.expected_return_date);
+    if (fromRequest) {
+      setReturnDate(fromRequest);
+      setOriginalReturnDate(fromRequest);
+    } else {
+      setReturnDate("");
+      setOriginalReturnDate("");
     }
-  }, [detailsData, deliveryDate]);
+    hasPrefillApplied.current = true;
+  }, [isOpen, detailsData]);
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedVendor("");
       setSelectedPaymentTerms("");
-      setDeliveryDate("");
+      setReturnDate("");
+      setOriginalReturnDate("");
+      setDateError(null);
       setToast(null);
+      hasPrefillApplied.current = false;
     }
   }, [isOpen]);
 
+  // ---------- Derived (hooks before any early return) ----------
+  const paymentType = (detailsData?.payment_type || "purchase").toLowerCase();
+  const isHire = paymentType === "hire";
+  const requiredDate = toDateOnly(detailsData?.required_date);
+
+  /** Min selectable return date = required date (or today if required is missing/past) */
+  const minReturnDate = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    if (!requiredDate) return today;
+    return requiredDate >= today ? requiredDate : today;
+  }, [requiredDate]);
+
+  const returnDateChanged =
+    isHire &&
+    Boolean(returnDate) &&
+    Boolean(originalReturnDate) &&
+    returnDate !== originalReturnDate;
+
+  const returnDateAdded = isHire && Boolean(returnDate) && !originalReturnDate;
+
   if (!isOpen && !isVisible) return null;
 
-  // ---------- Derived ----------
   const equipmentName = detailsData?.equipment_name || "—";
   const description = detailsData?.description || "—";
   const quantity = detailsData?.quantity ?? 0;
   const estimatedCost = Number(detailsData?.estimated_cost) || 0;
-  const paymentType = (detailsData?.payment_type || "purchase").toLowerCase();
-  const isHire = paymentType === "hire";
-  const expectedReturnDate = detailsData?.expected_return_date
-    ? detailsData.expected_return_date.slice(0, 10)
-    : null;
-  const requiredDate = detailsData?.required_date
-    ? detailsData.required_date.slice(0, 10)
-    : "—";
   const justification = detailsData?.justification_notes || "";
   const availableBudget = detailsData?.available_budget
     ? Number(detailsData.available_budget)
@@ -198,6 +250,28 @@ export default function ConvertToPOPlantEquipmentModal({
     setTimeout(() => setToast(null), 4500);
   };
 
+  const validateReturnDate = (value: string): string | null => {
+    if (!isHire) return null;
+    // Optional: processor may leave blank only if original was also blank;
+    // PRD expects a return date for hire — prefer requiring a value when hire
+    if (!value) {
+      return "Expected return date is required for hire requests";
+    }
+    if (requiredDate && value < requiredDate) {
+      return `Return date cannot be before the required date (${formatDisplayDate(requiredDate)})`;
+    }
+    const today = new Date().toISOString().split("T")[0];
+    if (value < today) {
+      return "Return date cannot be in the past";
+    }
+    return null;
+  };
+
+  const handleReturnDateChange = (value: string) => {
+    setReturnDate(value);
+    setDateError(validateReturnDate(value));
+  };
+
   const handleNext = () => {
     if (!selectedVendor) {
       showToast("error", "Please select a vendor");
@@ -207,9 +281,13 @@ export default function ConvertToPOPlantEquipmentModal({
       showToast("error", "Please select payment terms");
       return;
     }
-    if (!deliveryDate) {
-      showToast("error", "Please select an expected delivery date");
-      return;
+    if (isHire) {
+      const err = validateReturnDate(returnDate);
+      if (err) {
+        setDateError(err);
+        showToast("error", err);
+        return;
+      }
     }
     onNextStep();
   };
@@ -222,10 +300,19 @@ export default function ConvertToPOPlantEquipmentModal({
       return;
     }
 
+    if (isHire) {
+      const err = validateReturnDate(returnDate);
+      if (err) {
+        setDateError(err);
+        showToast("error", err);
+        return;
+      }
+    }
+
     const payload = {
       vendor: Number(selectedVendor),
       payment_term: selectedPaymentTerms ? Number(selectedPaymentTerms) : null,
-      expected_delivery_date: deliveryDate,
+      expected_return_date: isHire ? returnDate : "",
       currency: defaultCurrencyId,
       source_id: Number(sourceId),
       source_type: "plant_and_equipment",
@@ -285,7 +372,15 @@ export default function ConvertToPOPlantEquipmentModal({
     </div>
   );
 
-  const InfoCard = ({ label, value }: { label: string; value: string }) => (
+  const InfoCard = ({
+    label,
+    value,
+    hint,
+  }: {
+    label: string;
+    value: string;
+    hint?: string;
+  }) => (
     <div className="rounded-lg px-4 py-3 border border-gray-200 bg-gray-50">
       <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
         {label}
@@ -293,6 +388,7 @@ export default function ConvertToPOPlantEquipmentModal({
       <p className="text-sm font-medium text-gray-900">
         <TruncateWithTooltip text={value} maxLength={42} />
       </p>
+      {hint && <p className="mt-1 text-xs text-amber-700">{hint}</p>}
     </div>
   );
 
@@ -325,8 +421,8 @@ export default function ConvertToPOPlantEquipmentModal({
                   Qty: {quantity}
                   {" · "}
                   {formatLabel(paymentType)}
-                  {isHire && expectedReturnDate
-                    ? ` · Return by ${expectedReturnDate}`
+                  {isHire && originalReturnDate
+                    ? ` · Return by ${formatDisplayDate(originalReturnDate)}`
                     : ""}
                 </p>
               </div>
@@ -341,11 +437,18 @@ export default function ConvertToPOPlantEquipmentModal({
                 value={formatCurrency(estimatedCost)}
               />
               <InfoCard label="Payment Type" value={formatLabel(paymentType)} />
-              <InfoCard label="Required Date" value={requiredDate} />
+              <InfoCard
+                label="Required Date"
+                value={formatDisplayDate(requiredDate) || "—"}
+              />
               {isHire && (
                 <InfoCard
-                  label="Expected Return Date"
-                  value={expectedReturnDate || "Not set"}
+                  label="Original Expected Return"
+                  value={
+                    originalReturnDate
+                      ? formatDisplayDate(originalReturnDate)
+                      : "Not set on request"
+                  }
                 />
               )}
               <InfoCard label="WBS Element" value={wbsLabel} />
@@ -373,7 +476,7 @@ export default function ConvertToPOPlantEquipmentModal({
                   htmlFor="pe-vendor"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Vendor
+                  Vendor <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="pe-vendor"
@@ -393,7 +496,7 @@ export default function ConvertToPOPlantEquipmentModal({
 
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Payment Terms
+                  Payment Terms <span className="text-red-500">*</span>
                 </label>
                 <PaymentTermsSelect
                   value={selectedPaymentTerms}
@@ -402,26 +505,54 @@ export default function ConvertToPOPlantEquipmentModal({
                 />
               </div>
 
-              <div>
-                <label
-                  htmlFor="pe-delivery-date"
-                  className="text-sm font-medium text-gray-700 mb-2 block"
-                >
-                  Expected Delivery Date
-                </label>
-                <div className="relative">
-                  <Input
-                    id="pe-delivery-date"
-                    type="date"
-                    value={deliveryDate}
-                    onChange={(e) => setDeliveryDate(e.target.value)}
-                    disabled={isIssuing}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
-                    min={new Date().toISOString().split("T")[0]}
-                  />
-                  <CalendarIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+              {/* Expected Return Date — hire only; prefilled, editable */}
+              {isHire && (
+                <div>
+                  <label
+                    htmlFor="pe-return-date"
+                    className="text-sm font-medium text-gray-700 mb-1.5 block"
+                  >
+                    Expected Return Date <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Prefills from the approved request. You may change it if
+                    needed
+                    {requiredDate
+                      ? ` (must be on or after ${formatDisplayDate(requiredDate)})`
+                      : ""}
+                    .
+                  </p>
+                  <div className="relative">
+                    <Input
+                      id="pe-return-date"
+                      type="date"
+                      value={returnDate}
+                      onChange={(e) => handleReturnDateChange(e.target.value)}
+                      disabled={isIssuing}
+                      min={minReturnDate}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white ${
+                        dateError
+                          ? "border-red-300 focus:ring-red-400"
+                          : "border-gray-200"
+                      }`}
+                    />
+                    <CalendarIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                  </div>
+                  {dateError && (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {dateError}
+                    </p>
+                  )}
+                  {returnDateChanged && !dateError && (
+                    <p className="mt-1.5 text-xs text-amber-700">
+                      Changed from original{" "}
+                      <strong>{formatDisplayDate(originalReturnDate)}</strong> →{" "}
+                      <strong>{formatDisplayDate(returnDate)}</strong>
+                    </p>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </>
         )}
@@ -472,6 +603,33 @@ export default function ConvertToPOPlantEquipmentModal({
           </p>
         </div>
 
+        {/* Only when processor changed (or added) the return date */}
+        {isHire && (returnDateChanged || returnDateAdded) && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 flex items-start gap-2">
+            <CalendarIcon className="w-4 h-4 text-blue-700 mt-0.5 shrink-0" />
+            <div className="text-sm text-blue-900">
+              <p className="font-medium">
+                Expected return date will be updated
+              </p>
+              <p className="mt-0.5 text-blue-800">
+                {returnDateAdded ? (
+                  <>
+                    No return date was set on the request. The PO will use{" "}
+                    <strong>{formatDisplayDate(returnDate)}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Original:{" "}
+                    <strong>{formatDisplayDate(originalReturnDate)}</strong>
+                    {" → "}
+                    New: <strong>{formatDisplayDate(returnDate)}</strong>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <InfoCard label="Vendor" value={displayVendorName} />
           <InfoCard label="Equipment Name" value={equipmentName} />
@@ -482,22 +640,16 @@ export default function ConvertToPOPlantEquipmentModal({
           <InfoCard label="Quantity" value={String(quantity)} />
           <InfoCard label="Payment Type" value={formatLabel(paymentType)} />
           <InfoCard label="WBS Element" value={wbsLabel} />
-          <InfoCard
-            label="Expected Delivery Date"
-            value={
-              deliveryDate
-                ? new Date(deliveryDate).toLocaleDateString("en-NG", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : "Not specified"
-            }
-          />
+
           {isHire && (
             <InfoCard
               label="Expected Return Date"
-              value={expectedReturnDate || "Not set"}
+              value={returnDate ? formatDisplayDate(returnDate) : "Not set"}
+              hint={
+                returnDateChanged
+                  ? `Was ${formatDisplayDate(originalReturnDate)} on the request`
+                  : undefined
+              }
             />
           )}
           <InfoCard label="Originating Request" value={referenceId} />
