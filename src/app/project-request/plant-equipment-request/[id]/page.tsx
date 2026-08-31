@@ -69,6 +69,31 @@ export default function PlantEquipmentRequestDetailPage() {
       setRawRequestData(req);
       const projectId = (req as any).project_details?.id || (req as any).project_request_id || (req as any).project_request?.id || (req as any).project_request || (req as any).project;
       const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
+      let requesterName = "Requester";
+      if (req.created_by_details && typeof req.created_by_details === "object") {
+        const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
+        requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Requester";
+      } else if (
+        typeof req.project_request === "object" &&
+        (req as any).project_request?.created_by_details
+      ) {
+        const prCreatedBy = (req as any).project_request.created_by_details;
+        const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
+        requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Requester";
+      } else if (req.requester_details?.user) {
+        const userObj = req.requester_details.user;
+        const fullName = `${userObj.first_name || ""} ${userObj.last_name || ""}`.trim();
+        requesterName = fullName || userObj.username || userObj.email || "Requester";
+      } else if (req.created_by_name && typeof req.created_by_name === "string") {
+        requesterName = req.created_by_name;
+      } else if (req.requester_name && typeof req.requester_name === "string") {
+        requesterName = req.requester_name;
+      } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
+        requesterName = req.requester;
+      } else if (req.created_by_id) {
+        requesterName = `User #${req.created_by_id}`;
+      }
+
       setRequest({
         id: String(req.reference_id || (req as any).project_request?.reference_id || req.id),
         project: req.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
@@ -77,7 +102,7 @@ export default function PlantEquipmentRequestDetailPage() {
         quantity: req.quantity || 0,
         estimatedCost: parseFloat(req.estimated_cost) || 0,
         status: ((req as any).project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
-        requester: req.created_by_name || req.requester_name || "Current User",
+        requester: requesterName,
         date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",

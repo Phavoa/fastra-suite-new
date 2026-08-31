@@ -90,15 +90,23 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
 
   let requesterName = "Requester";
   if (req.created_by_details && typeof req.created_by_details === "object") {
-    requesterName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim() || req.created_by_details.username || "Requester";
-  } else if (req.created_by_id) {
-    requesterName = `User #${req.created_by_id}`;
+    const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
+    requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Requester";
+  } else if (
+    typeof (req as any).project_request === "object" &&
+    (req as any).project_request?.created_by_details
+  ) {
+    const prCreatedBy = (req as any).project_request.created_by_details;
+    const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
+    requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Requester";
+  } else if (req.requester_details?.user) {
+    const userObj = req.requester_details.user;
+    const fullName = `${userObj.first_name || ""} ${userObj.last_name || ""}`.trim();
+    requesterName = fullName || userObj.username || userObj.email || "Requester";
   } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
     requesterName = req.requester;
-  } else if (req.requester_details?.user) {
-    requesterName = `${req.requester_details.user.first_name || ""} ${req.requester_details.user.last_name || ""}`.trim() || req.requester_details.user.username;
-  } else if (typeof (req as any).project_request === "object" && (req as any).project_request?.created_by_details) {
-    requesterName = `${(req as any).project_request.created_by_details.first_name || ""} ${(req as any).project_request.created_by_details.last_name || ""}`.trim() || (req as any).project_request.created_by_details.username;
+  } else if (req.created_by_id) {
+    requesterName = `User #${req.created_by_id}`;
   }
 
   const dateValue = req.created_at || req.date_created || req.date || Date.now();
@@ -505,36 +513,36 @@ export default function PurchaseRequestDetailPage() {
       </main>
 
       {/* Action Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          {isConfirmingDelete ? (
-            <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-lg border border-red-100">
-              <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
-                <AlertCircle size={16} className="text-red-600" /> Confirm delete?
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsConfirmingDelete(false)}
-                  className="h-8 text-xs bg-white border-gray-200 text-gray-700"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
+      {request.status === "draft" && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            {isConfirmingDelete ? (
+              <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-lg border border-red-100">
+                <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
+                  <AlertCircle size={16} className="text-red-600" /> Confirm delete?
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsConfirmingDelete(false)}
+                    className="h-8 text-xs bg-white border-gray-200 text-gray-700"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2">
-                {request.status !== "pending" && (
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
                   <PermissionGuard module="project_request" entitlement="delete">
                     <Button
                       variant="outline"
@@ -544,9 +552,7 @@ export default function PurchaseRequestDetailPage() {
                       <Trash2 size={16} /> Delete
                     </Button>
                   </PermissionGuard>
-                )}
-                
-                {request.status === "draft" && (
+                  
                   <PermissionGuard module="project_request" entitlement="edit">
                     <Button
                       variant="outline"
@@ -556,11 +562,9 @@ export default function PurchaseRequestDetailPage() {
                       <Edit3 size={16} /> Edit
                     </Button>
                   </PermissionGuard>
-                )}
-              </div>
+                </div>
 
-              <div className="flex items-center gap-2 flex-1 justify-end">
-                {request.status === "draft" && (
+                <div className="flex items-center gap-2 flex-1 justify-end">
                   <PermissionGuard module="project_request" entitlement="submit">
                     <Button
                       disabled={isUpdating}
@@ -570,12 +574,12 @@ export default function PurchaseRequestDetailPage() {
                       <Check size={16} /> Submit
                     </Button>
                   </PermissionGuard>
-                )}
-              </div>
-            </>
-          )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <StatusModal
         isOpen={statusModal.isOpen}
         type={statusModal.type as any}

@@ -253,8 +253,18 @@ export const projectCostingApi = createApi({
       query: (id) => `/project-costing/projects/${id}/budget_adjustments/`,
       providesTags: (result, error, id) => [{ type: "BudgetAdjustments", id }],
     }),
-    getBudgetAdjustmentDetail: builder.query<BudgetAdjustment, number>({
-      query: (id) => `/project-costing/projects/${id}/budget_adjustment_detail/`,
+    // Project Settings
+    getProjectSettings: builder.query<any, number>({
+      query: (id) => `/project-costing/projects/${id}/project_settings/`,
+      providesTags: (result, error, id) => [{ type: "ProjectCosting", id }],
+    }),
+    updateProjectSettings: builder.mutation<any, { id: number; body: { allow_budget_decrease?: boolean; [key: string]: any } }>({
+      query: ({ id, body }) => ({
+        url: `/project-costing/projects/${id}/project_settings/`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: "ProjectCosting", id }],
     }),
 
     // Financials & Costs
@@ -319,6 +329,8 @@ export const {
   useSubmitBudgetAdjustmentMutation,
   useGetBudgetAdjustmentsQuery,
   useGetBudgetAdjustmentDetailQuery,
+  useGetProjectSettingsQuery,
+  useUpdateProjectSettingsMutation,
   useCreateActualCostMutation,
   useCreateCommitmentMutation,
   useGetProjectTransactionsQuery,

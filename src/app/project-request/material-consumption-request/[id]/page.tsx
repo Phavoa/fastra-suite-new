@@ -171,31 +171,6 @@ export default function MaterialConsumptionRequestDetailPage() {
     );
   }
 
-  if (request.status?.toLowerCase() !== "draft" && !statusModal.isOpen) {
-    return (
-      <PageGuard module="project_request" entitlement="view">
-        <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-          <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-sm w-full space-y-4">
-            <div className="w-12 h-12 bg-blue-50 text-[#3B7CED] rounded-full flex items-center justify-center mx-auto">
-              <Package size={24} />
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-800 font-bold">Request Already Submitted</p>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                This material consumption request has already been submitted and cannot be viewed or edited here.
-              </p>
-            </div>
-            <Button
-              onClick={() => router.push("/project-request/material-consumption-request")}
-              className="w-full bg-[#3B7CED] text-white hover:bg-blue-600 font-bold h-11 rounded-xl border-none shadow-none"
-            >
-              Go to Request List
-            </Button>
-          </div>
-        </div>
-      </PageGuard>
-    );
-  }
 
   const rawReq: any = request;
   const requestId = rawReq.request_id || (rawReq.reference_id || `MCR-${request.id}`);

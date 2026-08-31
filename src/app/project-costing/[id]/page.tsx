@@ -1074,9 +1074,12 @@ export default function ProjectDashboardPage() {
                             {isAdjExpanded && (
                               <div className="flex flex-col gap-3">
                                 {lines.map((line: any, idx: number) => {
-                                  const lineAmt = Number(line.adjustment_amount || line.amount || totalAdj);
+                                  const isDecrease = line.direction?.toUpperCase() === "DECREASE" || Number(line.adjustment_amount || line.amount || 0) < 0;
+                                  const rawAmt = Math.abs(Number(line.rate ? (Number(line.quantity || 1) * Number(line.rate)) : (line.adjustment_amount || line.amount || totalAdj)));
+                                  const lineAmt = isDecrease ? -rawAmt : rawAmt;
                                   const linePhase =
                                     line.phase_name ||
+                                    line.phase_details?.name ||
                                     line.phase ||
                                     (parsedPhases.find((p: any) =>
                                       p.activities?.some(
@@ -1095,11 +1098,18 @@ export default function ProjectDashboardPage() {
                                           <Badge variant="outline" className="text-[11px] font-normal text-gray-500 border-gray-200 px-2.5 py-0.5 rounded-full">
                                             {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
                                           </Badge>
+                                          {line.direction && (
+                                            <Badge className={`text-[10px] font-medium px-2 py-0.5 rounded-full border-0 ${
+                                              isDecrease ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                                            }`}>
+                                              {line.direction}
+                                            </Badge>
+                                          )}
                                         </div>
                                       </div>
                                       <div className="flex justify-between items-end mt-2">
                                         <span className="text-xs text-gray-500">
-                                          {line.activity_name || "LAB-001"} {line.reason ? `• ${line.reason}` : ""}
+                                          {line.activity_name || line.activity_details?.name || "Activity"} {line.quantity && line.rate ? `• Qty: ${line.quantity} @ ₦${Number(line.rate).toLocaleString()}` : (line.reason ? `• ${line.reason}` : "")}
                                         </span>
                                         <span className={`text-sm font-bold ${lineAmt >= 0 ? "text-green-600" : "text-red-500"}`}>
                                           {lineAmt >= 0 ? "+" : ""}₦{lineAmt.toLocaleString()}
@@ -1237,9 +1247,12 @@ export default function ProjectDashboardPage() {
                             {isAdjExpanded && (
                               <div className="flex flex-col gap-3">
                                 {lines.map((line: any, idx: number) => {
-                                  const lineAmt = Number(line.adjustment_amount || line.amount || totalAdj);
+                                  const isDecrease = line.direction?.toUpperCase() === "DECREASE" || Number(line.adjustment_amount || line.amount || 0) < 0;
+                                  const rawAmt = Math.abs(Number(line.rate ? (Number(line.quantity || 1) * Number(line.rate)) : (line.adjustment_amount || line.amount || totalAdj)));
+                                  const lineAmt = isDecrease ? -rawAmt : rawAmt;
                                   const linePhase =
                                     line.phase_name ||
+                                    line.phase_details?.name ||
                                     line.phase ||
                                     (parsedPhases.find((p: any) =>
                                       p.activities?.some(
@@ -1258,11 +1271,18 @@ export default function ProjectDashboardPage() {
                                           <Badge variant="outline" className="text-[11px] font-normal text-gray-500 border-gray-200 px-2.5 py-0.5 rounded-full">
                                             {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
                                           </Badge>
+                                          {line.direction && (
+                                            <Badge className={`text-[10px] font-medium px-2 py-0.5 rounded-full border-0 ${
+                                              isDecrease ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                                            }`}>
+                                              {line.direction}
+                                            </Badge>
+                                          )}
                                         </div>
                                       </div>
                                       <div className="flex justify-between items-end mt-2">
                                         <span className="text-xs text-gray-500">
-                                          {line.activity_name || "LAB-001"} {line.reason ? `• ${line.reason}` : ""}
+                                          {line.activity_name || line.activity_details?.name || "Activity"} {line.quantity && line.rate ? `• Qty: ${line.quantity} @ ₦${Number(line.rate).toLocaleString()}` : (line.reason ? `• ${line.reason}` : "")}
                                         </span>
                                         <span className={`text-sm font-bold ${lineAmt >= 0 ? "text-green-600" : "text-red-500"}`}>
                                           {lineAmt >= 0 ? "+" : ""}₦{lineAmt.toLocaleString()}
