@@ -23,6 +23,7 @@ import { companyApi } from "@/api/settings/companyApi";
 import { usersApi } from "@/api/settings/usersApi";
 import { tenantUserApi } from "@/api/settings/tenantUserApi";
 import { permissionsTemplateApi } from "@/api/settings/permissionsTemplateApi";
+import { auditTrailApi } from "@/api/settings/auditTrailApi";
 import { currencyApi } from "../../api/purchase/currencyApi";
 import { locationApi } from "../../api/inventory/locationApi";
 import { multilocationApi } from "../../api/inventory/multilocationApi";
@@ -95,6 +96,7 @@ const rootReducer = combineReducers({
   [usersApi.reducerPath]: usersApi.reducer,
   [tenantUserApi.reducerPath]: tenantUserApi.reducer,
   [permissionsTemplateApi.reducerPath]: permissionsTemplateApi.reducer,
+  [auditTrailApi.reducerPath]: auditTrailApi.reducer,
 
   [productsApi.reducerPath]: productsApi.reducer,
   [unitOfMeasureApi.reducerPath]: unitOfMeasureApi.reducer,
@@ -222,6 +224,7 @@ export const store = configureStore({
       approvedProjectRequestsApi.middleware,
       vendorBillsApi.middleware,
       notificationApi.middleware,
+      auditTrailApi.middleware,
     ),
 });
 
