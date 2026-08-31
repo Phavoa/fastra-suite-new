@@ -328,7 +328,6 @@ export const {
   useRejectBudgetAdjustmentMutation,
   useSubmitBudgetAdjustmentMutation,
   useGetBudgetAdjustmentsQuery,
-  useGetBudgetAdjustmentDetailQuery,
   useGetProjectSettingsQuery,
   useUpdateProjectSettingsMutation,
   useCreateActualCostMutation,

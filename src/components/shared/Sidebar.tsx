@@ -15,7 +15,7 @@ import {
   AppIcon,
   SettingsIcon,
 } from "./icons";
-import { ClipboardList, Coins } from "lucide-react";
+import { ClipboardList, Coins, ShieldCheck } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 
@@ -64,6 +64,12 @@ const middleItems = [
 ];
 
 const bottomItems = [
+  {
+    id: "audit-trail",
+    icon: ShieldCheck,
+    label: "Audit Trail",
+    route: "/settings/audit-trail",
+  },
   {
     id: "settings",
     icon: SettingsIcon,
@@ -151,8 +157,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (item.id === "inventory") {
       return pathname?.startsWith("/inventory");
     }
+    if (item.id === "audit-trail") {
+      return pathname?.startsWith("/settings/audit-trail") || pathname?.startsWith("/audit-trail");
+    }
     if (item.id === "settings") {
-      return pathname?.startsWith("/settings");
+      return pathname?.startsWith("/settings") && !pathname?.startsWith("/settings/audit-trail");
     }
     return pathname?.startsWith(item.route);
   };

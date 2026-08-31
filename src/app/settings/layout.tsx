@@ -18,7 +18,8 @@ type SettingsSection =
   | "accessgroup"
   | "application"
   | "permissiontemplates"
-  | "multilocation";
+  | "multilocation"
+  | "audittrail";
 
 export default function SettingsLayout({
   children,
@@ -52,6 +53,11 @@ export default function SettingsLayout({
       label: "Multi Location",
       href: "/settings/multi-location",
     },
+    {
+      key: "audittrail",
+      label: "Audit Trail",
+      href: "/settings/audit-trail",
+    },
     //{ label: "Application", href: "/settings/application" },
   ];
 
@@ -64,6 +70,8 @@ export default function SettingsLayout({
       return "permissiontemplates";
     if (path.startsWith("/settings/multi-location"))
       return "multilocation";
+    if (path.startsWith("/settings/audit-trail"))
+      return "audittrail";
     return "company";
   };
 
@@ -104,6 +112,9 @@ export default function SettingsLayout({
         break;
       case "permissiontemplates":
         basePath += "/permission-templates";
+        break;
+      case "audittrail":
+        basePath += "/audit-trail";
         break;
     }
     router.push(`${basePath}?search=${encodeURIComponent(query)}`);
@@ -150,6 +161,7 @@ export default function SettingsLayout({
     pathname === "/settings" ||
     pathname === "/settings/company/1" ||
     pathname === "/settings/multi-location" ||
+    pathname.startsWith("/settings/audit-trail") ||
     /^\/settings\/company\/updatecompany\/?$/.test(pathname);
 
   const sectionToEntitlement: Record<SettingsSection, string> = {
@@ -159,6 +171,7 @@ export default function SettingsLayout({
     multilocation: "view_location",
     accessgroup: "view_permissiontemplate",
     application: "view_company",
+    audittrail: "view_company",
   };
 
   return (
