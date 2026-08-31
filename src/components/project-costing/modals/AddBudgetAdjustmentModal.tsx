@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,9 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X } from "lucide-react";
+import { Plus, X, AlertTriangle } from "lucide-react";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
-import { useCreateBudgetAdjustmentMutation } from "@/api/projectCostingApi";
+import { 
+  useCreateBudgetAdjustmentMutation,
+  useGetProjectSettingsQuery,
+  useUpdateProjectSettingsMutation 
+} from "@/api/projectCostingApi";
 
 interface Props {
   isOpen: boolean;
@@ -29,16 +33,17 @@ interface Props {
 
 interface AdjustmentLine {
   id: string;
-  type: "existing" | "new";
+  adjustment_type: "EXISTING" | "NEW";
   activityId?: string;
   activityName: string;
+  phaseId?: string;
   phaseName: string;
+  direction: "INCREASE" | "DECREASE";
   currentAmount?: number;
-  costCategory: string;
   quantity: number;
   rate: number;
   amount: number;
-  reason: string;
+  reason?: string;
 }
 
 export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
@@ -47,6 +52,13 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   // Modals & API
   const statusModal = useStatusModal();
   const [createBudgetAdjustment, { isLoading: isSubmitting }] = useCreateBudgetAdjustmentMutation();
+  
+  // Project settings query & mutation
+  const { data: projectSettings, refetch: refetchSettings } = useGetProjectSettingsQuery(
+    project?.id,
+    { skip: !project?.id || !isOpen }
+  );
+  const [updateProjectSettings, { isLoading: isUpdatingSettings }] = useUpdateProjectSettingsMutation();
 
   // State for lines
   const [adjustmentLines, setAdjustmentLines] = useState<AdjustmentLine[]>([]);
@@ -54,14 +66,15 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   // Form State
   const [selectedActivity, setSelectedActivity] = useState("");
   const [selectedPhaseForNew, setSelectedPhaseForNew] = useState("");
-  const [costCategory, setCostCategory] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [rate, setRate] = useState("");
   const [amountInput, setAmountInput] = useState("");
-  const [direction, setDirection] = useState<"increase" | "decrease">("increase");
+  const [direction, setDirection] = useState<"INCREASE" | "DECREASE">("INCREASE");
   const [reason, setReason] = useState("");
   const [newActivityName, setNewActivityName] = useState("");
   const [overallReason, setOverallReason] = useState("");
+
+  const allowBudgetDecrease = projectSettings?.allow_budget_decrease ?? project?.allow_budget_decrease ?? true;
 
   let budgetNum = 0;
   if (project?.financials) {
@@ -75,7 +88,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
   
   // Current approved budget from backend
   const currentBudgetNum = budgetNum;
-  const totalStagedAdjustment = adjustmentLines.reduce((acc, line) => acc + line.amount, 0);
+  const totalStagedAdjustment = adjustmentLines.reduce((acc, line) => acc + (line.direction === "DECREASE" ? -line.amount : line.amount), 0);
   const proposedTotalBudget = budgetNum + totalStagedAdjustment;
   
   // Parse phases and structure activities by Phase
@@ -88,8 +101,9 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       if (Array.isArray(phasesArr)) {
         phasesArr.forEach((phase: any, pIndex: number) => {
           const pName = phase.name || `Phase ${pIndex + 1}`;
+          const phaseId = String(phase.id || phase.uuid || `phase-${pIndex}`);
           const phaseObj = {
-            id: String(phase.id || `phase-${pIndex}`),
+            id: phaseId,
             name: pName,
             activities: [] as any[],
           };
@@ -103,13 +117,14 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                   : Number(act.quantity || 1) * Number(act.rate || 0)
               );
               const actObj = {
-                activity_id: String(act.id || `${phaseObj.id}-act-${aIndex}`),
+                activity_id: String(act.id || act.uuid || `${phaseObj.id}-act-${aIndex}`),
                 activity_name: act.name || `Activity ${aIndex + 1}`,
                 wbs_code: act.serial_number
                   ? `ACT-${act.serial_number}`
                   : act.sn
                   ? `S/N ${act.sn}`
                   : `Act ${aIndex + 1}`,
+                phase_id: phaseId,
                 phase_name: pName,
                 amount: actAmt,
                 budget: actAmt,
@@ -130,14 +145,38 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
     (a) => String(a.activity_id) === String(selectedActivity)
   );
 
+  const handleEnableBudgetDecrease = async () => {
+    try {
+      await updateProjectSettings({
+        id: project.id,
+        body: { allow_budget_decrease: true }
+      }).unwrap();
+      refetchSettings();
+      statusModal.showSuccess("Settings Updated", "Budget decrease is now enabled for this project.");
+    } catch (err) {
+      console.error("Failed to update project settings", err);
+      statusModal.showError("Update Failed", "Failed to update project settings. Please try again.");
+    }
+  };
+
   const handleAddLine = () => {
     if (activeTab === "existing" && !selectedActivity) {
       alert("Please select an activity");
       return;
     }
     
-    if (activeTab === "new" && !newActivityName) {
+    if (activeTab === "new" && !selectedPhaseForNew) {
+      alert("Please select a target phase");
+      return;
+    }
+
+    if (activeTab === "new" && !newActivityName.trim()) {
       alert("Please enter a new activity name");
+      return;
+    }
+
+    if (direction === "DECREASE" && !allowBudgetDecrease) {
+      alert("Budget decrease is not enabled in project settings. Please enable 'Allow Budget Decrease' in project settings.");
       return;
     }
 
@@ -149,48 +188,49 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       qNum = 1;
       rNum = amtNum;
     } else if (isNaN(qNum) || isNaN(rNum) || qNum <= 0 || rNum <= 0) {
-      alert("Please enter a valid adjustment amount");
+      alert("Please enter a valid adjustment amount or quantity and rate");
       return;
     } else {
       amtNum = qNum * rNum;
     }
 
-    const finalAmount = direction === "decrease" ? -Math.abs(amtNum) : Math.abs(amtNum);
-
-    let actName = newActivityName;
-    let phaseName = selectedPhaseForNew || phasesList[0]?.name || "General Phase";
+    let actName = newActivityName.trim();
+    let phaseObj = phasesList.find((p) => String(p.id) === String(selectedPhaseForNew) || p.name === selectedPhaseForNew);
+    let phaseId = phaseObj?.id || selectedPhaseForNew || phasesList[0]?.id;
+    let phaseName = phaseObj?.name || phasesList[0]?.name || "General Phase";
     let currentAmount: number | undefined = undefined;
 
     if (activeTab === "existing") {
       actName = selectedActivityObj ? selectedActivityObj.activity_name : "Unknown Activity";
+      phaseId = selectedActivityObj ? selectedActivityObj.phase_id : undefined;
       phaseName = selectedActivityObj ? selectedActivityObj.phase_name : "General Phase";
       currentAmount = selectedActivityObj ? selectedActivityObj.amount : 0;
     }
 
     const newLine: AdjustmentLine = {
       id: Math.random().toString(36).substr(2, 9),
-      type: activeTab,
+      adjustment_type: activeTab === "new" ? "NEW" : "EXISTING",
       activityId: activeTab === "existing" ? selectedActivity : undefined,
       activityName: actName,
+      phaseId: activeTab === "new" ? phaseId : undefined,
       phaseName,
+      direction,
       currentAmount,
-      costCategory: costCategory || "LABOUR",
       quantity: qNum,
       rate: rNum,
-      amount: finalAmount,
-      reason,
+      amount: amtNum,
+      reason: reason.trim() || undefined,
     };
 
     setAdjustmentLines([...adjustmentLines, newLine]);
     
     // Reset form
-    setQuantity("");
+    setQuantity("1");
     setRate("");
     setAmountInput("");
     setReason("");
     setNewActivityName("");
     setSelectedActivity("");
-    setCostCategory("");
   };
 
   const removeLine = (id: string) => {
@@ -202,25 +242,46 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       statusModal.showError("Validation Error", "Please add at least one adjustment line before submitting.");
       return;
     }
+
+    const hasDecrease = adjustmentLines.some((l) => l.direction === "DECREASE");
+    if (hasDecrease && !allowBudgetDecrease) {
+      statusModal.showError(
+        "Budget Decrease Restricted",
+        "Budget decrease is disabled in project settings (allow_budget_decrease: false). Please enable it in project settings first."
+      );
+      return;
+    }
     
     const topReason = overallReason.trim() || adjustmentLines.map((l) => l.reason).filter(Boolean)[0] || "Budget adjustment request";
     
     try {
+      const payload = {
+        reason: topReason,
+        lines: adjustmentLines.map((line) => {
+          if (line.adjustment_type === "EXISTING") {
+            return {
+              adjustment_type: "EXISTING",
+              activity: line.activityId,
+              direction: line.direction,
+              quantity: line.quantity,
+              rate: line.rate,
+            };
+          } else {
+            return {
+              adjustment_type: "NEW",
+              phase: line.phaseId,
+              activity_name: line.activityName,
+              direction: line.direction,
+              quantity: line.quantity,
+              rate: line.rate,
+            };
+          }
+        }),
+      };
+
       await createBudgetAdjustment({
         id: project.id,
-        body: {
-          reason: topReason,
-          lines: adjustmentLines.map((line) => ({
-            adjustment_type: line.type === "new" ? "NEW" : "EXISTING",
-            activity: line.type === "existing" ? (!isNaN(Number(line.activityId)) ? Number(line.activityId) : line.activityId) : undefined,
-            activity_name: line.type === "new" ? line.activityName : undefined,
-            phase_name: line.phaseName,
-            quantity: line.quantity,
-            rate: line.rate,
-            cost_category: line.costCategory || undefined,
-            reason: line.reason || undefined,
-          })),
-        },
+        body: payload,
       }).unwrap();
 
       statusModal.showSuccess(
@@ -230,12 +291,17 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
       
       setAdjustmentLines([]);
       setOverallReason("");
-    } catch (error) {
-      console.error(error);
-      statusModal.showError(
-        "Submission Failed",
-        "Failed to submit budget adjustments. Please check your data and try again."
-      );
+    } catch (error: any) {
+      console.error("Failed to create budget adjustment:", error);
+      let errorMsg = "Failed to submit budget adjustments. Please check your data and try again.";
+      if (error?.data?.detail) {
+        errorMsg = error.data.detail;
+      } else if (error?.data?.message) {
+        errorMsg = error.data.message;
+      } else if (error?.data?.error) {
+        errorMsg = typeof error.data.error === "string" ? error.data.error : JSON.stringify(error.data.error);
+      }
+      statusModal.showError("Submission Failed", errorMsg);
     }
   };
 
@@ -378,7 +444,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                       </SelectTrigger>
                       <SelectContent>
                         {phasesList.map((p) => (
-                          <SelectItem key={p.id} value={p.name}>
+                          <SelectItem key={p.id} value={p.id}>
                             {p.name}
                           </SelectItem>
                         ))}
@@ -397,9 +463,9 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setDirection("increase")}
+                    onClick={() => setDirection("INCREASE")}
                     className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded border text-sm font-medium transition-colors ${
-                      direction === "increase"
+                      direction === "INCREASE"
                         ? "border-green-600 bg-green-50 text-green-700 font-semibold"
                         : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                     }`}
@@ -408,9 +474,9 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDirection("decrease")}
+                    onClick={() => setDirection("DECREASE")}
                     className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded border text-sm font-medium transition-colors ${
-                      direction === "decrease"
+                      direction === "DECREASE"
                         ? "border-red-600 bg-red-50 text-red-700 font-semibold"
                         : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                     }`}
@@ -418,11 +484,75 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                     ↘ Decrease Budget
                   </button>
                 </div>
+                
+                {/* Warning if decrease is chosen but allow_budget_decrease is false */}
+                {direction === "DECREASE" && !allowBudgetDecrease && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Budget decrease is currently disabled</span> for this project in Project Settings.
+                      </div>
+                    </div>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline"
+                      disabled={isUpdatingSettings}
+                      onClick={handleEnableBudgetDecrease} 
+                      className="text-xs h-7 px-2.5 bg-white border-amber-300 text-amber-900 hover:bg-amber-100 font-medium shrink-0"
+                    >
+                      {isUpdatingSettings ? "Enabling..." : "Enable in Settings"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-gray-900">Quantity</label>
+                  <Input 
+                    placeholder="1" 
+                    type="number" 
+                    value={quantity} 
+                    onChange={(e) => {
+                      setQuantity(e.target.value);
+                      if (rate && e.target.value) {
+                        setAmountInput(String(Number(e.target.value) * Number(rate)));
+                      }
+                    }} 
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-gray-900">Rate / Unit Cost (₦)</label>
+                  <Input 
+                    placeholder="e.g. 100000" 
+                    type="number" 
+                    value={rate} 
+                    onChange={(e) => {
+                      setRate(e.target.value);
+                      if (quantity && e.target.value) {
+                        setAmountInput(String(Number(quantity) * Number(e.target.value)));
+                      }
+                    }} 
+                  />
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-gray-900">Adjustment Amount (₦)</label>
-                <Input placeholder="Enter Amount" type="number" value={amountInput} onChange={(e) => setAmountInput(e.target.value)} />
+                <label className="text-sm font-semibold text-gray-900">Total Line Amount (₦)</label>
+                <Input 
+                  placeholder="Enter or computed total amount" 
+                  type="number" 
+                  value={amountInput} 
+                  onChange={(e) => {
+                    setAmountInput(e.target.value);
+                    if (e.target.value && (!rate || !quantity)) {
+                      setQuantity("1");
+                      setRate(e.target.value);
+                    }
+                  }} 
+                />
               </div>
 
               <Button type="button" onClick={handleAddLine} className="w-full mt-2 bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center justify-center gap-2 font-medium">
@@ -434,7 +564,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
           {/* Added Lines Summary */}
           {adjustmentLines.length > 0 && (
             <div className="flex flex-col gap-3 mt-2">
-              <h3 className="font-semibold text-gray-900">Adjustment Lines</h3>
+              <h3 className="font-semibold text-gray-900">Adjustment Lines ({adjustmentLines.length})</h3>
               <div className="flex flex-col gap-3">
                 {adjustmentLines.map((line) => (
                   <div key={line.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-xs flex flex-col gap-2">
@@ -442,7 +572,12 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-800">{line.phaseName}</span>
                         <Badge variant="outline" className="text-xs py-0.5 px-2 rounded-full border-gray-200 text-gray-500 font-normal">
-                          {line.type === "new" ? "New Activity" : "Existing Activity"}
+                          {line.adjustment_type === "NEW" ? "New Activity" : "Existing Activity"}
+                        </Badge>
+                        <Badge className={`text-xs py-0.5 px-2 rounded-full font-medium border-0 ${
+                          line.direction === "INCREASE" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        }`}>
+                          {line.direction}
                         </Badge>
                       </div>
                       <button type="button" onClick={() => removeLine(line.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
@@ -452,16 +587,16 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                     <div className="flex justify-between items-end mt-1">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-xs text-gray-700 font-medium">
-                          {line.activityName} {line.reason ? `• ${line.reason}` : ""}
+                          {line.activityName} {line.quantity && line.rate ? `• Qty: ${line.quantity} @ ₦${line.rate.toLocaleString()}` : ""}
                         </span>
-                        {line.currentAmount !== undefined && line.type === "existing" && (
+                        {line.currentAmount !== undefined && line.adjustment_type === "EXISTING" && (
                           <span className="text-[11px] text-gray-500">
-                            Current: ₦{line.currentAmount.toLocaleString()} → New: ₦{(line.currentAmount + line.amount).toLocaleString()}
+                            Current: ₦{line.currentAmount.toLocaleString()} → New: ₦{(line.currentAmount + (line.direction === "DECREASE" ? -line.amount : line.amount)).toLocaleString()}
                           </span>
                         )}
                       </div>
-                      <span className={`text-sm font-bold ${line.amount >= 0 ? "text-green-600" : "text-red-500"}`}>
-                        {line.amount >= 0 ? "+" : ""}₦{line.amount.toLocaleString()}
+                      <span className={`text-sm font-bold ${line.direction === "INCREASE" ? "text-green-600" : "text-red-500"}`}>
+                        {line.direction === "INCREASE" ? "+" : "-"}₦{line.amount.toLocaleString()}
                       </span>
                     </div>
                   </div>

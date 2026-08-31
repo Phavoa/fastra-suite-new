@@ -74,25 +74,30 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   );
 
   let requesterName = "";
-  if (
+  if (req.created_by_details && typeof req.created_by_details === "object") {
+    const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
+    requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Requester";
+  } else if (
+    typeof req.project_request === "object" &&
+    (req as any).project_request?.created_by_details
+  ) {
+    const prCreatedBy = (req as any).project_request.created_by_details;
+    const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
+    requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Requester";
+  } else if (req.requester_details?.user) {
+    const userObj = req.requester_details.user;
+    const fullName = `${userObj.first_name || ""} ${userObj.last_name || ""}`.trim();
+    requesterName = fullName || userObj.username || userObj.email || "Requester";
+  } else if (
     req.requester &&
     typeof req.requester === "string" &&
     isNaN(Number(req.requester))
   ) {
     requesterName = req.requester;
-  } else if (req.requester_details?.user) {
-    requesterName =
-      `${req.requester_details.user.first_name || ""} ${req.requester_details.user.last_name || ""}`.trim() ||
-      req.requester_details.user.username;
-  } else if (
-    typeof req.project_request === "object" &&
-    (req as any).project_request?.created_by_details
-  ) {
-    requesterName =
-      `${(req as any).project_request.created_by_details.first_name || ""} ${(req as any).project_request.created_by_details.last_name || ""}`.trim() ||
-      (req as any).project_request.created_by_details.username;
+  } else if (req.created_by_id) {
+    requesterName = `User #${req.created_by_id}`;
   }
-  
+
   if (!requesterName) {
     requesterName = "Unknown";
   }

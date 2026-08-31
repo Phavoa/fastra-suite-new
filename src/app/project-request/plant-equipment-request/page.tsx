@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, CheckCircle, Clock, XCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { useGetPlantEquipmentRequestsQuery } from "@/api/requests/plantEquipmentRequestApi";
 import { RequestDashboard } from "@/components/requests/RequestDashboard";
 import { RequestDashboardConfig, RequestStatus } from "@/components/requests/types";
@@ -40,6 +39,29 @@ export default function PlantEquipmentRequestDashboard() {
   useEffect(() => {
     if (apiRequests && Array.isArray(apiRequests)) {
       const mapped = apiRequests.map((req: any) => {
+        let requesterName = "Requester";
+        if (req.created_by_details && typeof req.created_by_details === "object") {
+          const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
+          requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Requester";
+        } else if (
+          typeof req.project_request === "object" &&
+          (req as any).project_request?.created_by_details
+        ) {
+          const prCreatedBy = (req as any).project_request.created_by_details;
+          const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
+          requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Requester";
+        } else if (req.requester_details?.user) {
+          const userObj = req.requester_details.user;
+          const fullName = `${userObj.first_name || ""} ${userObj.last_name || ""}`.trim();
+          requesterName = fullName || userObj.username || userObj.email || "Requester";
+        } else if (req.created_by_name && typeof req.created_by_name === "string") {
+          requesterName = req.created_by_name;
+        } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
+          requesterName = req.requester;
+        } else if (req.created_by_id) {
+          requesterName = `User #${req.created_by_id}`;
+        }
+
         return {
           id: String(req.id),
           referenceId: String((req as any).project_request?.reference_id || req.reference_id || req.id),
@@ -49,7 +71,7 @@ export default function PlantEquipmentRequestDashboard() {
           quantity: req.quantity || 0,
           estimatedCost: parseFloat(req.estimated_cost) || 0,
           status: ((req as any).project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
-          requester: req.created_by_name || "Requester",
+          requester: requesterName,
           date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
             day: "numeric",
             month: "short",
@@ -141,35 +163,56 @@ export default function PlantEquipmentRequestDashboard() {
       },
     ],
     renderItem: (req) => (
-      <Card
+      <div
         key={req.id}
         onClick={() => router.push(`/project-request/plant-equipment-request/${req.id}`)}
-        className="p-5 bg-white border border-gray-200 rounded-xl hover:shadow-xs transition-shadow duration-200 cursor-pointer space-y-4"
+        className="p-4 border border-gray-200 rounded-lg bg-white hover:border-[#3B7CED] hover:shadow-xs transition-all cursor-pointer group"
       >
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-bold text-[#3B7CED]">{req.referenceId || req.id}</span>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-xs font-bold text-[#3B7CED]">
+            {req.referenceId || req.id}
+          </span>
           <Badge variant={getStatusBadgeVariant(req.status)}>
             {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
           </Badge>
         </div>
 
-        <div>
-          <h3 className="text-base font-extrabold text-gray-900">{req.project}</h3>
+        <h3 className="text-sm font-bold text-gray-900 mb-1 group-hover:text-[#3B7CED] transition-colors">
+          {req.project}
+        </h3>
+        <div className="text-xs text-gray-500 mb-4 flex items-center gap-2">
+          <span>{req.equipment}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-xs">
+        <div className="grid grid-cols-3 text-xs gap-2 border-t border-gray-50 pt-3">
           <div>
-            <span className="block text-gray-400 font-medium mb-1">Equipment</span>
-            <span className="font-bold text-gray-900 text-sm">{req.equipment}</span>
+            <span className="block text-gray-400 font-medium mb-0.5">
+              Quantity
+            </span>
+            <span className="font-bold text-gray-800">
+              {req.quantity}
+            </span>
           </div>
-          <div>
-            <span className="block text-gray-400 font-medium mb-1 text-right">Estimated Cost</span>
-            <span className="block font-extrabold text-gray-950 text-sm text-right">
-              ₦{req.estimatedCost.toLocaleString("en-US")}
+          <div className="text-center">
+            <span className="block text-gray-400 font-medium mb-0.5">
+              Amount
+            </span>
+            <span className="font-bold text-gray-800">
+              ₦{req.estimatedCost.toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="block text-gray-400 font-medium mb-0.5">
+              Requester
+            </span>
+            <span className="font-bold text-gray-800 truncate block">
+              {req.requester}
             </span>
           </div>
         </div>
-      </Card>
+      </div>
     ),
     mockData: requests,
   };
