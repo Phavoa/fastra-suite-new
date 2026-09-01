@@ -441,7 +441,9 @@ export default function NewMaterialConsumptionPage() {
                     <Label className="text-gray-600 mb-1 block text-xs">Quantity</Label>
                     <Input
                       type="number"
-                      min="1"
+                      min="0.001"
+                      step="any"
+                      placeholder="Quantity"
                       value={line.quantity}
                       onChange={(e) => updateLine(line.id, "quantity", e.target.value)}
                       className="bg-white border-gray-200 h-9"

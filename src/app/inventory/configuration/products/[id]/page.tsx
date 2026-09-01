@@ -112,6 +112,7 @@ export default function ProductDetailsPage() {
   const [unit, setUnit] = useState("");
   const [category, setCategory] = useState("consumable");
   const [standardCost, setStandardCost] = useState("0");
+  const [reorderPoint, setReorderPoint] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [checkForDuplicates, setCheckForDuplicates] = useState(true);
@@ -172,6 +173,11 @@ export default function ProductDetailsPage() {
           ? String(productData.standard_cost)
           : "0"
       );
+      setReorderPoint(
+        productData.reorder_point !== null && productData.reorder_point !== undefined
+          ? String(productData.reorder_point)
+          : ""
+      );
       setDescription(productData.description || "");
       setIsActive(productData.is_active !== false);
     }
@@ -200,6 +206,7 @@ export default function ProductDetailsPage() {
         unit_of_measure: Number(unit),
         product_category: Number(category),
         standard_cost: parseFloat(standardCost) || 0,
+        reorder_point: reorderPoint !== "" && reorderPoint !== undefined && reorderPoint !== null ? Number(reorderPoint) : null,
         description: description.trim(),
         is_active: isActive,
       };
@@ -448,6 +455,19 @@ export default function ProductDetailsPage() {
                     type="text"
                     value={standardCost}
                     onChange={(e) => setStandardCost(e.target.value)}
+                    className="bg-white border-gray-200 rounded-md h-9 font-mono text-sm font-semibold text-[#32325D] focus:ring-[#3B7CED]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold text-[#525F7F]">
+                    Reorder Point
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 50"
+                    value={reorderPoint}
+                    onChange={(e) => setReorderPoint(e.target.value)}
                     className="bg-white border-gray-200 rounded-md h-9 font-mono text-sm font-semibold text-[#32325D] focus:ring-[#3B7CED]"
                   />
                 </div>

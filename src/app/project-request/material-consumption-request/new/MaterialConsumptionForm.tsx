@@ -59,7 +59,7 @@ const productLineSchema = z.object({
   productId: z.string().min(1, "Product is required"),
   quantity: z.preprocess(
     (val) => (val === "" ? undefined : Number(val)),
-    z.number().positive("Quantity must be positive").min(1, "Minimum 1"),
+    z.number().positive("Quantity must be positive"),
   ),
   unitCost: z.number(),
   totalCost: z.number(),

@@ -259,13 +259,16 @@ export default function EditMaterialConsumptionPage() {
         location: String(selectedLocationId),
         date_consumed: dateConsumed,
         notes: notes,
-        lines: lines.map(l => ({
-          ...(l.id && l.id.length < 10 ? { id: Number(l.id) } : {}), // only send ID if it's from backend
-          product: Number(l.product),
-          quantity: Number(l.quantity),
-          unit_cost: String(l.unit_cost),
-          total_cost: String(Number(l.quantity) * Number(l.unit_cost))
-        }))
+        lines: lines.map(l => {
+          const isExisting = l.id && !isNaN(Number(l.id)) && !String(l.id).includes(".") && String(l.id).length < 10;
+          return {
+            ...(isExisting ? { id: Number(l.id) } : {}),
+            product: Number(l.product),
+            quantity: Number(l.quantity),
+            unit_cost: String(l.unit_cost),
+            total_cost: String(Number(l.quantity) * Number(l.unit_cost))
+          };
+        })
       };
 
       // Call API
@@ -275,12 +278,20 @@ export default function EditMaterialConsumptionPage() {
       console.error("API submission failed:", error);
       let errMsg = "Your request update was unsuccessful. Please check your data and try again.";
       if (error?.data) {
-         const firstKey = Object.keys(error.data)[0];
-         if (firstKey) {
-            const val = error.data[firstKey];
-            const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
-            errMsg = `${firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ")}: ${errorText}`;
+         if (typeof error.data === "string") {
+            errMsg = error.data;
+         } else if (error.data.error || error.data.detail) {
+            errMsg = error.data.error || error.data.detail;
+         } else {
+            const firstKey = Object.keys(error.data)[0];
+            if (firstKey) {
+               const val = error.data[firstKey];
+               const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+               errMsg = `${firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ")}: ${errorText}`;
+            }
          }
+      } else if (error?.error || error?.message) {
+         errMsg = error.error || error.message;
       }
       setApiError(errMsg);
       setModalType("unsuccessful");
@@ -488,7 +499,9 @@ export default function EditMaterialConsumptionPage() {
                         <Label className="text-gray-600 mb-1 block text-xs">Quantity</Label>
                         <Input
                           type="number"
-                          min="1"
+                          min="0.001"
+                          step="any"
+                          placeholder="Quantity"
                           value={line.quantity}
                           onChange={(e) => updateLine(line.id, "quantity", e.target.value)}
                           className="bg-white border-gray-200 h-9"

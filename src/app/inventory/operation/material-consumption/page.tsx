@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 
 const STATUS_TABS = [
   { label: "All Records", value: "all" },
+  { label: "Partial Release", value: "partial_release" },
   { label: "Released", value: "released" },
   { label: "Approved", value: "approved" },
   { label: "Pending", value: "pending" },
@@ -40,6 +41,18 @@ const getStatusBadge = (status: string, releaseStatus?: string) => {
     return {
       label: "Released",
       className: "bg-[#EAFDF0] text-[#2BA24D]",
+    };
+  }
+  if (
+    rel === "PARTIAL_RELEASE" ||
+    rel === "PARTIALLY_RELEASED" ||
+    s === "partial_release" ||
+    s === "partially_released" ||
+    s === "partial release"
+  ) {
+    return {
+      label: "Partial Release",
+      className: "bg-[#FFF4E5] text-[#D97706]",
     };
   }
   if (s === "approved" || s === "validated") {
@@ -94,6 +107,14 @@ export default function MaterialConsumptionPage() {
 
       if (rel === "RELEASED" || st === "released") {
         normalizedGroup = "released";
+      } else if (
+        rel === "PARTIAL_RELEASE" ||
+        rel === "PARTIALLY_RELEASED" ||
+        st === "partial_release" ||
+        st === "partially_released" ||
+        st === "partial release"
+      ) {
+        normalizedGroup = "partial_release";
       } else if (st === "approved" || st === "validated") {
         normalizedGroup = "approved";
       } else if (st === "draft") {
