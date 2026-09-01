@@ -531,44 +531,6 @@ export default function MaterialConsumptionDetailPage() {
         </>
         )}
 
-        {/* Release Confirmation Dialog */}
-        {isReleaseModalOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
-                <CheckCircle2 className="w-5 h-5 text-[#3B7CED]" /> Confirm Release
-              </h3>
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date Consumed</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
-                    value={apiData?.date_consumed || new Date().toISOString().split("T")[0]}
-                    disabled
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Date is automatically recorded upon release.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Release Remarks (Optional)</label>
-                  <Textarea
-                    placeholder="Enter any notes regarding this release..."
-                    value={releaseNotes}
-                    onChange={(e) => setReleaseNotes(e.target.value)}
-                    className="resize-none h-24"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 justify-end">
-                <Button variant="outline" onClick={() => setIsReleaseModalOpen(false)} disabled={isReleasing}>Cancel</Button>
-                <Button onClick={handleRelease} disabled={isReleasing} className="bg-[#3B7CED] hover:bg-blue-600">
-                  {isReleasing ? "Confirming..." : "Confirm Release"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <StatusModal
           isOpen={statusModal.isOpen}
           onClose={statusModal.close}
