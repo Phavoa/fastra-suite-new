@@ -20,6 +20,8 @@ import { AutoSaveIcon } from "@/components/shared/icons";
 import { IncomingProductCards } from "@/components/inventory/operation/IncomingProductCards";
 import { useGetIncomingProductsQuery } from "@/api/inventory/incomingProductApi";
 import { useGetIncomingProductReturnsQuery } from "@/api/inventory/incomingProductReturns";
+import { useGetMaterialConsumptionsQuery } from "@/api/requests/materialConsumptionRequestApi";
+import { useGetScrapsQuery } from "@/api/inventory/scrapApi";
 import {
   Table,
   TableBody,
@@ -44,10 +46,14 @@ const STATUS_TABS = [
 // StatusCards-style tiles: horizontal row, icon+label top, big colored count below, border-r dividers
 function OperationsNavigationTiles({
   incomingCount,
+  materialConsumptionCount,
+  scrapCount,
   returnsCount,
   backordersCount,
 }: {
   incomingCount: number;
+  materialConsumptionCount: number;
+  scrapCount: number;
   returnsCount: number;
   backordersCount: number;
 }) {
@@ -62,14 +68,14 @@ function OperationsNavigationTiles({
     {
       title: "Material Consumption",
       href: "/inventory/operation/material-consumption",
-      count: 2,
+      count: materialConsumptionCount,
       icon: Hammer,
       color: "#F0B401",
     },
     {
       title: "Scrap Recording",
       href: "/inventory/operation/scrap",
-      count: 1,
+      count: scrapCount,
       icon: Trash2,
       color: "#E43D2B",
     },
@@ -141,13 +147,50 @@ export default function OperationPage() {
     is_backorder: false,
   });
 
-  const { data: pendingIncomingData = [] } = useGetIncomingProductsQuery({
+  const { data: rawPendingIncoming = [] } = useGetIncomingProductsQuery({
     status: "draft",
     is_backorder: false,
   });
 
-  const { data: returnsData = [] } = useGetIncomingProductReturnsQuery({});
-  const { data: backOrdersData = [] } = useGetIncomingProductsQuery({ is_backorder: true });
+  const { data: rawMaterialConsumptions = [] } = useGetMaterialConsumptionsQuery({});
+  const { data: rawScraps = [] } = useGetScrapsQuery({});
+  const { data: rawReturns = [] } = useGetIncomingProductReturnsQuery({});
+  const { data: rawBackOrders = [] } = useGetIncomingProductsQuery({ is_backorder: true });
+
+  const incomingDraftCount = useMemo(() => {
+    const list = Array.isArray(rawPendingIncoming) ? rawPendingIncoming : (rawPendingIncoming as any)?.results || [];
+    return list.filter((i: any) => (i.status || "").toLowerCase() === "draft" && !i.is_backorder).length;
+  }, [rawPendingIncoming]);
+
+  const materialConsumptionDraftCount = useMemo(() => {
+    const list = Array.isArray(rawMaterialConsumptions) ? rawMaterialConsumptions : (rawMaterialConsumptions as any)?.results || [];
+    return list.filter((i: any) => {
+      const s = (i.status || "").toLowerCase();
+      const r = (i.release_status || "").toLowerCase();
+      return (
+        s === "draft" ||
+        s === "partial_release" ||
+        s === "partially_released" ||
+        r === "partial_release" ||
+        r === "partially_released"
+      );
+    }).length;
+  }, [rawMaterialConsumptions]);
+
+  const scrapDraftCount = useMemo(() => {
+    const list = Array.isArray(rawScraps) ? rawScraps : (rawScraps as any)?.results || [];
+    return list.filter((i: any) => (i.status || "").toLowerCase() === "draft").length;
+  }, [rawScraps]);
+
+  const returnsDraftCount = useMemo(() => {
+    const list = Array.isArray(rawReturns) ? rawReturns : (rawReturns as any)?.results || [];
+    return list.filter((i: any) => (i.status || "").toLowerCase() === "draft").length;
+  }, [rawReturns]);
+
+  const backordersDraftCount = useMemo(() => {
+    const list = Array.isArray(rawBackOrders) ? rawBackOrders : (rawBackOrders as any)?.results || [];
+    return list.filter((i: any) => (i.status || "").toLowerCase() === "draft").length;
+  }, [rawBackOrders]);
 
   const totalPages = Math.max(1, Math.ceil(incomingProductsData.length / ITEMS_PER_PAGE));
   const incomingProducts = useMemo(() => {
@@ -223,9 +266,11 @@ export default function OperationPage() {
 
           {/* StatusCards-style tiles */}
           <OperationsNavigationTiles
-            incomingCount={pendingIncomingData.length}
-            returnsCount={returnsData.length}
-            backordersCount={backOrdersData.length}
+            incomingCount={incomingDraftCount}
+            materialConsumptionCount={materialConsumptionDraftCount}
+            scrapCount={scrapDraftCount}
+            returnsCount={returnsDraftCount}
+            backordersCount={backordersDraftCount}
           />
 
           {/* White section 1: top bar + status pills */}

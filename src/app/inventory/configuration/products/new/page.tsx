@@ -185,6 +185,7 @@ export default function NewProductPage() {
         product_category: Number(category),
         unit_of_measure: Number(unit),
         standard_cost: standardCost ? String(standardCost) : "0",
+        reorder_point: reorderPoint !== "" && reorderPoint !== undefined && reorderPoint !== null ? Number(reorderPoint) : null,
         is_active: isActive,
       };
 
