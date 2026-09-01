@@ -283,10 +283,6 @@ export default function MaterialConsumptionDetailPage() {
             )}
           </div>
         </div>
-              </>
-            )}
-          </div>
-        </div>
 
         {/* Details Content matching rest of FastraSuite */}
         <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10">
