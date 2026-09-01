@@ -111,9 +111,14 @@ export default function CreateStockAdjustmentPage() {
       : (rawStockLevels as any)?.results || (rawStockLevels as any)?.data || [];
     const map: Record<string, string> = {};
     list.forEach((item: any) => {
-      const pId = String(item.product_id || item.product?.id || item.product || item.id || "");
+      const pId = typeof item.product === "object"
+        ? String(item.product?.id || item.product?.product_id || "")
+        : String(item.product || item.product_id || "");
       if (pId) {
-        map[pId] = String(item.quantity ?? item.current_stock ?? item.available_quantity ?? "0");
+        const qty = item.quantity !== undefined && item.quantity !== null
+          ? item.quantity
+          : (item.current_stock ?? item.available_quantity ?? "0");
+        map[pId] = String(qty);
       }
     });
     return map;
@@ -213,19 +218,10 @@ export default function CreateStockAdjustmentPage() {
     );
   };
 
-  const productOptions: Option[] = products.map((p: any) => {
-    const uom =
-      p.unit_of_measure_details?.unit_symbol ||
-      p.unit_of_measure_details?.unit_name ||
-      p.unit_of_measure?.unit_symbol ||
-      "Unit";
-    const stock = stockByProductId[String(p.id)];
-    const stockLabel = stock !== undefined ? ` • ${stock} in stock` : "";
-    return {
-      value: String(p.id),
-      label: `${p.product_name || p.name || `Product #${p.id}`} (${uom})${stockLabel}`,
-    };
-  });
+  const productOptions: Option[] = products.map((p: any) => ({
+    value: String(p.id),
+    label: p.product_name || p.name || `Product #${p.id}`,
+  }));
 
   const locationOptions: Option[] = locations.map((l: any) => ({
     value: String(l.id),

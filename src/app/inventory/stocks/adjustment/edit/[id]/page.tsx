@@ -16,6 +16,7 @@ import {
   useUpdateStockAdjustmentMutation, 
   useValidateStockAdjustmentMutation 
 } from "@/api/inventory/stockAdjustmentApi";
+import { useGetStockLocationsByLocationQuery } from "@/api/inventory/stockLocationApi";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -142,27 +143,55 @@ export default function EditStockAdjustmentPage() {
     },
   });
 
+  const selectedLocation = watch("warehouse_location");
+  const { data: rawStockLevels } = useGetStockLocationsByLocationQuery(selectedLocation, {
+    skip: !selectedLocation,
+  });
+
+  const stockByProductId = React.useMemo(() => {
+    const list = Array.isArray(rawStockLevels)
+      ? rawStockLevels
+      : (rawStockLevels as any)?.results || (rawStockLevels as any)?.data || [];
+    const map: Record<string, string> = {};
+    list.forEach((item: any) => {
+      const pId = typeof item.product === "object"
+        ? String(item.product?.id || item.product?.product_id || "")
+        : String(item.product || item.product_id || "");
+      if (pId) {
+        const qty = item.quantity !== undefined && item.quantity !== null
+          ? item.quantity
+          : (item.current_stock ?? item.available_quantity ?? "0");
+        map[pId] = String(qty);
+      }
+    });
+    return map;
+  }, [rawStockLevels]);
+
   useEffect(() => {
     if (record) {
       const apiItems = record.stock_adjustment_items || (record as any).items || [];
       if (apiItems.length > 0) {
         setItems(
-          apiItems.map((item: any) => ({
-            id: String(item.id),
-            product: String(item.product?.id || item.product),
-            product_description: item.product_details?.description || item.product_description || "",
-            unit_of_measure: item.unit_of_measure?.unit_symbol || item.product_details?.unit_of_measure_details?.unit_symbol || (typeof item.unit_of_measure === "string" ? item.unit_of_measure : ""),
-            current_quantity: String(item.current_quantity || "0"),
-            new_quantity: String(item.new_quantity || "0"),
-          }))
+          apiItems.map((item: any) => {
+            const pId = String(item.product?.id || item.product);
+            const liveStock = stockByProductId[pId];
+            return {
+              id: String(item.id),
+              product: pId,
+              product_description: item.product_details?.description || item.product_description || "",
+              unit_of_measure: item.unit_of_measure?.unit_symbol || item.product_details?.unit_of_measure_details?.unit_symbol || (typeof item.unit_of_measure === "string" ? item.unit_of_measure : ""),
+              current_quantity: String(liveStock ?? item.current_quantity ?? "0"),
+              new_quantity: String(item.new_quantity || "0"),
+            };
+          })
         );
       }
     }
-  }, [record]);
+  }, [record, stockByProductId]);
 
   const productOptions: Option[] = products.map((p: any) => ({
     value: String(p.id),
-    label: `${p.product_name || p.name || `Product #${p.id}`} (${p.unit_of_measure_details?.unit_symbol || "Unit"})`,
+    label: p.product_name || p.name || `Product #${p.id}`,
   }));
 
   const locationOptions: Option[] = locations.map((l: any) => ({
@@ -176,6 +205,7 @@ export default function EditStockAdjustmentPage() {
       return;
     }
     const foundProduct = products.find((p: any) => String(p.id) === productId);
+    const stockVal = stockByProductId[productId] ?? "0";
     setItems((prev) =>
       prev.map((it) =>
         it.id === itemId
@@ -183,8 +213,8 @@ export default function EditStockAdjustmentPage() {
               ...it,
               product: productId,
               product_description: foundProduct?.description || foundProduct?.product_description || "",
-              unit_of_measure: foundProduct?.unit_of_measure_details?.unit_symbol || "",
-              current_quantity: "0",
+              unit_of_measure: foundProduct?.unit_of_measure_details?.unit_symbol || foundProduct?.unit_of_measure?.unit_symbol || "",
+              current_quantity: String(stockVal),
               new_quantity: "0",
             }
           : it,
