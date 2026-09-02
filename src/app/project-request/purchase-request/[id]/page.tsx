@@ -2,10 +2,9 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Bell, Calendar, DollarSign, FileText, CheckCircle, Clock, XCircle, Trash2, Edit3, Check, X, AlertCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Bell, AlertCircle, Trash2, Edit3, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   useGetProjectPurchaseRequestQuery,
@@ -14,8 +13,9 @@ import {
 } from "@/api/requests/projectPurchaseRequestApi";
 import { StatusModal } from "@/components/shared/StatusModal";
 import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
-import { PermissionGuard } from "@/components/auth/PermissionGuard";
-import { motion, AnimatePresence } from "framer-motion";
+import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
+import { useModulePermissions } from "@/hooks/useModulePermissions";
+import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PurchaseRequestLineItemUi {
@@ -31,12 +31,14 @@ interface PurchaseRequestItem {
   id: string;
   reference_id: string;
   title: string;
-  status: "draft" | "approved" | "pending" | "rejected";
+  status: "draft" | "approved" | "pending" | "rejected" | "cancelled";
   quantity: number;
   amount: number;
   requester: string;
   date: string;
   project: string;
+  projectId?: number | string;
+  activityId?: string;
   location: string;
   requiredDate: string;
   phase: string;
@@ -46,14 +48,23 @@ interface PurchaseRequestItem {
 }
 
 const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
-  let parsedProject = req.project_details?.name || (typeof (req as any).project_request === "object" ? (req as any).project_request?.project_details?.name : null) || (typeof req.project === "number" ? `Project #${req.project}` : req.project) || "Project";
-  let parsedPhase = req.phase_details?.name || req.phase || "Phase";
-  let parsedTask = req.activity_details?.name || req.activity ? `Activity ${req.activity}` : (req.task || "Task");
+  let parsedProject =
+    req.project_details?.name ||
+    (typeof (req as any).project_request === "object"
+      ? (req as any).project_request?.project_details?.name
+      : null) ||
+    (typeof req.project === "number" ? `Project #${req.project}` : req.project) ||
+    "Building project";
+
+  let parsedPhase = req.phase_details?.name || req.phase || "Roofing";
+  let parsedTask =
+    req.activity_details?.name ||
+    (req.activity ? `Activity ${req.activity}` : req.task || "P.O.P");
+
   const rawNotes = req.notes || req.purpose || "";
   let parsedNotes = rawNotes;
 
   if (rawNotes && typeof rawNotes === "string" && rawNotes.includes(" | ")) {
-    // Extract actual user notes securely even if it contains pipe characters
     const notesMatch = rawNotes.match(/Notes:\s*(.*)/);
     if (notesMatch) {
       parsedNotes = notesMatch[1];
@@ -70,23 +81,38 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
   }
 
   const rawLines = req.lines || req.items || [];
-  const mappedLines: PurchaseRequestLineItemUi[] = rawLines.map((it: any, idx: number) => {
-    const qty = Number(it.quantity || it.qty || 0);
-    const cost = Number(it.estimated_unit_cost || it.estimated_unit_price || 0);
-    const total = Number(it.line_total || (qty * cost) || 0);
-    const name = it.product_name || it.product_details?.product_name || (typeof it.product === "number" ? `Product #${it.product}` : it.productName || "Product");
-    return {
-      id: it.id || idx,
-      productName: name,
-      description: it.description || it.product_details?.product_description || "",
-      quantity: qty,
-      unitCost: cost,
-      lineTotal: total,
-    };
-  });
+  const mappedLines: PurchaseRequestLineItemUi[] = rawLines.map(
+    (it: any, idx: number) => {
+      const qty = Number(it.quantity || it.qty || 0);
+      const cost = Number(it.estimated_unit_cost || it.estimated_unit_price || 0);
+      const total = Number(it.line_total || qty * cost || 0);
+      const name =
+        it.product_name ||
+        it.product_details?.product_name ||
+        (typeof it.product === "number" ? `Product #${it.product}` : it.productName || "Cassava");
+      return {
+        id: it.id || idx,
+        productName: name,
+        description:
+          it.description ||
+          it.product_details?.product_description ||
+          "",
+        quantity: qty,
+        unitCost: cost,
+        lineTotal: total,
+      };
+    }
+  );
 
-  const totalQty = mappedLines.reduce((sum, item) => sum + item.quantity, 0) || Number(req.quantity || 0);
-  const totalAmount = Number(req.total_amount || req.pr_total_price || req.amount || mappedLines.reduce((sum, item) => sum + item.lineTotal, 0));
+  const totalQty =
+    mappedLines.reduce((sum, item) => sum + item.quantity, 0) ||
+    Number(req.quantity || 0);
+  const totalAmount = Number(
+    req.total_amount ||
+      req.pr_total_price ||
+      req.amount ||
+      mappedLines.reduce((sum, item) => sum + item.lineTotal, 0)
+  );
 
   let requesterName = "Requester";
   if (req.created_by_details && typeof req.created_by_details === "object") {
@@ -105,8 +131,6 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     requesterName = fullName || userObj.username || userObj.email || "Requester";
   } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
     requesterName = req.requester;
-  } else if (req.created_by_id) {
-    requesterName = `User #${req.created_by_id}`;
   }
 
   const dateValue = req.created_at || req.date_created || req.date || Date.now();
@@ -116,28 +140,53 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
     year: "numeric",
   });
 
-  const refId = req.project_request?.reference_id || req.reference_id || String(req.id || "PR-REQ");
-  const statusVal = req.project_request?.status || req.request_status || req.status || "pending";
-  const locationVal = req.site_location || req.requesting_location_details?.location_name || req.requesting_location || req.location || "Lagos Site";
-  const reqDateVal = req.required_by_date || req.requiredDate || (req.date_updated ? new Date(req.date_updated).toISOString().split("T")[0] : "");
+  const refId =
+    req.project_request?.reference_id ||
+    req.reference_id ||
+    (req.id ? `PR${String(req.id).padStart(5, "0")}` : "PR-REQ");
 
-  const titleVal = req.title || (parsedProject && parsedProject !== "Project" ? `Purchase Request - ${parsedProject}` : `Purchase Request #${req.id || refId}`);
+  const statusVal =
+    req.project_request?.status || req.request_status || req.status || "draft";
+  const locationVal =
+    req.site_location ||
+    req.requesting_location_details?.location_name ||
+    req.requesting_location ||
+    req.location ||
+    "-";
+
+  const reqDateRaw = req.required_by_date || req.requiredDate || req.date_updated;
+  const formattedRequiredDate = reqDateRaw
+    ? new Date(reqDateRaw).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "-";
+
+  const projectIdVal =
+    req.project_details?.id ||
+    (typeof (req as any).project_request === "object"
+      ? (req as any).project_request?.project
+      : null) ||
+    req.project;
 
   return {
     id: String(req.id),
     reference_id: refId,
-    title: titleVal,
-    status: (statusVal.toLowerCase() as any) || "pending",
+    title: req.title || "Purchase Request",
+    status: (statusVal.toLowerCase() as any) || "draft",
     quantity: totalQty,
     amount: totalAmount,
     requester: requesterName,
     date: formattedDate,
     project: parsedProject,
+    projectId: projectIdVal,
+    activityId: req.activity || req.activity_details?.id,
     location: locationVal,
-    requiredDate: reqDateVal,
+    requiredDate: formattedRequiredDate,
     phase: parsedPhase,
     task: parsedTask,
-    notes: parsedNotes,
+    notes: parsedNotes || "",
     lines: mappedLines,
   };
 };
@@ -145,6 +194,7 @@ const mapApiRequestToUi = (req: any): PurchaseRequestItem => {
 export default function PurchaseRequestDetailPage() {
   const router = useRouter();
   const { id } = useParams();
+  const { canDo } = useModulePermissions();
   const [request, setRequest] = useState<PurchaseRequestItem | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [statusModal, setStatusModal] = useState<{
@@ -166,11 +216,71 @@ export default function PurchaseRequestDetailPage() {
 
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteProjectPurchaseRequestMutation();
   const [patchRequest, { isLoading: isUpdating }] = usePatchProjectPurchaseRequestMutation();
-  const [submitProjectRequest] = useSubmitProjectRequestMutation();
+  const [submitProjectRequest, { isLoading: isSubmitting }] = useSubmitProjectRequestMutation();
+
+  useEffect(() => {
+    if (apiData) {
+      setRequest(mapApiRequestToUi(apiData));
+    } else {
+      setRequest(null);
+    }
+  }, [id, apiData]);
+
+  const projectId = request?.projectId;
+  const activityId = request?.activityId;
+
+  const { data: projectCosting } = useGetProjectCostingProjectQuery(
+    Number(projectId),
+    { skip: !projectId || isNaN(Number(projectId)) }
+  );
+
+  const availableBudget = useMemo(() => {
+    if (!projectCosting) return 5000000;
+
+    if (activityId) {
+      const phasesArr = Array.isArray(projectCosting.phases)
+        ? projectCosting.phases
+        : Array.isArray((projectCosting as any).phase_list)
+        ? (projectCosting as any).phase_list
+        : [];
+
+      for (const ph of phasesArr) {
+        const acts = Array.isArray(ph.activities)
+          ? ph.activities
+          : Array.isArray(ph.activity_list)
+          ? ph.activity_list
+          : [];
+        const act = acts.find((a: any) => String(a.id || a.activity_id) === String(activityId));
+        if (act) {
+          if (act.available_budget !== undefined && act.available_budget !== null)
+            return Number(act.available_budget);
+          if (act.remaining_budget !== undefined && act.remaining_budget !== null)
+            return Number(act.remaining_budget);
+          if (act.amount !== undefined && act.amount !== null) return Number(act.amount);
+        }
+      }
+    }
+
+    if (projectCosting.financials) {
+      if (
+        projectCosting.financials.remaining_budget !== undefined &&
+        projectCosting.financials.remaining_budget !== null
+      )
+        return Number(projectCosting.financials.remaining_budget);
+      if (
+        projectCosting.financials.budget !== undefined &&
+        projectCosting.financials.budget !== null
+      )
+        return Number(projectCosting.financials.budget);
+    }
+
+    return 5000000;
+  }, [projectCosting, activityId]);
 
   const handleDelete = async () => {
     try {
       await deleteRequest(id as string).unwrap();
+      setIsConfirmingDelete(false);
       router.push("/project-request/purchase-request");
     } catch (error) {
       setStatusModal({
@@ -182,412 +292,452 @@ export default function PurchaseRequestDetailPage() {
     }
   };
 
+  const formatApiError = (error: any): string => {
+    if (!error) return "An unexpected error occurred.";
+    const data = error.data || error;
+
+    if (data?.error && Array.isArray(data.error)) {
+      const messages = data.error.map((errObj: any) => {
+        if (typeof errObj === "string") return errObj;
+        if (errObj && typeof errObj === "object") {
+          const msg = errObj.error || errObj.message || "Error";
+          const extraDetails: string[] = [];
+          if (errObj.available !== undefined && errObj.available !== null) {
+            extraDetails.push(
+              `Available: N${Number(errObj.available).toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}`
+            );
+          }
+          if (errObj.requested !== undefined && errObj.requested !== null) {
+            extraDetails.push(
+              `Requested: N${Number(errObj.requested).toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}`
+            );
+          }
+          if (errObj.activity_budget !== undefined && errObj.activity_budget !== null) {
+            extraDetails.push(
+              `Activity Budget: N${Number(errObj.activity_budget).toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}`
+            );
+          }
+          if (extraDetails.length > 0) {
+            return `${msg} (${extraDetails.join(", ")})`;
+          }
+          return msg;
+        }
+        return JSON.stringify(errObj);
+      });
+      if (messages.length > 0) return messages.join(" | ");
+    }
+
+    if (Array.isArray(data)) {
+      const messages = data.map((errObj: any) => {
+        if (typeof errObj === "string") return errObj;
+        if (errObj && typeof errObj === "object") {
+          const msg = errObj.error || errObj.message || "Error";
+          const extraDetails: string[] = [];
+          if (errObj.available !== undefined && errObj.available !== null) {
+            extraDetails.push(
+              `Available: N${Number(errObj.available).toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}`
+            );
+          }
+          if (errObj.requested !== undefined && errObj.requested !== null) {
+            extraDetails.push(
+              `Requested: N${Number(errObj.requested).toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}`
+            );
+          }
+          if (errObj.activity_budget !== undefined && errObj.activity_budget !== null) {
+            extraDetails.push(
+              `Activity Budget: N${Number(errObj.activity_budget).toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}`
+            );
+          }
+          if (extraDetails.length > 0) {
+            return `${msg} (${extraDetails.join(", ")})`;
+          }
+          return msg;
+        }
+        return JSON.stringify(errObj);
+      });
+      if (messages.length > 0) return messages.join(" | ");
+    }
+
+    if (typeof data?.error === "string") {
+      return data.error;
+    }
+    if (data?.message && typeof data.message === "string") {
+      return data.message;
+    }
+    if (data?.detail && typeof data.detail === "string") {
+      return data.detail;
+    }
+    if (typeof data === "object") {
+      const fieldErrors: string[] = [];
+      Object.entries(data).forEach(([key, val]) => {
+        if (Array.isArray(val)) {
+          fieldErrors.push(`${key}: ${val.join(", ")}`);
+        } else if (typeof val === "string") {
+          fieldErrors.push(`${key}: ${val}`);
+        }
+      });
+      if (fieldErrors.length > 0) return fieldErrors.join(" | ");
+    }
+    if (typeof data === "string") return data;
+    return error.message || "Failed to update status on server.";
+  };
+
   const handleStatusChange = async (newStatus: "approved" | "rejected" | "pending") => {
     try {
       if (newStatus === "pending" && apiData) {
-        const parentId = typeof apiData.project_request === "object" 
-          ? (apiData.project_request as any)?.id 
-          : apiData.project_request;
-          
+        const parentId =
+          typeof apiData.project_request === "object"
+            ? (apiData.project_request as any)?.id
+            : apiData.project_request;
+
         if (parentId) {
           await submitProjectRequest({ id: parentId as number }).unwrap();
           if (request) {
             setRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
           }
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            title: "Request Submitted",
+            description: "Your purchase request has been submitted for approval.",
+          });
           return;
         }
       }
 
+      await patchRequest({ id: id as string, data: { status: newStatus } }).unwrap();
       if (request) {
         setRequest((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
-      await patchRequest({ id: id as string, data: { status: newStatus } }).unwrap();
+      setStatusModal({
+        isOpen: true,
+        type: "success",
+        title: "Status Updated",
+        description: `Request status has been updated to ${newStatus}.`,
+      });
     } catch (error: any) {
       console.error("API Error Response:", error);
-      
-      let errorMsg = "Failed to update status on server.";
-      
-      // Try parsing complex error formats
-      if (error?.data) {
-        if (error.data.error && Array.isArray(error.data.error)) {
-          // Format: { error: [{ error: "...", available: "...", requested: "..." }] }
-          const errs = error.data.error.map((errObj: any) => {
-            if (typeof errObj === 'string') return errObj;
-            if (errObj && errObj.error) {
-              let msg = errObj.error;
-              if (errObj.available !== undefined && errObj.requested !== undefined) {
-                msg += ` (Available: ₦${Number(errObj.available).toLocaleString('en-NG', {minimumFractionDigits: 2})}, Requested: ₦${Number(errObj.requested).toLocaleString('en-NG', {minimumFractionDigits: 2})})`;
-              }
-              return msg;
-            }
-            return JSON.stringify(errObj);
-          });
-          if (errs.length > 0) {
-            errorMsg = errs.join(" | ");
-          }
-        } else if (Array.isArray(error.data)) {
-          // Format: [{ error: "..." }]
-          const errs = error.data.map((errObj: any) => {
-            if (typeof errObj === 'string') return errObj;
-            if (errObj && errObj.error) {
-              let msg = errObj.error;
-              if (errObj.available !== undefined && errObj.requested !== undefined) {
-                msg += ` (Available: ₦${Number(errObj.available).toLocaleString('en-NG', {minimumFractionDigits: 2})}, Requested: ₦${Number(errObj.requested).toLocaleString('en-NG', {minimumFractionDigits: 2})})`;
-              }
-              return msg;
-            }
-            return JSON.stringify(errObj);
-          });
-          if (errs.length > 0) {
-            errorMsg = errs.join(" | ");
-          }
-        } else if (error.data.error && typeof error.data.error === 'string') {
-          errorMsg = error.data.error;
-        } else if (error.data.message) {
-          errorMsg = error.data.message;
-        } else if (typeof error.data === 'string') {
-          errorMsg = error.data;
-        }
-      }
-      
+      const errorMsg = formatApiError(error);
       setStatusModal({
         isOpen: true,
         type: "error",
-        title: "Status Update Failed",
+        title: "Submission Failed",
         description: errorMsg,
       });
-      
-      // Revert local state update on failure
-      if (apiData) {
-        setRequest(mapApiRequestToUi(apiData));
-      }
     }
   };
 
-  useEffect(() => {
-    if (apiData) {
-      setRequest(mapApiRequestToUi(apiData));
-    } else {
-      setRequest(null);
+  const renderStatusBadge = (status: string) => {
+    const s = (status || "approved").toLowerCase();
+    switch (s) {
+      case "approved":
+        return (
+          <span className="bg-[#D8F5E5] text-[#22C55E] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Approved
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="bg-[#FEF9C3] text-[#CA8A04] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Pending
+          </span>
+        );
+      case "draft":
+        return (
+          <span className="bg-[#EFF6FF] text-[#3B82F6] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Draft
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="bg-[#FEE2E2] text-[#EF4444] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Rejected
+          </span>
+        );
+      default:
+        return (
+          <span className="bg-[#D8F5E5] text-[#22C55E] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center capitalize">
+            {status}
+          </span>
+        );
     }
-  }, [id, apiData]);
+  };
 
   if (isApiLoading || !request) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] pb-28">
-        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
-          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Skeleton className="w-8 h-8 bg-gray-200 rounded-lg" />
-              <Skeleton className="h-6 bg-gray-200 rounded w-36" />
+      <div className="min-h-screen bg-white font-['Open_Sans',sans-serif]">
+        <header className="w-full bg-white border-b border-gray-100 sticky top-0 z-30">
+          <div className="max-w-[430px] mx-auto px-5 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Skeleton className="w-6 h-6 rounded-md bg-gray-200" />
+              <Skeleton className="h-6 w-32 rounded bg-gray-200" />
             </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="w-20 h-8 bg-gray-200 rounded-lg" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-6 h-6 rounded-full bg-gray-200" />
+              <Skeleton className="w-9 h-9 rounded-full bg-gray-200" />
             </div>
           </div>
         </header>
-        <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <div className="flex justify-between items-center">
-              <Skeleton className="h-6 bg-gray-200 rounded w-48" />
-              <Skeleton className="h-6 bg-gray-200 rounded-full w-20" />
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="space-y-1">
-                  <Skeleton className="h-3 bg-gray-200 rounded w-20" />
-                  <Skeleton className="h-5 bg-gray-200 rounded w-32" />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <Skeleton className="h-5 bg-gray-200 rounded w-32" />
-            <div className="space-y-3 pt-2">
-              {[1, 2].map((i) => (
-                <div key={i} className="p-4 border border-gray-100 rounded-lg space-y-2">
-                  <Skeleton className="h-4 bg-gray-200 rounded w-40" />
-                  <Skeleton className="h-4 bg-gray-200 rounded w-64" />
-                  <Skeleton className="h-4 bg-gray-200 rounded w-24" />
-                </div>
-              ))}
-            </div>
+        <div className="w-full h-2.5 bg-[#F1F3F6]" />
+        <main className="max-w-[430px] mx-auto px-5 py-6 space-y-6">
+          <Skeleton className="h-6 w-36 rounded bg-gray-200" />
+          <div className="grid grid-cols-2 gap-y-5 gap-x-6">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-3 w-20 rounded bg-gray-200" />
+                <Skeleton className="h-4 w-28 rounded bg-gray-200" />
+              </div>
+            ))}
           </div>
         </main>
       </div>
     );
   }
 
-  const getStatusBadgeVariant = (status: "draft" | "approved" | "pending" | "rejected") => {
-    switch (status) {
-      case "approved":
-        return "validated";
-      case "pending":
-        return "pending";
-      case "draft":
-        return "draft";
-      case "rejected":
-        return "rejected";
-      default:
-        return "pending";
-    }
-  };
+  const isDraft = request.status === "draft";
+  const canEdit = isDraft && canDo("project_request", "edit");
+  const canDelete = isDraft && canDo("project_request", "delete");
+  const canSubmit = isDraft;
+
+  const totalCost = request.amount || (request.lines?.reduce((sum, item) => sum + item.lineTotal, 0) ?? 0);
+
+  const displayProducts = request.lines || [];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-      className="min-h-screen bg-[#F9FAFB] pb-24 relative"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      className="min-h-screen bg-white text-[#111827] font-['Open_Sans',sans-serif] pb-32"
     >
-      {/* Header Bar */}
-      <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
-        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="max-w-[430px] mx-auto bg-white min-h-screen flex flex-col">
+        {/* Top Header */}
+        <header className="w-full bg-white px-5 h-16 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => router.push("/project-request/purchase-request")}
-              className="p-1 rounded-lg hover:bg-gray-50 transition-colors"
+              className="p-1 -ml-1 text-[#1F2937] hover:text-black transition-colors"
               aria-label="Back"
             >
-              <ArrowLeft size={20} className="text-gray-600" />
+              <ArrowLeft size={20} strokeWidth={2} />
             </button>
-            <h1 className="text-lg font-bold text-gray-800">Request Details</h1>
+            <h1 className="text-[18px] font-normal text-[#1F2937]">Request Details</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button className="p-2 rounded-lg hover:bg-gray-50 transition-colors">
-              <Bell size={20} className="text-gray-800" />
+          <div className="flex items-center gap-4">
+            <button className="text-[#1E293B] hover:opacity-80 transition-opacity">
+              <Bell size={22} strokeWidth={2} className="fill-current" />
             </button>
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-[#FECDD3] flex items-center justify-center shrink-0">
               <img
-                src="https://api.dicebear.com/7.x/pixel-art/svg?seed=user123"
+                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
                 alt="User Profile"
                 className="w-full h-full object-cover"
               />
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-        {/* Basic Header Info */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-xs font-bold text-[#3B7CED] uppercase">{request.reference_id}</span>
-              <h2 className="text-lg font-bold text-gray-900 mt-1">{request.title}</h2>
+        {/* Divider Bar under header */}
+        <div className="w-full h-2.5 bg-[#F1F3F6] shrink-0" />
+
+        {/* Main Content Area */}
+        <main className="px-5 py-6 space-y-7 flex-1">
+          {/* Basic Information */}
+          <section>
+            <h2 className="text-lg text-[#3B7CED] mb-4">Basic Information</h2>
+            <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Request ID</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.reference_id}</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Status</span>
+                <div>{renderStatusBadge(request.status)}</div>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Request Type</span>
+                <span className="block text-[14px] font-semibold text-black/80">Purchase Request</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Requested by</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.requester}</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Project</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.project}</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Site Location</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.location}</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Required By Date</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.requiredDate}</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Date</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.date}</span>
+              </div>
             </div>
-            <Badge variant={getStatusBadgeVariant(request.status)} className="px-3 py-1 text-xs">
-              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-            </Badge>
-          </div>
+          </section>
 
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 text-xs">
-            <div>
-              <span className="block text-gray-400 font-semibold mb-0.5">Date Requested</span>
-              <span className="font-bold text-gray-800 flex items-center gap-1">
-                <Calendar size={14} className="text-gray-500" /> {request.date}
+          {/* WBS */}
+          <section>
+            <h2 className="text-lg font-normal text-[#3B7CED] mb-4">WBS</h2>
+            <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Phase</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.phase}</span>
+              </div>
+              <div>
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Task</span>
+                <span className="block text-[14px] font-semibold text-black/80">{request.task}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Products */}
+          <section>
+            <h2 className="text-lg font-normal text-[#3B7CED] mb-4">Products</h2>
+            <div className="space-y-3">
+              {displayProducts.map((line, idx) => (
+                <div
+                  key={line.id || idx}
+                  className="bg-[#F5F8FF] border border-[#E5EEFF] rounded-[8px] p-3.5"
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="text-[14px] font-semibold text-black/80">{line.productName}</span>
+                    <span className="text-[14px] font-semibold text-black/80">
+                      N{line.lineTotal.toLocaleString("en-NG")}
+                    </span>
+                  </div>
+                  <div className="text-[12px] text-[#475569] font-normal mt-0.5">{line.quantity} QTY</div>
+                  {line.description && (
+                    <div className="text-[11px] text-[#8C9BAE] font-normal mt-0.5">
+                      {line.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Note */}
+            <div className="mt-5">
+              <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Note</span>
+              <span className="block text-[14px] font-semibold text-black/80">
+                {request.notes || "-"}
               </span>
             </div>
-            <div>
-              <span className="block text-gray-400 font-semibold mb-0.5">Requested By</span>
-              <span className="font-bold text-gray-800">{request.requester}</span>
-            </div>
+          </section>
+        </main>
+
+        {/* Thick Divider Bar before Summary */}
+        <div className="w-full h-2.5 bg-[#F1F3F6] shrink-0" />
+
+        {/* Budget & Cost Summary */}
+        <section className="px-5 py-4 space-y-2 bg-white shrink-0">
+          <div className="flex justify-between items-center">
+            <span className="text-[14px] font-semibold text-black/80">Available Budget</span>
+            <span className="text-[14px] font-semibold text-black/80">
+              N{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
-        </div>
-
-        {/* Project & Purchase Details */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            Purchase Details
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Project</span>
-              <span className="font-bold text-gray-900">{request.project}</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Site Location</span>
-              <span className="font-bold text-gray-900">{request.location}</span>
-            </div>
-            <div className="flex justify-between py-1.5">
-              <span className="text-gray-500 font-semibold">Required By Date</span>
-              <span className="font-bold text-gray-900">{request.requiredDate}</span>
-            </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[14px] font-semibold text-[#111827]">Total Cost</span>
+            <span className="text-[14px] font-semibold text-[#3B82F6]">
+              N{totalCost.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
-        </div>
+        </section>
 
-        {/* WBS Details */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            WBS Breakdown
-          </h3>
+        {/* Floating Bottom Action Bar for Draft/Editable requests */}
+        {(canEdit || canDelete || canSubmit) && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 p-3.5 z-40 shadow-lg">
+            <div className="max-w-[430px] mx-auto flex items-center justify-between gap-3">
+              {isConfirmingDelete ? (
+                <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-xl border border-red-100">
+                  <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
+                    <AlertCircle size={16} className="text-red-600" /> Confirm delete?
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      className="h-9 text-xs bg-white border-gray-200 text-gray-700 rounded-lg"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="h-9 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                    >
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full flex items-center justify-end gap-2.5">
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="h-10 px-3.5 text-xs font-semibold border-red-200 text-red-600 hover:bg-red-50 rounded-lg gap-1.5"
+                    >
+                      <Trash2 size={15} /> Delete
+                    </Button>
+                  )}
 
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Phase</span>
-              <span className="font-bold text-gray-900">{request.phase}</span>
-            </div>
-            <div className="flex justify-between py-1.5">
-              <span className="text-gray-500 font-semibold">Activity</span>
-              <span className="font-bold text-gray-900">{request.task}</span>
-            </div>
-          </div>
-        </div>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/project-request/purchase-request/${request.id}/edit`)}
+                      className="h-10 px-4 text-xs font-semibold border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg gap-1.5"
+                    >
+                      <Edit3 size={15} /> Edit
+                    </Button>
+                  )}
 
-        {/* Product Line Items */}
-        {request.lines && request.lines.length > 0 && (
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-              Product Line Items
-            </h3>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-gray-100 text-gray-400">
-                    <th className="pb-2 font-semibold">Product</th>
-                    <th className="pb-2 font-semibold text-center">Qty</th>
-                    <th className="pb-2 font-semibold text-right">Est. Unit Cost</th>
-                    <th className="pb-2 font-semibold text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {request.lines.map((line, idx) => (
-                    <tr key={line.id || idx} className="py-2">
-                      <td className="py-2.5 pr-2">
-                        <div className="font-bold text-gray-800">{line.productName}</div>
-                        {line.description && (
-                          <div className="text-[11px] text-gray-400 mt-0.5">{line.description}</div>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-semibold text-gray-700">{line.quantity}</td>
-                      <td className="py-2.5 px-2 text-right font-semibold text-gray-700">
-                        ₦{line.unitCost.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-2.5 pl-2 text-right font-bold text-gray-900">
-                        ₦{line.lineTotal.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {canSubmit && (
+                    <Button
+                      disabled={isSubmitting || isUpdating}
+                      onClick={() => handleStatusChange("pending")}
+                      className="h-10 px-4 text-xs font-semibold bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg gap-1.5 shadow-sm"
+                    >
+                      <Send size={14} /> Submit
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Cost Summary & Notes */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            Request Cost Summary
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Total Quantity</span>
-              <span className="font-bold text-gray-900">{request.quantity} Items</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Total Estimated Value</span>
-              <span className="font-bold text-[#3B7CED]">
-                ₦{request.amount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-
-          {request.notes && (
-            <div className="pt-3 border-t border-gray-100">
-              <span className="block text-xs font-semibold text-gray-500 mb-1">Note</span>
-              <p className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100 ">
-                "{request.notes}"
-              </p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Action Bottom Bar */}
-      {request.status === "draft" && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20">
-          <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-            {isConfirmingDelete ? (
-              <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-lg border border-red-100">
-                <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
-                  <AlertCircle size={16} className="text-red-600" /> Confirm delete?
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIsConfirmingDelete(false)}
-                    className="h-8 text-xs bg-white border-gray-200 text-gray-700"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    {isDeleting ? "Deleting..." : "Delete"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <PermissionGuard module="project_request" entitlement="delete">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsConfirmingDelete(true)}
-                      className="h-11 px-4 text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-                    >
-                      <Trash2 size={16} /> Delete
-                    </Button>
-                  </PermissionGuard>
-                  
-                  <PermissionGuard module="project_request" entitlement="edit">
-                    <Button
-                      variant="outline"
-                      onClick={() => router.push(`/project-request/purchase-request/${request.id}/edit`)}
-                      className="h-11 px-4 text-xs font-bold border-gray-200 text-gray-700 hover:bg-gray-50 gap-1.5"
-                    >
-                      <Edit3 size={16} /> Edit
-                    </Button>
-                  </PermissionGuard>
-                </div>
-
-                <div className="flex items-center gap-2 flex-1 justify-end">
-                  <PermissionGuard module="project_request" entitlement="submit">
-                    <Button
-                      disabled={isUpdating}
-                      onClick={() => handleStatusChange("pending")}
-                      className="h-11 px-5 text-xs font-bold bg-[#3B7CED] hover:bg-[#2d63c7] text-white gap-1.5"
-                    >
-                      <Check size={16} /> Submit
-                    </Button>
-                  </PermissionGuard>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        type={statusModal.type as any}
-        title={statusModal.title}
-        message={statusModal.description}
-        onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
-        onAction={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
-      />
+        {/* Status Modal */}
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          type={statusModal.type as any}
+          title={statusModal.title}
+          message={statusModal.description}
+          onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+          onAction={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        />
+      </div>
     </motion.div>
   );
 }

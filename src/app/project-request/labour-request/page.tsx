@@ -61,8 +61,14 @@ export default function LabourRequestPage() {
       ? rawApiData
       : (rawApiData as any).results || [];
 
-    const displayApiRequests: DisplayLabourRequest[] = apiRequests.map(
-      (req) => {
+    const displayApiRequests: DisplayLabourRequest[] = [...apiRequests]
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at || a.start_date || 0).getTime();
+        const dateB = new Date(b.created_at || b.start_date || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        return Number(b.id || 0) - Number(a.id || 0);
+      })
+      .map((req) => {
         const projectId = (req as any).project_request?.project || (req as any).project;
         const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
         return {

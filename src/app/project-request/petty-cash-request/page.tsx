@@ -37,7 +37,13 @@ export default function PettyCashRequestPage() {
   };
 
   const requests = React.useMemo(() => {
-    return apiRequests.map((req) => {
+    const sorted = [...apiRequests].sort((a: any, b: any) => {
+      const dateA = new Date(a.created_at || a.date_created || 0).getTime();
+      const dateB = new Date(b.created_at || b.date_created || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+    return sorted.map((req) => {
       let detail: any = {};
       if (req.detail) {
         if (typeof req.detail === "string") {

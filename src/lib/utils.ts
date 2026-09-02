@@ -53,31 +53,58 @@ export function extractErrorMessage(
     if (typeof data.detail === "string") return data.detail.trim();
     if (typeof data.message === "string") return data.message.trim();
 
-    // Handle nested error array (e.g. {"error": [{"detail": "..."}]})
+    // Handle nested error array (e.g. {"error": [{"error": "Insufficient budget.", "available": "...", ...}]})
     if (Array.isArray(data.error) && data.error.length > 0) {
-      const firstError = data.error[0];
-      if (typeof firstError === "string") return firstError.trim();
-      if (typeof firstError === "object" && firstError !== null) {
-        if (typeof firstError.detail === "string") return firstError.detail.trim();
-        if (typeof firstError.message === "string") return firstError.message.trim();
-        if (typeof firstError.non_field_errors === "string")
-          return firstError.non_field_errors.trim();
-        if (
-          Array.isArray(firstError.non_field_errors) &&
-          firstError.non_field_errors.length > 0
-        ) {
-          return String(firstError.non_field_errors[0]).trim();
-        }
+      const messages = data.error.map((errItem: any) => {
+        if (typeof errItem === "string") return errItem.trim();
+        if (typeof errItem === "object" && errItem !== null) {
+          if (errItem.error || errItem.detail || errItem.message) {
+            const mainMsg = errItem.error || errItem.detail || errItem.message;
+            const extraDetails: string[] = [];
+            if (errItem.available !== undefined && errItem.available !== null) {
+              const val = parseFloat(errItem.available);
+              extraDetails.push(
+                `Available: ₦${isNaN(val) ? errItem.available : val.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+              );
+            }
+            if (errItem.requested !== undefined && errItem.requested !== null) {
+              const val = parseFloat(errItem.requested);
+              extraDetails.push(
+                `Requested: ₦${isNaN(val) ? errItem.requested : val.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+              );
+            }
+            if (errItem.activity_budget !== undefined && errItem.activity_budget !== null) {
+              const val = parseFloat(errItem.activity_budget);
+              extraDetails.push(
+                `Activity Budget: ₦${isNaN(val) ? errItem.activity_budget : val.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+              );
+            }
+            if (extraDetails.length > 0) {
+              return `${mainMsg} (${extraDetails.join(", ")})`;
+            }
+            return mainMsg;
+          }
+          if (typeof errItem.non_field_errors === "string")
+            return errItem.non_field_errors.trim();
+          if (
+            Array.isArray(errItem.non_field_errors) &&
+            errItem.non_field_errors.length > 0
+          ) {
+            return String(errItem.non_field_errors[0]).trim();
+          }
 
-        // Fallback to the first available key in the error object
-        const firstKey = Object.keys(firstError)[0];
-        if (firstKey) {
-          const val = firstError[firstKey];
-          const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
-          const formattedKey = firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ");
-          return `${formattedKey}: ${errorText}`;
+          const firstKey = Object.keys(errItem)[0];
+          if (firstKey) {
+            const val = errItem[firstKey];
+            const errorText = (Array.isArray(val) ? String(val[0]) : String(val)).trim();
+            const formattedKey =
+              firstKey.charAt(0).toUpperCase() + firstKey.slice(1).replace(/_/g, " ");
+            return `${formattedKey}: ${errorText}`;
+          }
         }
-      }
+        return JSON.stringify(errItem);
+      });
+      if (messages.length > 0) return messages.join(" | ");
     }
 
     // Handle error as an object (standard DRF errors)

@@ -125,7 +125,17 @@ export default function SubcontractorRequestPage() {
         </div>
       </div>
     )},
-    mockData: requests.map(req => ({ ...req, status: (req as any).project_request?.status || req.status || "pending" })),
+    mockData: [...requests]
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at || a.start_date || 0).getTime();
+        const dateB = new Date(b.created_at || b.start_date || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        return Number(b.id || 0) - Number(a.id || 0);
+      })
+      .map((req: any) => ({
+        ...req,
+        status: (req as any).project_request?.status || req.status || "pending",
+      })),
   };
 
   return (

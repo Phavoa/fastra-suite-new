@@ -49,7 +49,7 @@ const middleItems = [
     label: "Project Costing",
     route: "/project-costing",
   },
-  { id: "contact", icon: ContactIcon, label: "Contact", route: "/contact" },
+  // { id: "contact", icon: ContactIcon, label: "Contact", route: "/contact" },
   // --- Non-Functional Modules (Coming Soon) ---
   /*
   { id: "sales", icon: SalesIcon, label: "Sales", route: "/sales" },
@@ -121,8 +121,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           return hasAccess("projectRequest");
         case "project-costing":
           return hasAccess("projectCosting");
-        case "contact":
-          return hasAccess("contact");
+        // case "contact":
+        //   return hasAccess("contact");
         default:
           return true;
       }
