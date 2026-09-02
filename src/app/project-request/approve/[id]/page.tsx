@@ -16,6 +16,7 @@ import {
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { extractErrorMessage } from "@/lib/utils";
 
 const DataField = ({ label, value, fullWidth = false }: { label: string; value: string | React.ReactNode; fullWidth?: boolean }) => (
   <div className={`flex flex-col gap-1 ${fullWidth ? "col-span-2" : ""}`}>
@@ -215,7 +216,8 @@ export default function RequestDetailsPage() {
         `Project request ${displayRequestId} has been successfully approved.`
       );
     } catch (err: any) {
-      const errMsg = err?.data?.message || err?.data?.detail || "An error occurred while approving the request.";
+      console.error("Approve Error:", err);
+      const errMsg = extractErrorMessage(err, "An error occurred while approving the request.");
       statusModal.showError("Approval Failed", errMsg);
     }
   };
@@ -229,7 +231,8 @@ export default function RequestDetailsPage() {
         `Project request ${displayRequestId} has been successfully rejected.`
       );
     } catch (err: any) {
-      const errMsg = err?.data?.message || err?.data?.detail || "An error occurred while rejecting the request.";
+      console.error("Reject Error:", err);
+      const errMsg = extractErrorMessage(err, "An error occurred while rejecting the request.");
       statusModal.showError("Rejection Failed", errMsg);
     }
   };
@@ -563,7 +566,7 @@ export default function RequestDetailsPage() {
 
       {/* Fixed Bottom Action Bar */}
       {request && (request.status === "pending" || detail.status === "pending") && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-4 md:py-6 z-40">
+        <div className="fixed bottom-0 left-16 right-0 bg-white border-t border-gray-100 px-4 py-4 md:py-6 z-40">
           <div className="max-w-2xl mx-auto space-y-4">
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-sm font-bold text-gray-900">

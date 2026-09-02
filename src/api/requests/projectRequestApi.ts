@@ -152,6 +152,20 @@ export const projectRequestApi = createApi({
         body: data || {},
       }),
     }),
+    updateProjectRequest: builder.mutation<ProjectRequest, { id: number; data: any }>({
+      query: ({ id, data }) => ({
+        url: `/project-requests/project-requests/${id}/`,
+        method: "PUT",
+        body: data,
+      }),
+    }),
+    patchProjectRequest: builder.mutation<ProjectRequest, { id: number; data: any }>({
+      query: ({ id, data }) => ({
+        url: `/project-requests/project-requests/${id}/`,
+        method: "PATCH",
+        body: data,
+      }),
+    }),
     deleteProjectRequest: builder.mutation<void, number>({
       query: (id) => ({
         url: `/project-requests/project-requests/${id}/`,
@@ -168,5 +182,7 @@ export const {
   useRejectProjectRequestMutation,
   useCancelProjectRequestMutation,
   useSubmitProjectRequestMutation,
+  useUpdateProjectRequestMutation,
+  usePatchProjectRequestMutation,
   useDeleteProjectRequestMutation,
 } = projectRequestApi;

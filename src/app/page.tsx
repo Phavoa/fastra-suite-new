@@ -59,15 +59,7 @@ const MODULES: Module[] = [
     Icon: InventoryIcon,
     isFunctional: true,
   },
-  {
-    id: "contacts",
-    title: "Contacts",
-    description:
-      "Store and organize contact information for customers, vendors, and other stakeholders to facilitate communication and collaboration.",
-    color: "yellow",
-    Icon: ContactIcon,
-    isFunctional: true,
-  },
+
   {
     id: "project-request",
     title: "Project Request",
@@ -97,6 +89,15 @@ const MODULES: Module[] = [
   },
   // --- Non-Functional Modules (Coming Soon) ---
   /*
+    {
+    id: "contacts",
+    title: "Contacts",
+    description:
+      "Store and organize contact information for customers, vendors, and other stakeholders to facilitate communication and collaboration.",
+    color: "yellow",
+    Icon: ContactIcon,
+    isFunctional: true,
+  },
   {
     id: "sales",
     title: "Sales",

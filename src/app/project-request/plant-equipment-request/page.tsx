@@ -38,7 +38,13 @@ export default function PlantEquipmentRequestDashboard() {
 
   useEffect(() => {
     if (apiRequests && Array.isArray(apiRequests)) {
-      const mapped = apiRequests.map((req: any) => {
+      const sortedList = [...apiRequests].sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at || a.date_created || 0).getTime();
+        const dateB = new Date(b.created_at || b.date_created || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
+      const mapped = sortedList.map((req: any) => {
         let requesterName = "Requester";
         if (req.created_by_details && typeof req.created_by_details === "object") {
           const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();

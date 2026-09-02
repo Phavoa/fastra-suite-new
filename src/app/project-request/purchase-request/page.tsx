@@ -151,13 +151,19 @@ export default function PurchaseRequestsDashboard() {
   }, [refetch]);
 
   useEffect(() => {
-    let apiList: PurchaseRequestItem[] = [];
+    let raw: any[] = [];
     if (apiRequests && Array.isArray(apiRequests)) {
-      apiList = apiRequests.map(mapApiRequestToUi);
+      raw = apiRequests;
     } else if (apiRequests && Array.isArray((apiRequests as any).results)) {
-      apiList = (apiRequests as any).results.map(mapApiRequestToUi);
+      raw = (apiRequests as any).results;
     }
-    setRequests(apiList);
+    const sorted = [...raw].sort((a: any, b: any) => {
+      const dateA = new Date(a.created_at || a.date_created || a.date || 0).getTime();
+      const dateB = new Date(b.created_at || b.date_created || b.date || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+    setRequests(sorted.map(mapApiRequestToUi));
   }, [apiRequests]);
 
   const getStatusBadgeVariant = (

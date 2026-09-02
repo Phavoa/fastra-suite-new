@@ -179,7 +179,7 @@ export default function OperationPage() {
 
   const scrapDraftCount = useMemo(() => {
     const list = Array.isArray(rawScraps) ? rawScraps : (rawScraps as any)?.results || [];
-    return list.filter((i: any) => (i.status || "").toLowerCase() === "draft").length;
+    return list.length;
   }, [rawScraps]);
 
   const returnsDraftCount = useMemo(() => {

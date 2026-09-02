@@ -1,39 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Bell,
-  Calendar,
-  User,
-  CheckCircle,
-  XCircle,
-  HelpCircle,
-  Loader2,
-  Edit,
   Trash2,
+  Edit3,
   Send,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   useGetSubcontractorRequestQuery,
   useDeleteSubcontractorRequestMutation,
   useSubmitSubcontractorRequestMutation,
 } from "@/api/subcontractorRequestApi";
+import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { extractErrorMessage } from "@/lib/utils";
 import { PageGuard } from "@/components/auth/PageGuard";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SubcontractorRequestDetailsPage() {
@@ -43,48 +31,73 @@ export default function SubcontractorRequestDetailsPage() {
   const requestId = Number(params.id);
 
   const { canDo } = useModulePermissions();
-  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const { data: request, isLoading, error, refetch } =
-    useGetSubcontractorRequestQuery(requestId);
+    useGetSubcontractorRequestQuery(requestId, {
+      skip: isNaN(requestId),
+    });
 
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteSubcontractorRequestMutation();
   const [submitRequest, { isLoading: isSubmitting }] = useSubmitSubcontractorRequestMutation();
 
-  const getStatusBadgeClass = (status?: string) => {
-    switch (status) {
-      case "approved":
-      case "completed":
-        return "bg-[#EAFDF0] text-[#2BA24D] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
-      case "submitted":
-      case "clarification_needed":
-      case "in_progress":
-      case "pending":
-        return "bg-[#FFFDF0] text-[#F0B401] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
-      case "draft":
-        return "bg-[#EEF4FF] text-[#3B7CED] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
-      case "rejected":
-        return "bg-[#FFF2F0] text-[#E43D2B] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
-      default:
-        return "bg-[#FFFDF0] text-[#F0B401] border-none font-bold text-xs px-2.5 py-1 rounded-lg";
-    }
-  };
+  const detail = (request as any)?.detail || (request as any) || {};
+  const projectRequest = (request as any)?.project_request || (request as any) || {};
 
-  const getStatusLabel = (status?: string) => {
-    if (!status) return "Pending";
-    switch (status) {
-      case "clarification_needed":
-        return "Clarification Needed";
-      case "in_progress":
-        return "In Progress";
-      default:
-        return status.charAt(0).toUpperCase() + status.slice(1);
+  const projectId = (request as any)?.project || projectRequest?.project || detail?.project;
+  const activityId = (request as any)?.activity || detail?.activity || detail?.task;
+
+  const { data: projectCosting } = useGetProjectCostingProjectQuery(
+    Number(projectId),
+    { skip: !projectId || isNaN(Number(projectId)) }
+  );
+
+  const availableBudget = useMemo(() => {
+    if (!projectCosting) return 5000000;
+
+    if (activityId) {
+      const phasesArr = Array.isArray(projectCosting.phases)
+        ? projectCosting.phases
+        : Array.isArray((projectCosting as any).phase_list)
+        ? (projectCosting as any).phase_list
+        : [];
+
+      for (const ph of phasesArr) {
+        const acts = Array.isArray(ph.activities)
+          ? ph.activities
+          : Array.isArray(ph.activity_list)
+          ? ph.activity_list
+          : [];
+        const act = acts.find((a: any) => String(a.id || a.activity_id) === String(activityId));
+        if (act) {
+          if (act.available_budget !== undefined && act.available_budget !== null)
+            return Number(act.available_budget);
+          if (act.remaining_budget !== undefined && act.remaining_budget !== null)
+            return Number(act.remaining_budget);
+          if (act.amount !== undefined && act.amount !== null) return Number(act.amount);
+        }
+      }
     }
-  };
+
+    if (projectCosting.financials) {
+      if (
+        projectCosting.financials.remaining_budget !== undefined &&
+        projectCosting.financials.remaining_budget !== null
+      )
+        return Number(projectCosting.financials.remaining_budget);
+      if (
+        projectCosting.financials.budget !== undefined &&
+        projectCosting.financials.budget !== null
+      )
+        return Number(projectCosting.financials.budget);
+    }
+
+    return 5000000;
+  }, [projectCosting, activityId]);
 
   const handleModalClose = () => {
     statusModal.close();
-    if (statusModal.type === "success" && !isConfirmDeleteOpen) {
+    if (statusModal.type === "success" && !isConfirmingDelete) {
       router.push("/project-request/subcontractor-request");
     }
   };
@@ -96,66 +109,98 @@ export default function SubcontractorRequestDetailsPage() {
   const handleDelete = async () => {
     try {
       await deleteRequest(requestId).unwrap();
-      setIsConfirmDeleteOpen(false);
+      setIsConfirmingDelete(false);
       statusModal.showSuccess(
         "Request Deleted",
         "The subcontractor request has been deleted successfully."
       );
-    } catch (error) {
-      console.error("Failed to delete request:", error);
-      statusModal.showError("Error", extractErrorMessage(error, "Failed to delete the request. Please try again."));
+    } catch (err) {
+      console.error("Failed to delete request:", err);
+      statusModal.showError(
+        "Error",
+        extractErrorMessage(err, "Failed to delete the request. Please try again.")
+      );
     }
   };
 
   const handleSubmit = async () => {
     try {
-      const parentRequestId = (request as any)?.project_request?.id || (request as any)?.project_request;
-      if (!parentRequestId) throw new Error("Could not find parent project request ID");
-      await submitRequest({ id: parentRequestId }).unwrap();
+      const submitId = Number(projectRequest?.id || (request as any)?.project_request_id || requestId);
+      await submitRequest({ id: submitId }).unwrap();
       statusModal.showSuccess(
         "Request Submitted",
         "The subcontractor request has been submitted for approval."
       );
       refetch();
-    } catch (error) {
-      console.error("Failed to submit request:", error);
-      statusModal.showError("Submit Failed", extractErrorMessage(error, "Failed to submit the request. Please try again."));
+    } catch (err) {
+      console.error("Failed to submit request:", err);
+      statusModal.showError(
+        "Submit Failed",
+        extractErrorMessage(err, "Failed to submit the request. Please try again.")
+      );
     }
   };
 
-  const requestStatus = (request as any)?.project_request?.status || request?.status;
-  const canEdit = requestStatus === "draft" && canDo("project_request", "edit");
-  const canDelete = requestStatus === "draft" && canDo("project_request", "delete");
-  const canSubmit = requestStatus === "draft" && canDo("project_request", "submit");
+  const renderStatusBadge = (status?: string) => {
+    const s = (status || "approved").toLowerCase();
+    switch (s) {
+      case "approved":
+        return (
+          <span className="bg-[#D8F5E5] text-[#22C55E] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Approved
+          </span>
+        );
+      case "pending":
+      case "submitted":
+        return (
+          <span className="bg-[#FEF9C3] text-[#CA8A04] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Pending
+          </span>
+        );
+      case "draft":
+        return (
+          <span className="bg-[#EFF6FF] text-[#3B82F6] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Draft
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="bg-[#FEE2E2] text-[#EF4444] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center">
+            Rejected
+          </span>
+        );
+      default:
+        return (
+          <span className="bg-[#D8F5E5] text-[#22C55E] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center capitalize">
+            {status || "Approved"}
+          </span>
+        );
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] pb-28">
-        <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30">
-          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Skeleton className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
-              <Skeleton className="h-6 bg-gray-200 rounded w-36 animate-pulse" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="w-20 h-8 bg-gray-200 rounded-lg animate-pulse" />
-            </div>
+      <div className="min-h-screen bg-white font-['Open_Sans',sans-serif]">
+        <header className="w-full bg-white px-5 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-6 h-6 rounded-md bg-gray-200" />
+            <Skeleton className="h-6 w-32 rounded bg-gray-200" />
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-6 h-6 rounded-full bg-gray-200" />
+            <Skeleton className="w-9 h-9 rounded-full bg-gray-200" />
           </div>
         </header>
-        <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-            <div className="flex justify-between items-center">
-              <Skeleton className="h-6 bg-gray-200 rounded w-48 animate-pulse" />
-              <Skeleton className="h-6 bg-gray-200 rounded-full w-20 animate-pulse" />
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="space-y-1">
-                  <Skeleton className="h-3 bg-gray-200 rounded w-20 animate-pulse" />
-                  <Skeleton className="h-5 bg-gray-200 rounded w-32 animate-pulse" />
-                </div>
-              ))}
-            </div>
+        <div className="w-full h-2.5 bg-[#F1F3F6]" />
+        <main className="max-w-[430px] mx-auto px-5 py-6 space-y-6">
+          <Skeleton className="h-6 w-36 rounded bg-gray-200" />
+          <div className="grid grid-cols-2 gap-y-5 gap-x-6">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-3 w-20 rounded bg-gray-200" />
+                <Skeleton className="h-4 w-28 rounded bg-gray-200" />
+              </div>
+            ))}
           </div>
         </main>
       </div>
@@ -164,15 +209,13 @@ export default function SubcontractorRequestDetailsPage() {
 
   if (error || !request) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-        <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-sm w-full">
-          <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-          <p className="text-gray-700 font-semibold mb-4">
-            Failed to load request details
-          </p>
+      <div className="min-h-screen bg-white flex items-center justify-center p-4 font-['Open_Sans',sans-serif]">
+        <div className="text-center bg-white p-8 rounded-2xl border border-gray-200 shadow-sm max-w-sm w-full">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+          <p className="text-gray-700 font-semibold mb-4">Failed to load request details</p>
           <Button
             onClick={() => router.back()}
-            className="w-full bg-[#3B7CED] text-white hover:bg-blue-600 font-bold h-11 rounded-xl"
+            className="w-full bg-[#3B82F6] text-white hover:bg-blue-600 font-bold h-11 rounded-xl"
           >
             Go Back
           </Button>
@@ -181,396 +224,297 @@ export default function SubcontractorRequestDetailsPage() {
     );
   }
 
-  const formattedDate = request.created_at
-    ? new Date(request.created_at).toLocaleDateString("en-GB", {
+  const requesterName =
+    projectRequest?.created_by_details?.first_name &&
+    projectRequest?.created_by_details?.last_name
+      ? `${projectRequest.created_by_details.first_name} ${projectRequest.created_by_details.last_name}`
+      : projectRequest?.created_by_details?.username ||
+        detail?.created_by_name ||
+        (request as any)?.created_by_name ||
+        "Firstname Lastname";
+
+  const refId =
+    (request as any).reference_id ||
+    projectRequest?.reference_id ||
+    `SC${String((request as any).id || requestId).padStart(5, "0")}`;
+
+  const projectName =
+    projectRequest?.project_details?.name ||
+    projectCosting?.name ||
+    (typeof projectId === "number" ? `Project #${projectId}` : "Building project");
+
+  const scopeOfWork = detail.scope_of_work || detail.service_type || "Engineer";
+  const subcontractorName =
+    detail.subcontractor_name ||
+    detail.subcontractor_details?.name ||
+    detail.contractor_name ||
+    "Firstname Lastname";
+
+  const startDateFormatted = detail.start_date
+    ? new Date(detail.start_date).toLocaleDateString("en-GB", {
         day: "numeric",
         month: "short",
         year: "numeric",
       })
-    : "N/A";
+    : "4 Apr 2024";
 
-  const totalContractFormatted = Number(
-    request.contract_value || 0
-  ).toLocaleString("en-NG", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const endDateFormatted = detail.end_date
+    ? new Date(detail.end_date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "4 Apr 2024";
 
-  const displayTitle = request.vendor_name || (request as any).activity_details?.name || (request as any).project_details?.name || "Subcontractor Contract";
-  const displayRefId = (request as any).project_request?.reference_id || request.reference_id || `SR-${String(request.id).padStart(5, "0")}`;
-  const displayStatus = (request as any).project_request?.status || request.status;
-  
-  const requesterName = 
-    (request as any).project_request?.created_by_details?.user?.first_name || 
-    (request as any).project_request?.created_by_details?.user?.username || 
-    request.created_by_name || 
-    "Unknown User";
+  const phaseName = detail.phase_name || detail.phase || "Roofing";
+  const taskName = detail.task_name || detail.task || (activityId ? `Activity ${activityId}` : "P.O.P");
+
+  const contractValue =
+    parseFloat(detail.contract_value || detail.estimated_cost || detail.amount || "500000") || 500000;
+  const paymentTerms = detail.payment_terms || "N500,000";
+
+  const noteText =
+    detail.notes ||
+    detail.justification_notes ||
+    detail.description ||
+    "-";
+
+  const totalCost = contractValue || 1500000;
+
+  const isDraft = request?.status === "draft";
+  const canEdit = isDraft && canDo("project_request", "edit");
+  const canDelete = isDraft && canDo("project_request", "delete");
+  const canSubmit = isDraft;
 
   return (
     <PageGuard module="project_request" entitlement="view">
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="min-h-screen bg-[#F9FAFB] pb-24 font-sans antialiased text-gray-900"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+        className="min-h-screen bg-white text-[#111827] font-['Open_Sans',sans-serif] pb-32"
       >
-      {/* Header Bar */}
-      <header className="w-full border-b border-gray-100 bg-white sticky top-0 z-30 shadow-none">
-        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/project-request/subcontractor-request")}
-              className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors"
-              aria-label="Back"
-            >
-              <ArrowLeft size={20} className="text-gray-600" />
-            </button>
-            <h1 className="text-lg font-bold text-gray-800">Request Details</h1>
-          </div>
+        <div className="max-w-[430px] mx-auto bg-white min-h-screen flex flex-col">
+          {/* Top Header */}
+          <header className="w-full bg-white px-5 h-16 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push("/project-request/subcontractor-request")}
+                className="p-1 -ml-1 text-[#1F2937] hover:text-black transition-colors"
+                aria-label="Back"
+              >
+                <ArrowLeft size={20} strokeWidth={2} />
+              </button>
+              <h1 className="text-[18px] font-normal text-[#1F2937]">Request Details</h1>
+            </div>
 
-          <div className="flex items-center gap-3">
-            <button className="p-2 rounded-lg hover:bg-gray-50 transition-colors">
-              <Bell size={20} className="text-gray-800" />
-            </button>
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
-              <img
-                src="https://api.dicebear.com/7.x/pixel-art/svg?seed=user123"
-                alt="User Profile"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-        {/* Basic Header Info */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <span className="text-xs font-bold text-[#3B7CED] uppercase">
-                {displayRefId}
-              </span>
-              <h2 className="text-lg font-bold text-gray-900 mt-1">
-                {displayTitle}
-              </h2>
-            </div>
-            <span className={getStatusBadgeClass(displayStatus)}>
-              {getStatusLabel(displayStatus)}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 text-xs">
-            <div>
-              <span className="block text-gray-400 font-semibold mb-0.5">
-                Date Requested
-              </span>
-              <span className="font-bold text-gray-800 flex items-center gap-1">
-                <Calendar size={14} className="text-gray-500" /> {formattedDate}
-              </span>
-            </div>
-            <div>
-              <span className="block text-gray-400 font-semibold mb-0.5">
-                Requested By
-              </span>
-              <span className="font-bold text-gray-800 flex items-center gap-1">
-                <User size={14} className="text-gray-500" />{" "}
-                {requesterName}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Subcontractor Details */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
-          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            Contract Details
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Subcontractor</span>
-              <span className="font-bold text-gray-900">
-                {displayTitle}
-              </span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Payment Type</span>
-              <span className="font-bold text-gray-900 capitalize">
-                {request.payment_type?.replace("_", " ") || "Lump Sum"}
-              </span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Contract Value</span>
-              <span className="font-black text-[#3B7CED] text-sm">
-                ₦{totalContractFormatted}
-              </span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-gray-50">
-              <span className="text-gray-500 font-semibold">Timeline</span>
-              <span className="font-bold text-gray-900">
-                {request.start_date || "N/A"} to {request.end_date || "N/A"}
-              </span>
-            </div>
-            <div className="flex justify-between py-1.5">
-              <span className="text-gray-500 font-semibold">Payment Terms</span>
-              <span className="font-bold text-gray-900">
-                {request.payment_terms || "Standard terms"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Scope of Work & Justification */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
-          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            Scope & Justification
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div>
-              <span className="block text-gray-500 font-semibold mb-1">
-                Scope of Work
-              </span>
-              <p className="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed ">
-                "{request.scope_of_work || "N/A"}"
-              </p>
-            </div>
-            {request.justification_notes && (
-              <div className="pt-2">
-                <span className="block text-gray-500 font-semibold mb-1">
-                  Justification Notes
-                </span>
-                <p className="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">
-                  {request.justification_notes}
-                </p>
+            <div className="flex items-center gap-4">
+              <button className="text-[#1E293B] hover:opacity-80 transition-opacity">
+                <Bell size={22} strokeWidth={2} className="fill-current" />
+              </button>
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-[#FECDD3] flex items-center justify-center shrink-0">
+                <img
+                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+                  alt="User Profile"
+                  className="w-full h-full object-cover"
+                />
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </header>
 
-        {/* Milestones Section */}
-        {request.payment_type === "milestone" &&
-          request.milestones &&
-          request.milestones.length > 0 && (
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
-              <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-                Project Milestones
-              </h3>
+          {/* Divider Bar under header */}
+          <div className="w-full h-2.5 bg-[#F1F3F6] shrink-0" />
 
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase">
-                    <tr>
-                      <th className="p-3">Milestone</th>
-                      <th className="p-3 text-center">Weight</th>
-                      <th className="p-3 text-right">Value (₦)</th>
-                      <th className="p-3 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {request.milestones.map((m: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="p-3 font-semibold text-gray-900">
-                          <div>{m.name}</div>
-                          {m.completion_criteria && (
-                            <div className="text-[11px] text-gray-500 font-normal mt-0.5">
-                              {m.completion_criteria}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3 text-center font-medium">
-                          {m.percentage}%
-                        </td>
-                        <td className="p-3 text-right font-bold text-gray-900">
-                          ₦
-                          {(
-                            (Number(m.percentage) / 100) *
-                            Number(request.contract_value || 0)
-                          ).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                          })}
-                        </td>
-                        <td className="p-3 text-center">
-                          {m.is_completed ? (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded uppercase">
-                              Completed
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded uppercase">
-                              Pending
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Main Content Area */}
+          <main className="px-5 py-6 space-y-7 flex-1">
+            {/* Basic Information */}
+            <section>
+              <h2 className="text-lg font-normal text-[#3B7CED] mb-4">Basic Information</h2>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Request ID</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{refId}</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Status</span>
+                  <div>{renderStatusBadge(request.status)}</div>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Request Type</span>
+                  <span className="block text-[14px] font-semibold text-black/80">Subcontractor Request</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Requested by</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{requesterName}</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Project</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{projectName}</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Scope of Work</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{scopeOfWork}</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Start Date</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{startDateFormatted}</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">End Date</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{endDateFormatted}</span>
+                </div>
+              </div>
+
+              {/* Subcontractor Name */}
+              <div className="mt-4">
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
+                  Subcontractor Name
+                </span>
+                <span className="block text-[14px] font-semibold text-black/80">{subcontractorName}</span>
+              </div>
+            </section>
+
+            {/* WBS */}
+            <section>
+              <h2 className="text-lg font-normal text-[#3B7CED] mb-4">WBS</h2>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Phase</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{phaseName}</span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Task</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{taskName}</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Cost Details */}
+            <section>
+              <h2 className="text-lg font-normal text-[#3B7CED] mb-4">Cost Details</h2>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-6 mb-4">
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
+                    Contract Value (Estimated)
+                  </span>
+                  <span className="block text-[14px] font-semibold text-black/80">
+                    N{contractValue.toLocaleString("en-NG")}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
+                    Payment Terms
+                  </span>
+                  <span className="block text-[14px] font-semibold text-black/80">
+                    {paymentTerms.startsWith("N") ? paymentTerms : `N${paymentTerms}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Note */}
+              <div className="mt-5">
+                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Note</span>
+                <span className="block text-[14px] font-semibold text-black/80">{noteText}</span>
+              </div>
+            </section>
+          </main>
+
+          {/* Thick Divider Bar before Summary */}
+          <div className="w-full h-2.5 bg-[#F1F3F6] shrink-0" />
+
+          {/* Budget & Cost Summary */}
+          <section className="px-5 py-4 space-y-2 bg-white shrink-0">
+            <div className="flex justify-between items-center">
+              <span className="text-[14px] font-semibold text-black/80">Available Budget</span>
+              <span className="text-[14px] font-semibold text-black/80">
+                N{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[14px] font-semibold text-black/80">Total Cost</span>
+              <span className="text-[14px] font-semibold text-[#3B82F6]">
+                N{totalCost.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </section>
+
+          {/* Floating Bottom Action Bar for Draft/Editable requests */}
+          {(canEdit || canDelete || canSubmit) && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 p-3.5 z-40 shadow-lg">
+              <div className="max-w-[430px] mx-auto flex items-center justify-between gap-3">
+                {isConfirmingDelete ? (
+                  <div className="w-full flex items-center justify-between gap-2 bg-red-50 p-2 rounded-xl border border-red-100">
+                    <span className="text-xs font-semibold text-red-700 flex items-center gap-1.5 pl-1">
+                      <AlertCircle size={16} className="text-red-600" /> Confirm delete?
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsConfirmingDelete(false)}
+                        className="h-9 text-xs bg-white border-gray-200 text-gray-700 rounded-lg"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="h-9 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                      >
+                        {isDeleting ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full flex items-center justify-end gap-2.5">
+                    {canDelete && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsConfirmingDelete(true)}
+                        className="h-10 px-3.5 text-xs font-semibold border-red-200 text-red-600 hover:bg-red-50 rounded-lg gap-1.5"
+                      >
+                        <Trash2 size={15} /> Delete
+                      </Button>
+                    )}
+
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        onClick={handleEdit}
+                        className="h-10 px-4 text-xs font-semibold border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg gap-1.5"
+                      >
+                        <Edit3 size={15} /> Edit
+                      </Button>
+                    )}
+
+                    {canSubmit && (
+                      <Button
+                        disabled={isSubmitting}
+                        onClick={handleSubmit}
+                        className="h-10 px-4 text-xs font-semibold bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg gap-1.5 shadow-sm"
+                      >
+                        <Send size={14} /> Submit
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-        {/* Audit Trail & History */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-none space-y-4">
-          <h3 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3B7CED]" />
-            Audit Trail
-          </h3>
-
-          <div className="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100 text-xs">
-            <div className="relative pl-7">
-              <span className="absolute left-0 top-0.5 w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
-                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-              </span>
-              <div>
-                <p className="font-bold text-gray-900">Request Created</p>
-                <p className="text-gray-400 text-[11px]">
-                  {new Date(request.created_at || Date.now()).toLocaleString("en-GB")}
-                </p>
-              </div>
-            </div>
-
-            {request.status !== "draft" && (
-              <div className="relative pl-7">
-                <span className="absolute left-0 top-0.5 w-6 h-6 bg-amber-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
-                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
-                </span>
-                <div>
-                  <p className="font-bold text-gray-900">Submitted for Approval</p>
-                  <p className="text-gray-400 text-[11px]">
-                    {new Date(request.created_at || Date.now()).toLocaleString("en-GB")}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {request.status === "approved" && (
-              <div className="relative pl-7">
-                <span className="absolute left-0 top-0.5 w-6 h-6 bg-green-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                </span>
-                <div>
-                  <p className="font-bold text-gray-900">Request Approved</p>
-                  <p className="text-gray-400 text-[11px]">Just now</p>
-                  <p className="text-green-700 mt-1  font-medium">
-                    "Budget validation passed. Ready for processing."
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {request.status === "rejected" && (
-              <div className="relative pl-7">
-                <span className="absolute left-0 top-0.5 w-6 h-6 bg-red-50 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
-                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                </span>
-                <div>
-                  <p className="font-bold text-gray-900">Request Rejected</p>
-                  <p className="text-gray-400 text-[11px]">Just now</p>
-                  <p className="text-red-600 mt-1  font-medium">
-                    "Reason: Exceeds budget allocation."
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Status Modal */}
+          <StatusModal
+            isOpen={statusModal.isOpen}
+            onClose={handleModalClose}
+            type={statusModal.type}
+            title={statusModal.title}
+            message={statusModal.message}
+            actionText="Back to List"
+            onAction={handleModalClose}
+            showCloseButton={false}
+          />
         </div>
-      </main>
-
-      {/* Fixed Action Bar for Draft Status */}
-      {(canEdit || canSubmit || canDelete) && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <div className="max-w-2xl mx-auto flex gap-3">
-            {canDelete && (
-              <Button
-                variant="outline"
-                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-11"
-                onClick={() => setIsConfirmDeleteOpen(true)}
-                disabled={isDeleting || isSubmitting}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-            )}
-            
-            {canEdit && (
-              <Button
-                variant="outline"
-                className="flex-1 border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 h-11"
-                onClick={handleEdit}
-                disabled={isDeleting || isSubmitting}
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-            )}
-
-            {canSubmit && (
-              <Button
-                className="flex-[2] bg-[#3B7CED] hover:bg-blue-600 text-white h-11"
-                onClick={handleSubmit}
-                disabled={isDeleting || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4 mr-2" />
-                )}
-                {isSubmitting ? "Submitting..." : "Submit for Approval"}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-red-600 flex items-center gap-2">
-              <Trash2 className="w-5 h-5" />
-              Delete Subcontractor Request
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this subcontractor request? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="sm:justify-end gap-2 mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsConfirmDeleteOpen(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isDeleting ? "Deleting..." : "Delete Request"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        onClose={handleModalClose}
-        type={statusModal.type}
-        title={statusModal.title}
-        message={statusModal.message}
-        actionText="Back to List"
-        onAction={handleModalClose}
-        showCloseButton={false}
-      />
       </motion.div>
     </PageGuard>
   );

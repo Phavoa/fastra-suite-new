@@ -752,10 +752,24 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
               <div className="space-y-4">
                 {fields.map((fieldItem, index) => {
                   const isEditing = form.watch(`productLines.${index}.isEditing`);
+                  const prodId = form.watch(`productLines.${index}.productId`);
+                  const prod = inventoryProducts.find((p) => String(p.id) === String(prodId));
+                  const availableStock = prod
+                    ? Number(
+                        prod.available_stock ??
+                          prod.available_product_quantity ??
+                          prod.current_stock ??
+                          prod.stock_quantity ??
+                          prod.quantity ??
+                          0
+                      )
+                    : 0;
+                  const unitSymbol =
+                    prod?.unit_of_measure_details?.unit_symbol ||
+                    prod?.unit_of_measure_details?.unit_name ||
+                    "units";
 
                   if (!isEditing) {
-                    const prodId = form.watch(`productLines.${index}.productId`);
-                    const prod = inventoryProducts.find(p => String(p.id) === String(prodId));
                     const qty = form.watch(`productLines.${index}.quantity`) || 0;
                     const uCost = form.watch(`productLines.${index}.unitCost`) || 0;
                     const tCost = qty * uCost;
@@ -763,7 +777,7 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                     return (
                       <div
                         key={fieldItem.id}
-                        className="p-4 border border-gray-200 rounded-lg bg-[#F8FAFC] relative space-y-1.5"
+                        className="p-4 border border-[#E5EEFF] rounded-lg bg-[#F5F8FF] relative space-y-2.5"
                       >
                         <div className="flex justify-between items-start">
                           <span className="text-xs font-medium text-gray-400">
@@ -773,7 +787,7 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                             <button
                               type="button"
                               onClick={() => form.setValue(`productLines.${index}.isEditing`, true)}
-                              className="p-1 rounded-md hover:bg-gray-200 transition-colors text-blue-500"
+                              className="p-1 rounded-md hover:bg-white transition-colors text-blue-500"
                               aria-label="Edit Item"
                             >
                               <Pencil size={15} />
@@ -781,7 +795,7 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                             <button
                               type="button"
                               onClick={() => remove(index)}
-                              className="p-1 rounded-md hover:bg-gray-200 transition-colors text-red-500"
+                              className="p-1 rounded-md hover:bg-white transition-colors text-red-500"
                               aria-label="Delete Item"
                             >
                               <Trash size={15} />
@@ -790,17 +804,20 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                         </div>
 
                         <div className="flex justify-between items-baseline">
-                          <h3 className="text-sm font-bold text-gray-900">
+                          <h3 className="text-sm font-semibold text-black/80">
                             {prod?.product_name || "Unknown Product"}
-                            {prod?.unit_of_measure_details?.unit_symbol ? ` (${prod.unit_of_measure_details.unit_symbol})` : ""}
+                            {unitSymbol ? ` (${unitSymbol})` : ""}
                           </h3>
                         </div>
 
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-xs text-gray-800 font-medium">
-                            {qty} QTY
+                        <div className="flex justify-between items-center bg-white px-3 py-2 rounded-md border border-[#E5EEFF] text-xs">
+                          <span className="text-gray-500">
+                            Available: <strong className="text-black/80 font-semibold">{availableStock} {unitSymbol}</strong>
                           </span>
-                          <span className="text-xs font-bold text-[#3B7CED]">
+                          <span className="text-gray-500">
+                            Consuming: <strong className="text-black/80 font-semibold">{qty} {unitSymbol}</strong>
+                          </span>
+                          <span className="font-semibold text-[#3B7CED]">
                             ₦{tCost.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
@@ -808,10 +825,13 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                     );
                   }
 
+                  const enteredQty = form.watch(`productLines.${index}.quantity`) || 0;
+                  const isOverStock = prod && enteredQty > availableStock;
+
                   return (
                     <div
                       key={fieldItem.id}
-                      className="p-4 border border-gray-200 bg-white rounded-lg shadow-sm space-y-4 relative"
+                      className="p-4 border border-gray-200 bg-white rounded-lg shadow-xs space-y-4 relative"
                     >
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs font-semibold text-gray-500">
@@ -830,164 +850,207 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                    {/* Product Select */}
-                    <FormField
-                      control={form.control}
-                      name={`productLines.${index}.productId`}
-                      render={({ field }) => (
-                        <FormItem className="col-span-2">
-                          <FormLabel className="text-xs font-semibold text-gray-700">
-                            Product name
-                          </FormLabel>
-                          {isEdit ? (
-                            <FormControl>
-                              <NativeSelect
-                                value={field.value}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  field.onChange(val);
-                                  const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
-                                  if (selectedProd) {
-                                    form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
-                                  }
-                                }}
-                                className={form.formState.errors.productLines?.[index]?.productId ? "border-red-500 focus:ring-red-500/20" : ""}
-                              >
-                                <option value="" disabled>{isLoadingProducts ? "Loading inventory..." : "Search inventory..."}</option>
-                                {inventoryProducts.map((prod) => (
-                                  <option key={prod.id} value={String(prod.id)}>
-                                    {prod.product_name}
-                                    {prod.unit_of_measure_details?.unit_symbol ? ` (${prod.unit_of_measure_details.unit_symbol})` : ""}
-                                  </option>
-                                ))}
-                              </NativeSelect>
-                            </FormControl>
-                          ) : (
-                            <Select
-                              key={`product-select-${index}-${inventoryProducts.length}`}
-                              onValueChange={(val) => {
-                                field.onChange(val);
-                                const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
-                                if (selectedProd) {
-                                  form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
-                                }
-                              }}
-                              value={field.value ? String(field.value) : undefined}
-                            >
-                              <FormControl>
-                                <SelectTrigger
-                                  className={cn(
-                                    "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20 w-full",
-                                    form.formState.errors.productLines?.[index]
-                                      ?.productId &&
-                                      "border-red-500 focus:ring-red-500/20",
-                                  )}
-                                >
-                                  <SelectValue
-                                    placeholder={
-                                      isLoadingProducts
-                                        ? "Loading inventory..."
-                                        : "Search inventory..."
-                                    }
-                                  />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {inventoryProducts.map((prod) => (
-                                  <SelectItem
-                                    key={prod.id}
-                                    value={String(prod.id)}
+                        {/* Product Select */}
+                        <FormField
+                          control={form.control}
+                          name={`productLines.${index}.productId`}
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-xs font-semibold text-gray-700">
+                                Product name
+                              </FormLabel>
+                              {isEdit ? (
+                                <FormControl>
+                                  <NativeSelect
+                                    value={field.value}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val);
+                                      const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
+                                      if (selectedProd) {
+                                        form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
+                                      }
+                                    }}
+                                    className={form.formState.errors.productLines?.[index]?.productId ? "border-red-500 focus:ring-red-500/20" : ""}
                                   >
-                                    {prod.product_name}
-                                    {prod.unit_of_measure_details?.unit_symbol
-                                      ? ` (${prod.unit_of_measure_details.unit_symbol})`
-                                      : ""}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                                    <option value="" disabled>{isLoadingProducts ? "Loading inventory..." : "Search inventory..."}</option>
+                                    {inventoryProducts.map((p) => {
+                                      const pStock = Number(
+                                        p.available_stock ??
+                                          p.available_product_quantity ??
+                                          p.current_stock ??
+                                          p.stock_quantity ??
+                                          p.quantity ??
+                                          0
+                                      );
+                                      const pUnit = p.unit_of_measure_details?.unit_symbol || p.unit_of_measure_details?.unit_name || "";
+                                      return (
+                                        <option key={p.id} value={String(p.id)}>
+                                          {p.product_name} {pUnit ? `(${pUnit})` : ""} — In Stock: {pStock}
+                                        </option>
+                                      );
+                                    })}
+                                  </NativeSelect>
+                                </FormControl>
+                              ) : (
+                                <Select
+                                  key={`product-select-${index}-${inventoryProducts.length}`}
+                                  onValueChange={(val) => {
+                                    field.onChange(val);
+                                    const selectedProd = inventoryProducts.find((p) => String(p.id) === val);
+                                    if (selectedProd) {
+                                      form.setValue(`productLines.${index}.unitCost`, Number(selectedProd.standard_cost) || 0, { shouldValidate: true });
+                                    }
+                                  }}
+                                  value={field.value ? String(field.value) : undefined}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger
+                                      className={cn(
+                                        "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20 w-full",
+                                        form.formState.errors.productLines?.[index]?.productId &&
+                                          "border-red-500 focus:ring-red-500/20"
+                                      )}
+                                    >
+                                      <SelectValue
+                                        placeholder={
+                                          isLoadingProducts
+                                            ? "Loading inventory..."
+                                            : "Search inventory..."
+                                        }
+                                      />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {inventoryProducts.map((p) => {
+                                      const pStock = Number(
+                                        p.available_stock ??
+                                          p.available_product_quantity ??
+                                          p.current_stock ??
+                                          p.stock_quantity ??
+                                          p.quantity ??
+                                          0
+                                      );
+                                      const pUnit = p.unit_of_measure_details?.unit_symbol || p.unit_of_measure_details?.unit_name || "";
+                                      return (
+                                        <SelectItem key={p.id} value={String(p.id)}>
+                                          <div className="flex justify-between items-center w-full gap-4">
+                                            <span>
+                                              {p.product_name} {pUnit ? `(${pUnit})` : ""}
+                                            </span>
+                                            <span className="text-[11px] font-semibold text-[#3B7CED] bg-[#EFF6FF] px-2 py-0.5 rounded border border-[#DBEAFE]">
+                                              Stock: {pStock}
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              <FormMessage />
+                            </FormItem>
                           )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        />
 
-                    {/* Quantity */}
-                    <FormField
-                      control={form.control}
-                      name={`productLines.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel className="text-xs font-semibold text-gray-700">
-                            Quantity
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1"
-                              className={cn(
-                                "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                                form.formState.errors.productLines?.[index]
-                                  ?.quantity &&
-                                  "border-red-500 focus:ring-red-500/20",
-                              )}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        {/* Available Stock Indicator Banner */}
+                        {prod && (
+                          <div className="col-span-2 bg-[#F5F8FF] border border-[#E5EEFF] rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-[#3B7CED] inline-block" />
+                              <span className="text-xs font-medium text-gray-700">
+                                Available in Inventory:
+                              </span>
+                            </div>
+                            <span className="text-xs font-semibold text-[#3B7CED] bg-white px-2.5 py-1 rounded-md border border-[#D0E2FF] shadow-2xs">
+                              {availableStock} {unitSymbol}
+                            </span>
+                          </div>
+                        )}
 
-                    {/* Unit Cost */}
-                    <FormField
-                      control={form.control}
-                      name={`productLines.${index}.unitCost`}
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel className="text-xs font-semibold text-gray-700">
-                            Estimated unit cost
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              className={cn(
-                                "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
-                                form.formState.errors.productLines?.[index]
-                                  ?.unitCost &&
-                                  "border-red-500 focus:ring-red-500/20",
+                        {/* Quantity */}
+                        <FormField
+                          control={form.control}
+                          name={`productLines.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem className="col-span-1">
+                              <FormLabel className="text-xs font-semibold text-gray-700">
+                                Quantity to Consume
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  className={cn(
+                                    "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                                    form.formState.errors.productLines?.[index]?.quantity &&
+                                      "border-red-500 focus:ring-red-500/20",
+                                    isOverStock && "border-amber-400 focus:ring-amber-400/20"
+                                  )}
+                                  {...field}
+                                />
+                              </FormControl>
+                              {prod && (
+                                <p className={cn("text-[11px]", isOverStock ? "text-amber-600 font-semibold" : "text-gray-500")}>
+                                  {isOverStock
+                                    ? `Exceeds available stock (${availableStock} ${unitSymbol})`
+                                    : `Max available: ${availableStock} ${unitSymbol}`}
+                                </p>
                               )}
-                              {...field}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                field.onChange(val === "" ? undefined : Number(val));
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const prod = form.getValues(`productLines.${index}.productId`);
-                      const qty = form.getValues(`productLines.${index}.quantity`);
-                      if (!prod || !qty || qty <= 0) {
-                        form.trigger(`productLines.${index}`);
-                        return;
-                      }
-                      form.setValue(`productLines.${index}.isEditing`, false);
-                    }}
-                    className="w-full h-11 bg-[#2BA24D] hover:bg-[#238c41] text-white rounded-lg text-sm font-semibold flex items-center justify-center transition-colors mt-2"
-                  >
-                    Done
-                  </button>
-                </div>
-                  )
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Unit Cost */}
+                        <FormField
+                          control={form.control}
+                          name={`productLines.${index}.unitCost`}
+                          render={({ field }) => (
+                            <FormItem className="col-span-1">
+                              <FormLabel className="text-xs font-semibold text-gray-700">
+                                Unit Cost (₦)
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={cn(
+                                    "h-11 bg-white border-gray-200 focus:ring-[#3B7CED]/20",
+                                    form.formState.errors.productLines?.[index]?.unitCost &&
+                                      "border-red-500 focus:ring-red-500/20"
+                                  )}
+                                  {...field}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val === "" ? undefined : Number(val));
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pId = form.getValues(`productLines.${index}.productId`);
+                          const qty = form.getValues(`productLines.${index}.quantity`);
+                          if (!pId || !qty || qty <= 0) {
+                            form.trigger(`productLines.${index}`);
+                            return;
+                          }
+                          form.setValue(`productLines.${index}.isEditing`, false);
+                        }}
+                        className="w-full h-11 bg-[#2BA24D] hover:bg-[#238c41] text-white rounded-lg text-sm font-semibold flex items-center justify-center transition-colors mt-2"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  );
                 })}
 
               <button

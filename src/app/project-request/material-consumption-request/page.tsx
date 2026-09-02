@@ -41,7 +41,16 @@ export default function MaterialConsumptionRequestPage() {
       ? apiData
       : (apiData as any).results ?? [];
 
-    return rawList.map((req: any) => {
+    const sortedList = [...rawList].sort((a: any, b: any) => {
+      const dateA = new Date(a.created_at || a.date_consumed || a.date || 0).getTime();
+      const dateB = new Date(b.created_at || b.date_consumed || b.date || 0).getTime();
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+
+    return sortedList.map((req: any) => {
       const totalCost = (req.lines ?? []).reduce(
         (sum: number, line: any) => sum + (parseFloat(line.total_cost) || 0),
         0,

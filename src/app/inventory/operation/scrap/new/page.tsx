@@ -637,7 +637,8 @@ export default function CreateScrapPage() {
         </main>
 
         {/* Signature Sticky Footer Bar */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
+       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
+  <div className="max-w-[1400px] mx-auto py-4 flex justify-end gap-3">
           <Link href="/inventory/operation/scrap">
             <Button
               variant="outline"
@@ -665,6 +666,7 @@ export default function CreateScrapPage() {
               {isSubmitting ? "Validating..." : "Validate"}
             </Button>
           </PermissionGuard>
+          </div>
         </div>
 
         {/* Status Modal */}
