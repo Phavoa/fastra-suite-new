@@ -72,6 +72,7 @@ import { materialConsumptionRequestApi } from "@/api/requests/materialConsumptio
 import { approvedProjectRequestsApi } from "@/api/invoice/approvedProjectRequestsApi";
 import { vendorBillsApi } from "@/api/invoice/vendorBillsApi";
 import { notificationApi } from "@/api/notificationApi";
+import { accountLedgerApi } from "@/api/invoice/accountLedgerApi";
 
 const authPersistConfig = {
   key: "auth",
@@ -153,6 +154,8 @@ const rootReducer = combineReducers({
 
   [approvedProjectRequestsApi.reducerPath]: approvedProjectRequestsApi.reducer,
   [vendorBillsApi.reducerPath]: vendorBillsApi.reducer,
+
+  [accountLedgerApi.reducerPath]: accountLedgerApi.reducer,
 });
 
 export const store = configureStore({
@@ -225,6 +228,8 @@ export const store = configureStore({
       vendorBillsApi.middleware,
       notificationApi.middleware,
       auditTrailApi.middleware,
+
+      accountLedgerApi.middleware,
     ),
 });
 
