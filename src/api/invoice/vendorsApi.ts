@@ -4,6 +4,20 @@ import type { RootState } from "../../lib/store/store";
 export type VendorType = "supplier" | "contractor" | string;
 export type VendorStatus = "active" | "inactive" | string;
 
+export const VENDOR_TYPE_CHOICES = [
+  { value: "supplier", label: "Supplier" },
+  { value: "subcontractor", label: "Subcontractor" },
+  { value: "labour", label: "Labour" },
+  { value: "service", label: "Service Provider" },
+] as const;
+
+export const VENDOR_TYPE_VALUES = VENDOR_TYPE_CHOICES.map((c) => c.value);
+
+export const isVendorType = (
+  value: unknown,
+): value is (typeof VENDOR_TYPE_CHOICES)[number]["value"] =>
+  VENDOR_TYPE_VALUES.includes(value as (typeof VENDOR_TYPE_CHOICES)[number]["value"]);
+
 export interface VendorBankAccount {
   id: number;
   bank_account_name: string;
@@ -61,9 +75,9 @@ export interface CreateVendorRequest {
   status?: VendorStatus;
 }
 
-export interface UpdateVendorRequest extends CreateVendorRequest {}
+export type UpdateVendorRequest = CreateVendorRequest;
 
-export interface PatchVendorRequest extends Partial<CreateVendorRequest> {}
+export type PatchVendorRequest = Partial<CreateVendorRequest>;
 
 export interface GetVendorsParams {
   ordering?: string;

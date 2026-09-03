@@ -1,17 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useCreateVendorMutation } from "@/api/invoice/vendorsApi";
+import {
+  useCreateVendorMutation,
+  VENDOR_TYPE_CHOICES,
+  isVendorType,
+} from "@/api/invoice/vendorsApi";
 import { useAddVendorBankAccountMutation } from "@/api/invoice/vendorBankAccountsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 const schema = z.object({
   vendorName: z.string().min(1, "Vendor name is required"),
+  vendorType: z.enum(["supplier", "subcontractor", "labour", "service"]),
   contactName: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
@@ -29,6 +34,12 @@ type FormData = z.infer<typeof schema>;
 
 export default function NewVendorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const paramVendorType = searchParams.get("vendor_type");
+  const initialVendorType = isVendorType(paramVendorType)
+    ? paramVendorType
+    : "supplier";
+
   const [createVendor, { isLoading: isCreating }] = useCreateVendorMutation();
   const [addBank, { isLoading: isAddingBank }] = useAddVendorBankAccountMutation();
   const [toast, setToast] = useState<{
@@ -43,6 +54,7 @@ export default function NewVendorPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { vendorType: initialVendorType as any },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -56,7 +68,7 @@ export default function NewVendorPage() {
         email: data.email || "",
         phone_number: data.phone || "",
         address: address,
-        vendor_type: "supplier",
+        vendor_type: data.vendorType,
         status: "active",
       };
 
@@ -139,9 +151,33 @@ export default function NewVendorPage() {
               )}
             </div>
 
-            <div className="flex flex-col items-end justify-end">
+             <div className="flex flex-col items-end justify-end">
               <p className="text-sm text-gray-500">Vendor Code</p>
               <p className="font-medium text-gray-900 mt-1">Generated Automatically</p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Vendor Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                {...register("vendorType")}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {VENDOR_TYPE_CHOICES.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Labour vendors can only be used for Labour Request bills.
+              </p>
+              {errors.vendorType && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.vendorType.message}
+                </p>
+              )}
             </div>
           </div>
         </div>
