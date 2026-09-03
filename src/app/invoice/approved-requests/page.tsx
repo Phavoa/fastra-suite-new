@@ -30,7 +30,7 @@ const getTypeColor = (type: string) => {
 
 const items: BreadcrumbItem[] = [
   { label: "Home", href: "/" },
-  { label: "Invoicing", href: "/invoice" },
+  { label: "Invoicing", href: "/invoice/approved-requests" },
   {
     label: "Approved Requests",
     href: "/invoice/approved-requests",

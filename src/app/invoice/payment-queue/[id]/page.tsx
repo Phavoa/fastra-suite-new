@@ -601,7 +601,7 @@ export default function PaymentQueueDetailPage() {
 
                 {/* Vendor & Source */}
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-blue-500 mb-4 flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-gray-400" />
                     Vendor & Source
                   </h2>
@@ -676,7 +676,7 @@ export default function PaymentQueueDetailPage() {
 
                 {/* Dates & Payment meta */}
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-blue-500 mb-4 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     Dates & Payment Details
                   </h2>
@@ -715,7 +715,7 @@ export default function PaymentQueueDetailPage() {
 
                 {/* Document */}
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-blue-500 mb-3 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-gray-400" />
                     Uploaded Document
                   </h2>
@@ -769,7 +769,7 @@ export default function PaymentQueueDetailPage() {
 
                 {/* Line items */}
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-3">
+                  <h2 className="text-sm font-semibold text-blue-500 mb-3">
                     Cost Items
                   </h2>
                   <div className="border border-gray-200 rounded-xl overflow-hidden">

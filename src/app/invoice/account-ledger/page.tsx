@@ -71,7 +71,7 @@ const SkeletonDetailRow = () => (
 
 // Utility Functions
 const formatCurrency = (value: number | string | null) => {
-  if (value === null || value === undefined || value === 0) return "-";
+  if (value === null || value === undefined) return "-";
   const num = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(num)) return "-";
   return `N${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -112,7 +112,7 @@ const Tooltip = ({
       {children}
       {isVisible && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
-          <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 max-w-xs whitespace-normal shadow-lg">
+          <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 max-w-xs whitespace-normal shadow-lg">
             {content}
             <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900" />
           </div>
@@ -311,7 +311,7 @@ export default function AccountLedgerPage() {
   if (isError) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <div className="bg-red-50 border border-red-200 rounded p-6 text-center">
           <X className="w-12 h-12 text-red-400 mx-auto mb-3" />
           <h2 className="text-lg font-semibold text-red-800">
             Failed to load account ledger
@@ -341,7 +341,7 @@ export default function AccountLedgerPage() {
             <input
               type="text"
               placeholder="Search by code or name..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -349,7 +349,7 @@ export default function AccountLedgerPage() {
 
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 border px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${showFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}
+            className={`flex items-center gap-2 border px-4 py-2.5 rounded text-sm font-medium transition-all ${showFilters ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}
           >
             <Filter className="w-4 h-4" />
             <span className="hidden sm:inline">Filter</span>
@@ -358,7 +358,7 @@ export default function AccountLedgerPage() {
           <div className="relative">
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-2 border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+              className="flex items-center gap-2 border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2.5 rounded text-sm font-medium transition-all"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Export</span>
@@ -369,7 +369,7 @@ export default function AccountLedgerPage() {
                   className="fixed inset-0 z-10"
                   onClick={() => setShowExportMenu(false)}
                 />
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-lg z-20 overflow-hidden">
                   <button
                     onClick={() => {
                       handleExportPDF(
@@ -405,7 +405,7 @@ export default function AccountLedgerPage() {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="bg-white rounded border border-gray-200 p-4 shadow-sm">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="min-w-[160px]">
               <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5">
@@ -413,7 +413,7 @@ export default function AccountLedgerPage() {
               </label>
               <input
                 type="date"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
               />
@@ -424,7 +424,7 @@ export default function AccountLedgerPage() {
               </label>
               <input
                 type="date"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
               />
@@ -434,7 +434,7 @@ export default function AccountLedgerPage() {
                 <Hash className="w-3.5 h-3.5" /> Period
               </label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               >
@@ -449,7 +449,7 @@ export default function AccountLedgerPage() {
                 <option value="last_year">Last Year</option>
               </select>
             </div>
-            <button className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            <button className="bg-blue-600 text-white px-5 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors">
               Apply Filters
             </button>
           </div>
@@ -459,13 +459,13 @@ export default function AccountLedgerPage() {
       {/* Stats Cards */}
       {!isLoading && filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="bg-white rounded border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-500 font-medium">Total Accounts</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
               {filtered.length}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="bg-white rounded border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-500 font-medium">Total Debits</p>
             <p className="text-2xl font-bold text-red-600 mt-1">
               {formatCurrency(
@@ -476,7 +476,7 @@ export default function AccountLedgerPage() {
               )}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="bg-white rounded border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-500 font-medium">Total Credits</p>
             <p className="text-2xl font-bold text-green-600 mt-1">
               {formatCurrency(
@@ -492,7 +492,7 @@ export default function AccountLedgerPage() {
 
       {/* Loading State */}
       {isLoading && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
@@ -525,7 +525,7 @@ export default function AccountLedgerPage() {
 
       {/* Main Table */}
       {!isLoading && filtered.length === 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
+        <div className="bg-white rounded border border-gray-200 shadow-sm p-12 text-center">
           <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-gray-900">
             No accounts found
@@ -537,7 +537,7 @@ export default function AccountLedgerPage() {
       )}
 
       {!isLoading && filtered.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -609,7 +609,7 @@ export default function AccountLedgerPage() {
                                       <Loader2 className="w-4 h-4 animate-spin" />{" "}
                                       Loading transactions...
                                     </div>
-                                    <div className="overflow-hidden rounded-lg border border-gray-200">
+                                    <div className="overflow-hidden rounded border border-gray-200">
                                       <table className="w-full text-sm">
                                         <tbody>
                                           <SkeletonDetailRow />
@@ -634,7 +634,7 @@ export default function AccountLedgerPage() {
                                       </button>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                                      <div className="bg-white rounded-lg border border-gray-200 p-3">
+                                      <div className="bg-white rounded border border-gray-200 p-3">
                                         <p className="text-xs text-gray-500">
                                           Opening Balance
                                         </p>
@@ -644,7 +644,7 @@ export default function AccountLedgerPage() {
                                           )}
                                         </p>
                                       </div>
-                                      <div className="bg-white rounded-lg border border-red-100 p-3">
+                                      <div className="bg-white rounded border border-red-100 p-3">
                                         <p className="text-xs text-gray-500">
                                           Total Debits
                                         </p>
@@ -654,7 +654,7 @@ export default function AccountLedgerPage() {
                                           )}
                                         </p>
                                       </div>
-                                      <div className="bg-white rounded-lg border border-green-100 p-3">
+                                      <div className="bg-white rounded border border-green-100 p-3">
                                         <p className="text-xs text-gray-500">
                                           Total Credits
                                         </p>
@@ -664,7 +664,7 @@ export default function AccountLedgerPage() {
                                           )}
                                         </p>
                                       </div>
-                                      <div className="bg-white rounded-lg border border-blue-100 p-3">
+                                      <div className="bg-white rounded border border-blue-100 p-3">
                                         <p className="text-xs text-gray-500">
                                           Closing Balance
                                         </p>
@@ -684,7 +684,7 @@ export default function AccountLedgerPage() {
                                         No transactions found for this account
                                       </div>
                                     ) : (
-                                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                      <div className="overflow-x-auto rounded border border-gray-200">
                                         <table className="w-full text-sm">
                                           <thead>
                                             <tr className="bg-gray-50 border-b border-gray-200">
