@@ -307,7 +307,7 @@ export default function VendorInfoPage() {
                 }
                 icon={<Building2 className="h-3.5 w-3.5" />}
               />
-              <InfoField
+              {/* <InfoField
                 label="Payment Term"
                 value={
                   (vendor as any).payment_term_details?.name ||
@@ -315,7 +315,7 @@ export default function VendorInfoPage() {
                     ? `Term #${(vendor as any).payment_term}`
                     : "—")
                 }
-              />
+              /> */}
               <InfoField
                 label="Created"
                 value={
