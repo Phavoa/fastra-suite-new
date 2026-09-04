@@ -136,7 +136,11 @@ export default function VendorInfoPage() {
     setToast({ show: true, message, type });
   };
 
-  const bankAccount = vendor?.bank_account as any;
+  const bankAccount =
+    vendor?.bank_account && typeof vendor.bank_account === "object"
+      ? (vendor.bank_account as any)
+      : null;
+
   const isBankConfirmed = Boolean(bankAccount?.confirmed);
   const hasBankDetails = Boolean(
     bankAccount?.bank_account_name ||
@@ -303,7 +307,7 @@ export default function VendorInfoPage() {
                 }
                 icon={<Building2 className="h-3.5 w-3.5" />}
               />
-              <InfoField
+              {/* <InfoField
                 label="Payment Term"
                 value={
                   (vendor as any).payment_term_details?.name ||
@@ -311,7 +315,7 @@ export default function VendorInfoPage() {
                     ? `Term #${(vendor as any).payment_term}`
                     : "—")
                 }
-              />
+              /> */}
               <InfoField
                 label="Created"
                 value={

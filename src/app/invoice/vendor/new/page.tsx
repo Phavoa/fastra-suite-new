@@ -11,7 +11,6 @@ import {
   VENDOR_TYPE_CHOICES,
   isVendorType,
 } from "@/api/invoice/vendorsApi";
-import { useAddVendorBankAccountMutation } from "@/api/invoice/vendorBankAccountsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 const schema = z.object({
@@ -24,6 +23,11 @@ const schema = z.object({
   lga: z.string().optional(),
   state: z.string().optional(),
   country: z.string().optional(),
+  // optional tax fields
+  taxId: z.string().optional(),
+  taxRegistered: z.boolean().optional(),
+  taxNumber: z.string().optional(),
+  // bank (all optional)
   bankAccountName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   bankName: z.string().optional(),
@@ -41,7 +45,6 @@ export default function NewVendorPage() {
     : "supplier";
 
   const [createVendor, { isLoading: isCreating }] = useCreateVendorMutation();
-  const [addBank, { isLoading: isAddingBank }] = useAddVendorBankAccountMutation();
   const [toast, setToast] = useState<{
     show: boolean;
     message: string;
@@ -51,42 +54,58 @@ export default function NewVendorPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { vendorType: initialVendorType as any },
+    defaultValues: {
+      vendorType: initialVendorType as any,
+      taxRegistered: false,
+    },
   });
+
+  const taxRegistered = watch("taxRegistered");
 
   const onSubmit = async (data: FormData) => {
     try {
-      const addressParts = [data.street, data.lga, data.state, data.country].filter(Boolean);
+      const addressParts = [
+        data.street,
+        data.lga,
+        data.state,
+        data.country,
+      ].filter(Boolean);
       const address = addressParts.join(", ");
+
+      const hasBank =
+        data.bankAccountName?.trim() ||
+        data.bankAccountNumber?.trim() ||
+        data.bankName?.trim() ||
+        data.branch?.trim();
 
       const vendorPayload = {
         vendor_name: data.vendorName,
         contact_name: data.contactName || "",
         email: data.email || "",
         phone_number: data.phone || "",
-        address: address,
+        address,
+        tax_id: data.taxId || undefined,
+        tax_registered: data.taxRegistered ?? false,
+        tax_number: data.taxNumber || undefined,
         vendor_type: data.vendorType,
-        status: "active",
+        status: "active" as const,
+        ...(hasBank
+          ? {
+              bank_account: {
+                bank_account_name: data.bankAccountName || "",
+                bank_account_number: data.bankAccountNumber || "",
+                bank_name: data.bankName || "",
+                branch_code: data.branch || "",
+              },
+            }
+          : {}),
       };
 
-      const vendorResponse = await createVendor(vendorPayload).unwrap();
-
-      const hasBankDetails = data.bankAccountName || data.bankAccountNumber || data.bankName || data.branch;
-      if (hasBankDetails) {
-        const vendorId = (vendorResponse as any).id;
-        if (vendorId) {
-          const bankPayload = {
-            bank_account_name: data.bankAccountName || "",
-            bank_account_number: data.bankAccountNumber || "",
-            bank_name: data.bankName || "",
-            branch_code: data.branch || "",
-          };
-          await addBank({ id: vendorId, data: bankPayload }).unwrap();
-        }
-      }
+      await createVendor(vendorPayload).unwrap();
 
       setToast({
         show: true,
@@ -95,17 +114,19 @@ export default function NewVendorPage() {
       });
       setTimeout(() => {
         router.push("/invoice/settings?tab=vendor");
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
       setToast({
         show: true,
-        message: err?.data?.message || err?.message || "Failed to create vendor",
+        message:
+          err?.data?.message ||
+          err?.data?.detail ||
+          err?.message ||
+          "Failed to create vendor",
         type: "error",
       });
     }
   };
-
-  const isSubmitting = isCreating || isAddingBank;
 
   return (
     <div className="p-6 space-y-6">
@@ -128,12 +149,11 @@ export default function NewVendorPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* Basic Information */}
+        {/* Basic Information – unchanged */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-blue-600 mb-6">
             Basic Information
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -150,12 +170,12 @@ export default function NewVendorPage() {
                 </p>
               )}
             </div>
-
-             <div className="flex flex-col items-end justify-end">
+            <div className="flex flex-col items-end justify-end">
               <p className="text-sm text-gray-500">Vendor Code</p>
-              <p className="font-medium text-gray-900 mt-1">Generated Automatically</p>
+              <p className="font-medium text-gray-900 mt-1">
+                Generated Automatically
+              </p>
             </div>
-
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Vendor Type <span className="text-red-500">*</span>
@@ -182,12 +202,11 @@ export default function NewVendorPage() {
           </div>
         </div>
 
-        {/* Contact Information */}
+        {/* Contact Information – unchanged */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-blue-600 mb-6">
             Contact Information
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -222,10 +241,9 @@ export default function NewVendorPage() {
           </div>
         </div>
 
-        {/* Address */}
+        {/* Address – unchanged */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Address</h2>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -270,12 +288,50 @@ export default function NewVendorPage() {
           </div>
         </div>
 
-        {/* Bank Information */}
+        {/* NEW – Tax Information (optional) */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-blue-600 mb-6">
+            Tax Information
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Tax ID
+              </label>
+              <input
+                {...register("taxId")}
+                placeholder="Optional Tax ID"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Tax Number
+              </label>
+              <input
+                {...register("taxNumber")}
+                placeholder="Optional TIN / Tax number"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer pb-2.5">
+                <input
+                  type="checkbox"
+                  {...register("taxRegistered")}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Tax Registered</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Information – unchanged layout, still optional */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-blue-600 mb-6">
             Bank Information
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -309,25 +365,25 @@ export default function NewVendorPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Branch
+                Branch / Sort Code
               </label>
               <input
                 {...register("branch")}
-                placeholder="Enter branch code"
+                placeholder="Optional branch code"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer */}
         <div className="flex justify-end pt-4">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isCreating}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-8 py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
-            {isSubmitting ? "Saving..." : "Save"}
+            {isCreating ? "Saving..." : "Save"}
           </button>
         </div>
       </form>
