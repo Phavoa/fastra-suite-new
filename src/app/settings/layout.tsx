@@ -19,7 +19,8 @@ type SettingsSection =
   | "application"
   | "permissiontemplates"
   | "multilocation"
-  | "audittrail";
+  | "audittrail"
+  | "billing";
 
 export default function SettingsLayout({
   children,
@@ -58,6 +59,11 @@ export default function SettingsLayout({
       label: "Audit Trail",
       href: "/settings/audit-trail",
     },
+    {
+      key: "billing",
+      label: "Billing & Subscriptions",
+      href: "/settings/billing",
+    },
     //{ label: "Application", href: "/settings/application" },
   ];
 
@@ -72,6 +78,8 @@ export default function SettingsLayout({
       return "multilocation";
     if (path.startsWith("/settings/audit-trail"))
       return "audittrail";
+    if (path.startsWith("/settings/billing"))
+      return "billing";
     return "company";
   };
 
@@ -115,6 +123,9 @@ export default function SettingsLayout({
         break;
       case "audittrail":
         basePath += "/audit-trail";
+        break;
+      case "billing":
+        basePath += "/billing";
         break;
     }
     router.push(`${basePath}?search=${encodeURIComponent(query)}`);
@@ -162,6 +173,7 @@ export default function SettingsLayout({
     pathname === "/settings/company/1" ||
     pathname === "/settings/multi-location" ||
     pathname.startsWith("/settings/audit-trail") ||
+    pathname.startsWith("/settings/billing") ||
     /^\/settings\/company\/updatecompany\/?$/.test(pathname);
 
   const sectionToEntitlement: Record<SettingsSection, string> = {
@@ -172,6 +184,7 @@ export default function SettingsLayout({
     accessgroup: "view_permissiontemplate",
     application: "view_company",
     audittrail: "view_company",
+    billing: "view_company",
   };
 
   return (
@@ -185,17 +198,19 @@ export default function SettingsLayout({
         </div>
       </div>
 
-      <SettingsControlBar
-        activeSection={activeSection}
-        onSearch={handleSearch}
-        onNew={handleNew}
-        initialView="grid"
-        onShowArchivedUsers={
-          activeSection === "permissiontemplates"
-            ? handleShowArchived
-            : undefined
-        }
-       />
+      {!hideControlBar && (
+        <SettingsControlBar
+          activeSection={activeSection}
+          onSearch={handleSearch}
+          onNew={handleNew}
+          initialView="grid"
+          onShowArchivedUsers={
+            activeSection === "permissiontemplates"
+              ? handleShowArchived
+              : undefined
+          }
+        />
+      )}
 
       {/* Page content */}
       <main>{children}</main>
