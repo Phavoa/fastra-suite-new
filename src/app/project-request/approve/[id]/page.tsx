@@ -126,12 +126,6 @@ export default function RequestDetailsPage() {
     detail?.project_details?.name || 
     getProjectName(request?.project || detail?.project);
 
-  const projectCode = 
-    (request?.project_details as any)?.project_code || 
-    (request?.project_details as any)?.code || 
-    detail?.project_details?.project_code || 
-    detail?.project_details?.code;
-
   const requestedBy = 
     request?.created_by_details
       ? `${request.created_by_details.first_name || ""} ${request.created_by_details.last_name || ""}`.trim() || request.created_by_details.email
@@ -147,8 +141,6 @@ export default function RequestDetailsPage() {
     (typeof detail?.phase === "string" && !detail.phase.includes("-") ? detail.phase : null) || 
     "N/A";
 
-  const phaseCode = detail?.phase_details?.code || detail?.phase_code;
-
   const activityName = 
     detail?.activity_details?.name || 
     (typeof detail?.activity === "object" ? detail?.activity?.name : null) || 
@@ -156,9 +148,6 @@ export default function RequestDetailsPage() {
     detail?.task || 
     (typeof detail?.activity === "string" && !detail.activity.includes("-") ? detail.activity : null) || 
     "N/A";
-
-  const activitySn = detail?.activity_details?.serial_number;
-  const costCategory = (request as any)?.cost_category_code || detail?.cost_category_code || detail?.cost_category;
   
   const availableBudget = Number(
     detail?.available_budget !== undefined 
@@ -322,12 +311,7 @@ export default function RequestDetailsPage() {
               
               <DataField 
                 label="Project" 
-                value={
-                  <div className="flex items-center gap-1.5">
-                    <span>{projectName}</span>
-                    {projectCode && <span className="text-xs text-gray-400 font-mono">({projectCode})</span>}
-                  </div>
-                } 
+                value={projectName} 
               />
               <DataField label="Status" value={getStatusBadge(request.status || detail.status)} />
               
@@ -394,25 +378,12 @@ export default function RequestDetailsPage() {
             <div className="grid grid-cols-2 gap-y-5 gap-x-4">
               <DataField 
                 label="Phase" 
-                value={
-                  <div className="flex items-center gap-1.5">
-                    <span>{phaseName}</span>
-                    {phaseCode && <span className="text-xs text-gray-400 font-mono">({phaseCode})</span>}
-                  </div>
-                } 
+                value={phaseName} 
               />
               <DataField 
-                label="Activity / Task" 
-                value={
-                  <div className="flex items-center gap-1.5">
-                    <span>{activityName}</span>
-                    {activitySn !== undefined && activitySn !== null && (
-                      <span className="text-xs text-gray-400 font-mono">(S/N {activitySn})</span>
-                    )}
-                  </div>
-                } 
+                label="Activity" 
+                value={activityName} 
               />
-              {costCategory && <DataField label="Cost Category Code" value={costCategory} />}
               {availableBudget > 0 && (
                 <DataField label="Activity Available Budget" value={formatCurrency(availableBudget)} />
               )}
@@ -436,11 +407,6 @@ export default function RequestDetailsPage() {
                               <span className="text-[14px] font-semibold text-gray-900">
                                 {prod.product_name || line.product_name || `Product #${line.product}`}
                               </span>
-                              {prod.product_code && (
-                                <span className="text-xs text-gray-400 font-mono ml-2">
-                                  ({prod.product_code})
-                                </span>
-                              )}
                             </div>
                             <span className="text-[14px] font-bold text-gray-900">
                               {formatCurrency(lineTotal)}

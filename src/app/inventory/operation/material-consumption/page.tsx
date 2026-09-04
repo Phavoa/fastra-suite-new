@@ -196,8 +196,8 @@ export default function MaterialConsumptionPage() {
             }
           />
 
-          {/* White section 1: top bar + search + status tabs */}
-          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+          {/* White section 1: top bar + status pills */}
+          <div data-wizard="inventory-consumption-table" className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
             {/* Top Bar: title + search + actions */}
             <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
               <div className="flex items-center gap-4">

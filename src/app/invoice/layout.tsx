@@ -48,7 +48,7 @@ export default function InvoiceLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <NavBar title="Invoices" items={navItems} />
+      <NavBar title="Invoices" items={navItems} wizardModuleId="invoice" />
       <main className="flex-1">
         <SettingsEnforcer>
           {children}

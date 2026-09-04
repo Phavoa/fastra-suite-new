@@ -21,6 +21,7 @@ import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ModuleWizard, WizardGuideButton } from "@/components/shared/wizard/ModuleWizard";
 
 const STATUS_TABS = [
   { label: "All", value: "all" },
@@ -196,8 +197,10 @@ export default function ProjectCostingListPage() {
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
+            <WizardGuideButton moduleId="project-costing" />
+
             <PermissionGuard module="project_costing" entitlement="create_project">
-              <Link href="/project-costing/new">
+              <Link href="/project-costing/new" data-wizard="pc-new-project">
                 <Button className="bg-[#3B7CED] hover:bg-[#3065c3] text-white h-9 px-4 rounded-md font-medium text-sm shadow-2xs transition-all">
                   New Project
                 </Button>
@@ -233,7 +236,7 @@ export default function ProjectCostingListPage() {
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 flex items-center gap-2 flex-wrap mb-6">
+        <div data-wizard="pc-status-tabs" className="bg-white p-4 flex items-center gap-2 flex-wrap mb-6">
           {STATUS_TABS.map((tab) => {
             const isSelected = selectedStatus === tab.value;
             return (
@@ -269,7 +272,7 @@ export default function ProjectCostingListPage() {
           {viewMode === "list" ? (
             <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
-                <Table>
+                <Table data-wizard="pc-table-row">
                   <TableHeader>
                     <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
                       <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
@@ -494,6 +497,7 @@ export default function ProjectCostingListPage() {
           )}
         </motion.div>
       </AnimatePresence>
+      <ModuleWizard moduleId="project-costing" />
     </div>
     </PageGuard>
   );

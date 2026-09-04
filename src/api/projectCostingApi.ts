@@ -118,6 +118,15 @@ export const projectCostingApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["ProjectCosting"],
+    }),
+    createPendingProjectCostingProject: builder.mutation<ProjectCostingProject, CreateProjectCostingProjectRequest>({
+      query: (body) => ({
+        url: "/project-costing/projects/create-pending/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["ProjectCosting"],
     }),
     updateProjectCostingProject: builder.mutation<ProjectCostingProject, { id: number; body: UpdateProjectCostingProjectRequest }>({
       query: ({ id, body }) => ({
@@ -312,6 +321,7 @@ export const {
   useGetProjectCostingProjectsQuery,
   useGetProjectCostingProjectQuery,
   useCreateProjectCostingProjectMutation,
+  useCreatePendingProjectCostingProjectMutation,
   useUpdateProjectCostingProjectMutation,
   usePatchProjectCostingProjectMutation,
   useDeleteProjectCostingProjectMutation,

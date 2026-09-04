@@ -17,6 +17,7 @@ import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { extractErrorMessage } from "@/lib/utils";
+import { ModuleWizard, WizardGuideButton } from "@/components/shared/wizard/ModuleWizard";
 
 export default function ApproveRequestPage() {
   const router = useRouter();
@@ -154,6 +155,7 @@ export default function ApproveRequestPage() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+            <WizardGuideButton moduleId="project-request" />
             <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Bell size={24} className="text-gray-900" />
             </button>
@@ -240,7 +242,7 @@ export default function ApproveRequestPage() {
                   </div>
 
                   <PermissionGuard module="project_request" entitlement="approve">
-                    <div className="flex gap-3 pt-2">
+                    <div data-wizard="pr-approve-action" className="flex gap-3 pt-2">
                       <Button
                         variant="outline"
                         className="flex-1 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600 h-10 font-semibold"
@@ -304,6 +306,7 @@ export default function ApproveRequestPage() {
         message={statusModal.message}
         actionText="Done"
       />
+      <ModuleWizard moduleId="project-request" />
     </motion.div>
   );
 }

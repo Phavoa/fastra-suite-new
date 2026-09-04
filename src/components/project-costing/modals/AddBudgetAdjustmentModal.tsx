@@ -76,24 +76,10 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
 
   const allowBudgetDecrease = projectSettings?.allow_budget_decrease ?? project?.allow_budget_decrease ?? true;
 
-  let budgetNum = 0;
-  if (project?.financials) {
-    try {
-      const fin = typeof project.financials === 'string' ? JSON.parse(project.financials) : project.financials;
-      budgetNum = Number(fin?.budget || 0);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-  
-  // Current approved budget from backend
-  const currentBudgetNum = budgetNum;
-  const totalStagedAdjustment = adjustmentLines.reduce((acc, line) => acc + (line.direction === "DECREASE" ? -line.amount : line.amount), 0);
-  const proposedTotalBudget = budgetNum + totalStagedAdjustment;
-  
   // Parse phases and structure activities by Phase
   const phasesList: { id: string; name: string; activities: any[] }[] = [];
   const allActivities: any[] = [];
+  let phasesTotalSum = 0;
 
   if (project?.phases) {
     try {
@@ -116,6 +102,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                   ? act.budget
                   : Number(act.quantity || 1) * Number(act.rate || 0)
               );
+              phasesTotalSum += actAmt;
               const actObj = {
                 activity_id: String(act.id || act.uuid || `${phaseObj.id}-act-${aIndex}`),
                 activity_name: act.name || `Activity ${aIndex + 1}`,
@@ -141,6 +128,24 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
     }
   }
 
+  let rawBudgetNum = 0;
+  let originalBudgetNum = 0;
+  if (project?.financials) {
+    try {
+      const fin = typeof project.financials === 'string' ? JSON.parse(project.financials) : project.financials;
+      rawBudgetNum = Number(fin?.budget || 0);
+      originalBudgetNum = Number(fin?.original_budget || fin?.budget || 0);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  const budgetNum = rawBudgetNum > 0 ? rawBudgetNum : (phasesTotalSum > 0 ? phasesTotalSum : Number(project?.budget || project?.total_budget || 0));
+  const origBudgetNum = originalBudgetNum > 0 ? originalBudgetNum : (phasesTotalSum > 0 ? phasesTotalSum : Number(project?.budget || project?.total_budget || 0));
+  const currentBudgetNum = budgetNum;
+  const totalStagedAdjustment = adjustmentLines.reduce((acc, line) => acc + (line.direction === "DECREASE" ? -line.amount : line.amount), 0);
+  const proposedTotalBudget = budgetNum + totalStagedAdjustment;
+
   const selectedActivityObj = allActivities.find(
     (a) => String(a.activity_id) === String(selectedActivity)
   );
@@ -159,63 +164,69 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
     }
   };
 
-  const handleAddLine = () => {
-    if (activeTab === "existing" && !selectedActivity) {
-      alert("Please select an activity");
-      return;
-    }
-    
-    if (activeTab === "new" && !selectedPhaseForNew) {
-      alert("Please select a target phase");
-      return;
-    }
-
-    if (activeTab === "new" && !newActivityName.trim()) {
-      alert("Please enter a new activity name");
-      return;
-    }
-
-    if (direction === "DECREASE" && !allowBudgetDecrease) {
-      alert("Budget decrease is not enabled in project settings. Please enable 'Allow Budget Decrease' in project settings.");
-      return;
-    }
-
+  const addLine = () => {
+    const qNum = Number(quantity) || 1;
+    const rNum = Number(rate) || 0;
     let amtNum = Number(amountInput);
-    let qNum = Number(quantity);
-    let rNum = Number(rate);
-
-    if (amountInput && !isNaN(amtNum) && amtNum > 0) {
-      qNum = 1;
-      rNum = amtNum;
-    } else if (isNaN(qNum) || isNaN(rNum) || qNum <= 0 || rNum <= 0) {
-      alert("Please enter a valid adjustment amount or quantity and rate");
-      return;
-    } else {
+    if (!amtNum || isNaN(amtNum)) {
       amtNum = qNum * rNum;
     }
 
-    let actName = newActivityName.trim();
-    let phaseObj = phasesList.find((p) => String(p.id) === String(selectedPhaseForNew) || p.name === selectedPhaseForNew);
-    let phaseId = phaseObj?.id || selectedPhaseForNew || phasesList[0]?.id;
-    let phaseName = phaseObj?.name || phasesList[0]?.name || "General Phase";
-    let currentAmount: number | undefined = undefined;
+    if (amtNum <= 0) {
+      statusModal.showError("Validation Error", "Amount or Quantity * Rate must be greater than 0.");
+      return;
+    }
+
+    let actName = "";
+    let actId = undefined;
+    let phName = "";
+    let phId = undefined;
+    let currAmt = undefined;
 
     if (activeTab === "existing") {
-      actName = selectedActivityObj ? selectedActivityObj.activity_name : "Unknown Activity";
-      phaseId = selectedActivityObj ? selectedActivityObj.phase_id : undefined;
-      phaseName = selectedActivityObj ? selectedActivityObj.phase_name : "General Phase";
-      currentAmount = selectedActivityObj ? selectedActivityObj.amount : 0;
+      if (!selectedActivity) {
+        statusModal.showError("Validation Error", "Please select an activity to adjust.");
+        return;
+      }
+      if (!selectedActivityObj) return;
+
+      actName = selectedActivityObj.activity_name;
+      actId = selectedActivityObj.activity_id;
+      phName = selectedActivityObj.phase_name;
+      phId = selectedActivityObj.phase_id;
+      currAmt = selectedActivityObj.amount;
+
+      if (direction === "DECREASE" && amtNum > (currAmt || 0)) {
+        statusModal.showError(
+          "Invalid Decrease Amount",
+          `Decrease amount (₦${amtNum.toLocaleString()}) cannot exceed current activity budget (₦${(currAmt || 0).toLocaleString()}).`
+        );
+        return;
+      }
+    } else {
+      if (!newActivityName.trim()) {
+        statusModal.showError("Validation Error", "Please enter a name for the new activity.");
+        return;
+      }
+      const targetPhase = phasesList.find((p) => p.id === selectedPhaseForNew) || phasesList[0];
+      if (!targetPhase) {
+        statusModal.showError("Validation Error", "No phase available to attach activity to.");
+        return;
+      }
+      actName = newActivityName.trim();
+      phName = targetPhase.name;
+      phId = targetPhase.id;
     }
 
     const newLine: AdjustmentLine = {
       id: Math.random().toString(36).substr(2, 9),
-      adjustment_type: activeTab === "new" ? "NEW" : "EXISTING",
-      activityId: activeTab === "existing" ? selectedActivity : undefined,
+      adjustment_type: activeTab === "existing" ? "EXISTING" : "NEW",
+      activityId: actId,
       activityName: actName,
-      phaseId: activeTab === "new" ? phaseId : undefined,
-      phaseName,
+      phaseId: phId,
+      phaseName: phName,
       direction,
-      currentAmount,
+      currentAmount: currAmt,
       quantity: qNum,
       rate: rNum,
       amount: amtNum,
@@ -324,13 +335,13 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
               <div>
                 <p className="text-xs text-gray-400 font-medium mb-1">Original Approved Budget</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-xl font-bold text-gray-900">{budgetNum > 0 ? `₦${budgetNum.toLocaleString()}` : "N/A"}</p>
+                  <p className="text-xl font-bold text-gray-900">₦{origBudgetNum.toLocaleString()}</p>
                   <Badge variant="outline" className="text-gray-400 border-gray-300 font-normal text-[10px] py-0 px-1.5">Locked</Badge>
                 </div>
               </div>
               <div>
                 <p className="text-xs text-gray-400 font-medium mb-1">Current Approved Budget</p>
-                <p className="text-xl font-bold text-gray-900">{currentBudgetNum > 0 ? `₦${currentBudgetNum.toLocaleString()}` : "N/A"}</p>
+                <p className="text-xl font-bold text-gray-900">₦{currentBudgetNum.toLocaleString()}</p>
               </div>
               {adjustmentLines.length > 0 && (
                 <div>
@@ -555,7 +566,7 @@ export function AddBudgetAdjustmentModal({ isOpen, onClose, project }: Props) {
                 />
               </div>
 
-              <Button type="button" onClick={handleAddLine} className="w-full mt-2 bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center justify-center gap-2 font-medium">
+              <Button type="button" onClick={addLine} className="w-full mt-2 bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center justify-center gap-2 font-medium">
                 <Plus className="h-4 w-4" /> Add Adjustment Line
               </Button>
             </div>

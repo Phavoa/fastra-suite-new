@@ -334,7 +334,7 @@ export default function PaymentQueuePage() {
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table data-wizard="inv-payment-table" className="w-full min-w-[900px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-5 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

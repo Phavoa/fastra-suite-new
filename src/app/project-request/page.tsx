@@ -27,11 +27,11 @@ export default function ApproverDashboardPage() {
       transition={{ duration: 0.25, ease: "easeOut" }}
       className="min-h-screen bg-[#F9FAFB]"
     >
-      <NavBar title="Approver Dashboard" items={[]} backUrl="/" />
+      <NavBar title="Project Request Dashboard" items={[]} backUrl="/" wizardModuleId="project-request" />
       
       <main className="max-w-2xl mx-auto p-4 pt-6">
         <div className="space-y-4">
-            <Link href="/project-request/make-request" className="block">
+            <Link href="/project-request/make-request" className="block" data-wizard="pr-make-request-card">
               <div className="bg-white border border-green-200 rounded-lg p-5 hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-4">
                   <FileText className="w-6 h-6 text-green-600 mt-0.5 shrink-0" />
@@ -43,7 +43,7 @@ export default function ApproverDashboardPage() {
               </div>
             </Link>
 
-            <Link href="/project-request/approve" className="block">
+            <Link href="/project-request/approve" className="block" data-wizard="pr-approve-card">
               <div className="bg-white border border-blue-200 rounded-lg p-5 hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-4">
                   <FileCheck className="w-6 h-6 text-[#3B7CED] mt-0.5 shrink-0" />

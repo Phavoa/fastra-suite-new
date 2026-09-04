@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,8 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
-import { Loader2 } from "lucide-react";
+import { useGetActiveLocationsQuery } from "@/api/inventory/locationApi";
+import { CreateLocationModal } from "./modals/CreateLocationModal";
+import { Loader2, Plus, MapPin } from "lucide-react";
 
 interface BasicInformationFormProps {
   name: string;
@@ -44,7 +45,45 @@ export function BasicInformationForm({
   siteLocation,
   setSiteLocation,
 }: BasicInformationFormProps) {
-  const { data: activeLocations, isLoading: isLoadingLocations } = useGetActiveLocationsFilteredQuery();
+  const {
+    data: activeLocations,
+    isLoading: isLoadingLocations,
+    refetch: refetchLocations,
+  } = useGetActiveLocationsQuery();
+
+  const [isCreateLocationOpen, setIsCreateLocationOpen] = useState(false);
+
+  const internalLocations = React.useMemo(() => {
+    if (!activeLocations || !Array.isArray(activeLocations)) return [];
+    return activeLocations.filter((loc: any) => {
+      // Exclude hidden or inactive locations
+      if (loc.is_hidden || loc.is_active === false) return false;
+
+      // Only allow internal locations (exclude partner, customer, supplier/vendor locations)
+      const locType = (loc.location_type || "").toLowerCase().trim();
+      if (locType && locType !== "internal") {
+        return false;
+      }
+
+      // Safeguard against customer, supplier, vendor, partner locations by name
+      const name = (loc.location_name || loc.name || "").toLowerCase();
+      if (
+        name.includes("customer") ||
+        name.includes("supplier") ||
+        name.includes("vendor") ||
+        name.includes("partner")
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [activeLocations]);
+
+  const handleLocationCreated = async (newLocationId: string) => {
+    await refetchLocations();
+    setSiteLocation(newLocationId);
+  };
 
   return (
     <section>
@@ -107,7 +146,18 @@ export function BasicInformationForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label className="text-gray-700 font-medium">Site Location</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-gray-700 font-medium">Site Location</Label>
+            <button
+              type="button"
+              onClick={() => setIsCreateLocationOpen(true)}
+              className="text-xs text-[#3B7CED] hover:underline flex items-center gap-0.5 font-medium cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Location</span>
+            </button>
+          </div>
+
           <Select value={siteLocation} onValueChange={setSiteLocation}>
             <SelectTrigger className="bg-white border-gray-300 rounded text-gray-700 h-10">
               {isLoadingLocations ? (
@@ -116,15 +166,21 @@ export function BasicInformationForm({
                   <span className="text-gray-400">Loading...</span>
                 </div>
               ) : (
-                <SelectValue placeholder="Select Site Location" />
+                <SelectValue placeholder={internalLocations.length === 0 ? "No locations (Click 'Add Location' to create)" : "Select Site Location"} />
               )}
             </SelectTrigger>
             <SelectContent>
-              {activeLocations?.map((loc: any) => (
-                <SelectItem key={loc.id} value={loc.id}>
-                  {loc.location_name || loc.name || loc.id}
-                </SelectItem>
-              ))}
+              {internalLocations.length === 0 ? (
+                <div className="p-3 text-center text-xs text-gray-500">
+                  No internal locations found.
+                </div>
+              ) : (
+                internalLocations.map((loc: any) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {loc.location_name || loc.name || loc.id}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -139,6 +195,12 @@ export function BasicInformationForm({
           />
         </div>
       </div>
+
+      <CreateLocationModal
+        isOpen={isCreateLocationOpen}
+        onClose={() => setIsCreateLocationOpen(false)}
+        onSuccess={handleLocationCreated}
+      />
     </section>
   );
 }
