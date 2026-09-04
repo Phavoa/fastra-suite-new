@@ -18,7 +18,8 @@ type SettingsControlBarProps = {
     | "application"
     | "permissiontemplates"
     | "multilocation"
-    | "audittrail";
+    | "audittrail"
+    | "billing";
   onSearch?: (query: string) => void;
   onNew?: () => void;
   onShowArchivedUsers?: () => void; // NEW HANDLER
@@ -71,7 +72,8 @@ export const SettingsControlBar = ({
     | "application"
     | "permissiontemplates"
     | "multilocation"
-    | "audittrail",
+    | "audittrail"
+    | "billing",
     string
   > = {
     company: "change_company",
@@ -81,6 +83,7 @@ export const SettingsControlBar = ({
     accessgroup: "add_permissiontemplate",
     application: "change_company",
     audittrail: "view_company",
+    billing: "view_company",
   };
 
   return (
