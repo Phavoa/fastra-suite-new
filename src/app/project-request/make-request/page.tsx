@@ -71,10 +71,10 @@ export default function MakeRequestPage() {
       transition={{ duration: 0.25, ease: "easeOut" }}
       className="min-h-screen bg-[#F9FAFB]"
     >
-      <NavBar title="Make Request" items={[]} backUrl="/project-request" />
+      <NavBar title="Make Request" items={[]} backUrl="/project-request" wizardModuleId="project-request" />
       
       <main className="max-w-2xl mx-auto p-4 pt-6 pb-24">
-        <div className="space-y-4">
+        <div data-wizard="pr-request-types-grid" className="space-y-4">
           {requestTypes.map((req, index) => {
             const Icon = req.icon;
             return (

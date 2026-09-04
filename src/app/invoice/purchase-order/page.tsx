@@ -378,7 +378,7 @@ export default function PurchaseOrderPage() {
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px]">
+          <table data-wizard="inv-po-table" className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/80">
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">

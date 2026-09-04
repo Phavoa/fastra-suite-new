@@ -37,6 +37,7 @@ import { RootState } from "@/lib/store/store";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ModuleWizard, WizardGuideButton } from "@/components/shared/wizard/ModuleWizard";
 
 interface ItemState {
   id: string;
@@ -655,6 +656,7 @@ export default function NewPurchaseRequestPage() {
               Purchase Request
             </h1>
           </div>
+          <WizardGuideButton moduleId="project-request" />
         </div>
       </header>
 
@@ -703,7 +705,7 @@ export default function NewPurchaseRequestPage() {
         </div>
 
         {/* Purchase Details Section */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
+        <div data-wizard="pr-project-wbs-select" className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
           <h2 className="text-sm font-bold text-[#3B7CED] uppercase tracking-wider flex items-center gap-2">
             Purchase Details
           </h2>
@@ -997,6 +999,7 @@ export default function NewPurchaseRequestPage() {
       <div className="fixed bottom-0 left-16 right-0 bg-white border-t border-gray-100 p-4 z-20">
         <div className="max-w-2xl mx-auto">
           <Button
+            data-wizard="pr-items-submit"
             onClick={handleSubmit}
             className="w-full h-12 text-sm font-bold flex items-center justify-center bg-[#3B7CED] hover:bg-[#2d63c7] text-white rounded-lg shadow-sm"
           >
@@ -1016,6 +1019,7 @@ export default function NewPurchaseRequestPage() {
         onAction={handleModalClose}
         showCloseButton={false}
       />
+      <ModuleWizard moduleId="project-request" />
       </motion.div>
     </PageGuard>
   );

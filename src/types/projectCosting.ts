@@ -31,6 +31,8 @@ export interface ProjectCostingProject {
   description: string;
   phases?: Phase[] | any;
   financials?: any;
+  allow_budget_decrease?: boolean;
+  [key: string]: any;
 }
 
 export interface CreateProjectCostingProjectRequest {

@@ -12,6 +12,7 @@ import { AddDocumentModal } from "@/components/project-costing/modals/AddDocumen
 import { ProjectCostingExportTemplate } from "@/components/project-costing/export/ProjectCostingExportTemplate";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { PageGuard } from "@/components/auth/PageGuard";
+import { ModuleWizard, WizardGuideButton } from "@/components/shared/wizard/ModuleWizard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,9 +47,14 @@ import {
   useGetBudgetAdjustmentsQuery,
   useApproveBudgetAdjustmentMutation,
   useGetProjectTransactionsQuery,
-  useAddProjectDocumentMutation
+  useAddProjectDocumentMutation,
+  useGetProjectSettingsQuery,
+  useUpdateProjectSettingsMutation
 } from "@/api/projectCostingApi";
+import { Switch } from "@/components/ui/switch";
 import {
+  AreaChart,
+  Area,
   LineChart,
   Line,
   XAxis,
@@ -85,6 +91,17 @@ export default function ProjectDashboardPage() {
   const [activeTab, setActiveTab] = useState("phases");
   const [isAdjExpanded, setIsAdjExpanded] = useState(true);
 
+  // Sync tab with wizard when a guided step requires a specific tab
+  React.useEffect(() => {
+    const handleWizardTab = (e: any) => {
+      if (e?.detail?.tab) {
+        setActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener("wizard:tab-change", handleWizardTab);
+    return () => window.removeEventListener("wizard:tab-change", handleWizardTab);
+  }, []);
+
   // Filter States
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -104,6 +121,12 @@ export default function ProjectDashboardPage() {
     Number(id),
     { skip: !id }
   );
+
+  const { data: projectSettings, isLoading: isLoadingSettings, refetch: refetchSettings } = useGetProjectSettingsQuery(
+    Number(id),
+    { skip: !id }
+  );
+  const [updateProjectSettings, { isLoading: isUpdatingSettings }] = useUpdateProjectSettingsMutation();
 
   const statusModal = useStatusModal();
 
@@ -475,12 +498,12 @@ export default function ProjectDashboardPage() {
     } catch (e) {
       console.error("Failed to parse financials", e);
     }
-  } else {
-    if (parsedPhases.length > 0) {
-      budgetNum = parsedPhases.reduce((acc, phase) => {
-        return acc + (phase.activities || []).reduce((sum: number, act: any) => sum + Number(act.amount || 0), 0);
-      }, 0);
-    }
+  }
+
+  if (budgetNum === 0 && parsedPhases.length > 0) {
+    budgetNum = parsedPhases.reduce((acc, phase) => {
+      return acc + (phase.activities || []).reduce((sum: number, act: any) => sum + Number(act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || act.budget || 0), 0);
+    }, 0);
   }
 
   remaining = budgetNum - actualSpend - committed;
@@ -492,47 +515,104 @@ export default function ProjectDashboardPage() {
   const availablePercent = budgetNum > 0 ? remaining / budgetNum : 1;
 
   let dynamicLineChartData: any[] = [];
-  if (project?.start_date && project?.expected_end_date && budgetNum > 0) {
-    const start = new Date(project.start_date);
-    const end = new Date(project.expected_end_date);
+  if (budgetNum > 0) {
+    const start = project?.start_date ? new Date(project.start_date) : null;
+    const end = project?.expected_end_date ? new Date(project.expected_end_date) : null;
     
-    if (start >= end) {
-      dynamicLineChartData = [
-        { name: start.toLocaleString('default', { month: 'short' }), planned: budgetNum, actual: actualSpend }
-      ];
-    } else {
-      const monthDiff = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1;
-      const plannedIncrement = budgetNum / monthDiff;
+    const monthDiff = (start && end && start < end)
+      ? (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1
+      : 1;
+
+    // Helper: Sigmoid S-Curve distribution factor (0 to 1) for natural project ramp-up & plateau
+    const getSigmoidWeight = (t: number) => {
+      const k = 6;
+      const raw = (x: number) => 1 / (1 + Math.exp(-k * (x - 0.5)));
+      const minVal = raw(0);
+      const maxVal = raw(1);
+      return Math.max(0, Math.min(1, (raw(t) - minVal) / (maxVal - minVal)));
+    };
+
+    if (monthDiff > 2 && start && end) {
+      // Multi-month timeline: Generate standard project S-Curve
       const now = new Date();
       const currentMonthIndex = Math.max(0, Math.min(monthDiff, (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth() + 1));
-      const actualIncrement = currentMonthIndex > 0 ? actualSpend / currentMonthIndex : 0;
       
-      let currentPlanned = 0;
-      let currentActual = 0;
-      
+      dynamicLineChartData.push({
+        name: "Start",
+        fullName: "Project Start",
+        planned: 0,
+        actual: 0,
+      });
+
       for (let i = 0; i < monthDiff; i++) {
         const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-        currentPlanned += plannedIncrement;
-        
+        const t = (i + 1) / monthDiff;
+        const sWeight = getSigmoidWeight(t);
+        const plannedValue = Math.round(budgetNum * sWeight);
+
+        let actualValue: number | null = null;
         if (i < currentMonthIndex) {
-          currentActual += actualIncrement;
+          if (transactions && transactions.length > 0) {
+            const endOfMonth = new Date(start.getFullYear(), start.getMonth() + i + 1, 0, 23, 59, 59);
+            const txUpToMonth = transactions.filter((tx: any) => {
+              const txDate = new Date(tx.created_at || tx.date || tx.transaction_date);
+              return !isNaN(txDate.getTime()) && txDate <= endOfMonth;
+            });
+            actualValue = txUpToMonth.reduce((acc: number, tx: any) => acc + Number(tx.amount || 0), 0);
+          } else {
+            const actT = (i + 1) / Math.max(1, currentMonthIndex);
+            actualValue = Math.round(actualSpend * getSigmoidWeight(actT));
+          }
         }
-        
+
         dynamicLineChartData.push({
           name: d.toLocaleString('default', { month: 'short' }),
-          planned: Math.round(currentPlanned),
-          actual: i < currentMonthIndex ? Math.round(currentActual) : null,
+          fullName: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          planned: plannedValue,
+          actual: actualValue,
         });
       }
-    }
-  }
+    } else if (parsedPhases && parsedPhases.length > 0) {
+      // Phase-Milestone based curve (ideal for same-day, short duration, or phase-governed project costing)
+      dynamicLineChartData.push({
+        name: "Start",
+        fullName: "Project Mobilization",
+        planned: 0,
+        actual: 0,
+      });
 
-  if (dynamicLineChartData.length === 1) {
-    dynamicLineChartData.unshift({
-      name: "Start",
-      planned: 0,
-      actual: 0
-    });
+      let cumulativePhaseBudget = 0;
+      parsedPhases.forEach((phase: any, pIndex: number) => {
+        const phaseBudget = (phase.activities || []).reduce(
+          (sum: number, act: any) => sum + Number(act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || act.budget || 0),
+          0
+        );
+        cumulativePhaseBudget += phaseBudget;
+
+        let phaseActual: number | null = null;
+        if (actualSpend > 0) {
+          const ratio = Math.min(1, (pIndex + 1) / parsedPhases.length);
+          phaseActual = Math.round(actualSpend * ratio);
+        } else {
+          phaseActual = 0;
+        }
+
+        const rawName = phase.name || `Phase ${pIndex + 1}`;
+        const shortName = rawName.length > 15 ? `${rawName.slice(0, 13)}...` : rawName;
+
+        dynamicLineChartData.push({
+          name: shortName,
+          fullName: rawName,
+          planned: Math.round(cumulativePhaseBudget),
+          actual: phaseActual,
+        });
+      });
+    } else {
+      dynamicLineChartData = [
+        { name: "Start", fullName: "Project Start", planned: 0, actual: 0 },
+        { name: "Target", fullName: "Project Completion", planned: budgetNum, actual: actualSpend },
+      ];
+    }
   }
 
   const renderPhaseRows = (phases: any[]): React.ReactNode => {
@@ -644,7 +724,7 @@ export default function ProjectDashboardPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div data-wizard="pc-header-actions" className="flex items-center gap-3">
             <PermissionGuard module="project_costing" entitlement="export_reports">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -674,6 +754,8 @@ export default function ProjectDashboardPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </PermissionGuard>
+
+            <WizardGuideButton moduleId="project-costing" />
 
             {(!project.status || project.status === "DRAFT") && (
               <PermissionGuard module="project_costing" entitlement="submit_project">
@@ -744,7 +826,12 @@ export default function ProjectDashboardPage() {
           </div>
           <div>
             <PermissionGuard module="project_costing" entitlement="submit_budget_adjustment">
-              <Button onClick={() => setIsBudgetAdjustmentModalOpen(true)} variant="outline" className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 hover:text-[#3B7CED] h-9 font-medium px-6">
+              <Button
+                data-wizard="pc-create-adjustment-btn"
+                onClick={() => setIsBudgetAdjustmentModalOpen(true)}
+                variant="outline"
+                className="border-[#3B7CED] text-[#3B7CED] hover:bg-blue-50 hover:text-[#3B7CED] h-9 font-medium px-6"
+              >
                 Create Budget Adjustment
               </Button>
             </PermissionGuard>
@@ -752,13 +839,13 @@ export default function ProjectDashboardPage() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div data-wizard="pc-charts-section" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Left Column (2/3 width) */}
           <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
             
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 bg-white rounded shadow-sm border border-gray-100">
+            <div data-wizard="pc-kpis-chart" className="grid grid-cols-2 md:grid-cols-5 bg-white rounded shadow-sm border border-gray-100">
               <div className="p-4 border-r border-gray-100">
                 <div className="text-xs text-gray-500 font-medium mb-1">Budget</div>
                 <div className="text-lg font-semibold text-gray-800">₦{budgetNum.toLocaleString()}</div>
@@ -781,31 +868,121 @@ export default function ProjectDashboardPage() {
               </div>
             </div>
 
-            {/* Line Chart */}
+            {/* Line / Area Chart */}
             <div className="bg-white p-6 rounded shadow-sm border border-gray-100 flex-1 flex flex-col">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium text-[#3B7CED]">Spend Over Time vs Budget Curve</h3>
+                <div>
+                  <h3 className="text-lg font-medium text-[#3B7CED]">Spend Over Time vs Budget Curve</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {dynamicLineChartData.length > 2 && parsedPhases?.length > 0 && (!project?.start_date || project.start_date === project.expected_end_date)
+                      ? "Milestone budget progress across project phases"
+                      : "Cumulative planned S-curve vs actual project expenditure"}
+                  </p>
+                </div>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={showActual} onChange={() => setShowActual(!showActual)} className="w-4 h-4 rounded border-gray-300 text-[#3B7CED] focus:ring-[#3B7CED] accent-[#3B7CED] cursor-pointer" />
-                    <span className="text-sm text-gray-600">Actual Spend</span>
+                    <input type="checkbox" checked={showActual} onChange={() => setShowActual(!showActual)} className="w-4 h-4 rounded border-gray-300 text-[#2BA24D] focus:ring-[#2BA24D] accent-[#2BA24D] cursor-pointer" />
+                    <span className="text-sm text-gray-600 font-medium flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#2BA24D]"></span>
+                      Actual Spend
+                    </span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={showPlanned} onChange={() => setShowPlanned(!showPlanned)} className="w-4 h-4 rounded border-gray-300 text-[#3B7CED] focus:ring-[#3B7CED] accent-[#3B7CED] cursor-pointer" />
-                    <span className="text-sm text-gray-600">Planned Spend</span>
+                    <span className="text-sm text-gray-600 font-medium flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#3B7CED]"></span>
+                      Planned Spend
+                    </span>
                   </label>
                 </div>
               </div>
-              <div className="flex-1 w-full min-h-[300px]">
+              <div className="flex-1 w-full min-h-[300px] relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dynamicLineChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} tickFormatter={(val) => val === 0 ? "₦0" : `₦${val/1000}k`} />
-                    <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 1}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                    {showActual && <Line type="monotone" dataKey="actual" stroke="#2BA24D" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />}
-                    {showPlanned && <Line type="monotone" dataKey="planned" stroke="#3B7CED" strokeWidth={2} dot={false} strokeDasharray="5 5" />}
-                  </LineChart>
+                  <AreaChart data={dynamicLineChartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                    <defs>
+                      <linearGradient id="plannedGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3B7CED" stopOpacity={0.12}/>
+                        <stop offset="95%" stopColor="#3B7CED" stopOpacity={0.0}/>
+                      </linearGradient>
+                      <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2BA24D" stopOpacity={0.15}/>
+                        <stop offset="95%" stopColor="#2BA24D" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F3F6" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={{ stroke: '#E5E7EB' }} 
+                      tickLine={false} 
+                      tick={{ fill: '#6B7280', fontSize: 12 }} 
+                      dy={10} 
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#6B7280', fontSize: 12 }} 
+                      tickFormatter={(val) => {
+                        if (val === 0) return "₦0";
+                        if (val >= 1000000) return `₦${(val / 1000000).toFixed(1)}M`;
+                        return `₦${Math.round(val / 1000)}k`;
+                      }} 
+                    />
+                    <Tooltip 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const dataPoint = payload[0]?.payload;
+                          const fullName = dataPoint?.fullName || label;
+                          return (
+                            <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100 text-xs">
+                              <p className="font-semibold text-gray-800 mb-2 border-b border-gray-100 pb-1">{fullName}</p>
+                              {payload.map((entry: any, index: number) => {
+                                const isPlanned = entry.dataKey === "planned";
+                                const color = isPlanned ? "#3B7CED" : "#2BA24D";
+                                const name = isPlanned ? "Planned Budget" : "Actual Spend";
+                                const value = entry.value !== null && entry.value !== undefined ? `₦${Number(entry.value).toLocaleString()}` : "Not reached";
+                                return (
+                                  <div key={`item-${index}`} className="flex items-center justify-between gap-4 py-0.5">
+                                    <span className="flex items-center gap-1.5 text-gray-600">
+                                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                      {name}:
+                                    </span>
+                                    <span className="font-medium text-gray-900">{value}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    {showPlanned && (
+                      <Area 
+                        type="monotone" 
+                        dataKey="planned" 
+                        stroke="#3B7CED" 
+                        strokeWidth={2.5} 
+                        fillOpacity={1} 
+                        fill="url(#plannedGradient)" 
+                        dot={{ r: 4, fill: '#3B7CED', strokeWidth: 1, stroke: '#fff' }}
+                        activeDot={{ r: 6, fill: '#3B7CED' }} 
+                        name="Planned Spend"
+                      />
+                    )}
+                    {showActual && (
+                      <Area 
+                        type="monotone" 
+                        dataKey="actual" 
+                        stroke="#2BA24D" 
+                        strokeWidth={2.5} 
+                        fillOpacity={1} 
+                        fill="url(#actualGradient)" 
+                        dot={{ r: 4, fill: '#2BA24D', strokeWidth: 1, stroke: '#fff' }}
+                        activeDot={{ r: 6, fill: '#2BA24D' }} 
+                        name="Actual Spend"
+                      />
+                    )}
+                  </AreaChart>
                 </ResponsiveContainer>
                 {/* Fallback for empty data */}
                 {dynamicLineChartData.length === 0 && (
@@ -942,6 +1119,12 @@ export default function ProjectDashboardPage() {
           >
             Documents & Links
           </button>
+          <button 
+            className={`pb-3 text-sm font-medium ${activeTab === 'settings' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            Settings
+          </button>
         </div>
 
         {/* Tabs Content */}
@@ -955,7 +1138,7 @@ export default function ProjectDashboardPage() {
               transition={{ duration: 0.2 }}
             >
               {activeTab === 'phases' && (
-          <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
+          <div data-wizard="pc-phases-table" className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
             <div className="flex justify-between items-center p-4 border-b border-gray-100">
               <h3 className="text-lg font-medium text-[#3B7CED]">Project Phases & Activities</h3>
               <Link href={`/project-costing/${project.id}/phases`}>
@@ -996,7 +1179,7 @@ export default function ProjectDashboardPage() {
         )}
 
         {activeTab === 'adjustments' && (
-          <div className="flex flex-col gap-6 mb-12">
+          <div data-wizard="pc-adjustments-content" className="flex flex-col gap-6 mb-12">
             
             {/* Original Budget Box */}
             <div className="border border-gray-200 rounded-lg p-6 bg-white shadow-sm mb-2">
@@ -1330,7 +1513,7 @@ export default function ProjectDashboardPage() {
         )}
 
         {activeTab === 'documents' && (
-          <div className="bg-white rounded shadow-sm border border-gray-100 p-6 mb-12">
+          <div data-wizard="pc-documents-content" className="bg-white rounded shadow-sm border border-gray-100 p-6 mb-12">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-[#3B7CED]">Project Documents & Links</h3>
               {(!project?.status || ["DRAFT", "PENDING_APPROVAL"].includes(project.status.toUpperCase())) && (
@@ -1378,12 +1561,74 @@ export default function ProjectDashboardPage() {
             )}
           </div>
         )}
+
+        {activeTab === 'settings' && (
+          <div data-wizard="pc-settings-content" className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-6 mb-12 shadow-sm">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Project Budget & Costing Settings</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Configure budget adjustment permissions and policies for this project.
+              </p>
+            </div>
+
+            <div className="border border-gray-100 rounded-lg p-5 bg-gray-50/50 flex items-start justify-between gap-6">
+              <div className="flex flex-col gap-1.5 max-w-xl">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-semibold text-gray-800 text-base">Allow Budget Decrease</span>
+                  <Badge
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full border-0 ${
+                      (projectSettings?.allow_budget_decrease ?? project?.allow_budget_decrease ?? true)
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    {(projectSettings?.allow_budget_decrease ?? project?.allow_budget_decrease ?? true)
+                      ? "Enabled"
+                      : "Disabled"}
+                  </Badge>
+                </div>
+                <p className="text-sm text-gray-600">
+                  When enabled, users and project managers can create budget adjustment requests that decrease individual activity or overall project allocations. When disabled, only budget increases or non-decreasing adjustments are permitted.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0 pt-1">
+                {isUpdatingSettings && <Loader2 className="w-4 h-4 animate-spin text-[#3B7CED]" />}
+                <Switch
+                  checked={projectSettings?.allow_budget_decrease ?? project?.allow_budget_decrease ?? true}
+                  disabled={isUpdatingSettings || isLoadingSettings}
+                  className="data-[state=checked]:bg-[#3B7CED] data-[state=unchecked]:bg-gray-200"
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updateProjectSettings({
+                        id: Number(id),
+                        body: { allow_budget_decrease: checked },
+                      }).unwrap();
+                      await refetchSettings();
+                      refetch();
+                      statusModal.showSuccess(
+                        "Settings Updated",
+                        `Budget decrease has been ${checked ? "enabled" : "disabled"} for this project.`
+                      );
+                    } catch (err) {
+                      console.error(err);
+                      statusModal.showError(
+                        "Update Failed",
+                        "Failed to update project settings. Please try again."
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
             </motion.div>
           </AnimatePresence>
         </div>
 
         {/* Recent transactions */}
-        <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
+        <div data-wizard="pc-transactions-table" className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden mb-12">
           <div className="flex justify-between items-center p-4 border-b border-gray-100">
             <h3 className="text-lg font-medium text-[#3B7CED]">Recent transactions</h3>
             <Link href={`/project-costing/${project?.id || id}/transactions`}>
@@ -1393,7 +1638,7 @@ export default function ProjectDashboardPage() {
           <Table>
             <TableHeader className="bg-gray-50 border-b border-gray-200">
               <TableRow className="hover:bg-gray-50 border-0">
-                <TableHead className="font-medium text-gray-500 py-3">Date</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3 px-4">Date</TableHead>
                 <TableHead className="font-medium text-gray-500 py-3">Description</TableHead>
                 <TableHead className="font-medium text-gray-500 py-3">Category</TableHead>
                 <TableHead className="font-medium text-gray-500 py-3">Cost Category</TableHead>
@@ -1416,7 +1661,7 @@ export default function ProjectDashboardPage() {
               ) : transactions && transactions.length > 0 ? (
                 transactions.slice(0, 6).map((tx: any, idx: number) => (
                   <TableRow key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                    <TableCell className="py-3 text-sm text-gray-600">
+                    <TableCell className="py-3 px-4 text-sm text-gray-600">
                       {tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString() : "N/A"}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-gray-800 font-medium">
@@ -1510,6 +1755,7 @@ export default function ProjectDashboardPage() {
           />
         </div>
       </div>
+      <ModuleWizard moduleId="project-costing" />
     </div>
     </PageGuard>
   );

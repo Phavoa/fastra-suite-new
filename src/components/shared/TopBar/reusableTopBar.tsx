@@ -26,6 +26,7 @@ import {
 import { ProtectedComponent } from "@/components/ProtectedComponent";
 import { useSidebarContext } from "@/app/AppWrapper";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { WizardGuideButton, ModuleWizard } from "@/components/shared/wizard/ModuleWizard";
 
 interface NavItem {
   label: string;
@@ -43,6 +44,7 @@ interface TopNavProps {
   onMenuToggle?: () => void;
   backUrl?: string;
   activeHref?: string;
+  wizardModuleId?: string;
 }
 
 export function NavBar({
@@ -52,6 +54,7 @@ export function NavBar({
   onMenuToggle,
   backUrl,
   activeHref,
+  wizardModuleId,
 }: TopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -232,9 +235,21 @@ export function NavBar({
               const hasActiveChild = item.children.some((child) =>
                 isActive(child.href),
               );
+
+              // Check if any child matches known wizard target for the dropdown trigger
+              const triggerWizardTarget = item.children.find((c) =>
+                c.href?.includes("incoming_product") ||
+                c.href?.includes("stock-on-hand") ||
+                c.href?.includes("material-consumption")
+              ) ? (
+                item.label.toLowerCase().includes("operation") ? "inventory-nav-incoming" :
+                item.label.toLowerCase().includes("stock") ? "inventory-nav-stock-on-hand" : undefined
+              ) : undefined;
+
               return (
                 <DropdownMenu key={`dropdown-${index}`}>
                   <DropdownMenuTrigger
+                    data-wizard={triggerWizardTarget}
                     className={`h-full flex items-center text-base font-medium transition-all duration-200 hover:text-[#3B7CED] hover:border-b-2 hover:border-[#3B7CED] focus:outline-none focus:text-[#3B7CED] focus:border-b-2 focus:border-[#3B7CED] group ${
                       hasActiveChild
                         ? "text-[#3B7CED] border-b-2 border-[#3B7CED]"
@@ -267,14 +282,21 @@ export function NavBar({
                               <>{children}</>
                             );
 
+                      const optionWizardTarget =
+                        option.href?.includes("incoming_product") ? "inventory-nav-incoming" :
+                        option.href?.includes("material-consumption") ? "inventory-nav-consumption" :
+                        option.href?.includes("stock-on-hand") ? "inventory-nav-stock-on-hand" :
+                        option.href?.includes("adjustment") ? "inventory-nav-adjustments" : undefined;
+
                       return (
                         <Wrapper key={option.href}>
                           <DropdownMenuItem asChild>
                             <Link
                               href={option.href!}
+                              data-wizard={optionWizardTarget}
                               className={`w-full px-3 py-2.5 text-sm cursor-pointer transition-colors duration-150 border-l-2 ${
                                 isActive(option.href)
-                                  ? "text-[#3B7CED] bg-blue-50 border-l-[#3B7CED] font-medium"
+                                   ? "text-[#3B7CED] bg-blue-50 border-l-[#3B7CED] font-medium"
                                   : "text-gray-700 hover:text-[#3B7CED] hover:bg-gray-50 hover:border-l-gray-300"
                               } ${
                                 childIndex === item.children!.length - 1
@@ -310,10 +332,16 @@ export function NavBar({
                     <>{children}</>
                   );
 
+            const linkWizardTarget =
+              item.href?.includes("approved-requests") ? "inv-nav-approved-requests" :
+              item.href?.includes("purchase-order") ? "inv-nav-purchase-order" :
+              item.href?.includes("payment-queue") ? "inv-nav-payment-queue" : undefined;
+
             return (
               <Wrapper key={item.href}>
                 <Link
                   href={item.href!}
+                  data-wizard={linkWizardTarget}
                   className={`h-full flex items-center text-base transition-colors duration-200 ${
                     isActive(item.href)
                       ? "text-[#3B7CED] border-b-2 border-[#3B7CED]"
@@ -327,7 +355,12 @@ export function NavBar({
           })}
         </nav>
 
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Module Guide Button */}
+          {wizardModuleId && (
+            <WizardGuideButton moduleId={wizardModuleId} />
+          )}
+
           {/* Notification Bell with interactive popover */}
           {showNotify && <NotificationBell />}
 
@@ -402,6 +435,7 @@ export function NavBar({
           </div>
         </div>
       </div>
+      {wizardModuleId && <ModuleWizard moduleId={wizardModuleId} />}
     </header>
   );
 }

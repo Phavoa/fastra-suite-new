@@ -198,7 +198,7 @@ export default function StockOnHandListPage() {
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <Table className="min-w-[900px] w-full">
+              <Table data-wizard="inventory-stock-table" className="min-w-[900px] w-full">
                 <TableHeader>
                   <TableRow className="bg-[#F8FAFC] border-b border-gray-100 hover:bg-[#F8FAFC]">
                     <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">

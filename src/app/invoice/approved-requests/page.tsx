@@ -417,7 +417,7 @@ export default function ApprovedRequestsPage() {
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table data-wizard="inv-approved-table" className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -499,7 +499,7 @@ export default function ApprovedRequestsPage() {
                       {formatCurrency(request.requestedAmount)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-start gap-2 flex-wrap">
+                      <div data-wizard="inv-convert-action" className="flex items-center justify-start gap-2 flex-wrap">
                         {request.type === "Purchase" && (
                           <button
                             type="button"

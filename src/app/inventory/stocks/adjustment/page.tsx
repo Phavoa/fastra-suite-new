@@ -156,7 +156,7 @@ export default function StockAdjustmentPage() {
           </div>
 
           {/* White Section Card 2: Table or Grid */}
-          <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+          <div data-wizard="inventory-adjustments-table" className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
             {currentView === "list" ? (
               <StockAdjustmentTable rows={rows} query={query} isLoading={isLoading} />
             ) : (

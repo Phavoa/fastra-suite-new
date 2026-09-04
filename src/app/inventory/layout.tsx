@@ -92,7 +92,7 @@ export default function InventoryLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <NavBar title="Inventory" items={navItems} />
+      <NavBar title="Inventory" items={navItems} wizardModuleId="inventory" />
       <main className="flex-1">
         {children}
       </main>

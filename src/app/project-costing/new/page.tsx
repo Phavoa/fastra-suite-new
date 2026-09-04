@@ -10,13 +10,19 @@ import { useRouter } from "next/navigation";
 import { BasicInformationForm } from "@/components/project-costing/BasicInformationForm";
 import { WBSTable } from "@/components/project-costing/wbs/WBSTable";
 import { Phase, Activity } from "@/components/project-costing/types";
-import { useCreateProjectCostingProjectMutation, useAddProjectDocumentMutation } from "@/api/projectCostingApi";
+import {
+  useCreateProjectCostingProjectMutation,
+  useCreatePendingProjectCostingProjectMutation,
+  useAddProjectDocumentMutation,
+} from "@/api/projectCostingApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { extractErrorMessage } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ModuleWizard } from "@/components/shared/wizard/ModuleWizard";
+import { ToastNotification } from "@/components/shared/ToastNotification";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -40,9 +46,23 @@ export default function NewProjectPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
-  const [createProject, { isLoading }] = useCreateProjectCostingProjectMutation();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createProject, { isLoading: isSavingDraft }] = useCreateProjectCostingProjectMutation();
+  const [createPendingProject, { isLoading: isSubmittingPending }] = useCreatePendingProjectCostingProjectMutation();
   const [addProjectDocument] = useAddProjectDocumentMutation();
   const statusModal = useStatusModal();
+
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({
+    show: false,
+    message: "",
+    type: "success",
+  });
+
+  const isProcessing = isSubmitting || isSavingDraft || isSubmittingPending;
 
   const wbsFileInputRef = useRef<HTMLInputElement>(null);
   const [importedFileName, setImportedFileName] = useState("");
@@ -201,16 +221,19 @@ export default function NewProjectPage() {
         });
 
         setPhases(newPhases);
-        statusModal.showSuccess(
-          "Import Successful",
-          "The WBS has been populated from the Excel file."
-        );
+        const totalActs = newPhases.reduce((acc, p) => acc + (p.activities?.length || 0), 0);
+        setToast({
+          show: true,
+          message: `WBS imported successfully (${newPhases.length} phase${newPhases.length === 1 ? "" : "s"}, ${totalActs} activit${totalActs === 1 ? "y" : "ies"} loaded).`,
+          type: "success",
+        });
       } catch (err) {
         console.error(err);
-        statusModal.showError(
-          "Parsing Error",
-          "There was an error reading the Excel file. Please ensure it is a valid format."
-        );
+        setToast({
+          show: true,
+          message: "Error reading the Excel file. Please ensure it is a valid format.",
+          type: "error",
+        });
       }
     };
     reader.readAsBinaryString(file);
@@ -285,7 +308,9 @@ export default function NewProjectPage() {
     XLSX.writeFile(workbook, "wbs_import_template.xlsx");
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (isSubmitForApproval = false) => {
+    if (isProcessing) return;
+
     if (!name || !clientName) {
       statusModal.showError(
         "Missing Information",
@@ -293,6 +318,8 @@ export default function NewProjectPage() {
       );
       return;
     }
+
+    setIsSubmitting(true);
 
     // Map Phase structure to backend schema
     const phasesPayload = phases.map((phase) => ({
@@ -318,7 +345,7 @@ export default function NewProjectPage() {
     }));
 
     try {
-      const res = await createProject({
+      const payload = {
         name,
         client_name: clientName,
         project_type: projectType,
@@ -327,7 +354,11 @@ export default function NewProjectPage() {
         description,
         site_location: siteLocation,
         phases: phasesPayload,
-      } as any).unwrap();
+      } as any;
+
+      const res = isSubmitForApproval
+        ? await createPendingProject(payload).unwrap()
+        : await createProject(payload).unwrap();
 
       const newProjectId = res.id;
 
@@ -356,24 +387,37 @@ export default function NewProjectPage() {
         }
       }
 
-      statusModal.showSuccess(
-        "Project Created Successfully",
-        `Your project "${name}" has been created and submitted for approval.`
-      );
+      if (isSubmitForApproval) {
+        statusModal.showSuccess(
+          "Project Submitted for Approval",
+          `Your project "${name}" has been created and submitted for approval.`
+        );
+      } else {
+        statusModal.showSuccess(
+          "Project Saved as Draft",
+          `Your project "${name}" has been created and saved as a draft.`
+        );
+      }
     } catch (err: any) {
       statusModal.showError(
-        "Project Creation Failed",
+        isSubmitForApproval ? "Submission Failed" : "Project Creation Failed",
         extractErrorMessage(
           err,
           "There was an error creating your project. Please check your inputs and try again."
         )
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleModalAction = () => {
+    const isProjectCreated =
+      statusModal.title === "Project Submitted for Approval" ||
+      statusModal.title === "Project Saved as Draft" ||
+      statusModal.title === "Project Created Successfully";
     statusModal.close();
-    if (statusModal.type === "success" && statusModal.title === "Project Created Successfully") {
+    if (statusModal.type === "success" && isProjectCreated) {
       router.push("/project-costing");
     }
   };
@@ -404,25 +448,27 @@ export default function NewProjectPage() {
       </div>
 
       <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-10 overflow-y-auto">
-        <BasicInformationForm
-          name={name}
-          setName={setName}
-          clientName={clientName}
-          setClientName={setClientName}
-          projectType={projectType}
-          setProjectType={setProjectType}
-          startDate={startDate}
-          setStartDate={setStartDate}
-          expectedEndDate={expectedEndDate}
-          setExpectedEndDate={setExpectedEndDate}
-          description={description}
-          setDescription={setDescription}
-          siteLocation={siteLocation}
-          setSiteLocation={setSiteLocation}
-        />
+        <div data-wizard="pc-basic-info">
+          <BasicInformationForm
+            name={name}
+            setName={setName}
+            clientName={clientName}
+            setClientName={setClientName}
+            projectType={projectType}
+            setProjectType={setProjectType}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            expectedEndDate={expectedEndDate}
+            setExpectedEndDate={setExpectedEndDate}
+            description={description}
+            setDescription={setDescription}
+            siteLocation={siteLocation}
+            setSiteLocation={setSiteLocation}
+          />
+        </div>
 
         {/* WBS Excel Import Section */}
-        <section>
+        <section data-wizard="pc-wbs-section">
           <h2 className="text-[#3B7CED] text-base font-medium mb-4">
             Documents (WBS Excel Import)
           </h2>
@@ -523,14 +569,26 @@ export default function NewProjectPage() {
       </div>
 
       {/* Footer sticky bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200 p-4 flex justify-end">
+      <div className="absolute bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200 p-4 flex justify-end items-center gap-3">
         <Button
-          onClick={handleSubmit}
-          disabled={isLoading}
-          className="bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center gap-2"
+          type="button"
+          variant="outline"
+          onClick={() => handleSubmit(false)}
+          disabled={isProcessing}
+          className="border-gray-300 text-gray-700 hover:bg-gray-100 bg-white"
         >
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          Submit for Approval
+          {isSavingDraft && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+          <span>{isSavingDraft ? "Saving Draft..." : "Save as Draft"}</span>
+        </Button>
+        <Button
+          type="button"
+          data-wizard="pc-submit-button"
+          onClick={() => handleSubmit(true)}
+          disabled={isProcessing}
+          className="bg-[#3B7CED] hover:bg-[#3065c3] text-white flex items-center gap-2 shadow-2xs"
+        >
+          {isSubmittingPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          <span>{isSubmittingPending ? "Submitting..." : "Submit for Approval"}</span>
         </Button>
       </div>
 
@@ -693,6 +751,13 @@ export default function NewProjectPage() {
         onAction={handleModalAction}
         showCloseButton={false}
       />
+      <ToastNotification
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+      />
+      <ModuleWizard moduleId="project-costing" />
     </div>
     </PageGuard>
   );
