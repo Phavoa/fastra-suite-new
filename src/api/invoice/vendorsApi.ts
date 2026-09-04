@@ -16,17 +16,19 @@ export const VENDOR_TYPE_VALUES = VENDOR_TYPE_CHOICES.map((c) => c.value);
 export const isVendorType = (
   value: unknown,
 ): value is (typeof VENDOR_TYPE_CHOICES)[number]["value"] =>
-  VENDOR_TYPE_VALUES.includes(value as (typeof VENDOR_TYPE_CHOICES)[number]["value"]);
+  VENDOR_TYPE_VALUES.includes(
+    value as (typeof VENDOR_TYPE_CHOICES)[number]["value"],
+  );
 
 export interface VendorBankAccount {
-  id: number;
+  id?: number;
   bank_account_name: string;
   bank_account_number: string;
   bank_name: string;
-  branch_code: string;
-  confirmed: boolean;
-  updated_at: string;
-  updated_by: number;
+  branch_code?: string | null;
+  confirmed?: boolean;
+  updated_at?: string;
+  updated_by?: number;
 }
 
 export interface VendorListItem {
@@ -50,34 +52,42 @@ export interface VendorFull {
   email: string;
   phone_number: string;
   address: string;
-  tax_id: string;
-  tax_registered: boolean;
-  tax_number: string;
+  tax_id: string | null;
+  tax_registered: boolean | null;
+  tax_number: string | null;
   vendor_type: VendorType;
   status: VendorStatus;
-  bank_account: string | VendorBankAccount | null;
+  bank_account: VendorBankAccount | null; // always object or null
   payment_term: number | null;
+  payment_term_details?: { name?: string } | null;
   created_on: string;
   updated_on: string;
+  vendor_type_display?: string;
 }
 
 export interface CreateVendorRequest {
   vendor_name: string;
-  contact_name: string;
-  email: string;
-  phone_number: string;
-  address: string;
+  contact_name?: string;
+  email?: string;
+  phone_number?: string;
+  address?: string;
   tax_id?: string;
   tax_registered?: boolean;
   tax_number?: string;
   payment_term?: number | null;
   vendor_type: VendorType;
   status?: VendorStatus;
+  /** Nested bank details – backend accepts this on create */
+  bank_account?: {
+    bank_account_name: string;
+    bank_account_number: string;
+    bank_name: string;
+    branch_code?: string;
+  } | null;
 }
 
-export type UpdateVendorRequest = CreateVendorRequest;
-
-export type PatchVendorRequest = Partial<CreateVendorRequest>;
+export type UpdateVendorRequest = Omit<CreateVendorRequest, "bank_account">;
+export type PatchVendorRequest = Partial<UpdateVendorRequest>;
 
 export interface GetVendorsParams {
   ordering?: string;
@@ -89,7 +99,10 @@ const getTenantBaseUrl = (state: RootState): string => {
   const tenantSchemaName = state.auth.tenant_schema_name;
   const apiDomain =
     process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
-  const protocol = (apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")) ? "http" : "https";
+  const protocol =
+    apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")
+      ? "http"
+      : "https";
   return `${protocol}://${tenantSchemaName}.${apiDomain}`;
 };
 

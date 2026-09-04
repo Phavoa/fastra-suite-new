@@ -22,6 +22,9 @@ const schema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
+  taxId: z.string().optional(),
+  taxRegistered: z.boolean().optional(),
+  taxNumber: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -33,7 +36,11 @@ export default function EditVendorPage() {
   const vendorIdStr = (params?.id as string) || "";
   const vendorId = parseInt(vendorIdStr, 10);
 
-  const { data: vendor, isLoading, isError } = useGetVendorByIdQuery(vendorId, {
+  const {
+    data: vendor,
+    isLoading,
+    isError,
+  } = useGetVendorByIdQuery(vendorId, {
     skip: isNaN(vendorId),
   });
 
@@ -77,6 +84,9 @@ export default function EditVendorPage() {
         email: vendor.email || "",
         phone: vendor.phone_number || "",
         address: vendor.address || "",
+        taxId: vendor.tax_id || "",
+        taxRegistered: Boolean(vendor.tax_registered),
+        taxNumber: vendor.tax_number || "",
       });
     }
   }, [vendor, reset]);
@@ -89,6 +99,9 @@ export default function EditVendorPage() {
         email: data.email || "",
         phone_number: data.phone || "",
         address: data.address || "",
+        tax_id: data.taxId || "",
+        tax_registered: data.taxRegistered ?? false,
+        tax_number: data.taxNumber || "",
         vendor_type: data.vendorType,
         status: vendor?.status || "active",
       };
@@ -106,7 +119,8 @@ export default function EditVendorPage() {
     } catch (err: any) {
       setToast({
         show: true,
-        message: err?.data?.message || err?.message || "Failed to update vendor",
+        message:
+          err?.data?.message || err?.message || "Failed to update vendor",
         type: "error",
       });
     }
@@ -176,9 +190,11 @@ export default function EditVendorPage() {
               )}
             </div>
 
-             <div className="flex flex-col items-end justify-end">
+            <div className="flex flex-col items-end justify-end">
               <p className="text-sm text-gray-500">Vendor Code</p>
-              <p className="font-medium text-gray-900 mt-1">{vendor.vendor_code}</p>
+              <p className="font-medium text-gray-900 mt-1">
+                {vendor.vendor_code}
+              </p>
             </div>
 
             <div className="md:col-span-2">
@@ -187,7 +203,9 @@ export default function EditVendorPage() {
                   Vendor Type <span className="text-red-500">*</span>
                 </label>
                 {isBillsLoading && (
-                  <span className="text-xs text-gray-400">(checking linked bills…)</span>
+                  <span className="text-xs text-gray-400">
+                    (checking linked bills…)
+                  </span>
                 )}
               </div>
               <select
@@ -214,10 +232,9 @@ export default function EditVendorPage() {
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <p className="text-xs">
                     This vendor is referenced by{" "}
-                    <strong>{billsList.length}</strong>{" "}
-                    existing vendor bill
-                    {billsList.length === 1 ? "" : "s"}. The vendor type cannot be
-                    changed because it may break linked records.
+                    <strong>{billsList.length}</strong> existing vendor bill
+                    {billsList.length === 1 ? "" : "s"}. The vendor type cannot
+                    be changed because it may break linked records.
                   </p>
                 </div>
               )}
@@ -284,6 +301,45 @@ export default function EditVendorPage() {
               placeholder="Enter full address"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+        </div>
+
+        {/* Tax Information */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-blue-600 mb-6">
+            Tax Information
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Tax ID
+              </label>
+              <input
+                {...register("taxId")}
+                placeholder="Optional Tax ID"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Tax Number
+              </label>
+              <input
+                {...register("taxNumber")}
+                placeholder="Optional TIN / Tax number"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer pb-2.5">
+                <input
+                  type="checkbox"
+                  {...register("taxRegistered")}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Tax Registered</span>
+              </label>
+            </div>
           </div>
         </div>
 

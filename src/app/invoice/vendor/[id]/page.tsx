@@ -136,7 +136,11 @@ export default function VendorInfoPage() {
     setToast({ show: true, message, type });
   };
 
-  const bankAccount = vendor?.bank_account as any;
+  const bankAccount =
+    vendor?.bank_account && typeof vendor.bank_account === "object"
+      ? (vendor.bank_account as any)
+      : null;
+
   const isBankConfirmed = Boolean(bankAccount?.confirmed);
   const hasBankDetails = Boolean(
     bankAccount?.bank_account_name ||

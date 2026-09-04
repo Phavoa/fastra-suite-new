@@ -10,6 +10,10 @@ import ConvertToPOSubcontractorModal from "@/components/invoice/subcontractor/Co
 import CreateVendorBillLabourModal from "@/components/invoice/labour-request/CreateVendorBillLabourReqModal";
 import CreateDisbursementModal from "@/components/invoice/petty-cash/CreateDisbursementModal";
 import ConvertToPOPlantEquipmentModal from "@/components/invoice/plant-and-equipment/ConvertToPOPlantEquipmentModal";
+import {
+  useCreateDisbursementMutation,
+  type CreateDisbursementRequest,
+} from "@/api/invoice/disbursementApi";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { ToastNotification } from "@/components/shared/ToastNotification";
@@ -130,6 +134,8 @@ export default function ApprovedRequestsPage() {
     isPettyCashDisbursementModalOpen,
     setIsPettyCashDisbursementModalOpen,
   ] = useState(false);
+  const [createDisbursement, { isLoading: isCreatingDisbursement }] =
+    useCreateDisbursementMutation();
 
   const [toast, setToast] = useState<{
     type: "success" | "error";
@@ -172,34 +178,36 @@ export default function ApprovedRequestsPage() {
     setSelectedRequest(null);
   };
 
-  const handlePettyCashSubmitDisbursement = async (payload: {
-    source_id: number;
-    company_bank_account_id: number;
-    disbursement_method: "bank_transfer" | "cash";
-    recipient_bank_name?: string;
-    recipient_account_number?: string;
-    recipient_bank?: string;
-    cash_recipient_name?: string;
-    cash_handover_confirmed?: boolean;
-  }) => {
-    console.log("Disbursement submitted →", {
-      request_id: selectedRequest?.backendId,
-      reference: selectedRequest?.id,
-      ...payload,
-    });
+  const handlePettyCashSubmitDisbursement = async (
+    payload: CreateDisbursementRequest,
+  ) => {
+    try {
+      if (process.env.NODE_ENV === "development")
+        console.log("Petty Cash Disbursement payload →", payload);
+      await createDisbursement(payload).unwrap();
 
-    // TODO: call disbursement mutation when backend is ready
-    showToast(
-      "success",
-      "Disbursement submitted. It will appear in the Payment Queue.",
-    );
-    handleClosePettyCashDisbursementModal();
-    refetch();
+      showToast(
+        "success",
+        "Successfully created disbursement. Navigating to Payment Queue.",
+      );
+
+      handleClosePettyCashDisbursementModal();
+      refetch();
+
+      // Give the toast a moment to appear, then navigate
+      setTimeout(() => {
+        router.push("/invoice/payment-queue");
+      }, 900);
+    } catch (err: unknown) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Create disbursement error →", err);
+      }
+      showToast("error", extractErrorMessage(err));
+    }
   };
-
-  // ---------- Plant & Equipment ----------
   const handleConvertToPlantEquipment = (request: any) => {
-    console.log("Convert to Plant & Equipment →", request);
+    if (process.env.NODE_ENV === "development")
+      console.log("Convert to Plant & Equipment →", request);
     setSelectedRequest(request);
     setCurrentStep(1);
     setIsPlantEquipmentModalOpen(true);
@@ -245,11 +253,12 @@ export default function ApprovedRequestsPage() {
       return;
     }
 
-    console.log("Subcontractor → Vendor Bill", {
-      approved_request_id: selectedRequest.backendId,
-      reference_id: selectedRequest.id,
-      type: selectedRequest.originalType,
-    });
+    if (process.env.NODE_ENV === "development")
+      console.log("Subcontractor → Vendor Bill", {
+        approved_request_id: selectedRequest.backendId,
+        reference_id: selectedRequest.id,
+        type: selectedRequest.originalType,
+      });
 
     try {
       // TODO: real mutation when backend is ready
@@ -300,8 +309,9 @@ export default function ApprovedRequestsPage() {
       expected_delivery_date: payload?.expected_delivery_date,
       expected_return_date: payload?.expected_return_date,
     };
-
-    console.log("Convert to PO – final payload sent to API →", finalPayload);
+    if (process.env.NODE_ENV === "development") {
+      console.log("Convert to PO – final payload sent to API →", finalPayload);
+    }
 
     try {
       const created = await convertRequestToPurchaseOrder({
@@ -624,6 +634,7 @@ export default function ApprovedRequestsPage() {
         request={selectedRequest}
         onSubmit={handlePettyCashSubmitDisbursement}
         formatCurrency={formatCurrency}
+        isSubmitting={isCreatingDisbursement}
       />
 
       {/* Global toast */}
