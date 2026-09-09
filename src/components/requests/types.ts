@@ -44,6 +44,10 @@ export interface RequestFormField {
   rows?: number;
   className?: string;
   hintText?: string;
+  hintNode?: React.ReactNode;
+  action?: React.ReactNode;
+  disabled?: boolean;
+  emptyMessage?: string;
   halfWidth?: boolean;
   dependsOn?: string;
   visibleIf?: { field: string; value: any }; // New: only show if field equals value

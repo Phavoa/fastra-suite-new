@@ -16,7 +16,7 @@ import FormSelect from "@/components/Settings/form/FormSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GridCardIcon } from "@/components/icons/gridCardIcon";
 import NewUserRoleSelect from "@/components/Settings/form/formRoleSelect";
-import { ToastNotification } from "@/components/shared/ToastNotification";
+import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { PageGuard } from "@/components/auth/PageGuard";
 
 import { z } from "zod";
@@ -33,9 +33,18 @@ import {
 import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
 
 const userCreateSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  company_role: z.coerce.number().min(1, "Role is required").optional(),
+  company_role: z
+    .preprocess((val) => {
+      if (val === "" || val === 0 || val === "0" || val === null || val === undefined) {
+        return undefined;
+      }
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    }, z.number().min(1, "Role must be valid").optional())
+    .optional(),
   phone_number: z.string().min(1, "Phone number is required"),
   language: z.string().min(1, "Language is required"),
   timezone: z.string().min(1, "Timezone is required"),
@@ -64,19 +73,14 @@ export default function NewUser() {
 
   const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
 
-  // Notification state
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-    show: boolean;
-  }>({
-    message: "",
-    type: "success",
-    show: false,
-  });
+  const statusModal = useStatusModal();
 
-  const closeNotification = () => {
-    setNotification((prev) => ({ ...prev, show: false }));
+  const handleModalClose = () => {
+    const wasSuccess = statusModal.type === "success";
+    statusModal.close();
+    if (wasSuccess) {
+      router.push("/settings/users");
+    }
   };
 
   const {
@@ -87,18 +91,20 @@ export default function NewUser() {
     formState,
     setError,
     clearErrors,
+    trigger,
   } = useForm<UserCreateInput>({
     resolver: zodResolver(userCreateSchema) as any,
-    mode: "all", // Still use mode for real-time updates if needed
+    mode: "all",
     defaultValues: {
-      name: "",
+      first_name: "",
+      last_name: "",
       email: "",
       phone_number: "",
       language: "en",
       timezone: "Africa/Lagos",
       in_app_notifications: true,
       email_notifications: true,
-      company_role: 0,
+      company_role: undefined,
       user_image_image: null,
     },
   });
@@ -120,14 +126,17 @@ export default function NewUser() {
   const onSubmit = async (data: UserCreateInput) => {
     console.log("Submitting form data object:", data);
     const formData = new FormData();
+    const fullName = `${data.first_name} ${data.last_name}`.trim();
 
-    // Explicitly add fields
-    formData.append("name", data.name);
+    // Explicitly add fields (both first/last name and full name for backend flexibility)
+    formData.append("first_name", data.first_name);
+    formData.append("last_name", data.last_name);
+    formData.append("name", fullName);
     formData.append("email", data.email);
     formData.append("tenant_schema_name", tenant_schema_name || "");
 
-    // Ensure company_role is a string-represented number
-    if (data.company_role) {
+    // Ensure company_role is a string-represented number if present
+    if (data.company_role && data.company_role !== 0) {
       formData.append("company_role", String(data.company_role));
     }
 
@@ -168,66 +177,82 @@ export default function NewUser() {
     }
 
     try {
-      const res = await createUser(formData).unwrap();
-      setNotification({
-        message: `User ${data.name} created successfully!`,
-        type: "success",
-        show: true,
-      });
-      setTimeout(() => {
-        router.push("/settings/users");
-      }, 2000);
+      await createUser(formData).unwrap();
+      statusModal.showSuccess(
+        "User Created",
+        `User ${fullName} created successfully!`,
+        "Back to Users",
+        () => {
+          statusModal.close();
+          router.push("/settings/users");
+        }
+      );
     } catch (err: any) {
       console.error("Submission error:", err);
 
-      const backendErrors = err?.data?.error;
-      if (Array.isArray(backendErrors)) {
-        backendErrors.forEach((errorObj: any) => {
-          Object.entries(errorObj).forEach(([field, message]) => {
-            setError(field as any, {
-              type: "manual",
-              message: message as string,
-            });
-          });
-        });
+      const errorData = err?.data;
+      const messages: string[] = [];
+      let hasFieldErrors = false;
 
-        // Switch to the tab with the first error
-        const firstErrorField = Object.keys(backendErrors[0])[0];
-        const basicFields = [
-          "name",
-          "email",
-          "company_role",
-          "phone_number",
-          "language",
-          "timezone",
-        ];
-        if (basicFields.includes(firstErrorField)) {
-          setActiveTab("basic");
-        } else if (firstErrorField.startsWith("user_permissions")) {
-          setActiveTab("permissions");
+      if (errorData) {
+        if (typeof errorData === "string") {
+          messages.push(errorData);
+        } else if (typeof errorData.detail === "string") {
+          messages.push(errorData.detail);
+        } else if (typeof errorData.message === "string") {
+          messages.push(errorData.message);
+        } else if (Array.isArray(errorData.non_field_errors) && errorData.non_field_errors.length > 0) {
+          messages.push(...errorData.non_field_errors.map(String));
         }
 
-        setNotification({
-          message: "Please fix the errors highlighted in the form.",
-          type: "error",
-          show: true,
-        });
-      } else {
-        setNotification({
-          message:
-            err?.data?.detail ||
-            "An unexpected error occurred. Please try again.",
-          type: "error",
-          show: true,
-        });
+        // Handle array of error objects: [{"email": "This email already exists"}]
+        if (Array.isArray(errorData.error)) {
+          errorData.error.forEach((errorObj: any) => {
+            if (typeof errorObj === "string") {
+              messages.push(errorObj);
+            } else if (typeof errorObj === "object" && errorObj !== null) {
+              Object.entries(errorObj).forEach(([field, msg]) => {
+                const msgStr = Array.isArray(msg) ? msg.join(", ") : String(msg);
+                setError(field as any, { type: "manual", message: msgStr });
+                messages.push(msgStr);
+                hasFieldErrors = true;
+              });
+            }
+          });
+        } else if (typeof errorData.error === "string") {
+          messages.push(errorData.error);
+        }
+
+        // Handle standard DRF field errors: { email: ["This email already exists"], first_name: [...] }
+        if (typeof errorData === "object" && !Array.isArray(errorData)) {
+          Object.entries(errorData).forEach(([field, val]) => {
+            if (["detail", "message", "error", "non_field_errors", "status"].includes(field)) return;
+            const msgStr = Array.isArray(val) ? val.join(", ") : String(val);
+            setError(field as any, { type: "manual", message: msgStr });
+            messages.push(`${field}: ${msgStr}`);
+            hasFieldErrors = true;
+          });
+        }
       }
+
+      if (hasFieldErrors) {
+        setActiveTab("basic");
+      }
+
+      const displayMessage =
+        messages.length > 0
+          ? Array.from(new Set(messages)).join("\n")
+          : (err?.message || "An unexpected error occurred. Please try again.");
+
+      statusModal.showError("Failed to Create User", displayMessage);
     }
   };
 
   const onInvalid = (errors: any) => {
     console.error("Validation Errors:", errors);
     const basicFields = [
-      "name",
+      "first_name",
+      "last_name",
       "email",
       "company_role",
       "phone_number",
@@ -237,19 +262,19 @@ export default function NewUser() {
     const hasBasicErrors = basicFields.some((field) => errors[field]);
 
     if (hasBasicErrors && activeTab !== "basic") {
-      setNotification({
-        message: "Please check for errors in the Basic Settings tab.",
-        type: "error",
-        show: true,
-      });
       setActiveTab("basic");
-    } else {
-      setNotification({
-        message: "Please fill in all required fields correctly.",
-        type: "error",
-        show: true,
-      });
     }
+
+    const messages = Object.values(errors)
+      .map((err: any) => err?.message)
+      .filter(Boolean);
+
+    statusModal.showError(
+      "Validation Error",
+      messages.length > 0
+        ? messages.join("\n")
+        : "Please fill in all required fields correctly."
+    );
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -313,40 +338,65 @@ export default function NewUser() {
                   />
 
                   <div className="border-l border-[#E6E6E6] py-6 pl-10 ml-6 grid grid-cols-2 gap-8 w-[60%]">
-                    <Controller
-                      name="name"
-                      control={control}
-                      render={({ field }) => (
-                        <FormInput
-                          label="Name"
-                          {...field}
-                          value={field.value as string}
-                          placeholder="Enter your Name here"
-                          required
-                        />
+                    <div>
+                      <Controller
+                        name="first_name"
+                        control={control}
+                        render={({ field }) => (
+                          <FormInput
+                            label="First Name"
+                            {...field}
+                            value={field.value as string}
+                            placeholder="Enter first name"
+                            required
+                          />
+                        )}
+                      />
+                      {errors.first_name && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.first_name.message}
+                        </p>
                       )}
-                    />
-                    {errors.name && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.name.message}
-                      </p>
-                    )}
+                    </div>
 
-                    <Controller
-                      name="company_role"
-                      control={control}
-                      render={({ field }) => (
-                        <NewUserRoleSelect
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
+                    <div>
+                      <Controller
+                        name="last_name"
+                        control={control}
+                        render={({ field }) => (
+                          <FormInput
+                            label="Last Name"
+                            {...field}
+                            value={field.value as string}
+                            placeholder="Enter last name"
+                            required
+                          />
+                        )}
+                      />
+                      {errors.last_name && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.last_name.message}
+                        </p>
                       )}
-                    />
-                    {errors.company_role && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.company_role.message}
-                      </p>
-                    )}
+                    </div>
+
+                    <div className="col-span-2">
+                      <Controller
+                        name="company_role"
+                        control={control}
+                        render={({ field }) => (
+                          <NewUserRoleSelect
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                        )}
+                      />
+                      {errors.company_role && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.company_role.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </FormSection>
@@ -512,10 +562,41 @@ export default function NewUser() {
 
                 <button
                   type="button"
-                  className="px-8 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  onClick={() => setActiveTab("permissions")}
+                  className="px-8 py-2 border border-blue-600 text-[#3B7CED] rounded hover:bg-blue-50 font-medium"
+                  onClick={async () => {
+                    const valid = await trigger([
+                      "first_name",
+                      "last_name",
+                      "email",
+                      "phone_number",
+                      "language",
+                      "timezone",
+                    ]);
+                    if (valid) {
+                      setActiveTab("permissions");
+                    } else {
+                      const messages = Object.values(formState.errors)
+                        .map((err: any) => err?.message)
+                        .filter(Boolean);
+
+                      statusModal.showError(
+                        "Validation Error",
+                        messages.length > 0
+                          ? messages.join("\n")
+                          : "Please fill in all required fields correctly."
+                      );
+                    }
+                  }}
                 >
-                  Next
+                  Next: Permissions
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-8 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 font-medium"
+                >
+                  {isSubmitting ? "Saving..." : "Save User"}
                 </button>
               </div>
             </div>
@@ -582,18 +663,21 @@ export default function NewUser() {
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
                 >
-                  {isSubmitting ? "Saving..." : "Save"}
+                  {isSubmitting ? "Saving..." : "Save User"}
                 </button>
               </div>
             </div>
           )}
         </form>
 
-        <ToastNotification
-          message={notification.message}
-          type={notification.type}
-          show={notification.show}
-          onClose={closeNotification}
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={handleModalClose}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          actionText={statusModal.actionText || (statusModal.type === "success" ? "Back to Users" : "Close")}
+          onAction={statusModal.onAction || handleModalClose}
         />
       </div>
     </PageGuard>

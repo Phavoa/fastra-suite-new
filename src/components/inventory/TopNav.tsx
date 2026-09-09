@@ -19,7 +19,7 @@ export function TopNav() {
     { label: "Stock on Hand", href: "/inventory/stock-on-hand" },
     { label: "Stock Adjustment", href: "/inventory/stocks/adjustment" },
     { label: "Inventory Ledger", href: "/inventory/stocks/stock-moves" },
-    { label: "Scrap", href: "/inventory/stocks/scrap" },
+    { label: "Scrap", href: "/inventory/operation/scrap" },
   ];
 
   const configurationOptions: NavOption[] = [
@@ -45,6 +45,10 @@ export function TopNav() {
       label: "Incoming Product Return",
       href: "/inventory/operation/incoming_product_return",
     },
+    {
+      label: "Material Consumption",
+      href: "/inventory/operation/material-consumption",
+    },
     { label: "Delivery Order", href: "/inventory/operation/delivery_order" },
     {
       label: "Delivery Order Return",
@@ -54,7 +58,7 @@ export function TopNav() {
       label: "Internal Transfer",
       href: "/inventory/operation/internal_transfer",
     },
-    { label: "Back Order", href: "/inventory/operation/back_order" },
+    { label: "Back Order", href: "/inventory/operation/backorder" },
   ];
 
   type NavOption = {

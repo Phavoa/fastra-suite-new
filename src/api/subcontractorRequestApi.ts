@@ -17,6 +17,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const subcontractorRequestApi = createApi({
   reducerPath: "subcontractorRequestApi",
+  tagTypes: ["SubcontractorRequest", "SubcontractorMilestone"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -73,14 +74,26 @@ export const subcontractorRequestApi = createApi({
     }
   },
   endpoints: (builder) => ({
-    getSubcontractorRequests: builder.query<SubcontractorRequest[], GetSubcontractorRequestsParams>({
+    getSubcontractorRequests: builder.query<SubcontractorRequest[], GetSubcontractorRequestsParams | void>({
       query: (params) => ({
         url: "/project-requests/subcontractor-requests/",
-        params,
+        params: params || undefined,
       }),
+      providesTags: (result) => {
+        const list = Array.isArray(result)
+          ? result
+          : (result as any)?.results && Array.isArray((result as any).results)
+          ? (result as any).results
+          : [];
+        return [
+          ...list.map(({ id }: { id: any }) => ({ type: "SubcontractorRequest" as const, id })),
+          { type: "SubcontractorRequest", id: "LIST" },
+        ];
+      },
     }),
-    getSubcontractorRequest: builder.query<SubcontractorRequest, number>({
+    getSubcontractorRequest: builder.query<SubcontractorRequest, number | string>({
       query: (id) => `/project-requests/subcontractor-requests/${id}/`,
+      providesTags: (result, error, id) => [{ type: "SubcontractorRequest", id }],
     }),
     createSubcontractorRequest: builder.mutation<SubcontractorRequest, CreateSubcontractorRequest>({
       query: (body) => ({
@@ -88,33 +101,45 @@ export const subcontractorRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: [{ type: "SubcontractorRequest", id: "LIST" }],
     }),
-    updateSubcontractorRequest: builder.mutation<SubcontractorRequest, { id: number; body: Partial<SubcontractorRequest> }>({
+    updateSubcontractorRequest: builder.mutation<SubcontractorRequest, { id: number | string; body: Partial<SubcontractorRequest> }>({
       query: ({ id, body }) => ({
         url: `/project-requests/subcontractor-requests/${id}/`,
         method: "PUT",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "SubcontractorRequest", id },
+        { type: "SubcontractorRequest", id: "LIST" },
+      ],
     }),
-    deleteSubcontractorRequest: builder.mutation<void, number>({
+    deleteSubcontractorRequest: builder.mutation<void, number | string>({
       query: (id) => ({
         url: `/project-requests/subcontractor-requests/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: [{ type: "SubcontractorRequest", id: "LIST" }],
     }),
-    submitSubcontractorRequest: builder.mutation<SubcontractorRequest, { id: number; data?: any }>({
+    submitSubcontractorRequest: builder.mutation<SubcontractorRequest, { id: number | string; subcontractorRequestId?: number | string; data?: any }>({
       query: ({ id, data }) => ({
         url: `/project-requests/project-requests/${id}/submit/`,
         method: "POST",
-        body: data,
+        body: data || {},
       }),
+      invalidatesTags: (result, error, { id, subcontractorRequestId }) => [
+        { type: "SubcontractorRequest", id },
+        ...(subcontractorRequestId ? [{ type: "SubcontractorRequest" as const, id: subcontractorRequestId }] : []),
+        { type: "SubcontractorRequest", id: "LIST" },
+      ],
     }),
     // Milestone endpoints
-    getSubcontractorMilestones: builder.query<Milestone[], GetSubcontractorRequestsParams>({
+    getSubcontractorMilestones: builder.query<Milestone[], GetSubcontractorRequestsParams | void>({
       query: (params) => ({
         url: "/project-requests/subcontractor-milestone/",
-        params,
+        params: params || undefined,
       }),
+      providesTags: ["SubcontractorMilestone"],
     }),
     createSubcontractorMilestone: builder.mutation<Milestone, Partial<Milestone>>({
       query: (body) => ({
@@ -122,6 +147,7 @@ export const subcontractorRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["SubcontractorMilestone"],
     }),
   }),
 });

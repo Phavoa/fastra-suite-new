@@ -82,6 +82,9 @@ function expandPermissionType(type: string): PermissionAction[] {
     actions.push("view", "create" as any, "add" as any, "edit" as any, "change" as any, "delete" as any);
   } else if (normalizedType === "approver") {
     actions.push("view", "approve" as any, "reject" as any);
+  } else if (normalizedType === "requester") {
+    // Requester has specific granular entitlements; do not give blanket module-wide view/create
+    actions.push("requester" as PermissionAction);
   } else {
     actions.push(type as PermissionAction);
   }
@@ -130,34 +133,116 @@ export function normalizePermissionDetails(
             toAdd.push(entitlement);
           }
 
-          // Map new backend names to the old Django names the frontend UI expects
-          const TEMPORARY_MAP: Record<string, string> = {
-            "view_product_category": "view_productcategory",
-            "create_product_category": "add_productcategory",
-            "edit_product_category": "change_productcategory",
-            "delete_product_category": "delete_productcategory",
-            "view_unit_of_measure": "view_unitofmeasure",
-            "create_unit_of_measure": "add_unitofmeasure",
-            "edit_unit_of_measure": "change_unitofmeasure",
-            "delete_unit_of_measure": "delete_unitofmeasure",
-            "create_products": "add_products",
-            "edit_products": "change_products",
-            "view_stock_adjustment": "view_stockadjustment",
-            "create_stock_adjustment": "add_stockadjustment",
-            "edit_stock_adjustment": "change_stockadjustment",
-            "create_location": "add_location",
-            "edit_location": "change_location",
-            "create_delivery_return": "add_returnincomingproduct",
-            "edit_delivery_return": "change_returnincomingproduct",
-            "create_scrap": "add_scrap",
-            "edit_scrap": "change_scrap",
-            // Add any other specific mappings here if needed
+          // Map new backend names to the old Django names the frontend UI expects (and vice-versa)
+          const TEMPORARY_MAP: Record<string, string[]> = {
+            // Stock on Hand / Inventory
+            "view_stock_on_hand": ["view_inventory", "view_stock_on_hand"],
+            "view_inventory": ["view_stock_on_hand", "view_inventory"],
+            "export_stock_on_hand": ["export_inventory", "export_stock_on_hand"],
+            "view_stock_detail": ["view_inventory_detail", "view_stock_detail"],
+
+            // Product Categories (singular & plural)
+            "view_product_categories": ["view_productcategory", "view_product_category", "view_product_categories"],
+            "view_product_category": ["view_productcategory", "view_product_categories"],
+            "create_product_categories": ["add_productcategory", "create_product_category", "create_product_categories"],
+            "create_product_category": ["add_productcategory", "create_product_categories"],
+            "edit_product_categories": ["change_productcategory", "edit_product_category", "edit_product_categories"],
+            "edit_product_category": ["change_productcategory", "edit_product_categories"],
+            "delete_product_categories": ["delete_productcategory", "delete_product_category", "delete_product_categories"],
+            "delete_product_category": ["delete_productcategory", "delete_product_categories"],
+
+            // Units of Measure
+            "view_unit_of_measure": ["view_unitofmeasure", "view_unit_of_measure"],
+            "create_unit_of_measure": ["add_unitofmeasure", "create_unit_of_measure"],
+            "edit_unit_of_measure": ["change_unitofmeasure", "edit_unit_of_measure"],
+            "delete_unit_of_measure": ["delete_unitofmeasure", "delete_unit_of_measure"],
+
+            // Products
+            "view_products": ["view_product", "view_products"],
+            "create_products": ["add_products", "add_product", "create_products"],
+            "edit_products": ["change_products", "change_product", "edit_products"],
+            "delete_products": ["delete_products", "delete_product"],
+
+            // Locations (singular & plural)
+            "view_locations": ["view_location", "view_locations"],
+            "view_location": ["view_locations", "view_location"],
+            "create_locations": ["add_location", "create_location", "create_locations"],
+            "create_location": ["add_location", "create_locations"],
+            "edit_locations": ["change_location", "edit_location", "edit_locations"],
+            "edit_location": ["change_location", "edit_locations"],
+            "delete_locations": ["delete_location", "delete_locations"],
+            "delete_location": ["delete_locations", "delete_location"],
+            "view_locations_stock": ["view_location_stock", "view_locations_stock"],
+
+            // Stock Adjustment
+            "view_stock_adjustment": ["view_stockadjustment", "view_stock_adjustment"],
+            "create_stock_adjustment": ["add_stockadjustment", "create_stock_adjustment"],
+            "edit_stock_adjustment": ["change_stockadjustment", "edit_stock_adjustment"],
+            "validate_stock_adjustment": ["validate_stockadjustment", "validate_stock_adjustment"],
+            "cancel_stock_adjustment": ["cancel_stockadjustment", "cancel_stock_adjustment"],
+
+            // Scrap
+            "view_scrap": ["view_scrap"],
+            "create_scrap": ["add_scrap", "create_scrap"],
+            "edit_scrap": ["change_scrap", "edit_scrap"],
+            "delete_scrap": ["delete_scrap"],
+            "validate_scrap": ["validate_scrap"],
+
+            // Supplier Return & Delivery Return
+            "view_supplier_return": ["view_returnincomingproduct", "view_supplier_return", "view_supplierreturn"],
+            "create_supplier_return": ["add_returnincomingproduct", "create_supplier_return", "add_supplierreturn"],
+            "edit_supplier_return": ["change_returnincomingproduct", "edit_supplier_return", "change_supplierreturn"],
+            "delete_supplier_return": ["delete_returnincomingproduct", "delete_supplier_return"],
+            "validate_supplier_return": ["validate_returnincomingproduct", "validate_supplier_return"],
+            "cancel_supplier_return": ["cancel_returnincomingproduct", "cancel_supplier_return"],
+            "create_delivery_return": ["add_returnincomingproduct", "create_delivery_return"],
+            "edit_delivery_return": ["change_returnincomingproduct", "edit_delivery_return"],
+            "delete_delivery_return": ["delete_returnincomingproduct", "delete_delivery_return"],
+
+            // Incoming Product
+            "view_incoming_product": ["view_incomingproduct", "view_incoming_product"],
+            "create_incoming_product": ["add_incomingproduct", "create_incoming_product"],
+            "edit_incoming_product": ["change_incomingproduct", "edit_incoming_product"],
+            "delete_incoming_product": ["delete_incomingproduct", "delete_incoming_product"],
+            "validate_incoming_product": ["validate_incomingproduct", "validate_incoming_product"],
+            "cancel_incoming_product": ["cancel_incomingproduct", "cancel_incoming_product"],
+
+            // Material Consumption
+            "view_material_consumption": ["view_materialconsumption", "view_materialconsumptionrequest", "view_material_consumption"],
+            "create_material_consumption": ["add_materialconsumption", "add_materialconsumptionrequest", "create_material_consumption"],
+            "edit_material_consumption": ["change_materialconsumption", "change_materialconsumptionrequest", "edit_material_consumption"],
+            "delete_material_consumption": ["delete_materialconsumption", "delete_material_consumption"],
+            "release_material_consumption": ["release_materialconsumption", "release_material_consumption"],
+
+            // Backorder
+            "view_backorder": ["view_backorder", "view_back_order"],
+            "create_backorder": ["add_backorder", "create_backorder", "add_back_order"],
+            "validate_backorder": ["validate_backorder", "validate_back_order"],
+
+            // Inventory Ledger / Stock Moves
+            "view_inventory_ledger": ["view_stockmove", "view_inventory_ledger"],
+            "export_inventory_ledger": ["export_stockmove", "export_inventory_ledger"],
+            "view_stock_move_detail": ["view_stockmove_detail", "view_stock_move_detail"],
+            "create_stock_move": ["add_stockmove", "create_stock_move"],
           };
 
           for (const rawEnt of toAdd) {
-            const mappedEnt = TEMPORARY_MAP[rawEnt] || rawEnt;
-            const action = DJANGO_ACTION_MAP[mappedEnt] ?? mappedEnt;
-            permissions[detail.module].add(action as PermissionAction);
+            if (!rawEnt || typeof rawEnt !== "string" || !rawEnt.trim()) continue;
+
+            // Add raw entitlement
+            permissions[detail.module].add(rawEnt as PermissionAction);
+
+            // Add mapped aliases
+            const mappedList = TEMPORARY_MAP[rawEnt];
+            if (mappedList) {
+              for (const m of mappedList) {
+                const action = DJANGO_ACTION_MAP[m] ?? m;
+                permissions[detail.module].add(action as PermissionAction);
+              }
+            } else {
+              const action = DJANGO_ACTION_MAP[rawEnt] ?? rawEnt;
+              permissions[detail.module].add(action as PermissionAction);
+            }
           }
         }
       }

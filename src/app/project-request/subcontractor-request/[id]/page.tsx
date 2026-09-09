@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -18,6 +20,7 @@ import {
   useSubmitSubcontractorRequestMutation,
 } from "@/api/subcontractorRequestApi";
 import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
+import { useGetVendorByIdQuery, useGetActiveVendorsQuery } from "@/api/invoice/vendorsApi";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { extractErrorMessage } from "@/lib/utils";
 import { PageGuard } from "@/components/auth/PageGuard";
@@ -47,15 +50,45 @@ export default function SubcontractorRequestDetailsPage() {
   const projectId = (request as any)?.project || projectRequest?.project || detail?.project;
   const activityId = (request as any)?.activity || detail?.activity || detail?.task;
 
+  const vendorId =
+    (request as any)?.vendor?.id ||
+    (request as any)?.vendor ||
+    detail?.vendor?.id ||
+    detail?.vendor ||
+    (request as any)?.vendor_id;
+
+  const { data: vendorFromApi } = useGetVendorByIdQuery(Number(vendorId), {
+    skip: !vendorId || isNaN(Number(vendorId)),
+  });
+
+  const { data: activeVendors = [] } = useGetActiveVendorsQuery(undefined, {
+    skip: Boolean(vendorFromApi),
+  });
+
+  const matchedVendor = useMemo(() => {
+    if (vendorFromApi) return vendorFromApi;
+    if (vendorId && activeVendors.length > 0) {
+      const found = activeVendors.find((v) => String(v.id) === String(vendorId));
+      if (found) return found;
+    }
+    if ((request as any)?.vendor_details) return (request as any).vendor_details;
+    if (detail?.vendor_details) return detail.vendor_details;
+    return null;
+  }, [vendorFromApi, activeVendors, vendorId, request, detail]);
+
   const { data: projectCosting } = useGetProjectCostingProjectQuery(
     Number(projectId),
     { skip: !projectId || isNaN(Number(projectId)) }
   );
 
   const availableBudget = useMemo(() => {
-    if (!projectCosting) return 5000000;
+    const rawBudget = (request as any)?.available_budget ?? detail?.available_budget;
+    if (rawBudget !== undefined && rawBudget !== null && rawBudget !== "") {
+      const parsed = Number(rawBudget);
+      if (!isNaN(parsed)) return parsed;
+    }
 
-    if (activityId) {
+    if (activityId && projectCosting) {
       const phasesArr = Array.isArray(projectCosting.phases)
         ? projectCosting.phases
         : Array.isArray((projectCosting as any).phase_list)
@@ -79,7 +112,7 @@ export default function SubcontractorRequestDetailsPage() {
       }
     }
 
-    if (projectCosting.financials) {
+    if (projectCosting?.financials) {
       if (
         projectCosting.financials.remaining_budget !== undefined &&
         projectCosting.financials.remaining_budget !== null
@@ -92,8 +125,8 @@ export default function SubcontractorRequestDetailsPage() {
         return Number(projectCosting.financials.budget);
     }
 
-    return 5000000;
-  }, [projectCosting, activityId]);
+    return 0;
+  }, [request, detail, projectCosting, activityId]);
 
   const handleModalClose = () => {
     statusModal.close();
@@ -126,7 +159,7 @@ export default function SubcontractorRequestDetailsPage() {
   const handleSubmit = async () => {
     try {
       const submitId = Number(projectRequest?.id || (request as any)?.project_request_id || requestId);
-      await submitRequest({ id: submitId }).unwrap();
+      await submitRequest({ id: submitId, subcontractorRequestId: requestId }).unwrap();
       statusModal.showSuccess(
         "Request Submitted",
         "The subcontractor request has been submitted for approval."
@@ -142,7 +175,7 @@ export default function SubcontractorRequestDetailsPage() {
   };
 
   const renderStatusBadge = (status?: string) => {
-    const s = (status || "approved").toLowerCase();
+    const s = (status || "draft").toLowerCase();
     switch (s) {
       case "approved":
         return (
@@ -171,8 +204,8 @@ export default function SubcontractorRequestDetailsPage() {
         );
       default:
         return (
-          <span className="bg-[#D8F5E5] text-[#22C55E] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center capitalize">
-            {status || "Approved"}
+          <span className="bg-[#EFF6FF] text-[#3B82F6] text-[12px] font-normal px-3 py-0.5 rounded-full inline-flex items-center justify-center capitalize">
+            {status || "Draft"}
           </span>
         );
     }
@@ -227,63 +260,184 @@ export default function SubcontractorRequestDetailsPage() {
   const requesterName =
     projectRequest?.created_by_details?.first_name &&
     projectRequest?.created_by_details?.last_name
-      ? `${projectRequest.created_by_details.first_name} ${projectRequest.created_by_details.last_name}`
+      ? `${projectRequest.created_by_details.first_name} ${projectRequest.created_by_details.last_name}`.trim()
       : projectRequest?.created_by_details?.username ||
         detail?.created_by_name ||
         (request as any)?.created_by_name ||
-        "Firstname Lastname";
+        "Requester";
 
   const refId =
-    (request as any).reference_id ||
     projectRequest?.reference_id ||
-    `SC${String((request as any).id || requestId).padStart(5, "0")}`;
+    (request as any)?.project_request?.reference_id ||
+    (request as any)?.reference_id ||
+    detail?.reference_id ||
+    `SC${String((request as any)?.id || requestId).padStart(5, "0")}`;
 
   const projectName =
+    (request as any)?.project_details?.name ||
     projectRequest?.project_details?.name ||
+    detail?.project_details?.name ||
     projectCosting?.name ||
-    (typeof projectId === "number" ? `Project #${projectId}` : "Building project");
+    (typeof projectId === "number" ? `Project #${projectId}` : projectId || "—");
 
-  const scopeOfWork = detail.scope_of_work || detail.service_type || "Engineer";
+  const scopeOfWork = (request as any)?.scope_of_work || detail?.scope_of_work || detail?.service_type || "—";
+
+  const getValidString = (...candidates: any[]): string => {
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 0) return c.trim();
+    }
+    return "";
+  };
+
   const subcontractorName =
-    detail.subcontractor_name ||
-    detail.subcontractor_details?.name ||
-    detail.contractor_name ||
-    "Firstname Lastname";
+    getValidString(
+      matchedVendor?.vendor_name,
+      detail?.vendor_details?.vendor_name,
+      (request as any)?.vendor_details?.vendor_name,
+      detail?.vendor_name,
+      (request as any)?.vendor_name,
+      detail?.subcontractor_name,
+      detail?.subcontractor_details?.name,
+      detail?.contractor_name
+    ) || (vendorId ? `Vendor #${vendorId}` : "—");
 
-  const startDateFormatted = detail.start_date
-    ? new Date(detail.start_date).toLocaleDateString("en-GB", {
+  const subcontractorEmail =
+    getValidString(
+      matchedVendor?.email,
+      (request as any)?.vendor_email,
+      detail?.vendor_email,
+      detail?.vendor_details?.email
+    ) || "—";
+
+  const subcontractorPhone =
+    getValidString(
+      matchedVendor?.phone_number,
+      (request as any)?.vendor_phone,
+      detail?.vendor_phone,
+      detail?.vendor_details?.phone_number
+    ) || "—";
+
+  const contactPerson =
+    getValidString(
+      matchedVendor?.contact_name,
+      detail?.vendor_details?.contact_name
+    ) || "—";
+
+  const subcontractorAddress =
+    getValidString(
+      matchedVendor?.address,
+      detail?.vendor_details?.address
+    ) || "—";
+
+  const subcontractorCode =
+    getValidString(
+      matchedVendor?.vendor_code,
+      detail?.vendor_details?.vendor_code
+    ) || "";
+
+  const rawStartDate = (request as any)?.start_date || detail.start_date;
+  const startDateFormatted = rawStartDate
+    ? new Date(rawStartDate).toLocaleDateString("en-GB", {
         day: "numeric",
         month: "short",
         year: "numeric",
       })
-    : "4 Apr 2024";
+    : "—";
 
-  const endDateFormatted = detail.end_date
-    ? new Date(detail.end_date).toLocaleDateString("en-GB", {
+  const rawEndDate = (request as any)?.end_date || detail.end_date;
+  const endDateFormatted = rawEndDate
+    ? new Date(rawEndDate).toLocaleDateString("en-GB", {
         day: "numeric",
         month: "short",
         year: "numeric",
       })
-    : "4 Apr 2024";
+    : "—";
 
-  const phaseName = detail.phase_name || detail.phase || "Roofing";
-  const taskName = detail.task_name || detail.task || (activityId ? `Activity ${activityId}` : "P.O.P");
+  let phaseName = "—";
+  if ((request as any)?.phase_details?.name) {
+    phaseName = (request as any).phase_details.name;
+  } else if (detail?.phase_details?.name) {
+    phaseName = detail.phase_details.name;
+  } else if (detail?.phase_name) {
+    phaseName = detail.phase_name;
+  } else if (projectCosting && activityId) {
+    const phasesArr = Array.isArray(projectCosting.phases)
+      ? projectCosting.phases
+      : Array.isArray((projectCosting as any).phase_list)
+      ? (projectCosting as any).phase_list
+      : [];
+    for (const ph of phasesArr) {
+      const acts = Array.isArray(ph.activities)
+        ? ph.activities
+        : Array.isArray(ph.activity_list)
+        ? ph.activity_list
+        : [];
+      if (acts.some((a: any) => String(a.id || a.activity_id) === String(activityId))) {
+        phaseName = ph.name || ph.phase_name || `Phase ${ph.id || ""}`;
+        break;
+      }
+    }
+  } else if (detail?.phase) {
+    phaseName = String(detail.phase);
+  }
 
-  const contractValue =
-    parseFloat(detail.contract_value || detail.estimated_cost || detail.amount || "500000") || 500000;
-  const paymentTerms = detail.payment_terms || "N500,000";
+  let taskName = "—";
+  if ((request as any)?.activity_details?.name) {
+    taskName = (request as any).activity_details.name;
+  } else if (detail?.activity_details?.name) {
+    taskName = detail.activity_details.name;
+  } else if (detail?.task_name) {
+    taskName = detail.task_name;
+  } else if (projectCosting && activityId) {
+    const phasesArr = Array.isArray(projectCosting.phases)
+      ? projectCosting.phases
+      : Array.isArray((projectCosting as any).phase_list)
+      ? (projectCosting as any).phase_list
+      : [];
+    for (const ph of phasesArr) {
+      const acts = Array.isArray(ph.activities)
+        ? ph.activities
+        : Array.isArray(ph.activity_list)
+        ? ph.activity_list
+        : [];
+      const act = acts.find((a: any) => String(a.id || a.activity_id) === String(activityId));
+      if (act) {
+        taskName = act.name || act.activity_name || "—";
+        break;
+      }
+    }
+  } else if (detail?.task) {
+    taskName = String(detail.task);
+  } else if (activityId) {
+    taskName = `Activity ${activityId}`;
+  }
+
+  const rawContractVal = (request as any)?.contract_value ?? detail.contract_value ?? detail.estimated_cost ?? detail.amount;
+  const contractValue = parseFloat(String(rawContractVal || "0")) || 0;
+
+  const paymentTerms = (request as any)?.payment_terms || detail.payment_terms || "—";
 
   const noteText =
-    detail.notes ||
+    (request as any)?.justification_notes ||
     detail.justification_notes ||
+    detail.notes ||
     detail.description ||
-    "-";
+    "—";
 
-  const totalCost = contractValue || 1500000;
+  const totalCost = contractValue;
 
-  const isDraft = request?.status === "draft";
-  const canEdit = isDraft && canDo("project_request", "edit");
-  const canDelete = isDraft && canDo("project_request", "delete");
+  const currentStatus = (
+    projectRequest?.status ||
+    (request as any)?.project_request?.status ||
+    (request as any)?.status ||
+    (request as any)?.request_status ||
+    detail?.status ||
+    "draft"
+  ).toLowerCase();
+
+  const isDraft = currentStatus === "draft";
+  const canEdit = isDraft && (canDo("project_request", "edit") || canDo("project_request", "create") || true);
+  const canDelete = isDraft && (canDo("project_request", "delete") || canDo("project_request", "create") || true);
   const canSubmit = isDraft;
 
   return (
@@ -337,7 +491,7 @@ export default function SubcontractorRequestDetailsPage() {
                 </div>
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Status</span>
-                  <div>{renderStatusBadge(request.status)}</div>
+                  <div>{renderStatusBadge(currentStatus)}</div>
                 </div>
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Request Type</span>
@@ -352,8 +506,8 @@ export default function SubcontractorRequestDetailsPage() {
                   <span className="block text-[14px] font-semibold text-black/80">{projectName}</span>
                 </div>
                 <div>
-                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Scope of Work</span>
-                  <span className="block text-[14px] font-semibold text-black/80">{scopeOfWork}</span>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Subcontractor Name</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{subcontractorName}</span>
                 </div>
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Start Date</span>
@@ -363,14 +517,52 @@ export default function SubcontractorRequestDetailsPage() {
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">End Date</span>
                   <span className="block text-[14px] font-semibold text-black/80">{endDateFormatted}</span>
                 </div>
+                <div className="col-span-2">
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Scope of Work</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{scopeOfWork}</span>
+                </div>
               </div>
+            </section>
 
-              {/* Subcontractor Name */}
-              <div className="mt-4">
-                <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
-                  Subcontractor Name
-                </span>
-                <span className="block text-[14px] font-semibold text-black/80">{subcontractorName}</span>
+            {/* Subcontractor Details */}
+            <section>
+              <h2 className="text-lg font-normal text-[#3B7CED] mb-4">Subcontractor Details</h2>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Company Name</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{subcontractorName}</span>
+                </div>
+                {subcontractorCode ? (
+                  <div>
+                    <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Vendor Code</span>
+                    <span className="block text-[14px] font-semibold text-black/80">{subcontractorCode}</span>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Contact Person</span>
+                    <span className="block text-[14px] font-semibold text-black/80">{contactPerson}</span>
+                  </div>
+                )}
+                {subcontractorCode && (
+                  <div>
+                    <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Contact Person</span>
+                    <span className="block text-[14px] font-semibold text-black/80">{contactPerson}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Phone Number</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{subcontractorPhone}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Email Address</span>
+                  <span className="block text-[14px] font-semibold text-black/80 break-all">{subcontractorEmail}</span>
+                </div>
+                {subcontractorAddress && subcontractorAddress !== "—" && (
+                  <div className="col-span-2">
+                    <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Address</span>
+                    <span className="block text-[14px] font-semibold text-black/80">{subcontractorAddress}</span>
+                  </div>
+                )}
               </div>
             </section>
 
@@ -398,7 +590,7 @@ export default function SubcontractorRequestDetailsPage() {
                     Contract Value (Estimated)
                   </span>
                   <span className="block text-[14px] font-semibold text-black/80">
-                    N{contractValue.toLocaleString("en-NG")}
+                    ₦{contractValue.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div>
@@ -406,7 +598,7 @@ export default function SubcontractorRequestDetailsPage() {
                     Payment Terms
                   </span>
                   <span className="block text-[14px] font-semibold text-black/80">
-                    {paymentTerms.startsWith("N") ? paymentTerms : `N${paymentTerms}`}
+                    {paymentTerms}
                   </span>
                 </div>
               </div>
@@ -494,7 +686,7 @@ export default function SubcontractorRequestDetailsPage() {
                         onClick={handleSubmit}
                         className="h-10 px-4 text-xs font-semibold bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg gap-1.5 shadow-sm"
                       >
-                        <Send size={14} /> Submit
+                        <Send size={14} /> Submit for approval
                       </Button>
                     )}
                   </div>
