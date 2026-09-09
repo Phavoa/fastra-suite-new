@@ -14,6 +14,7 @@ import {
 } from "@/api/invoice/vendorsApi";
 import { useGetVendorBillsQuery } from "@/api/invoice/vendorBillsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 const schema = z.object({
   vendorName: z.string().min(1, "Vendor name is required"),
@@ -138,11 +139,13 @@ export default function EditVendorPage() {
 
   if (isError || !vendor) {
     return (
-      <div className="p-6">
-        <div className="p-12 text-center text-red-500 bg-white rounded-2xl border border-gray-100">
-          Failed to load vendor.
+      <PageGuard module="invoice" entitlement="configure_invoice">
+        <div className="p-6">
+          <div className="p-12 text-center text-red-500 bg-white rounded-2xl border border-gray-100">
+            Failed to load vendor.
+          </div>
         </div>
-      </div>
+      </PageGuard>
     );
   }
 

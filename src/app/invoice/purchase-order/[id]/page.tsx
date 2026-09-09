@@ -3,15 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  Mail,
-  FileText,
-  CheckCircle,
-  Loader2,
-  ArrowLeft,
-  Calendar,
-  Wrench,
-} from "lucide-react";
+import { Mail, FileText, CheckCircle, Loader2, ArrowLeft } from "lucide-react";
 import CreateVendorBillModal from "@/components/invoice/CreateVendorBillModal";
 import ReturnHiredEquipmentModal from "@/components/invoice/ReturnHiredEquipmentModal";
 import { ToastNotification } from "@/components/shared/ToastNotification";
@@ -24,6 +16,8 @@ import {
   type ProjectPurchaseOrder,
 } from "@/api/invoice/projectPurchaseOrdersApi";
 import { useGetAccountingSettingsQuery } from "@/api/invoice/accountingSettingsApi";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Helpers                                  */
@@ -273,54 +267,66 @@ export default function PurchaseOrderDetailPage() {
           </button>
 
           {isDraft && (
-            <button
-              type="button"
-              onClick={handleIssuePO}
-              disabled={isIssuing}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            <PermissionGuard
+              module="invoice"
+              entitlement="issue_purchase_orders"
             >
-              {isIssuing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Issuing…
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Issue PO
-                </>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={handleIssuePO}
+                disabled={isIssuing}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isIssuing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Issuing…
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Issue PO
+                  </>
+                )}
+              </button>
+            </PermissionGuard>
           )}
 
           {equipmentHire &&
             equipmentHire.status !== "returned" &&
             status === "issued" && (
-              <button
-                type="button"
-                onClick={() => setIsReturnModalOpen(true)}
-                disabled={isReturning || !equipmentHire}
-                className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              <PermissionGuard
+                module="invoice"
+                entitlement="receive_purchase_orders"
               >
-                {isReturning ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ArrowLeft className="h-4 w-4 rotate-180" />
-                )}
-                Mark Returned
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReturnModalOpen(true)}
+                  disabled={isReturning || !equipmentHire}
+                  className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isReturning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowLeft className="h-4 w-4 rotate-180" />
+                  )}
+                  Mark Returned
+                </button>
+              </PermissionGuard>
             )}
 
           {canCreateBill && (
-            <button
-              type="button"
-              onClick={() => setIsBillModalOpen(true)}
-              disabled={!isCreateBillEnabled}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FileText className="h-4 w-4" />
-              Create Bill
-            </button>
+            <PermissionGuard module="invoice" entitlement="edit_invoice">
+              <button
+                type="button"
+                onClick={() => setIsBillModalOpen(true)}
+                disabled={!isCreateBillEnabled}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FileText className="h-4 w-4" />
+                Create Bill
+              </button>
+            </PermissionGuard>
           )}
         </div>
       </div>

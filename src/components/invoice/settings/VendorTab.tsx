@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Plus, Grid3X3, List } from "lucide-react";
 import Link from "next/link";
 import { useGetVendorsQuery } from "@/api/invoice/vendorsApi";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 export function VendorTab() {
   const router = useRouter();
@@ -36,13 +37,15 @@ export function VendorTab() {
             />
           </div>
 
-          <Link
-            href="/invoice/vendor/new"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Vendor
-          </Link>
+          <PermissionGuard module="invoice" entitlement="configure_invoice">
+            <Link
+              href="/invoice/vendor/new"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Vendor
+            </Link>
+          </PermissionGuard>
 
           <div className="flex border border-gray-200 rounded-lg overflow-hidden">
             <button className="p-2.5 bg-white">
@@ -58,9 +61,13 @@ export function VendorTab() {
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading vendors...</div>
+          <div className="p-8 text-center text-gray-500">
+            Loading vendors...
+          </div>
         ) : isError ? (
-          <div className="p-8 text-center text-red-500">Failed to load vendors.</div>
+          <div className="p-8 text-center text-red-500">
+            Failed to load vendors.
+          </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No vendors found.</div>
         ) : (
