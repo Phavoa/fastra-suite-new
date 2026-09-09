@@ -1,5 +1,9 @@
 "use client";
-
+import type {
+  CreateDisbursementRequest,
+  CreateCashDisbursement,
+  CreateBankTransferDisbursement,
+} from "@/api/invoice/disbursementApi";
 import { useState, useEffect, useRef } from "react";
 import { X, Loader2, InfoIcon } from "lucide-react";
 import { ToastNotification } from "@/components/shared/ToastNotification";
@@ -10,16 +14,7 @@ interface CreateDisbursementModalProps {
   isOpen: boolean;
   onClose: () => void;
   request: any;
-  onSubmit: (payload: {
-    source_id: number;
-    company_bank_account_id: number;
-    disbursement_method: "bank_transfer" | "cash";
-    recipient_bank_name?: string;
-    recipient_account_number?: string;
-    recipient_bank?: string;
-    cash_recipient_name?: string;
-    cash_handover_confirmed?: boolean;
-  }) => void | Promise<void>;
+  onSubmit: (payload: CreateDisbursementRequest) => void | Promise<void>;
   formatCurrency: (amount: number) => string;
   isSubmitting?: boolean;
 }
@@ -60,9 +55,9 @@ export default function CreateDisbursementModal({
     "bank_transfer" | "cash"
   >("bank_transfer");
   const [bankAccount, setBankAccount] = useState("");
-  const [bankName, setBankName] = useState("");
+  const [accountName, setAccountName] = useState(""); // recipient_account_name
   const [accountNumber, setAccountNumber] = useState("");
-  const [bank, setBank] = useState("");
+  const [bankName, setBankName] = useState(""); // recipient_bank_name (free text)
   const [cashRecipientName, setCashRecipientName] = useState("");
   const [cashHandoverConfirmed, setCashHandoverConfirmed] = useState(false);
   const [toast, setToast] = useState<{
@@ -108,9 +103,9 @@ export default function CreateDisbursementModal({
     if (!isOpen) {
       setDisbursementMethod("bank_transfer");
       setBankAccount("");
-      setBankName("");
+      setAccountName("");
       setAccountNumber("");
-      setBank("");
+      setBankName("");
       setCashRecipientName("");
       setCashHandoverConfirmed(false);
       setToast(null);
@@ -161,47 +156,55 @@ export default function CreateDisbursementModal({
     }
 
     if (disbursementMethod === "bank_transfer") {
-      if (!bankName.trim() || !accountNumber.trim() || !bank) {
+      if (!accountName.trim() || !accountNumber.trim() || !bankName.trim()) {
         showToast("error", "Please fill in all recipient bank account details");
         return;
       }
+
+      const payload: CreateBankTransferDisbursement = {
+        source_type: "PETTY_CASH",
+        disbursement_method: "BANK_TRANSFER",
+        petty_cash_request: Number(sourceId),
+        company_bank_account: Number(bankAccount),
+        recipient_bank_name: bankName.trim(),
+        recipient_account_number: accountNumber.trim(),
+        recipient_account_name: accountName.trim(),
+        cash_received: false,
+      };
+
+      console.log("Petty Cash Disbursement payload →", payload);
+      try {
+        await onSubmit(payload);
+      } catch (err) {
+        console.error("Disbursement submit failed:", err);
+      }
+      return;
     }
 
-    if (disbursementMethod === "cash") {
-      if (!cashRecipientName.trim()) {
-        showToast(
-          "error",
-          "Please enter the name of the person receiving cash",
-        );
-        return;
-      }
-      if (!cashHandoverConfirmed) {
-        showToast(
-          "error",
-          "Please confirm that the cash was physically handed over",
-        );
-        return;
-      }
+    // cash branch
+    if (!cashRecipientName.trim()) {
+      showToast("error", "Please enter the name of the person receiving cash");
+      return;
+    }
+    if (!cashHandoverConfirmed) {
+      showToast(
+        "error",
+        "Please confirm that the cash was physically handed over",
+      );
+      return;
     }
 
-    const payload = {
-      source_id: Number(sourceId),
-      company_bank_account_id: Number(bankAccount),
-      disbursement_method: disbursementMethod,
-      ...(disbursementMethod === "bank_transfer"
-        ? {
-            recipient_bank_name: bankName.trim(),
-            recipient_account_number: accountNumber.trim(),
-            recipient_bank: bank,
-          }
-        : {
-            cash_recipient_name: cashRecipientName.trim(),
-            cash_handover_confirmed: true as const,
-          }),
+    const payload: CreateCashDisbursement = {
+      source_type: "PETTY_CASH",
+      disbursement_method: "CASH",
+      petty_cash_request: Number(sourceId),
+      company_bank_account: Number(bankAccount),
+      recipient_name: cashRecipientName.trim(),
+      cash_received: true,
     };
 
-    console.log("Petty Cash Disbursement payload →", payload);
-
+    if (process.env.NODE_ENV === "development")
+      console.log("Petty Cash Disbursement payload →", payload);
     try {
       await onSubmit(payload);
     } catch (err) {
@@ -297,21 +300,14 @@ export default function CreateDisbursementModal({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <InfoCard label="Petty Cash Reference" value={pettyCashRef} />
                   <InfoCard label="WBS Element" value={wbs} />
-                  <InfoCard label="Requester Name" value={requesterName} />
+                  {/* <InfoCard label="Requester Name" value={requesterName} /> */}
                   <InfoCard label="Project Name" value={projectName} />
                   <InfoCard label="Account Type" value={accountType} />
                   <InfoCard label="Request Type" value="Petty Cash Request" />
-                </div>
-
-                <div className="mb-4">
-                  <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 inline-block">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-                      Amount Approved
-                    </p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {formatCurrency(amountApproved)}
-                    </p>
-                  </div>
+                  <InfoCard
+                    label="Amount Approved"
+                    value={formatCurrency(amountApproved)}
+                  />
                 </div>
 
                 <div className="mb-4">
@@ -413,8 +409,8 @@ export default function CreateDisbursementModal({
                   </label>
                   <input
                     type="text"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
                     placeholder="Account holder name"
                     disabled={isSubmitting}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:opacity-60"
@@ -437,20 +433,14 @@ export default function CreateDisbursementModal({
                   <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">
                     Bank
                   </label>
-                  <select
-                    aria-label="Bank"
-                    value={bank}
-                    onChange={(e) => setBank(e.target.value)}
+                  <input
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="e.g. GTBank, First Bank, UBA…"
                     disabled={isSubmitting}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:opacity-60"
-                  >
-                    <option value="">Select Bank</option>
-                    <option value="GT Bank">GT Bank</option>
-                    <option value="First Bank">First Bank</option>
-                    <option value="UBA">UBA</option>
-                    <option value="Access Bank">Access Bank</option>
-                    <option value="Zenith Bank">Zenith Bank</option>
-                  </select>
+                  />
                 </div>
               </div>
             )}

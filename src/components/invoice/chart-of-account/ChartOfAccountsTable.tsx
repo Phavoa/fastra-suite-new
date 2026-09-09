@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ChartOfAccountDetail } from "@/api/invoice/chartOfAccountsApi";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 interface Props {
   accounts: ChartOfAccountDetail[];
@@ -13,14 +14,7 @@ interface Props {
   onEditAccount: (accountId: number) => void;
 }
 
-const filters = [
-  "All",
-  "ASSET",
-  "LIABILITY",
-  "EQUITY",
-  "INCOME",
-  "EXPENSE",
-];
+const filters = ["All", "ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"];
 
 const typeBadgeStyles: Record<string, string> = {
   ASSET: "bg-blue-100 text-blue-700",
@@ -115,29 +109,44 @@ export function ChartOfAccountsTable({
                   <td className="py-4 px-6">
                     <span
                       className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${
-                        typeBadgeStyles[cat.account_type] || "bg-gray-100 text-gray-700"
+                        typeBadgeStyles[cat.account_type] ||
+                        "bg-gray-100 text-gray-700"
                       }`}
                     >
                       {cat.account_type}
                     </span>
                   </td>
                   <td className="py-4 px-6 text-right font-medium text-gray-900">
-                    N{parseFloat(cat.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    N
+                    {parseFloat(cat.balance || "0").toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex justify-end gap-3">
-                      <button
-                        onClick={() => onEditAccount(cat.id)}
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="configure_invoice"
                       >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onAddAccount(cat.id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-1.5 rounded transition-colors"
+                        <button
+                          onClick={() => onEditAccount(cat.id)}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                      </PermissionGuard>
+
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="configure_invoice"
                       >
-                        Add Sub-account
-                      </button>
+                        <button
+                          onClick={() => onAddAccount(cat.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-1.5 rounded transition-colors"
+                        >
+                          Add Sub-account
+                        </button>
+                      </PermissionGuard>
                     </div>
                   </td>
                 </tr>
@@ -161,15 +170,24 @@ export function ChartOfAccountsTable({
                         <span className="text-gray-400 text-xs">-</span>
                       </td>
                       <td className="py-3.5 px-6 text-right font-medium text-gray-800">
-                        N{parseFloat(child.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        N
+                        {parseFloat(child.balance || "0").toLocaleString(
+                          undefined,
+                          { minimumFractionDigits: 2 },
+                        )}
                       </td>
                       <td className="py-3.5 px-6 text-right">
-                        <button
-                          onClick={() => onEditAccount(child.id)}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        <PermissionGuard
+                          module="invoice"
+                          entitlement="configure_invoice"
                         >
-                          Edit
-                        </button>
+                          <button
+                            onClick={() => onEditAccount(child.id)}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          >
+                            Edit
+                          </button>
+                        </PermissionGuard>
                       </td>
                     </tr>
                   ))}

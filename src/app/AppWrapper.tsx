@@ -10,6 +10,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import Sidebar from "@/components/shared/Sidebar";
 import SessionTimeoutWrapper from "@/components/SessionTimeoutWrapper";
 import DatabaseInitializer from "@/components/DatabaseInitializer";
+import SubscriptionGuard from "@/components/shared/SubscriptionGuard";
 
 import { createContext, useContext } from "react";
 
@@ -91,7 +92,9 @@ export default function AppWrapper({
                   <div
                     className={`flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ${!isAuthPage ? (sidebarExpanded ? "md:ml-64" : "md:ml-16") : ""}`}
                   >
-                    {children}
+                    <SubscriptionGuard>
+                      {children}
+                    </SubscriptionGuard>
                   </div>
                 </div>
               </SessionTimeoutWrapper>

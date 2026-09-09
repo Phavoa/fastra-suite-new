@@ -24,6 +24,7 @@ import { usersApi } from "@/api/settings/usersApi";
 import { tenantUserApi } from "@/api/settings/tenantUserApi";
 import { permissionsTemplateApi } from "@/api/settings/permissionsTemplateApi";
 import { auditTrailApi } from "@/api/settings/auditTrailApi";
+import { subscriptionApi } from "@/api/settings/subscriptionApi";
 import { currencyApi } from "../../api/purchase/currencyApi";
 import { locationApi } from "../../api/inventory/locationApi";
 import { multilocationApi } from "../../api/inventory/multilocationApi";
@@ -72,6 +73,8 @@ import { materialConsumptionRequestApi } from "@/api/requests/materialConsumptio
 import { approvedProjectRequestsApi } from "@/api/invoice/approvedProjectRequestsApi";
 import { vendorBillsApi } from "@/api/invoice/vendorBillsApi";
 import { notificationApi } from "@/api/notificationApi";
+import { accountLedgerApi } from "@/api/invoice/accountLedgerApi";
+import { disbursementsApi } from "@/api/invoice/disbursementApi";
 
 const authPersistConfig = {
   key: "auth",
@@ -153,6 +156,9 @@ const rootReducer = combineReducers({
 
   [approvedProjectRequestsApi.reducerPath]: approvedProjectRequestsApi.reducer,
   [vendorBillsApi.reducerPath]: vendorBillsApi.reducer,
+  [accountLedgerApi.reducerPath]: accountLedgerApi.reducer,
+  [disbursementsApi.reducerPath]: disbursementsApi.reducer,
+  [subscriptionApi.reducerPath]: subscriptionApi.reducer,
 });
 
 export const store = configureStore({
@@ -225,6 +231,9 @@ export const store = configureStore({
       vendorBillsApi.middleware,
       notificationApi.middleware,
       auditTrailApi.middleware,
+      accountLedgerApi.middleware,
+      disbursementsApi.middleware,
+      subscriptionApi.middleware,
     ),
 });
 

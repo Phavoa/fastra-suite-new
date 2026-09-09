@@ -114,7 +114,7 @@ export function UpdateBankDetailsModal({
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-gray-500">
               Bank Account Name, Number and Bank Name are required before any
-              payment can be processed to this vendor (PRD §9.8).
+              payment can be processed to this vendor.
             </Dialog.Description>
 
             <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">

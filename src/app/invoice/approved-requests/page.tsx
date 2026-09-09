@@ -10,9 +10,15 @@ import ConvertToPOSubcontractorModal from "@/components/invoice/subcontractor/Co
 import CreateVendorBillLabourModal from "@/components/invoice/labour-request/CreateVendorBillLabourReqModal";
 import CreateDisbursementModal from "@/components/invoice/petty-cash/CreateDisbursementModal";
 import ConvertToPOPlantEquipmentModal from "@/components/invoice/plant-and-equipment/ConvertToPOPlantEquipmentModal";
+import {
+  useCreateDisbursementMutation,
+  type CreateDisbursementRequest,
+} from "@/api/invoice/disbursementApi";
 import Breadcrumbs from "@/components/shared/BreadScrumbs";
 import { BreadcrumbItem } from "@/components/shared/types";
 import { ToastNotification } from "@/components/shared/ToastNotification";
+import { PageGuard } from "@/components/auth/PageGuard";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 const getTypeColor = (type: string) => {
   switch (type) {
@@ -30,7 +36,7 @@ const getTypeColor = (type: string) => {
 
 const items: BreadcrumbItem[] = [
   { label: "Home", href: "/" },
-  { label: "Invoicing", href: "/invoice" },
+  { label: "Invoicing", href: "/invoice/approved-requests" },
   {
     label: "Approved Requests",
     href: "/invoice/approved-requests",
@@ -130,6 +136,8 @@ export default function ApprovedRequestsPage() {
     isPettyCashDisbursementModalOpen,
     setIsPettyCashDisbursementModalOpen,
   ] = useState(false);
+  const [createDisbursement, { isLoading: isCreatingDisbursement }] =
+    useCreateDisbursementMutation();
 
   const [toast, setToast] = useState<{
     type: "success" | "error";
@@ -172,34 +180,36 @@ export default function ApprovedRequestsPage() {
     setSelectedRequest(null);
   };
 
-  const handlePettyCashSubmitDisbursement = async (payload: {
-    source_id: number;
-    company_bank_account_id: number;
-    disbursement_method: "bank_transfer" | "cash";
-    recipient_bank_name?: string;
-    recipient_account_number?: string;
-    recipient_bank?: string;
-    cash_recipient_name?: string;
-    cash_handover_confirmed?: boolean;
-  }) => {
-    console.log("Disbursement submitted →", {
-      request_id: selectedRequest?.backendId,
-      reference: selectedRequest?.id,
-      ...payload,
-    });
+  const handlePettyCashSubmitDisbursement = async (
+    payload: CreateDisbursementRequest,
+  ) => {
+    try {
+      if (process.env.NODE_ENV === "development")
+        console.log("Petty Cash Disbursement payload →", payload);
+      await createDisbursement(payload).unwrap();
 
-    // TODO: call disbursement mutation when backend is ready
-    showToast(
-      "success",
-      "Disbursement submitted. It will appear in the Payment Queue.",
-    );
-    handleClosePettyCashDisbursementModal();
-    refetch();
+      showToast(
+        "success",
+        "Successfully created disbursement. Navigating to Payment Queue.",
+      );
+
+      handleClosePettyCashDisbursementModal();
+      refetch();
+
+      // Give the toast a moment to appear, then navigate
+      setTimeout(() => {
+        router.push("/invoice/payment-queue");
+      }, 900);
+    } catch (err: unknown) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Create disbursement error →", err);
+      }
+      showToast("error", extractErrorMessage(err));
+    }
   };
-
-  // ---------- Plant & Equipment ----------
   const handleConvertToPlantEquipment = (request: any) => {
-    console.log("Convert to Plant & Equipment →", request);
+    if (process.env.NODE_ENV === "development")
+      console.log("Convert to Plant & Equipment →", request);
     setSelectedRequest(request);
     setCurrentStep(1);
     setIsPlantEquipmentModalOpen(true);
@@ -245,11 +255,12 @@ export default function ApprovedRequestsPage() {
       return;
     }
 
-    console.log("Subcontractor → Vendor Bill", {
-      approved_request_id: selectedRequest.backendId,
-      reference_id: selectedRequest.id,
-      type: selectedRequest.originalType,
-    });
+    if (process.env.NODE_ENV === "development")
+      console.log("Subcontractor → Vendor Bill", {
+        approved_request_id: selectedRequest.backendId,
+        reference_id: selectedRequest.id,
+        type: selectedRequest.originalType,
+      });
 
     try {
       // TODO: real mutation when backend is ready
@@ -300,8 +311,9 @@ export default function ApprovedRequestsPage() {
       expected_delivery_date: payload?.expected_delivery_date,
       expected_return_date: payload?.expected_return_date,
     };
-
-    console.log("Convert to PO – final payload sent to API →", finalPayload);
+    if (process.env.NODE_ENV === "development") {
+      console.log("Convert to PO – final payload sent to API →", finalPayload);
+    }
 
     try {
       const created = await convertRequestToPurchaseOrder({
@@ -390,253 +402,283 @@ export default function ApprovedRequestsPage() {
     }).format(amount);
 
   return (
-    <div className="p-6">
-      <Breadcrumbs items={items} className="pl-0 mb-6" />
+    <PageGuard module="invoice" entitlement="view_approved_requests">
+      <div className="p-6">
+        <Breadcrumbs items={items} className="pl-0 mb-6" />
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row gap-4 md:items-center mb-6 bg-white rounded px-4 py-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-gray-900">Invoicing</h1>
-        </div>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row gap-4 md:items-center mb-6 bg-white rounded px-4 py-2">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900">Invoicing</h1>
+          </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1 max-w-lg">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search …"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
-              aria-label="Search approved requests"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-lg">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search …"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                aria-label="Search approved requests"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table data-wizard="inv-approved-table" className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Request ID
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Request Type
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  WBS element
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Approval Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Requested Amount
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {isLoading ? (
-                <TableSkeleton rows={6} />
-              ) : isError ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <p className="text-sm text-red-600 mb-3">
-                      Failed to load requests.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => refetch()}
-                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      Retry
-                    </button>
-                  </td>
+        {/* Table */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table data-wizard="inv-approved-table" className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Request ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Request Type
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    WBS element
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Approval Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Requested Amount
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ) : filteredRequests.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-sm text-gray-500"
-                  >
-                    {searchTerm
-                      ? "No results found"
-                      : "No approved requests found"}
-                  </td>
-                </tr>
-              ) : (
-                filteredRequests.map((request, index) => (
-                  <tr
-                    key={request.backendId || index}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      {request.id}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTypeColor(
-                          request.type,
-                        )}`}
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {isLoading ? (
+                  <TableSkeleton rows={6} />
+                ) : isError ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center">
+                      <p className="text-sm text-red-600 mb-3">
+                        Failed to load requests.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => refetch()}
+                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                       >
-                        {request.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[220px]">
-                      <span className="truncate block" title={request.wbs}>
-                        {request.wbs}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {request.approvalDate}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                      {formatCurrency(request.requestedAmount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div data-wizard="inv-convert-action" className="flex items-center justify-start gap-2 flex-wrap">
-                        {request.type === "Purchase" && (
-                          <button
-                            type="button"
-                            onClick={() => handleConvertToPO(request)}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                            aria-label={`Convert ${request.id} to Purchase Order`}
-                          >
-                            Convert to PO
-                          </button>
-                        )}
-
-                        {request.type === "Subcontractor" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleConvertToSubcontractor(request)
-                            }
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                            aria-label={`Convert ${request.id} to Vendor Bill`}
-                          >
-                            Convert to Invoice
-                          </button>
-                        )}
-
-                        {request.type === "Plant and Equipment" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleConvertToPlantEquipment(request)
-                            }
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                            aria-label={`Convert ${request.id} to Plant & Equipment PO`}
-                          >
-                            Convert to PO
-                          </button>
-                        )}
-
-                        {request.type === "Labour Request" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleConvertToLabourInvoice(request)
-                            }
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                            aria-label={`Convert ${request.id} to Invoice`}
-                          >
-                            Convert to Invoice
-                          </button>
-                        )}
-
-                        {request.type === "Petty Cash Request" && (
-                          <button
-                            type="button"
-                            onClick={() => handleProcessDisbursement(request)}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
-                            aria-label={`Process disbursement for ${request.id}`}
-                          >
-                            Process Disbursement
-                          </button>
-                        )}
-                      </div>
+                        Retry
+                      </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : filteredRequests.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-8 text-center text-sm text-gray-500"
+                    >
+                      {searchTerm
+                        ? "No results found"
+                        : "No approved requests found"}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRequests.map((request, index) => (
+                    <tr
+                      key={request.backendId || index}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {request.id}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTypeColor(
+                            request.type,
+                          )}`}
+                        >
+                          {request.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-[220px]">
+                        <span className="truncate block" title={request.wbs}>
+                          {request.wbs}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {request.approvalDate}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                        {formatCurrency(request.requestedAmount)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div
+                          data-wizard="inv-convert-action"
+                          className="flex items-center justify-start gap-2 flex-wrap"
+                        >
+                          {request.type === "Purchase" && (
+                            <PermissionGuard
+                              module="invoice"
+                              entitlement="convert_approved_requests_to_purchase_orders"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleConvertToPO(request)}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                                aria-label={`Convert ${request.id} to Purchase Order`}
+                              >
+                                Convert to PO
+                              </button>
+                            </PermissionGuard>
+                          )}
+
+                          {request.type === "Subcontractor" && (
+                            <PermissionGuard
+                              module="invoice"
+                              entitlement="convert_approved_requests_to_purchase_orders"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleConvertToSubcontractor(request)
+                                }
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                                aria-label={`Convert ${request.id} to Vendor Bill`}
+                              >
+                                Convert to Invoice
+                              </button>
+                            </PermissionGuard>
+                          )}
+
+                          {request.type === "Plant and Equipment" && (
+                            <PermissionGuard
+                              module="invoice"
+                              entitlement="convert_approved_requests_to_purchase_orders"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleConvertToPlantEquipment(request)
+                                }
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                                aria-label={`Convert ${request.id} to Plant & Equipment PO`}
+                              >
+                                Convert to PO
+                              </button>
+                            </PermissionGuard>
+                          )}
+
+                          {request.type === "Labour Request" && (
+                            <PermissionGuard
+                              module="invoice"
+                              entitlement="manage_accounts_payable_queue"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleConvertToLabourInvoice(request)
+                                }
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                                aria-label={`Convert ${request.id} to Invoice`}
+                              >
+                                Convert to Invoice
+                              </button>
+                            </PermissionGuard>
+                          )}
+
+                          {request.type === "Petty Cash Request" && (
+                            <PermissionGuard module="invioice">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleProcessDisbursement(request)
+                                }
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors whitespace-nowrap"
+                                aria-label={`Process disbursement for ${request.id}`}
+                              >
+                                Process Disbursement
+                              </button>
+                            </PermissionGuard>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* Purchase → PO */}
+        <ConvertToPOModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          request={selectedRequest}
+          currentStep={currentStep}
+          onNextStep={handleNextStep}
+          onBackStep={handleBackStep}
+          onIssuePO={handleIssuePO}
+          formatCurrency={formatCurrency}
+          isIssuing={isIssuing}
+        />
+
+        {/* Plant & Equipment → PO */}
+        <ConvertToPOPlantEquipmentModal
+          isOpen={isPlantEquipmentModalOpen}
+          onClose={handleClosePlantEquipmentModal}
+          request={selectedRequest}
+          currentStep={currentStep}
+          onNextStep={handleNextStep}
+          onBackStep={handleBackStep}
+          onIssuePO={handleIssuePO}
+          formatCurrency={formatCurrency}
+          isIssuing={isIssuing}
+        />
+
+        {/* Subcontractor → Vendor Bill */}
+        <ConvertToPOSubcontractorModal
+          isOpen={isSubcontractorModalOpen}
+          request={selectedRequest}
+          onClose={handleCloseSubcontractorModal}
+          currentStep={currentStep}
+          onNextStep={handleNextStep}
+          onBackStep={handleBackStep}
+          onConvertToInvoice={handleSubcontractorConvertToInvoice}
+          formatCurrency={formatCurrency}
+          isIssuing={false}
+        />
+
+        {/* Labour → Vendor Bill */}
+        <CreateVendorBillLabourModal
+          isOpen={isLabourCreateBillModalOpen}
+          onClose={handleCloseLabourCreateBillModal}
+          request={selectedRequest}
+          formatCurrency={formatCurrency}
+        />
+
+        {/* Petty Cash → Disbursement */}
+        <CreateDisbursementModal
+          isOpen={isPettyCashDisbursementModalOpen}
+          onClose={handleClosePettyCashDisbursementModal}
+          request={selectedRequest}
+          onSubmit={handlePettyCashSubmitDisbursement}
+          formatCurrency={formatCurrency}
+          isSubmitting={isCreatingDisbursement}
+        />
+
+        {/* Global toast */}
+        {toast && (
+          <div className="fixed bottom-6 right-6 z-[70] max-w-sm">
+            <ToastNotification
+              show={true}
+              type={toast.type}
+              message={toast.message}
+              onClose={() => setToast(null)}
+            />
+          </div>
+        )}
       </div>
-
-      {/* Purchase → PO */}
-      <ConvertToPOModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        request={selectedRequest}
-        currentStep={currentStep}
-        onNextStep={handleNextStep}
-        onBackStep={handleBackStep}
-        onIssuePO={handleIssuePO}
-        formatCurrency={formatCurrency}
-        isIssuing={isIssuing}
-      />
-
-      {/* Plant & Equipment → PO */}
-      <ConvertToPOPlantEquipmentModal
-        isOpen={isPlantEquipmentModalOpen}
-        onClose={handleClosePlantEquipmentModal}
-        request={selectedRequest}
-        currentStep={currentStep}
-        onNextStep={handleNextStep}
-        onBackStep={handleBackStep}
-        onIssuePO={handleIssuePO}
-        formatCurrency={formatCurrency}
-        isIssuing={isIssuing}
-      />
-
-      {/* Subcontractor → Vendor Bill */}
-      <ConvertToPOSubcontractorModal
-        isOpen={isSubcontractorModalOpen}
-        request={selectedRequest}
-        onClose={handleCloseSubcontractorModal}
-        currentStep={currentStep}
-        onNextStep={handleNextStep}
-        onBackStep={handleBackStep}
-        onConvertToInvoice={handleSubcontractorConvertToInvoice}
-        formatCurrency={formatCurrency}
-        isIssuing={false}
-      />
-
-      {/* Labour → Vendor Bill */}
-      <CreateVendorBillLabourModal
-        isOpen={isLabourCreateBillModalOpen}
-        onClose={handleCloseLabourCreateBillModal}
-        request={selectedRequest}
-        formatCurrency={formatCurrency}
-      />
-
-      {/* Petty Cash → Disbursement */}
-      <CreateDisbursementModal
-        isOpen={isPettyCashDisbursementModalOpen}
-        onClose={handleClosePettyCashDisbursementModal}
-        request={selectedRequest}
-        onSubmit={handlePettyCashSubmitDisbursement}
-        formatCurrency={formatCurrency}
-      />
-
-      {/* Global toast */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-[70] max-w-sm">
-          <ToastNotification
-            show={true}
-            type={toast.type}
-            message={toast.message}
-            onClose={() => setToast(null)}
-          />
-        </div>
-      )}
-    </div>
+    </PageGuard>
   );
 }

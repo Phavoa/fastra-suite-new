@@ -112,7 +112,7 @@ export default function CreateVendorBillLabourReqModal({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState<string | null>(null);
-  const [bankAccountId, setBankAccountId] = useState("");
+   const [bankAccountId, setBankAccountId] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [paymentTermId, setPaymentTermId] = useState("");
   const [discrepancyAck, setDiscrepancyAck] = useState(false);
@@ -144,11 +144,11 @@ export default function CreateVendorBillLabourReqModal({
   const { data: bankAccountsResponse, isLoading: isBanksLoading } =
     useGetCompanyBankAccountsQuery(undefined, { skip: !isOpen });
 
-  const { data: vendorsResponse, isLoading: isVendorsLoading } =
-    useGetActiveVendorsQuery(undefined, { skip: !isOpen });
-
   // const { data: vendorsResponse, isLoading: isVendorsLoading } =
-  //   useGetVendorsByTypeQuery(undefined, { skip: !isOpen });
+  //   useGetActiveVendorsQuery(undefined, { skip: !isOpen });
+
+  const { data: vendorsResponse, isLoading: isVendorsLoading } =
+    useGetVendorsByTypeQuery(undefined, { skip: !isOpen });
 
   const { data: paymentTermsResponse, isLoading: isPaymentTermsLoading } =
     useGetPaymentTermsQuery(undefined, { skip: !isOpen });
@@ -162,6 +162,10 @@ export default function CreateVendorBillLabourReqModal({
     : [];
 
   const vendors = Array.isArray(vendorsResponse) ? vendorsResponse : [];
+
+  const labourVendors = vendors.filter(
+    (v: any) => v.vendor_type === "labour",
+  );
 
   const paymentTerms = Array.isArray(paymentTermsResponse)
     ? paymentTermsResponse.filter((t: any) => t.is_active)
@@ -190,7 +194,15 @@ export default function CreateVendorBillLabourReqModal({
   const hasDiscrepancy =
     projectedCost > 0 && Math.abs(invoiceNum - projectedCost) > 0.01;
 
-  const selectedVendor = vendors.find((v: any) => v.id === Number(vendorId));
+  const effectiveVendorId = labourVendors.some(
+    (v: any) => v.id === Number(vendorId),
+  )
+    ? vendorId
+    : "";
+  const vendorStale = Boolean(vendorId) && !effectiveVendorId;
+  const selectedVendor = labourVendors.find(
+    (v: any) => v.id === Number(effectiveVendorId),
+  );
   const vendorPaymentTermId = selectedVendor?.payment_term;
   const effectivePaymentTermId =
     paymentTermId || (vendorPaymentTermId ? String(vendorPaymentTermId) : "");
@@ -233,8 +245,8 @@ export default function CreateVendorBillLabourReqModal({
       showToast("error", "Invalid request");
       return;
     }
-    if (!vendorId) {
-      showToast("error", "Please select a vendor");
+    if (!vendorId || !selectedVendor) {
+      showToast("error", "Please select a labour vendor");
       return;
     }
     if (!bankAccountId) {
@@ -565,34 +577,52 @@ export default function CreateVendorBillLabourReqModal({
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Loading vendors…
                   </div>
-                ) : vendors.length === 0 ? (
-                  <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                    No active vendors found. Add a vendor under Settings before
-                    submitting.
+                ) : labourVendors.length === 0 ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                    <span>
+                      No labour vendors found. Create a Labour vendor first.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push("/invoice/vendor/new?vendor_type=labour")
+                      }
+                      className="text-blue-600 hover:text-blue-700 font-medium text-xs sm:text-sm underline"
+                    >
+                      Create Labour vendor
+                    </button>
                   </div>
                 ) : (
-                  <select
-                    value={vendorId}
-                    onChange={(e) => {
-                      const newId = e.target.value;
-                      setVendorId(newId);
-                      const newVendor = vendors.find(
-                        (v: any) => v.id === Number(newId),
-                      );
-                      if (newVendor?.payment_term && paymentTerms.length > 0) {
-                        setPaymentTermId(String(newVendor.payment_term));
-                      }
-                    }}
-                    disabled={isSubmitting}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                  >
-                    <option value="">Select vendor</option>
-                    {vendors.map((v: any) => (
-                      <option key={v.id} value={v.id}>
-                        {v.vendor_name} — {v.vendor_type || "—"}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      value={effectiveVendorId}
+                      onChange={(e) => {
+                        const newId = e.target.value;
+                        setVendorId(newId);
+                        const newVendor = labourVendors.find(
+                          (v: any) => v.id === Number(newId),
+                        );
+                        if (newVendor?.payment_term && paymentTerms.length > 0) {
+                          setPaymentTermId(String(newVendor.payment_term));
+                        }
+                      }}
+                      disabled={isSubmitting}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                    >
+                      <option value="">Select vendor</option>
+                      {labourVendors.map((v: any) => (
+                        <option key={v.id} value={v.id}>
+                          {v.vendor_name} — {v.vendor_type || "—"}
+                        </option>
+                      ))}
+                    </select>
+                    {vendorStale && (
+                      <p className="text-red-500 text-xs mt-1.5">
+                        The previously selected vendor is no longer a labour
+                        vendor. Please select a labour vendor.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -696,14 +726,17 @@ export default function CreateVendorBillLabourReqModal({
               ref={submitButtonRef}
               type="button"
               onClick={handleSubmit}
-              disabled={
-                isSubmitting ||
-                isDetailsLoading ||
-                bankAccounts.length === 0 ||
-                vendors.length === 0 ||
+               disabled={
+                 isSubmitting ||
+                 isDetailsLoading ||
+                 bankAccounts.length === 0 ||
+                 labourVendors.length === 0 ||
+                !vendorId ||
+                !selectedVendor ||
+                vendorStale ||
                 paymentTerms.length === 0
-              }
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+               }
+               className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
                 <>

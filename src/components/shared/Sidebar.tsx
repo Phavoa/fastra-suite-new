@@ -15,9 +15,10 @@ import {
   AppIcon,
   SettingsIcon,
 } from "./icons";
-import { ClipboardList, Coins, ShieldCheck } from "lucide-react";
+import { ClipboardList, Coins, ShieldCheck, Lock } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
+import { useGetSubscriptionStatusQuery } from "@/api/settings/subscriptionApi";
 
 // Navigation items grouped into sections
 const topItems = [{ id: "menu", icon: MenuIcon, label: "Menu", route: "/" }];
@@ -103,6 +104,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const router = useRouter();
   const { isAdmin } = usePermission();
   const { hasAccess } = useModulePermissions();
+  const { data: subStatus } = useGetSubscriptionStatusQuery();
+  const isExpired =
+    subStatus?.status === "expired" ||
+    (subStatus &&
+      subStatus.is_access_granted === false &&
+      subStatus.status !== "trialing" &&
+      subStatus.status !== "past_due");
 
   const visibleMiddleItems = middleItems.filter((item) => {
     if (!isAdmin && ["sales", "finance", "hr", "logistics"].includes(item.id)) {
@@ -144,6 +152,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     route: string;
   }) => {
     if (onClose) onClose();
+    if (isExpired && !item.route.startsWith("/settings")) {
+      router.push("/settings/billing?expired=true");
+      return;
+    }
     router.push(item.route);
   };
 
@@ -222,13 +234,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                 key={item.id}
                 onClick={() => handleNavigation(item)}
                 onMouseEnter={(e) => {
-                  if (!isExpanded) handleMouseEnter(e, item.label);
+                  if (!isExpanded)
+                    handleMouseEnter(
+                      e,
+                      isExpired ? `${item.label} (Subscription Expired)` : item.label
+                    );
                 }}
                 onMouseLeave={() => {
                   if (!isExpanded) handleMouseLeave();
                 }}
                 className={`w-full h-11 flex items-center rounded-lg transition-colors duration-300 ease-in-out
                 ${isExpanded ? "px-3 gap-3" : "px-3 gap-3 md:w-11 md:px-0 md:justify-center md:gap-0"}
+                ${isExpired ? "opacity-55 hover:opacity-80" : ""}
                 ${isActive ? "text-[#3B7CED] bg-[#3B7CED]/10" : "text-[#B8B8B8] hover:text-[#3B7CED] hover:bg-[#3B7CED]/5"}
               `}
                 aria-label={item.label}
@@ -243,6 +260,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                   {item.label}
                 </span>
+                {isExpired && isExpanded && (
+                  <Lock className="w-3.5 h-3.5 text-gray-400 ml-auto flex-shrink-0" />
+                )}
               </button>
             );
           })}

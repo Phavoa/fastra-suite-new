@@ -31,6 +31,7 @@ import {
   convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
 import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
+import { extractErrorMessage } from "@/lib/utils";
 
 const userCreateSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
@@ -71,7 +72,8 @@ export default function NewUser() {
 
   const [createUser, { isLoading: isSubmitting }] = useCreateUserMutation();
 
-  const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
+  const { data: permissionTemplates = [], isLoading: templatesLoading } =
+    useGetPermissionTemplatesQuery();
 
   const statusModal = useStatusModal();
 
@@ -188,7 +190,10 @@ export default function NewUser() {
         }
       );
     } catch (err: any) {
-      console.error("Submission error:", err);
+      if (process.env.NODE_ENV === "development")
+        console.error("Submission error:", err);
+
+      clearErrors();
 
       const errorData = err?.data;
       const messages: string[] = [];
@@ -242,7 +247,7 @@ export default function NewUser() {
       const displayMessage =
         messages.length > 0
           ? Array.from(new Set(messages)).join("\n")
-          : (err?.message || "An unexpected error occurred. Please try again.");
+          : extractErrorMessage(err, "An unexpected error occurred. Please try again.");
 
       statusModal.showError("Failed to Create User", displayMessage);
     }
