@@ -26,6 +26,8 @@ import {
   useCancelVendorBillMutation,
   type CreateVendorBillRequest,
 } from "@/api/invoice/vendorBillsApi";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { PageGuard } from "@/components/auth/PageGuard";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Helpers                                  */
@@ -469,496 +471,515 @@ export default function PaymentQueueDetailPage() {
   /* -------------------------------- Render -------------------------------- */
 
   return (
-    <div className="p-4 sm:p-6 min-h-screen bg-gray-50">
-      <div className="fixed bottom-6 right-6 z-60 max-w-sm">
-        <ToastNotification
-          show={toast.show}
-          message={toast.message}
-          type={toast.type}
-          onClose={hideToast}
-        />
-      </div>
-
-      <div className="max-w-7xl mx-auto">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-          <button
-            type="button"
-            onClick={() => router.push("/invoice/payment-queue")}
-            className="hover:text-gray-700"
-            aria-label="Back to Payment Queue"
-          >
-            ←
-          </button>
-          <span>Home</span>
-          <span className="text-gray-300">›</span>
-          <span>Invoice</span>
-          <span className="text-gray-300">›</span>
-          <button
-            type="button"
-            onClick={() => router.push("/invoice/payment-queue")}
-            className="hover:text-gray-700"
-          >
-            Payment Queue
-          </button>
-          <span className="text-gray-300">›</span>
-          <span className="text-gray-800 font-medium truncate max-w-[160px]">
-            {inv?.bill_number || "Vendor Bill"}
-          </span>
-        </nav>
-
-        {isLoading || isFetching ? (
-          <DetailSkeleton />
-        ) : !invoice ? (
-          <div className="text-center py-20 text-gray-500">
-            Vendor bill not found.
-          </div>
-        ) : (
-          <>
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
-                  {inv.bill_number || `VB-${inv.id}`}
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Vendor Bill · {sourceTypeDisplay}
-                </p>
+    <PageGuard module="invoice" entitlement="view_accounts_payable_queue">
+      <div className="p-4 sm:p-6 min-h-screen bg-gray-50">
+        <div className="fixed bottom-6 right-6 z-60 max-w-sm">
+          <ToastNotification
+            show={toast.show}
+            message={toast.message}
+            type={toast.type}
+            onClose={hideToast}
+          />
+        </div>
+        <div className="max-w-7xl mx-auto">
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+            <button
+              type="button"
+              onClick={() => router.push("/invoice/payment-queue")}
+              className="hover:text-gray-700"
+              aria-label="Back to Payment Queue"
+            >
+              ←
+            </button>
+            <span>Home</span>
+            <span className="text-gray-300">›</span>
+            <span>Invoice</span>
+            <span className="text-gray-300">›</span>
+            <button
+              type="button"
+              onClick={() => router.push("/invoice/payment-queue")}
+              className="hover:text-gray-700"
+            >
+              Payment Queue
+            </button>
+            <span className="text-gray-300">›</span>
+            <span className="text-gray-800 font-medium truncate max-w-[160px]">
+              {inv?.bill_number || "Vendor Bill"}
+            </span>
+          </nav>
+          {isLoading || isFetching ? (
+            <DetailSkeleton />
+          ) : !invoice ? (
+            <div className="text-center py-20 text-gray-500">
+              Vendor bill not found.
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
+                    {inv.bill_number || `VB-${inv.id}`}
+                  </h1>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Vendor Bill · {sourceTypeDisplay}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium capitalize ${
+                      statusBadgeStyles[currentStatus] ||
+                      "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {inv.status_display || currentStatus}
+                  </span>
+                  {inv.payment_status && (
+                    <span className="inline-flex px-3 py-1.5 rounded-full text-sm font-medium capitalize bg-gray-50 text-gray-700 border border-gray-200">
+                      {inv.payment_status_display || inv.payment_status}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium capitalize ${
-                    statusBadgeStyles[currentStatus] ||
-                    "bg-gray-100 text-gray-700"
+              {/* Read-only banner */}
+              {isReadOnlyStatus && (
+                <div
+                  className={`mb-6 p-4 rounded-xl border text-sm font-medium ${
+                    currentStatus === "paid"
+                      ? "bg-green-50 border-green-200 text-green-800"
+                      : "bg-red-50 border-red-200 text-red-800"
                   }`}
                 >
-                  {inv.status_display || currentStatus}
-                </span>
-                {inv.payment_status && (
-                  <span className="inline-flex px-3 py-1.5 rounded-full text-sm font-medium capitalize bg-gray-50 text-gray-700 border border-gray-200">
-                    {inv.payment_status_display || inv.payment_status}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Read-only banner */}
-            {isReadOnlyStatus && (
-              <div
-                className={`mb-6 p-4 rounded-xl border text-sm font-medium ${
-                  currentStatus === "paid"
-                    ? "bg-green-50 border-green-200 text-green-800"
-                    : "bg-red-50 border-red-200 text-red-800"
-                }`}
-              >
-                This bill is <span className="capitalize">{currentStatus}</span>
-                . No further actions are available.
-              </div>
-            )}
-
-            {/* Main card */}
-            <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-5 sm:p-6 space-y-8">
-                {/* Summary amounts */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="text-xs text-gray-500 mb-1">Amount</div>
-                    <div className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(inv.amount)}
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="text-xs text-gray-500 mb-1">
-                      Amount Paid
-                    </div>
-                    <div className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(inv.amount_paid)}
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="text-xs text-gray-500 mb-1">Balance</div>
-                    <div className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(inv.balance)}
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="text-xs text-gray-500 mb-1">
-                      Days Until Due
-                    </div>
-                    <div
-                      className={`text-lg font-semibold ${
-                        isOverdue ? "text-red-600" : "text-gray-900"
-                      }`}
-                    >
-                      {daysUntilDue === null
-                        ? "—"
-                        : isOverdue
-                          ? `${Math.abs(daysUntilDue)}d overdue`
-                          : `${daysUntilDue}d`}
-                    </div>
-                  </div>
+                  This bill is{" "}
+                  <span className="capitalize">{currentStatus}</span>. No
+                  further actions are available.
                 </div>
-
-                {/* Vendor & Source */}
-                <div>
-                  <h2 className="text-sm font-semibold text-blue-500 mb-4 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-gray-400" />
-                    Vendor & Source
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    <InfoField
-                      label="Vendor"
-                      value={
-                        <span>
-                          {vendorName}
-                          {vendorCode && (
-                            <span className="text-gray-400 font-normal">
-                              {" "}
-                              ({vendorCode})
-                            </span>
-                          )}
-                        </span>
-                      }
-                      icon={<User className="w-3.5 h-3.5" />}
-                    />
-                    <InfoField
-                      label="Contact"
-                      value={
-                        vendorContact || vendorEmail || vendorPhone
-                          ? [vendorContact, vendorEmail, vendorPhone]
-                              .filter(Boolean)
-                              .join(" · ")
-                          : "—"
-                      }
-                    />
-                    <InfoField
-                      label="Vendor Bank"
-                      value={
-                        vendorBankLabel || (
-                          <span className="text-amber-600 flex items-center gap-1">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            Not confirmed
-                          </span>
-                        )
-                      }
-                      icon={<CreditCard className="w-3.5 h-3.5" />}
-                    />
-                    <InfoField label="Source Type" value={sourceTypeDisplay} />
-                    {poNumber && (
+              )}
+              {/* Main card */}
+              <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 sm:p-6 space-y-8">
+                  {/* Summary amounts */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <div className="text-xs text-gray-500 mb-1">Amount</div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(inv.amount)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <div className="text-xs text-gray-500 mb-1">
+                        Amount Paid
+                      </div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(inv.amount_paid)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <div className="text-xs text-gray-500 mb-1">Balance</div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(inv.balance)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <div className="text-xs text-gray-500 mb-1">
+                        Days Until Due
+                      </div>
+                      <div
+                        className={`text-lg font-semibold ${
+                          isOverdue ? "text-red-600" : "text-gray-900"
+                        }`}
+                      >
+                        {daysUntilDue === null
+                          ? "—"
+                          : isOverdue
+                            ? `${Math.abs(daysUntilDue)}d overdue`
+                            : `${daysUntilDue}d`}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Vendor & Source */}
+                  <div>
+                    <h2 className="text-sm font-semibold text-blue-500 mb-4 flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-gray-400" />
+                      Vendor & Source
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                       <InfoField
-                        label="Purchase Order"
-                        value={poNumber}
-                        icon={<Hash className="w-3.5 h-3.5" />}
-                      />
-                    )}
-                    {requestRef && (
-                      <InfoField
-                        label="Request Reference"
-                        value={requestRef}
-                        icon={<Hash className="w-3.5 h-3.5" />}
-                      />
-                    )}
-                    {(projectName || projectCode) && (
-                      <InfoField
-                        label="Project"
+                        label="Vendor"
                         value={
-                          projectCode
-                            ? `${projectName || ""} (${projectCode})`
-                            : projectName
+                          <span>
+                            {vendorName}
+                            {vendorCode && (
+                              <span className="text-gray-400 font-normal">
+                                {" "}
+                                ({vendorCode})
+                              </span>
+                            )}
+                          </span>
+                        }
+                        icon={<User className="w-3.5 h-3.5" />}
+                      />
+                      <InfoField
+                        label="Contact"
+                        value={
+                          vendorContact || vendorEmail || vendorPhone
+                            ? [vendorContact, vendorEmail, vendorPhone]
+                                .filter(Boolean)
+                                .join(" · ")
+                            : "—"
                         }
                       />
-                    )}
-                    {wbsName && (
-                      <InfoField label="WBS / Activity" value={wbsName} />
-                    )}
-                  </div>
-                </div>
-
-                {/* Dates & Payment meta */}
-                <div>
-                  <h2 className="text-sm font-semibold text-blue-500 mb-4 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    Dates & Payment Details
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    <InfoField
-                      label="Invoice Date"
-                      value={formatDate(inv.invoice_date)}
-                    />
-                    <InfoField
-                      label="Due Date"
-                      value={formatDate(inv.due_date)}
-                    />
-                    <InfoField label="Payment Terms" value={paymentTermName} />
-                    <InfoField
-                      label="Company Bank Account"
-                      value={companyBankLabel || "Not selected"}
-                      icon={<CreditCard className="w-3.5 h-3.5" />}
-                    />
-                    {approvedByName && (
-                      <InfoField label="Approved By" value={approvedByName} />
-                    )}
-                    {inv.approved_at && (
                       <InfoField
-                        label="Approved At"
-                        value={formatDateTime(inv.approved_at)}
+                        label="Vendor Bank"
+                        value={
+                          vendorBankLabel || (
+                            <span className="text-amber-600 flex items-center gap-1">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              Not confirmed
+                            </span>
+                          )
+                        }
+                        icon={<CreditCard className="w-3.5 h-3.5" />}
                       />
-                    )}
-                    {inv.paid_at && (
                       <InfoField
-                        label="Paid At"
-                        value={formatDateTime(inv.paid_at)}
+                        label="Source Type"
+                        value={sourceTypeDisplay}
                       />
-                    )}
+                      {poNumber && (
+                        <InfoField
+                          label="Purchase Order"
+                          value={poNumber}
+                          icon={<Hash className="w-3.5 h-3.5" />}
+                        />
+                      )}
+                      {requestRef && (
+                        <InfoField
+                          label="Request Reference"
+                          value={requestRef}
+                          icon={<Hash className="w-3.5 h-3.5" />}
+                        />
+                      )}
+                      {(projectName || projectCode) && (
+                        <InfoField
+                          label="Project"
+                          value={
+                            projectCode
+                              ? `${projectName || ""} (${projectCode})`
+                              : projectName
+                          }
+                        />
+                      )}
+                      {wbsName && (
+                        <InfoField label="WBS / Activity" value={wbsName} />
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* Document */}
-                <div>
-                  <h2 className="text-sm font-semibold text-blue-500 mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-gray-400" />
-                    Uploaded Document
-                  </h2>
-                  {documentUrl ? (
-                    <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="text-3xl shrink-0">📄</div>
-                        <div className="min-w-0">
-                          <div className="font-medium text-gray-900 truncate">
-                            Invoice Document
+                  {/* Dates & Payment meta */}
+                  <div>
+                    <h2 className="text-sm font-semibold text-blue-500 mb-4 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      Dates & Payment Details
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <InfoField
+                        label="Invoice Date"
+                        value={formatDate(inv.invoice_date)}
+                      />
+                      <InfoField
+                        label="Due Date"
+                        value={formatDate(inv.due_date)}
+                      />
+                      <InfoField
+                        label="Payment Terms"
+                        value={paymentTermName}
+                      />
+                      <InfoField
+                        label="Company Bank Account"
+                        value={companyBankLabel || "Not selected"}
+                        icon={<CreditCard className="w-3.5 h-3.5" />}
+                      />
+                      {approvedByName && (
+                        <InfoField label="Approved By" value={approvedByName} />
+                      )}
+                      {inv.approved_at && (
+                        <InfoField
+                          label="Approved At"
+                          value={formatDateTime(inv.approved_at)}
+                        />
+                      )}
+                      {inv.paid_at && (
+                        <InfoField
+                          label="Paid At"
+                          value={formatDateTime(inv.paid_at)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  {/* Document */}
+                  <div>
+                    <h2 className="text-sm font-semibold text-blue-500 mb-3 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-gray-400" />
+                      Uploaded Document
+                    </h2>
+                    {documentUrl ? (
+                      <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="text-3xl shrink-0">📄</div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-900 truncate">
+                              Invoice Document
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Attached to this vendor bill
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            Attached to this vendor bill
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <a
+                            href={documentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-white transition-colors"
+                            title="View in new tab"
+                            aria-label="View document"
+                          >
+                            <ExternalLink className="w-5 h-5" />
+                          </a>
+                          <a
+                            href={documentUrl}
+                            download
+                            className="p-2 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-white transition-colors"
+                            title="Download"
+                            aria-label="Download document"
+                          >
+                            <Download className="w-5 h-5" />
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-gray-500">
+                        <div className="text-3xl">📄</div>
+                        <div>
+                          <div className="font-medium">No document</div>
+                          <div className="text-xs">
+                            No document was attached to this bill
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <a
-                          href={documentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-white transition-colors"
-                          title="View in new tab"
-                          aria-label="View document"
-                        >
-                          <ExternalLink className="w-5 h-5" />
-                        </a>
-                        <a
-                          href={documentUrl}
-                          download
-                          className="p-2 rounded-lg text-gray-600 hover:text-blue-700 hover:bg-white transition-colors"
-                          title="Download"
-                          aria-label="Download document"
-                        >
-                          <Download className="w-5 h-5" />
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-gray-500">
-                      <div className="text-3xl">📄</div>
-                      <div>
-                        <div className="font-medium">No document</div>
-                        <div className="text-xs">
-                          No document was attached to this bill
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Line items */}
-                <div>
-                  <h2 className="text-sm font-semibold text-blue-500 mb-3">
-                    Cost Items
-                  </h2>
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[520px]">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-200">
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Description
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Qty
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Unit Price
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Total
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {(inv.lines || []).length === 0 ? (
-                            <tr>
+                    )}
+                  </div>
+                  {/* Line items */}
+                  <div>
+                    <h2 className="text-sm font-semibold text-blue-500 mb-3">
+                      Cost Items
+                    </h2>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[520px]">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Description
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Qty
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Unit Price
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {(inv.lines || []).length === 0 ? (
+                              <tr>
+                                <td
+                                  colSpan={4}
+                                  className="px-4 py-8 text-center text-sm text-gray-500"
+                                >
+                                  No line items
+                                </td>
+                              </tr>
+                            ) : (
+                              inv.lines.map((line: any, idx: number) => {
+                                const qty = Number(line.quantity || 0);
+                                const price = Number(line.unit_price || 0);
+                                const total =
+                                  line.line_total != null
+                                    ? Number(line.line_total)
+                                    : qty * price;
+                                const description =
+                                  line.description ||
+                                  line.source?.item_name ||
+                                  line.source?.product?.product_name ||
+                                  "—";
+                                return (
+                                  <tr
+                                    key={line.id || idx}
+                                    className="hover:bg-gray-50/60"
+                                  >
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                      {description}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                                      {line.quantity ?? "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                                      {line.unit_price
+                                        ? formatCurrency(line.unit_price)
+                                        : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                                      {formatCurrency(total)}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-gray-50 border-t border-gray-200">
                               <td
-                                colSpan={4}
-                                className="px-4 py-8 text-center text-sm text-gray-500"
+                                colSpan={3}
+                                className="px-4 py-3 text-sm font-semibold text-gray-900"
                               >
-                                No line items
+                                Grand Total
+                              </td>
+                              <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                                {formatCurrency(inv.amount)}
                               </td>
                             </tr>
-                          ) : (
-                            inv.lines.map((line: any, idx: number) => {
-                              const qty = Number(line.quantity || 0);
-                              const price = Number(line.unit_price || 0);
-                              const total =
-                                line.line_total != null
-                                  ? Number(line.line_total)
-                                  : qty * price;
-                              const description =
-                                line.description ||
-                                line.source?.item_name ||
-                                line.source?.product?.product_name ||
-                                "—";
-
-                              return (
-                                <tr
-                                  key={line.id || idx}
-                                  className="hover:bg-gray-50/60"
-                                >
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                    {description}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                                    {line.quantity ?? "—"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                                    {line.unit_price
-                                      ? formatCurrency(line.unit_price)
-                                      : "—"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                                    {formatCurrency(total)}
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-gray-50 border-t border-gray-200">
-                            <td
-                              colSpan={3}
-                              className="px-4 py-3 text-sm font-semibold text-gray-900"
-                            >
-                              Grand Total
-                            </td>
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
-                              {formatCurrency(inv.amount)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                          </tfoot>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex flex-wrap items-center justify-end gap-3 mt-6">
-              {!isReadOnlyStatus && (
-                <>
-                  {showSubmit && (
-                    <Button
-                      variant="contained"
-                      onClick={handleSubmit}
-                      disabled={actionPending || isActionLoading}
-                      aria-label="Submit bill"
-                    >
-                      {isSubmitting || actionPending
-                        ? "Submitting…"
-                        : "Submit Bill"}
-                    </Button>
-                  )}
-
-                  {showApprove && (
-                    <Button
-                      variant="contained"
-                      onClick={handleApprove}
-                      disabled={actionPending || isActionLoading}
-                      aria-label="Approve bill"
-                    >
-                      {isApproving || actionPending
-                        ? "Approving…"
-                        : "Approve Bill"}
-                    </Button>
-                  )}
-
-                  {showReject && (
-                    <Button
-                      variant="outline"
-                      onClick={handleReject}
-                      disabled={actionPending || isActionLoading}
-                      aria-label="Reject bill"
-                      className="border-red-200 text-red-700 hover:bg-red-50"
-                    >
-                      {isRejecting || actionPending
-                        ? "Rejecting…"
-                        : "Reject Bill"}
-                    </Button>
-                  )}
-
-                  {showCancel && (
-                    <Button
-                      variant="outline"
-                      onClick={handleCancel}
-                      disabled={actionPending || isActionLoading}
-                      aria-label="Cancel bill"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                    >
-                      {isCancelling || actionPending
-                        ? "Cancelling…"
-                        : "Cancel Bill"}
-                    </Button>
-                  )}
-
-                  {showPay && (
-                    <Button
-                      variant="contained"
-                      onClick={handlePayBill}
-                      disabled={actionPending || isActionLoading}
-                      aria-label="Pay bill"
-                    >
-                      {isPaying || actionPending ? "Processing…" : "Pay Bill"}
-                    </Button>
-                  )}
-                </>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => router.push("/invoice/payment-queue")}
-                disabled={actionPending || isActionLoading}
-                aria-label="Back to queue"
-              >
-                Back
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Modals */}
-        <BankSelectModal
-          isOpen={showBankModal}
-          onClose={() => setShowBankModal(false)}
-          onConfirm={handleConfirmPayment}
-          currentBankAccountId={invoice?.company_bank_account}
-          currentBankLabel={
-            invoice?.company_bank_account_details?.bank_name ?? undefined
-          }
-        />
-
-        <SuccessModal
-          isOpen={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
-          onDone={handleDone}
-        />
+              {/* Action buttons */}
+              <div className="flex flex-wrap items-center justify-end gap-3 mt-6">
+                {!isReadOnlyStatus && (
+                  <>
+                    {showSubmit && (
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="edit_invoice"
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={handleSubmit}
+                          disabled={actionPending || isActionLoading}
+                          aria-label="Submit bill"
+                        >
+                          {isSubmitting || actionPending
+                            ? "Submitting…"
+                            : "Submit Bill"}
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                    {showApprove && (
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="approve_invoice_for_payment_processing"
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={handleApprove}
+                          disabled={actionPending || isActionLoading}
+                          aria-label="Approve bill"
+                        >
+                          {isApproving || actionPending
+                            ? "Approving…"
+                            : "Approve Bill"}
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                    {showReject && (
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="approve_invoice_for_payment_processing"
+                      >
+                        <Button
+                          variant="outline"
+                          onClick={handleReject}
+                          disabled={actionPending || isActionLoading}
+                          aria-label="Reject bill"
+                          className="border-red-200 text-red-700 hover:bg-red-50"
+                        >
+                          {isRejecting || actionPending
+                            ? "Rejecting…"
+                            : "Reject Bill"}
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                    {showCancel && (
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="edit_invoice"
+                      >
+                        <Button
+                          variant="outline"
+                          onClick={handleCancel}
+                          disabled={actionPending || isActionLoading}
+                          aria-label="Cancel bill"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
+                          {isCancelling || actionPending
+                            ? "Cancelling…"
+                            : "Cancel Bill"}
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                    {showPay && (
+                      <PermissionGuard
+                        module="invoice"
+                        entitlement="execute_payment"
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={handlePayBill}
+                          disabled={actionPending || isActionLoading}
+                          aria-label="Pay bill"
+                        >
+                          {isPaying || actionPending
+                            ? "Processing…"
+                            : "Pay Bill"}
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                  </>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => router.push("/invoice/payment-queue")}
+                  disabled={actionPending || isActionLoading}
+                  aria-label="Back to queue"
+                >
+                  Back
+                </Button>
+              </div>
+            </>
+          )}
+          {/* Modals */}
+          <BankSelectModal
+            isOpen={showBankModal}
+            onClose={() => setShowBankModal(false)}
+            onConfirm={handleConfirmPayment}
+            currentBankAccountId={invoice?.company_bank_account}
+            currentBankLabel={
+              invoice?.company_bank_account_details?.bank_name ?? undefined
+            }
+          />
+          <SuccessModal
+            isOpen={showSuccessModal}
+            onClose={() => setShowSuccessModal(false)}
+            onDone={handleDone}
+          />
+        </div>
       </div>
-    </div>
+    </PageGuard>
   );
 }

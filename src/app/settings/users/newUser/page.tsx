@@ -31,6 +31,7 @@ import {
   convertApiItemsToPermissions,
 } from "@/utils/modulePermissionsStore";
 import { useGetPermissionTemplatesQuery } from "@/api/settings/permissionsTemplateApi";
+import { extractErrorMessage } from "@/lib/utils";
 
 const userCreateSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -62,7 +63,8 @@ export default function NewUser() {
 
   const [createUser, { isLoading: isSubmitting }] = useCreateUserMutation();
 
-  const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
+  const { data: permissionTemplates = [], isLoading: templatesLoading } =
+    useGetPermissionTemplatesQuery();
 
   // Notification state
   const [notification, setNotification] = useState<{
@@ -178,21 +180,56 @@ export default function NewUser() {
         router.push("/settings/users");
       }, 2000);
     } catch (err: any) {
-      console.error("Submission error:", err);
+      if (process.env.NODE_ENV === "development")
+        console.error("Submission error:", err);
 
+      // 1. Always get a clean human-readable message
+      const friendlyMessage = extractErrorMessage(
+        err,
+        "An unexpected error occurred. Please try again.",
+      );
+
+      // 2. Try to map real field errors (only when the keys match form fields)
       const backendErrors = err?.data?.error;
+      let hasFieldErrors = false;
+
       if (Array.isArray(backendErrors)) {
+        const knownFields = [
+          "name",
+          "email",
+          "company_role",
+          "phone_number",
+          "language",
+          "timezone",
+          "user_image_image",
+          // add any other real form field names here
+        ];
+
+        // Clear any previous manual errors before setting new ones
+        clearErrors();
+
         backendErrors.forEach((errorObj: any) => {
+          if (typeof errorObj !== "object" || errorObj === null) return;
+
           Object.entries(errorObj).forEach(([field, message]) => {
-            setError(field as any, {
-              type: "manual",
-              message: message as string,
-            });
+            // Only set form error when the key is an actual form field
+            if (knownFields.includes(field)) {
+              setError(field as any, {
+                type: "manual",
+                message: Array.isArray(message)
+                  ? String(message[0])
+                  : String(message),
+              });
+              hasFieldErrors = true;
+            }
           });
         });
+      }
 
-        // Switch to the tab with the first error
-        const firstErrorField = Object.keys(backendErrors[0])[0];
+      // 3. Decide which notification to show
+      if (hasFieldErrors) {
+        // real field-level errors → switch tab if needed + show the “fix highlighted” message
+        const firstErrorField = Object.keys(backendErrors[0] || {})[0];
         const basicFields = [
           "name",
           "email",
@@ -203,7 +240,7 @@ export default function NewUser() {
         ];
         if (basicFields.includes(firstErrorField)) {
           setActiveTab("basic");
-        } else if (firstErrorField.startsWith("user_permissions")) {
+        } else if (firstErrorField?.startsWith("user_permissions")) {
           setActiveTab("permissions");
         }
 
@@ -213,10 +250,9 @@ export default function NewUser() {
           show: true,
         });
       } else {
+        // generic / non-field error (the case you just hit)
         setNotification({
-          message:
-            err?.data?.detail ||
-            "An unexpected error occurred. Please try again.",
+          message: friendlyMessage,
           type: "error",
           show: true,
         });
