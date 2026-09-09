@@ -2,10 +2,12 @@
 
 import React, { useMemo } from "react";
 import { z } from "zod";
+import Link from "next/link";
 import { RequestForm } from "@/components/requests/RequestForm";
 import { RequestFormConfig } from "@/components/requests/types";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { ExternalLink } from "lucide-react";
 import { useCreateSubcontractorRequestMutation } from "@/api/subcontractorRequestApi";
 import { useGetActiveVendorsQuery } from "@/api/invoice/vendorsApi";
 import { useGetAvailableBudgetQuery } from "@/api/projectApi";
@@ -40,7 +42,13 @@ type FormValues = z.infer<typeof formSchema>;
 export default function NewSubcontractorRequestPage() {
   const router = useRouter();
   const [createRequest, { isLoading: isSubmitting }] = useCreateSubcontractorRequestMutation();
-  const { data: vendors = [], isLoading: isLoadingVendors } = useGetActiveVendorsQuery();
+  const {
+    data: vendors = [],
+    isLoading: isLoadingVendors,
+  } = useGetActiveVendorsQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnMountOrArgChange: true,
+  });
   const loggedInUser = useSelector((state: RootState) => state.auth.user);
   const loggedInUserName = React.useMemo(() => {
     if (!loggedInUser) return "Current User";
@@ -56,6 +64,8 @@ export default function NewSubcontractorRequestPage() {
       value: String(vendor.id),
     }));
   }, [vendors]);
+
+  const hasNoVendors = !isLoadingVendors && vendors.length === 0;
 
   const config: RequestFormConfig<FormValues> = {
     title: "Subcontractor Request",
@@ -100,8 +110,25 @@ export default function NewSubcontractorRequestPage() {
             name: "vendor",
             label: "Subcontractor Name",
             type: "select",
-            placeholder: isLoadingVendors ? "Loading subcontractors..." : "Enter name",
+            placeholder: isLoadingVendors
+              ? "Loading subcontractors..."
+              : hasNoVendors
+              ? "No vendors available (Create Vendor first)"
+              : "Select subcontractor",
             options: vendorOptions,
+            disabled: hasNoVendors || isLoadingVendors,
+            action: hasNoVendors ? (
+              <Link
+                href="/invoice/settings?tab=vendor"
+                // target="_blank"
+                // rel="noopener noreferrer"
+                className="text-xs text-[#3B7CED] hover:underline inline-flex items-center gap-1 font-medium"
+              >
+                <span>Create Vendor</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            ) : undefined,
+            emptyMessage: "No vendors found. Please create a vendor in Invoice Settings > Vendor tab.",
           },
           {
             name: "scope_of_work",
@@ -201,6 +228,12 @@ export default function NewSubcontractorRequestPage() {
     },
     onSubmit: async (data) => {
       try {
+        if (hasNoVendors || !data.vendor) {
+          throw new Error(
+            "A subcontractor/vendor is required. Please create a vendor in Invoice Settings (Vendor tab) first."
+          );
+        }
+
         const ensureValidUUID = (val: string): string => {
           if (!val) return "";
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

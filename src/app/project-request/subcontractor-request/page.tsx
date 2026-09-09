@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+export const dynamic = "force-dynamic";
+
+import React, { useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, CheckCircle, Clock, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +15,29 @@ import { extractErrorMessage } from "@/lib/utils";
 export default function SubcontractorRequestPage() {
   const router = useRouter();
   const {
-    data: requests = [],
+    data: rawRequests = [],
     isLoading,
     isError,
     error,
-  } = useGetSubcontractorRequestsQuery({});
+    refetch,
+  } = useGetSubcontractorRequestsQuery({}, {
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+  });
+
+  useEffect(() => {
+    if (typeof refetch === "function") {
+      refetch();
+    }
+  }, [refetch]);
+
+  const requests: any[] = useMemo(() => {
+    if (Array.isArray(rawRequests)) return rawRequests;
+    if (rawRequests && Array.isArray((rawRequests as any).results)) {
+      return (rawRequests as any).results;
+    }
+    return [];
+  }, [rawRequests]);
 
   const statusCounts: Record<RequestStatus, number> = useMemo(() => {
     const counts: Record<RequestStatus, number> = {
@@ -98,6 +118,7 @@ export default function SubcontractorRequestPage() {
     ],
     renderItem: (req: any) => {
       const displayTitle = (req as any).activity_details?.name || (req as any).project_details?.name || "Subcontractor Request";
+      const subName = (req as any).vendor_details?.vendor_name || (req as any).vendor_name || (req as any).sub_contractor_name || "";
       
       return (
       <div 
@@ -112,6 +133,9 @@ export default function SubcontractorRequestPage() {
           </Badge>
         </div>
         <p className="text-sm font-bold text-gray-900 mt-1">{displayTitle}</p>
+        {subName && (
+          <p className="text-xs text-gray-500 font-medium mt-0.5">{subName}</p>
+        )}
 
         <div className="flex justify-between items-center mt-4">
           <div>

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { CompanyBankAccountsTab } from "@/components/invoice/settings/CompanyBankAccountsTab";
 import { AccountingSettingsTab } from "@/components/invoice/settings/AccountingSettingsTab";
 import { CurrenciesTab } from "@/components/invoice/settings/CurrenciesTab";
@@ -17,8 +18,37 @@ type Tab =
   | "payment-terms"
   | "vendor";
 
-export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("accounting");
+const VALID_TABS: Tab[] = [
+  "accounting",
+  "bank-accounts",
+  "request-mappings",
+  "currencies",
+  "payment-terms",
+  "vendor",
+];
+
+function SettingsPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab") as Tab | null;
+
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (tabParam && VALID_TABS.includes(tabParam)) {
+      return tabParam;
+    }
+    return "accounting";
+  });
+
+  useEffect(() => {
+    if (tabParam && VALID_TABS.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    router.replace(`/invoice/settings?tab=${tab}`, { scroll: false });
+  };
 
   return (
     <PageGuard module="invoice" entitlement="configure_invoice">
@@ -45,8 +75,8 @@ export default function SettingsPage() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             <button
-              onClick={() => setActiveTab("accounting")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              onClick={() => handleTabChange("accounting")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === "accounting"
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -55,8 +85,8 @@ export default function SettingsPage() {
               Accounting Settings
             </button>
             <button
-              onClick={() => setActiveTab("bank-accounts")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              onClick={() => handleTabChange("bank-accounts")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === "bank-accounts"
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -65,8 +95,8 @@ export default function SettingsPage() {
               Company Bank Accounts
             </button>
             <button
-              onClick={() => setActiveTab("request-mappings")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              onClick={() => handleTabChange("request-mappings")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === "request-mappings"
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -75,8 +105,8 @@ export default function SettingsPage() {
               Account Mapping
             </button>
             <button
-              onClick={() => setActiveTab("currencies")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              onClick={() => handleTabChange("currencies")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === "currencies"
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -85,8 +115,8 @@ export default function SettingsPage() {
               Currencies
             </button>
             <button
-              onClick={() => setActiveTab("payment-terms")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              onClick={() => handleTabChange("payment-terms")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === "payment-terms"
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -95,8 +125,8 @@ export default function SettingsPage() {
               Payment Terms
             </button>
             <button
-              onClick={() => setActiveTab("vendor")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              onClick={() => handleTabChange("vendor")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === "vendor"
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -120,3 +150,12 @@ export default function SettingsPage() {
     </PageGuard>
   );
 }
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading settings...</div>}>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+

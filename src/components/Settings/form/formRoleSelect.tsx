@@ -24,9 +24,9 @@ export default function NewUserRoleSelect({
     <FormSelect
       label="Role"
       name="company_role"
-      value={value ?? ""}
+      value={value && value !== 0 ? value : ""}
       onChange={(e) =>
-        onChange(e.target.value ? Number(e.target.value) : null)
+        onChange(e.target.value ? Number(e.target.value) : undefined)
       }
       placeholder={isLoading ? "Loading roles..." : "Select role"}
       options={roleOptions}

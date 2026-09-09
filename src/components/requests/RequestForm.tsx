@@ -392,6 +392,7 @@ export function RequestForm<T extends Record<string, any>>({
     if (statusModal.type === "success") {
       reset();
       router.push(config.backPath);
+      router.refresh();
     }
   };
   console.log("config", config);
@@ -533,12 +534,15 @@ export function RequestForm<T extends Record<string, any>>({
                       key={field.name}
                       className={`space-y-2 ${field.halfWidth ? "col-span-1" : "col-span-2"}`}
                     >
-                      <Label
-                        htmlFor={field.name}
-                        className="text-sm font-semibold text-gray-900"
-                      >
-                        {dynamicLabel}
-                      </Label>
+                      <div className="flex items-center justify-between">
+                        <Label
+                          htmlFor={field.name}
+                          className="text-sm font-semibold text-gray-900"
+                        >
+                          {dynamicLabel}
+                        </Label>
+                        {field.action}
+                      </div>
                       <Controller
                         name={field.name as any}
                         control={control}
@@ -578,24 +582,34 @@ export function RequestForm<T extends Record<string, any>>({
                               <Select
                                 onValueChange={controllerField.onChange}
                                 value={controllerField.value}
+                                disabled={field.disabled}
                               >
                                 <SelectTrigger
                                   id={field.name}
-                                  className="w-full"
+                                  className={cn(
+                                    "w-full",
+                                    field.disabled && "bg-gray-50 text-gray-400 cursor-not-allowed opacity-75"
+                                  )}
                                 >
                                   <SelectValue
                                     placeholder={dynamicPlaceholder}
                                   />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {options.map((opt) => (
-                                    <SelectItem
-                                      key={opt.value}
-                                      value={opt.value}
-                                    >
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
+                                  {options.length === 0 ? (
+                                    <div className="p-3 text-center text-xs text-gray-500">
+                                      {field.emptyMessage || "No options available."}
+                                    </div>
+                                  ) : (
+                                    options.map((opt) => (
+                                      <SelectItem
+                                        key={opt.value}
+                                        value={opt.value}
+                                      >
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))
+                                  )}
                                 </SelectContent>
                               </Select>
                             );
@@ -606,6 +620,7 @@ export function RequestForm<T extends Record<string, any>>({
                                 id={field.name}
                                 placeholder={dynamicPlaceholder}
                                 rows={field.rows || 4}
+                                disabled={field.disabled}
                                 className="resize-none"
                                 {...controllerField}
                               />
@@ -626,6 +641,7 @@ export function RequestForm<T extends Record<string, any>>({
                                 <Checkbox
                                   id={field.name}
                                   checked={controllerField.value}
+                                  disabled={field.disabled}
                                   onCheckedChange={controllerField.onChange}
                                 />
                                 <Label
@@ -642,6 +658,7 @@ export function RequestForm<T extends Record<string, any>>({
                               id={field.name}
                               type={field.type as any}
                               placeholder={dynamicPlaceholder}
+                              disabled={field.disabled}
                               {...controllerField}
                               aria-invalid={!!errors[field.name]}
                               className={
@@ -653,12 +670,13 @@ export function RequestForm<T extends Record<string, any>>({
                           );
                         }}
                       />
+                      {field.hintNode}
                       {errors[field.name] && (
                         <p className="text-sm text-red-500">
                           {(errors[field.name] as any).message}
                         </p>
                       )}
-                      {!errors[field.name] && field.hintText && (
+                      {!errors[field.name] && !field.hintNode && field.hintText && (
                         <p className="text-xs text-gray-500 mt-1">
                           {field.hintText}
                         </p>
