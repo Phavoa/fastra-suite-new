@@ -22,6 +22,18 @@ export type VendorBillStatus =
 
 export type VendorBillPaymentStatus = "unpaid" | "partial" | "paid" | string;
 
+/* ------------------------- Accounts Payable Accounts ---------------------- */
+
+export interface AccountsPayableAccount {
+  id: number;
+  account_number: string;
+  account_name: string;
+  label: string;
+  account_type: string;
+  control_type: string;
+  is_control_account: boolean;
+}
+
 /* ----------------------------- Line Types --------------------------------- */
 
 export interface VendorBillLine {
@@ -93,6 +105,7 @@ export interface VendorBill {
   request_id?: number | string | null;
   vendor_details?: { vendor_name?: string | null };
   company_bank_account_details?: { bank_name?: string | null }; // bank_name
+  accounts_payable_account?: number | null;
 }
 
 /* ------------------------- Create / Update Payloads ----------------------- */
@@ -150,7 +163,10 @@ const getTenantBaseUrl = (state: RootState): string => {
   const tenantSchemaName = state.auth.tenant_schema_name;
   const apiDomain =
     process.env.NEXT_PUBLIC_API_DOMAIN || "fastrasuiteapi.com.ng";
-  const protocol = (apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")) ? "http" : "https";
+  const protocol =
+    apiDomain.includes("localhost") || apiDomain.includes("127.0.0.1")
+      ? "http"
+      : "https";
   return `${protocol}://${tenantSchemaName}.${apiDomain}`;
 };
 
@@ -258,6 +274,23 @@ export const vendorBillsApi = createApi({
     >({
       query: (params) => ({
         url: "/invoicing/vendor-bills/payment_queue/",
+        params,
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: "VendorBill" as const, id })),
+              { type: "VendorBill", id: "LIST" },
+            ]
+          : [{ type: "VendorBill", id: "LIST" }],
+    }),
+
+    getAccountsPayableAccounts: builder.query<
+      AccountsPayableAccount[],
+      GetVendorBillsParams | void
+    >({
+      query: (params) => ({
+        url: "/invoicing/vendor-bills/accounts-payable-accounts/",
         params,
       }),
       providesTags: (result) =>
@@ -432,6 +465,8 @@ export const {
   useGetVendorBillByIdQuery,
   useLazyGetVendorBillsQuery,
   useLazyGetVendorBillByIdQuery,
+  useGetAccountsPayableAccountsQuery,
+  useLazyGetAccountsPayableAccountsQuery,
 
   // Mutations
   useCreateVendorBillMutation,

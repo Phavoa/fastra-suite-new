@@ -375,17 +375,27 @@ export default function PaymentQueueDetailPage() {
 
   const handleConfirmPayment = async (bankId: string | null) => {
     if (!invoice) return;
+
+    // Resolve bank: modal selection, or fall back to bill's existing bank
+    const resolvedBankId = bankId
+      ? Number(bankId)
+      : invoice.company_bank_account != null
+        ? Number(invoice.company_bank_account)
+        : null;
+
+    if (resolvedBankId == null || Number.isNaN(resolvedBankId)) {
+      showToast("Please select a company bank account", "error");
+      return;
+    }
+
     const billNumber = invoice.bill_number || String(invoice.id);
     optimisticUpdate("paid");
-    try {
-      const payload: Record<string, unknown> = {
-        amount: invoice.balance || invoice.amount || "0",
-      };
 
-      // Only send company_bank_account if the user explicitly changed it
-      if (bankId && Number(bankId) !== invoice.company_bank_account) {
-        payload.company_bank_account = Number(bankId);
-      }
+    try {
+      const payload = {
+        amount: invoice.balance || invoice.amount || "0",
+        company_bank_account: resolvedBankId, // always send, even if unchanged
+      };
 
       await payVendorBill({
         id: invoice.id,

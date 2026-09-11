@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { X, Upload, File, Trash2, ChevronRight, Loader2 } from "lucide-react";
 
-import { useCreateVendorBillMutation } from "@/api/invoice/vendorBillsApi";
+import { useCreateVendorBillMutation, useGetAccountsPayableAccountsQuery } from "@/api/invoice/vendorBillsApi";
 import {
   useGetCompanyBankAccountsQuery,
   type CompanyBankAccount,
@@ -117,6 +117,9 @@ export default function CreateVendorBillModal({
   const [companyBankAccount, setCompanyBankAccount] = useState<number | null>(
     null,
   );
+  const [accountsPayableAccount, setAccountsPayableAccount] = useState<number | null>(
+    null,
+  );
   const [toast, setToast] = useState<{
     show: boolean;
     message: string;
@@ -127,12 +130,15 @@ export default function CreateVendorBillModal({
 
   const { data: bankAccounts, isLoading: isBanksLoading } =
     useGetCompanyBankAccountsQuery(undefined, { skip: !isOpen });
+  const { data: accountsPayableAccounts, isLoading: isAccountsPayableLoading } =
+    useGetAccountsPayableAccountsQuery(undefined, { skip: !isOpen });
   const [createVendorBill, { isLoading: isSubmitting }] =
     useCreateVendorBillMutation();
 
   const activeBankAccounts =
     bankAccounts?.filter((account: CompanyBankAccount) => account.is_active) ||
     [];
+  const activeAccountsPayable = accountsPayableAccounts || [];
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ show: true, message, type });
@@ -177,8 +183,12 @@ export default function CreateVendorBillModal({
 
   const handleSubmit = async () => {
     // PRD: vendor invoice upload is optional and never blocks submission
-    if (!companyBankAccount) {
-      showToast("Please select a company bank account", "error");
+    // if (!companyBankAccount) {
+    //   showToast("Please select a company bank account", "error");
+    //   return;
+    // }
+    if (!accountsPayableAccount) {
+      showToast("Please select an accounts payable account", "error");
       return;
     }
 
@@ -209,7 +219,8 @@ export default function CreateVendorBillModal({
     formData.append("vendor", String(vendorId));
     formData.append("invoice_date", invoiceDate);
     formData.append("payment_term", String(paymentTerm));
-    formData.append("company_bank_account", String(companyBankAccount));
+    // formData.append("company_bank_account", String(companyBankAccount));
+    formData.append("accounts_payable_account", String(accountsPayableAccount));
     if (uploadedFile) {
       formData.append("document", uploadedFile);
     }
@@ -261,6 +272,8 @@ export default function CreateVendorBillModal({
     formData.append("lines", JSON.stringify(mappedLines));
 
     try {
+      if (process.env.NODE_ENV === "development")
+        console.log("createVendorbill payload -> ", formData);
       const result = await createVendorBill(formData).unwrap();
       console.log("[CreateVendorBill] - API result: ", result);
 
@@ -423,7 +436,7 @@ export default function CreateVendorBillModal({
               )}
             </div>
 
-            {/* Company Bank Account */}
+            {/* Company Bank Account (commented out - no longer required)
             <div className="mb-6">
               <h3 className="mb-1 text-sm font-medium text-gray-700">
                 Company Bank Account <span className="text-red-500">*</span>
@@ -434,7 +447,7 @@ export default function CreateVendorBillModal({
               {isBanksLoading ? (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading accounts…
+                  Loading accounts&hellip;
                 </div>
               ) : activeBankAccounts.length === 0 ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -455,9 +468,50 @@ export default function CreateVendorBillModal({
                   <SelectContent>
                     {activeBankAccounts.map((account) => (
                       <SelectItem key={account.id} value={String(account.id)}>
-                        {account.bank_name} •{" "}
+                        {account.bank_name} &bull;{" "}
                         {account.account_number_display ||
                           account.account_number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          */}
+
+            {/* Accounts Payable Account */}
+            <div className="mb-6">
+              <h3 className="mb-1 text-sm font-medium text-gray-700">
+                Accounts Payable Account <span className="text-red-500">*</span>
+              </h3>
+              <p className="mb-3 text-xs text-gray-500">
+                The liability account to record this vendor bill against.
+              </p>
+              {isAccountsPayableLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading accounts&hellip;
+                </div>
+              ) : activeAccountsPayable.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  No accounts payable accounts found. Configure accounts under
+                  Chart of Accounts before submitting.
+                </div>
+              ) : (
+                <Select
+                  value={accountsPayableAccount ? String(accountsPayableAccount) : ""}
+                  onValueChange={(value) =>
+                    setAccountsPayableAccount(Number(value))
+                  }
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select accounts payable account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeAccountsPayable.map((account) => (
+                      <SelectItem key={account.id} value={String(account.id)}>
+                        {account.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -548,8 +602,8 @@ export default function CreateVendorBillModal({
               onClick={handleSubmit}
               disabled={
                 isSubmitting ||
-                isBanksLoading ||
-                activeBankAccounts.length === 0 ||
+                isAccountsPayableLoading ||
+                activeAccountsPayable.length === 0 ||
                 lines.length === 0
               }
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
@@ -557,7 +611,7 @@ export default function CreateVendorBillModal({
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Submitting…
+                  Submitting&hellip;
                 </>
               ) : (
                 <>

@@ -18,7 +18,10 @@ import {
   useGetVendorsByTypeQuery,
 } from "@/api/invoice/vendorsApi";
 import { useGetPaymentTermsQuery } from "@/api/invoice/paymentTermsApi";
-import { useCreateVendorBillMutation } from "@/api/invoice/vendorBillsApi";
+import {
+  useCreateVendorBillMutation,
+  useGetAccountsPayableAccountsQuery,
+} from "@/api/invoice/vendorBillsApi";
 import { ToastNotification } from "@/components/shared/ToastNotification";
 
 interface Props {
@@ -112,7 +115,8 @@ export default function CreateVendorBillLabourReqModal({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState<string | null>(null);
-   const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [accountsPayableAccountId, setAccountsPayableAccountId] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [paymentTermId, setPaymentTermId] = useState("");
   const [discrepancyAck, setDiscrepancyAck] = useState(false);
@@ -144,6 +148,9 @@ export default function CreateVendorBillLabourReqModal({
   const { data: bankAccountsResponse, isLoading: isBanksLoading } =
     useGetCompanyBankAccountsQuery(undefined, { skip: !isOpen });
 
+  const { data: accountsPayableAccountsResponse, isLoading: isAccountsPayableLoading } =
+    useGetAccountsPayableAccountsQuery(undefined, { skip: !isOpen });
+
   // const { data: vendorsResponse, isLoading: isVendorsLoading } =
   //   useGetActiveVendorsQuery(undefined, { skip: !isOpen });
 
@@ -161,11 +168,13 @@ export default function CreateVendorBillLabourReqModal({
     ? bankAccountsResponse.filter((b: any) => b.is_active)
     : [];
 
+  const accountsPayableAccounts = Array.isArray(accountsPayableAccountsResponse)
+    ? accountsPayableAccountsResponse
+    : [];
+
   const vendors = Array.isArray(vendorsResponse) ? vendorsResponse : [];
 
-  const labourVendors = vendors.filter(
-    (v: any) => v.vendor_type === "labour",
-  );
+  const labourVendors = vendors.filter((v: any) => v.vendor_type === "labour");
 
   const paymentTerms = Array.isArray(paymentTermsResponse)
     ? paymentTermsResponse.filter((t: any) => t.is_active)
@@ -249,8 +258,12 @@ export default function CreateVendorBillLabourReqModal({
       showToast("error", "Please select a labour vendor");
       return;
     }
-    if (!bankAccountId) {
-      showToast("error", "Please select a company bank account");
+    // if (!bankAccountId) {
+    //   showToast("error", "Please select a company bank account");
+    //   return;
+    // }
+    if (!accountsPayableAccountId) {
+      showToast("error", "Please select an accounts payable account");
       return;
     }
     if (!effectivePaymentTermId) {
@@ -285,7 +298,8 @@ export default function CreateVendorBillLabourReqModal({
     formData.append("vendor", String(vendorId));
     formData.append("invoice_date", new Date().toISOString().split("T")[0]);
     formData.append("payment_term", String(effectivePaymentTermId));
-    formData.append("company_bank_account", String(bankAccountId));
+    // formData.append("company_bank_account", String(bankAccountId));
+    formData.append("accounts_payable_account", String(accountsPayableAccountId));
     if (uploadedFile) {
       formData.append("document", uploadedFile);
     }
@@ -602,7 +616,10 @@ export default function CreateVendorBillLabourReqModal({
                         const newVendor = labourVendors.find(
                           (v: any) => v.id === Number(newId),
                         );
-                        if (newVendor?.payment_term && paymentTerms.length > 0) {
+                        if (
+                          newVendor?.payment_term &&
+                          paymentTerms.length > 0
+                        ) {
                           setPaymentTermId(String(newVendor.payment_term));
                         }
                       }}
@@ -626,41 +643,77 @@ export default function CreateVendorBillLabourReqModal({
                 )}
               </div>
 
-              {/* Bank Account */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  Company Bank Account
-                </h3>
-                <p className="text-xs text-gray-500 mb-3">
-                  Account the payment will be drawn from.
-                </p>
-                {isBanksLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading accounts…
-                  </div>
-                ) : bankAccounts.length === 0 ? (
-                  <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                    No active company bank accounts found. Add one under Invoice
-                    settings before submitting.
-                  </div>
-                ) : (
-                  <select
-                    value={bankAccountId}
-                    onChange={(e) => setBankAccountId(e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                  >
-                    <option value="">Select bank account</option>
-                    {bankAccounts.map((b: any) => (
-                      <option key={b.id} value={b.id}>
-                        {b.bank_name} — {b.account_name} (
-                        {b.account_number_display || b.account_number})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+{/* Bank Account (commented out - no longer required)
+               <div>
+                 <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                   Company Bank Account
+                 </h3>
+                 <p className="text-xs text-gray-500 mb-3">
+                   Account the payment will be drawn from.
+                 </p>
+                 {isBanksLoading ? (
+                   <div className="flex items-center gap-2 text-sm text-gray-500">
+                     <Loader2 className="w-4 h-4 animate-spin" />
+                     Loading accounts…
+                   </div>
+                 ) : bankAccounts.length === 0 ? (
+                   <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                     No active company bank accounts found. Add one under Invoice
+                     settings before submitting.
+                   </div>
+                 ) : (
+                   <select
+                     value={bankAccountId}
+                     onChange={(e) => setBankAccountId(e.target.value)}
+                     disabled={isSubmitting}
+                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                   >
+                     <option value="">Select bank account</option>
+                     {bankAccounts.map((b: any) => (
+                       <option key={b.id} value={b.id}>
+                         {b.bank_name} — {b.account_name} (
+                         {b.account_number_display || b.account_number})
+                       </option>
+                     ))}
+                   </select>
+                 )}
+               </div>
+             */}
+
+               {/* Accounts Payable Account */}
+               <div>
+                 <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                   Accounts Payable Account
+                 </h3>
+                 <p className="text-xs text-gray-500 mb-3">
+                   The liability account to record this vendor bill against.
+                 </p>
+                 {isAccountsPayableLoading ? (
+                   <div className="flex items-center gap-2 text-sm text-gray-500">
+                     <Loader2 className="w-4 h-4 animate-spin" />
+                     Loading accounts…
+                   </div>
+                 ) : accountsPayableAccounts.length === 0 ? (
+                   <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                     No accounts payable accounts found. Configure accounts under
+                     Chart of Accounts before submitting.
+                   </div>
+                 ) : (
+                   <select
+                     value={accountsPayableAccountId}
+                     onChange={(e) => setAccountsPayableAccountId(e.target.value)}
+                     disabled={isSubmitting}
+                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                   >
+                     <option value="">Select accounts payable account</option>
+                     {accountsPayableAccounts.map((a: any) => (
+                       <option key={a.id} value={a.id}>
+                         {a.label}
+                       </option>
+                     ))}
+                   </select>
+                 )}
+               </div>
 
               {/* Payment Term */}
               <div>
@@ -722,14 +775,14 @@ export default function CreateVendorBillLabourReqModal({
             >
               Cancel
             </button>
-            <button
+<button
               ref={submitButtonRef}
               type="button"
               onClick={handleSubmit}
                disabled={
                  isSubmitting ||
                  isDetailsLoading ||
-                 bankAccounts.length === 0 ||
+                 accountsPayableAccounts.length === 0 ||
                  labourVendors.length === 0 ||
                 !vendorId ||
                 !selectedVendor ||
