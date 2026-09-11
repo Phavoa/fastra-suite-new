@@ -122,17 +122,17 @@ export default function PaymentQueuePage() {
     vendor: "",
   });
 
-  // const {
-  //   data: invoices = [],
-  //   isLoading,
-  //   isFetching,
-  // } = useGetVendorBillsQuery();
-
   const {
     data: invoices = [],
     isLoading,
     isFetching,
-  } = useGetPaymentQueueVendorBillsQuery();
+  } = useGetVendorBillsQuery();
+
+  // const {
+  //   data: invoices = [],
+  //   isLoading,
+  //   isFetching,
+  // } = useGetPaymentQueueVendorBillsQuery();
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
