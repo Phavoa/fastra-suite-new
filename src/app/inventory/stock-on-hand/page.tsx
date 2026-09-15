@@ -23,9 +23,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Filter, Loader2, List, LayoutGrid } from "lucide-react";
-import { useGetStockOnHandListQuery, StockOnHandProduct } from "@/api/inventory/stockOnHandApi";
+import {
+  Search,
+  Loader2,
+  Package,
+  CheckCircle2,
+  AlertTriangle,
+  AlertOctagon,
+} from "lucide-react";
 import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetStockOnHandListQuery, StockOnHandProduct } from "@/api/inventory/stockOnHandApi";
 
 export default function StockOnHandListPage() {
   const router = useRouter();
@@ -58,6 +65,40 @@ export default function StockOnHandListPage() {
     out_of_stock: 0,
   };
 
+  const metricCards = useMemo(
+    () => [
+      {
+        title: "Total Products",
+        count: metrics.total_products,
+        icon: Package,
+        color: "#3B7CED",
+        statusValue: "all",
+      },
+      {
+        title: "Products in Stock",
+        count: metrics.products_in_stock,
+        icon: CheckCircle2,
+        color: "#1E8E3E",
+        statusValue: "in_stock",
+      },
+      {
+        title: "Low Stock",
+        count: metrics.low_stock,
+        icon: AlertTriangle,
+        color: "#F0B401",
+        statusValue: "low_stock",
+      },
+      {
+        title: "Out of Stock",
+        count: metrics.out_of_stock,
+        icon: AlertOctagon,
+        color: "#E43D2B",
+        statusValue: "out_of_stock",
+      },
+    ],
+    [metrics],
+  );
+
   const products = data?.results || [];
 
   const breadcrumbsItems: BreadcrumbItem[] = [
@@ -70,20 +111,20 @@ export default function StockOnHandListPage() {
     switch (statusKey) {
       case "in_stock":
         return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#E8F8EE] text-[#1E8E3E]">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#E8F8EE] text-[#1E8E3E]">
             {statusLabel}
           </span>
         );
       case "low_stock":
         return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF7E6] text-[#B06000]">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FEF7E6] text-[#B06000]">
             {statusLabel}
           </span>
         );
       case "out_of_stock":
       default:
         return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#FCE8E6] text-[#D93025]">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FCE8E6] text-[#D93025]">
             {statusLabel}
           </span>
         );
@@ -96,53 +137,50 @@ export default function StockOnHandListPage() {
         <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex flex-col gap-6">
           <Breadcrumbs items={breadcrumbsItems} />
 
-          {/* Metric Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Total Products */}
-            <div className="bg-white rounded-xl p-6 shadow-2xs border border-gray-100 flex flex-col gap-2">
-              <span className="text-xs font-medium text-[#4285F4] uppercase tracking-wider">
-                Total Products
-              </span>
-              <span className="text-3xl font-semibold text-[#1A73E8]">
-                {metrics.total_products}
-              </span>
-            </div>
-
-            {/* Products in Stock */}
-            <div className="bg-white rounded-xl p-6 shadow-2xs border border-gray-100 flex flex-col gap-2">
-              <span className="text-xs font-medium text-[#1E8E3E] uppercase tracking-wider">
-                Products in Stock
-              </span>
-              <span className="text-3xl font-semibold text-[#1E8E3E]">
-                {metrics.products_in_stock}
-              </span>
-            </div>
-
-            {/* Low Stock */}
-            <div className="bg-white rounded-xl p-6 shadow-2xs border border-gray-100 flex flex-col gap-2">
-              <span className="text-xs font-medium text-[#F9AB00] uppercase tracking-wider">
-                Low Stock
-              </span>
-              <span className="text-3xl font-semibold text-[#F9AB00]">
-                {metrics.low_stock}
-              </span>
-            </div>
-
-            {/* Out of Stock */}
-            <div className="bg-white rounded-xl p-6 shadow-2xs border border-gray-100 flex flex-col gap-2">
-              <span className="text-xs font-medium text-[#D93025] uppercase tracking-wider">
-                Out of Stock
-              </span>
-              <span className="text-3xl font-semibold text-[#D93025]">
-                {metrics.out_of_stock}
-              </span>
+          {/* Metric Summary Cards matching Fastra Suite style */}
+          <div className="bg-white border border-gray-100 rounded-lg shadow-2xs overflow-hidden font-open-sans">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              {metricCards.map((card, idx) => (
+                <button
+                  key={card.title}
+                  type="button"
+                  onClick={() => setSelectedStatus(card.statusValue)}
+                  className={`p-5 cursor-pointer hover:bg-gray-50 transition-colors group flex flex-col text-left ${
+                    idx < 3 ? "border-b" : ""
+                  } ${
+                    idx % 2 === 0 ? "sm:border-r" : ""
+                  } ${
+                    idx < 2 ? "sm:border-b" : "sm:border-b-0"
+                  } ${
+                    idx < 3 ? "lg:border-r lg:border-b-0" : "lg:border-r-0"
+                  } border-gray-100 ${
+                    selectedStatus === card.statusValue ? "bg-gray-50/70" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <card.icon
+                      className="w-[18px] h-[18px] shrink-0"
+                      style={{ color: card.color }}
+                    />
+                    <span className="text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors leading-tight">
+                      {card.title}
+                    </span>
+                  </div>
+                  <div
+                    className="text-[2rem] font-bold"
+                    style={{ color: card.color }}
+                  >
+                    {card.count}
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Main Table Card */}
-          <div className="bg-white rounded-xl shadow-2xs border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xs border border-gray-100 overflow-hidden font-open-sans">
             {/* Header & Controls */}
-            <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
+            <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 font-open-sans">
               <h2 className="text-lg font-semibold text-gray-800">
                 Stock on Hand
               </h2>
@@ -154,7 +192,7 @@ export default function StockOnHandListPage() {
                   <Input
                     type="text"
                     placeholder="Search product code, name, category..."
-                    className="pl-9 bg-gray-50/50 border-gray-200 h-9 text-sm rounded-lg focus-visible:ring-1 focus-visible:ring-[#3B7CED] focus-visible:border-[#3B7CED]"
+                    className="pl-9 bg-gray-50/50 border-gray-200 h-9 text-sm rounded-lg focus-visible:ring-1 focus-visible:ring-[#3B7CED] focus-visible:border-[#3B7CED] font-open-sans"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -165,10 +203,10 @@ export default function StockOnHandListPage() {
                   value={selectedLocation}
                   onValueChange={setSelectedLocation}
                 >
-                  <SelectTrigger className="w-[180px] h-9 text-xs bg-white border-gray-200 rounded-lg">
+                  <SelectTrigger className="w-[180px] h-9 text-xs bg-white border-gray-200 rounded-lg font-open-sans">
                     <SelectValue placeholder="All Locations" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="font-open-sans">
                     <SelectItem value="all">All Locations</SelectItem>
                     {locations.map((loc: any) => (
                       <SelectItem key={loc.id} value={String(loc.id)}>
@@ -183,10 +221,10 @@ export default function StockOnHandListPage() {
                   value={selectedStatus}
                   onValueChange={setSelectedStatus}
                 >
-                  <SelectTrigger className="w-[150px] h-9 text-xs bg-white border-gray-200 rounded-lg">
+                  <SelectTrigger className="w-[150px] h-9 text-xs bg-white border-gray-200 rounded-lg font-open-sans">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="font-open-sans">
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="in_stock">In Stock</SelectItem>
                     <SelectItem value="low_stock">Low Stock</SelectItem>
@@ -198,7 +236,7 @@ export default function StockOnHandListPage() {
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <Table data-wizard="inventory-stock-table" className="min-w-[900px] w-full">
+              <Table data-wizard="inventory-stock-table" className="min-w-[900px] w-full font-open-sans">
                 <TableHeader>
                   <TableRow className="bg-[#F8FAFC] border-b border-gray-100 hover:bg-[#F8FAFC]">
                     <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
@@ -259,7 +297,7 @@ export default function StockOnHandListPage() {
                         }
                         className="border-b border-gray-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
                       >
-                        <TableCell className="py-4 px-6 font-medium text-gray-800 text-sm font-mono">
+                        <TableCell className="py-4 px-6 text-sm font-medium text-gray-800">
                           <Link
                             href={`/inventory/stock-on-hand/${encodeURIComponent(
                               item.code || item.id
@@ -279,7 +317,7 @@ export default function StockOnHandListPage() {
                         <TableCell className="py-4 px-6 text-gray-600 text-sm">
                           {item.unit}
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-right font-semibold text-gray-900 text-sm">
+                        <TableCell className="py-4 px-6 text-right font-medium text-gray-900 text-sm">
                           {item.stock_on_hand}
                         </TableCell>
                         <TableCell className="py-4 px-6 text-right text-gray-600 text-sm">

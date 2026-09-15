@@ -18,7 +18,7 @@ const formSchema = z.object({
   amountRequested: z.coerce
     .number()
     .positive("Enter a valid amount")
-    .max(50000, "Maximum Limit is N50,000"),
+    .max(50000, "Maximum Limit is ₦50,000"),
   purpose: z.string().min(2, "Purpose is required"),
   description: z.string().min(2, "Description is required"),
   notes: z.string().optional(),
@@ -123,7 +123,7 @@ export default function NewPettyCashRequestPage() {
             label: "Amount Requested",
             type: "number",
             placeholder: "Enter amount",
-            hintText: "Maximum Limit: N50,000",
+            hintText: "Maximum Limit: ₦50,000",
           },
         ],
       },
@@ -142,7 +142,7 @@ export default function NewPettyCashRequestPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-900">Total Cost</span>
                 <span className="text-sm font-semibold text-[#3B7CED]">
-                  N{(data.amountRequested || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ₦{(data.amountRequested || 0).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

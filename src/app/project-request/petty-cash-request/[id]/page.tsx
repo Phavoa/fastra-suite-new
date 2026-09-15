@@ -374,7 +374,7 @@ export default function PettyCashRequestDetailPage() {
                   <span className="block text-[14px] font-semibold text-black/80">{request.phase}</span>
                 </div>
                 <div>
-                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Task</span>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Activity</span>
                   <span className="block text-[14px] font-semibold text-black/80">{request.task}</span>
                 </div>
               </div>
@@ -388,7 +388,7 @@ export default function PettyCashRequestDetailPage() {
                   Amount Requested
                 </span>
                 <span className="block text-[14px] font-semibold text-black/80">
-                  N{request.amountRequested.toLocaleString("en-NG")}
+                  ₦{request.amountRequested.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
@@ -408,13 +408,13 @@ export default function PettyCashRequestDetailPage() {
             <div className="flex justify-between items-center">
               <span className="text-[14px] font-semibold text-black/80">Available Budget</span>
               <span className="text-[14px] font-semibold text-black/80">
-                N{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[14px] font-semibold text-black/80">Total Cost</span>
               <span className="text-[14px] font-semibold text-[#3B82F6]">
-                N{request.amountRequested.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{request.amountRequested.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </section>

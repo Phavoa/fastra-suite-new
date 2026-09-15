@@ -45,6 +45,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const plantEquipmentRequestApi = createApi({
   reducerPath: "plantEquipmentRequestApi",
+  tagTypes: ["PlantEquipmentRequest"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -116,9 +117,11 @@ export const plantEquipmentRequestApi = createApi({
         url: "/project-requests/plant-equipment/",
         params: params || undefined,
       }),
+      providesTags: ["PlantEquipmentRequest"],
     }),
     getPlantEquipmentRequest: builder.query<PlantEquipmentRequest, number>({
       query: (id) => `/project-requests/plant-equipment/${id}/`,
+      providesTags: (result, error, id) => [{ type: "PlantEquipmentRequest", id }],
     }),
     createPlantEquipmentRequest: builder.mutation<
       PlantEquipmentRequest,
@@ -129,6 +132,7 @@ export const plantEquipmentRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["PlantEquipmentRequest"],
     }),
     updatePlantEquipmentRequest: builder.mutation<
       PlantEquipmentRequest,
@@ -139,6 +143,7 @@ export const plantEquipmentRequestApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "PlantEquipmentRequest", id }, "PlantEquipmentRequest"],
     }),
     patchPlantEquipmentRequest: builder.mutation<
       PlantEquipmentRequest,
@@ -149,18 +154,21 @@ export const plantEquipmentRequestApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "PlantEquipmentRequest", id }, "PlantEquipmentRequest"],
     }),
     deletePlantEquipmentRequest: builder.mutation<void, number>({
       query: (id) => ({
         url: `/project-requests/plant-equipment/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [{ type: "PlantEquipmentRequest", id }, "PlantEquipmentRequest"],
     }),
     softDeletePlantEquipmentRequest: builder.mutation<void, number>({
       query: (id) => ({
         url: `/project-requests/plant-equipment/${id}/soft_delete/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [{ type: "PlantEquipmentRequest", id }, "PlantEquipmentRequest"],
     }),
     toggleHiddenStatus: builder.mutation<
       PlantEquipmentRequest,
@@ -171,12 +179,15 @@ export const plantEquipmentRequestApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "PlantEquipmentRequest", id }, "PlantEquipmentRequest"],
     }),
     getActivePlantEquipmentRequests: builder.query<PlantEquipmentRequest[], void>({
       query: () => "/project-requests/plant-equipment/active_list/",
+      providesTags: ["PlantEquipmentRequest"],
     }),
     getHiddenPlantEquipmentRequests: builder.query<PlantEquipmentRequest[], void>({
       query: () => "/project-requests/plant-equipment/hidden_list/",
+      providesTags: ["PlantEquipmentRequest"],
     }),
     submitPlantEquipmentRequest: builder.mutation<PlantEquipmentRequest, { id: number; data?: any }>({
       query: ({ id, data }) => ({
@@ -184,6 +195,7 @@ export const plantEquipmentRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "PlantEquipmentRequest", id }, "PlantEquipmentRequest"],
     }),
   }),
 });

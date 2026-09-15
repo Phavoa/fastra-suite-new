@@ -52,6 +52,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const materialConsumptionRequestApi = createApi({
   reducerPath: "materialConsumptionRequestApi",
+  tagTypes: ["MaterialConsumption"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -116,9 +117,11 @@ export const materialConsumptionRequestApi = createApi({
         url: "/project-requests/material-consumption/",
         params: params || undefined,
       }),
+      providesTags: ["MaterialConsumption"],
     }),
     getMaterialConsumption: builder.query<MaterialConsumptionRequest, number>({
       query: (id) => `/project-requests/material-consumption/${id}/`,
+      providesTags: (result, error, id) => [{ type: "MaterialConsumption", id }],
     }),
     createMaterialConsumption: builder.mutation<MaterialConsumptionRequest, CreateMaterialConsumptionRequest>({
       query: (body) => ({
@@ -126,6 +129,7 @@ export const materialConsumptionRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["MaterialConsumption"],
     }),
     updateMaterialConsumption: builder.mutation<MaterialConsumptionRequest, { id: number; body: UpdateMaterialConsumptionRequest }>({
       query: ({ id, body }) => ({
@@ -133,6 +137,7 @@ export const materialConsumptionRequestApi = createApi({
         method: "PUT",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "MaterialConsumption", id }, "MaterialConsumption"],
     }),
     patchMaterialConsumption: builder.mutation<MaterialConsumptionRequest, { id: number; body: UpdateMaterialConsumptionRequest }>({
       query: ({ id, body }) => ({
@@ -140,12 +145,14 @@ export const materialConsumptionRequestApi = createApi({
         method: "PATCH",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "MaterialConsumption", id }, "MaterialConsumption"],
     }),
     deleteMaterialConsumption: builder.mutation<void, number>({
       query: (id) => ({
         url: `/project-requests/material-consumption/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [{ type: "MaterialConsumption", id }, "MaterialConsumption"],
     }),
 
     submitMaterialConsumptionRequest: builder.mutation<MaterialConsumptionRequest, { id: number; data?: any }>({
@@ -154,6 +161,7 @@ export const materialConsumptionRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "MaterialConsumption", id }, "MaterialConsumption"],
     }),
     releaseMaterialConsumption: builder.mutation<any, { id: number; body?: { location?: string; date_consumed?: string; notes?: string; lines?: Array<{ id: number | string; quantity_to_release: number }> } }>({
       query: ({ id, body }) => ({
@@ -161,6 +169,7 @@ export const materialConsumptionRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "MaterialConsumption", id }, "MaterialConsumption"],
     }),
   }),
 });

@@ -63,7 +63,7 @@ export type UpdateTenantUser = Partial<CreateTenantUser>;
 
 // Password change request interface
 export interface ChangePasswordRequest {
-  user_id: number;
+  user_id?: number;
   old_password: string;
   new_password: string;
   confirm_password: string;
@@ -93,26 +93,53 @@ export const tenantUserApi = createApi({
 
     const headers = new Headers();
     if (token) headers.set("authorization", `Bearer ${token}`);
-    headers.set("content-type", "application/json");
     headers.set("accept", "application/json");
 
     let url: string;
+    let method = "GET";
+    let body: any = undefined;
 
     if (typeof args === "string") {
       url = `${baseUrl}${args}`;
     } else {
-      url = `${baseUrl}${args.url}`;
+      method = args.method || "GET";
+      const params = new URLSearchParams();
+      if (args.params) {
+        Object.entries(args.params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            params.append(key, String(value));
+          }
+        });
+      }
+      const queryString = params.toString();
+      url = `${baseUrl}${args.url}${queryString ? `?${queryString}` : ""}`;
+
+      if (args.body instanceof FormData) {
+        body = args.body;
+      } else if (args.body) {
+        body = JSON.stringify(args.body);
+        headers.set("content-type", "application/json");
+      }
     }
 
     try {
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { method, headers, body });
       if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = await response.text();
+        }
         return {
           error: {
             status: response.status,
-            data: await response.json(),
+            data: errorData,
           },
         };
+      }
+      if (response.status === 204) {
+        return { data: null };
       }
       const data = await response.json();
       return { data };
@@ -189,13 +216,28 @@ export const tenantUserApi = createApi({
       ],
     }),
 
-    // DELETE /users/tenant-users/{id}/soft_delete/ - Soft delete tenant user
-    softDeleteTenantUser: builder.mutation<void, number>({
+    // DELETE /users/tenant-users/{id}/ - Delete tenant user
+    deleteTenantUser: builder.mutation<void, number | string>({
       query: (id) => ({
-        url: `/users/tenant-users/${id}/soft_delete/`,
+        url: `/users/tenant-users/${id}/`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, id) => [{ type: "TenantUser", id }],
+      invalidatesTags: (result, error, id) => [
+        { type: "TenantUser", id },
+        "TenantUser",
+      ],
+    }),
+
+    // DELETE /users/tenant-users/{id}/ - Soft delete tenant user (backward compatibility)
+    softDeleteTenantUser: builder.mutation<void, number | string>({
+      query: (id) => ({
+        url: `/users/tenant-users/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "TenantUser", id },
+        "TenantUser",
+      ],
     }),
 
     // PUT /users/tenant-users/{id}/toggle_hidden_status/ - Toggle hidden status
@@ -242,12 +284,15 @@ export const tenantUserApi = createApi({
       providesTags: ["TenantUser"],
     }),
 
-    // POST /users/tenant-users/change-password - Change password
-    changePassword: builder.mutation<unknown, ChangePasswordRequest>({
-      query: (passwordData) => ({
-        url: "/users/tenant-users/change-password/",
+    // POST /users/tenant-users/{id}/change_password/ - Change password
+    changePassword: builder.mutation<
+      unknown,
+      { id: number | string; data: ChangePasswordRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/users/tenant-users/${id}/change_password/`,
         method: "POST",
-        body: passwordData,
+        body: data,
       }),
     }),
 
@@ -290,6 +335,7 @@ export const {
   useCreateTenantUserMutation,
   useUpdateTenantUserMutation,
   usePatchTenantUserMutation,
+  useDeleteTenantUserMutation,
   useSoftDeleteTenantUserMutation,
   useToggleHiddenStatusMutation,
   useToggleHiddenStatusPatchMutation,

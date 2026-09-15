@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, CheckCircle, Clock, XCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -28,15 +28,24 @@ interface PlantEquipmentRequestItem {
 
 export default function PlantEquipmentRequestDashboard() {
   const router = useRouter();
-  const [requests, setRequests] = useState<PlantEquipmentRequestItem[]>([]);
-
-  const { data: apiRequests, isLoading: apiLoading } = useGetPlantEquipmentRequestsQuery();
-  const { data: projectsData } = useGetProjectCostingProjectsQuery({});
-  const projects = Array.isArray(projectsData)
-    ? projectsData
-    : (projectsData as any)?.results || [];
+  const { data: apiRequests, isLoading: apiLoading, refetch } = useGetPlantEquipmentRequestsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   useEffect(() => {
+    if (typeof refetch === "function") {
+      refetch();
+    }
+  }, [refetch]);
+
+  const { data: projectsData } = useGetProjectCostingProjectsQuery({});
+  const projects = useMemo(() => {
+    return Array.isArray(projectsData)
+      ? projectsData
+      : (projectsData as any)?.results || [];
+  }, [projectsData]);
+
+  const requests: PlantEquipmentRequestItem[] = useMemo(() => {
     if (apiRequests && Array.isArray(apiRequests)) {
       const sortedList = [...apiRequests].sort((a: any, b: any) => {
         const dateA = new Date(a.created_at || a.date_created || 0).getTime();
@@ -44,7 +53,7 @@ export default function PlantEquipmentRequestDashboard() {
         if (dateB !== dateA) return dateB - dateA;
         return Number(b.id || 0) - Number(a.id || 0);
       });
-      const mapped = sortedList.map((req: any) => {
+      return sortedList.map((req: any) => {
         let requesterName = "Requester";
         if (req.created_by_details && typeof req.created_by_details === "object") {
           const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
@@ -68,9 +77,15 @@ export default function PlantEquipmentRequestDashboard() {
           requesterName = `User #${req.created_by_id}`;
         }
 
+        const itemRefId =
+          (req.reference_id && String(req.reference_id).trim()) ||
+          ((req as any).detail?.reference_id && String((req as any).detail.reference_id).trim()) ||
+          ((req as any).project_request?.reference_id && String((req as any).project_request.reference_id).trim()) ||
+          `PE${String(req.id).padStart(4, "0")}`;
+
         return {
           id: String(req.id),
-          referenceId: String((req as any).project_request?.reference_id || req.reference_id || req.id),
+          referenceId: itemRefId,
           project: req.project_details?.name || "General Project",
           equipment: req.equipment_name || "-",
           description: req.description || "",
@@ -78,22 +93,22 @@ export default function PlantEquipmentRequestDashboard() {
           estimatedCost: parseFloat(req.estimated_cost) || 0,
           status: ((req as any).project_request?.status || req.status || "pending") as "draft" | "approved" | "pending" | "rejected",
           requester: requesterName,
-          date: new Date(req.created_at || Date.now()).toLocaleDateString("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric"
-          }),
+          date: req.created_at || req.date_created
+            ? new Date(req.created_at || req.date_created).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric"
+              })
+            : "-",
           requiredDate: req.required_date ? new Date(req.required_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-",
           phase: req.phase_details?.name || "-",
           task: req.activity_details?.name || "-",
           notes: req.justification_notes || ""
         };
       });
-      setRequests(mapped);
-    } else {
-      setRequests([]);
     }
-  }, [apiRequests, projects]);
+    return [];
+  }, [apiRequests]);
 
   const getStatusBadgeVariant = (status: RequestStatus) => {
     switch (status) {

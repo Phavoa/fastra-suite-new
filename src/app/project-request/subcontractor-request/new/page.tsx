@@ -16,6 +16,15 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/lib/store/store";
 import { PageGuard } from "@/components/auth/PageGuard";
 
+const milestoneSchema = z.object({
+  name: z.string().min(1, "Milestone name is required"),
+  percentage: z.coerce
+    .number()
+    .min(1, "Percentage must be greater than 0")
+    .max(100, "Percentage cannot exceed 100"),
+  completion_criteria: z.string().min(1, "Completion criteria is required"),
+});
+
 const formSchema = z.object({
   project: z.string().min(1, "Please select a project"),
   vendor: z.string().min(1, "Please select a subcontractor"),
@@ -23,7 +32,11 @@ const formSchema = z.object({
   start_date: z.string().min(2, "Start date is required"),
   end_date: z.string().min(2, "End date is required"),
   contract_value: z.string().min(1, "Contract value is required"),
-  payment_terms: z.string().min(2, "Payment terms are required"),
+  payment_type: z.enum(["lump_sum", "milestone"], {
+    message: "Please select a payment type",
+  }),
+  payment_terms: z.string().optional(),
+  milestones: z.array(milestoneSchema).optional(),
   phase: z.string().min(1, "Please select a phase"),
   task: z.string().min(1, "Please select an activity"),
   justification_notes: z.string().optional(),
@@ -35,6 +48,19 @@ const formSchema = z.object({
 }, {
   message: "End date cannot be earlier than start date",
   path: ["end_date"],
+}).refine((data) => {
+  if (data.payment_type === "milestone") {
+    const ms = data.milestones || [];
+    if (ms.length < 2) {
+      return false;
+    }
+    const total = ms.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
+    return Math.abs(total - 100) < 0.01;
+  }
+  return true;
+}, {
+  message: "Milestone-based payment requires at least 2 milestones totaling exactly 100%",
+  path: ["milestones"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -157,15 +183,32 @@ export default function NewSubcontractorRequestPage() {
         fields: [
           {
             name: "contract_value",
-            label: "Contract Value (Estimated)",
+            label: "Contract Value",
             type: "text",
             placeholder: "Enter value",
+          },
+          {
+            name: "payment_type",
+            label: "Payment Type",
+            type: "select",
+            placeholder: "Select payment type",
+            options: [
+              { label: "Lump Sum", value: "lump_sum" },
+              { label: "Milestone-Based", value: "milestone" },
+            ],
+          },
+          {
+            name: "milestones",
+            label: "Milestones",
+            type: "milestones",
+            visibleIf: { field: "payment_type", value: "milestone" },
           },
           {
             name: "payment_terms",
             label: "Payment Terms",
             type: "text",
-            placeholder: "Enter payment terms",
+            placeholder: "Enter payment terms (optional)",
+            hintText: "Optional payment terms or conditions",
           },
         ],
       },
@@ -199,13 +242,22 @@ export default function NewSubcontractorRequestPage() {
             placeholder: "Enter note",
           },
         ],
-        renderTop: (data: FormValues) => {
+        renderTop: (data: FormValues, extra?: any) => {
+          const availBudget = extra?.availableBudget || 0;
           return (
             <div className="pb-4 mb-4 border-b border-gray-200 space-y-2">
+              {availBudget > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">Available Budget</span>
+                  <span className="text-sm font-semibold text-black/80">
+                    ₦{Number(availBudget).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-900">Total Cost</span>
                 <span className="text-sm font-semibold text-[#3B7CED]">
-                  N{Number(data.contract_value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ₦{Number(data.contract_value || 0).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
@@ -221,10 +273,20 @@ export default function NewSubcontractorRequestPage() {
       start_date: "",
       end_date: "",
       contract_value: "",
+      payment_type: "lump_sum",
       payment_terms: "",
+      milestones: [],
       phase: "",
       task: "",
       justification_notes: "",
+    },
+    calculateProjectedCost: (data: FormValues) => {
+      return Number(data.contract_value || 0);
+    },
+    budgetConfig: {
+      projectField: "project",
+      wbsField: "task",
+      costCode: "SUB-001",
     },
     onSubmit: async (data) => {
       try {
@@ -251,13 +313,20 @@ export default function NewSubcontractorRequestPage() {
           activity: ensureValidUUID(data.task),
           vendor: Number(data.vendor),
           scope_of_work: data.scope_of_work,
-          payment_type: "lump_sum",
+          payment_type: data.payment_type,
           contract_value: data.contract_value,
-          payment_terms: data.payment_terms,
+          payment_terms: data.payment_terms || "",
           start_date: data.start_date,
           end_date: data.end_date,
           justification_notes: data.justification_notes || "",
-          milestones: [],
+          milestones: data.payment_type === "milestone"
+            ? (data.milestones || []).map((m: any) => ({
+                name: m.name,
+                percentage: String(m.percentage),
+                completion_criteria: m.completion_criteria,
+                is_completed: false,
+              }))
+            : [],
         };
 
         await createRequest(payload).unwrap();

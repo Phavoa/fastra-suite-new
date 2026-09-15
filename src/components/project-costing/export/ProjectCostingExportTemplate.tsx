@@ -55,8 +55,13 @@ export const ProjectCostingExportTemplate = ({
   pieChartData = []
 }: ExportTemplateProps) => {
   const today = new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
-  const remaining = budgetNum - actualSpend;
-  const variance = budgetNum > 0 ? ((budgetNum - actualSpend) / budgetNum) * 100 : 0;
+  const fin = typeof project?.financials === "string" ? JSON.parse(project.financials) : project?.financials;
+  const remaining = fin?.remaining_budget !== undefined && fin?.remaining_budget !== null
+    ? Number(fin.remaining_budget)
+    : (budgetNum - actualSpend - committedSpend);
+  const variance = fin?.consumed_percent !== undefined
+    ? Number(fin.consumed_percent)
+    : (budgetNum > 0 ? ((actualSpend / budgetNum) * 100) : 0);
   
   const COLORS = ["#3B7CED", "#2BA24D", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
@@ -84,7 +89,12 @@ export const ProjectCostingExportTemplate = ({
               </div>
               <div className="text-sm text-gray-500 mt-2">{(project as any)?.project_code || "PRJ-CODE"}</div>
               <div className="text-sm text-gray-800 mt-1">
-                <span className="font-semibold text-gray-600">Project Manager:</span> {(project as any)?.project_manager || "Manager"} <span className="mx-2"> </span> <span className="font-semibold text-gray-600">Date:</span> {(project as any)?.start_date || "Start Date"} - {(project as any)?.expected_end_date || "End Date"}
+                <span className="font-semibold text-gray-600">Project Manager:</span>{" "}
+                {(project as any)?.project_manager_details?.first_name || (project as any)?.project_manager_details?.last_name
+                  ? `${(project as any).project_manager_details.first_name || ""} ${(project as any).project_manager_details.last_name || ""}`.trim()
+                  : (project as any)?.project_manager_details?.email || (typeof (project as any)?.project_manager === "string" ? (project as any).project_manager : "N/A")}{" "}
+                <span className="mx-2"> </span>{" "}
+                <span className="font-semibold text-gray-600">Date:</span> {(project as any)?.start_date || "Start Date"} - {(project as any)?.expected_end_date || "End Date"}
               </div>
             </div>
           </div>
@@ -101,11 +111,11 @@ export const ProjectCostingExportTemplate = ({
             <div className="text-2xl font-black text-blue-900">{formatCurrency(budgetNum)}</div>
           </div>
           <div className="p-5 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col justify-center">
-            <div className="text-xs text-orange-600 font-bold mb-1 uppercase tracking-wide">Amount Spent (Actual)</div>
+            <div className="text-xs text-orange-600 font-bold mb-1 uppercase tracking-wide">Actual Spent</div>
             <div className="text-2xl font-black text-orange-900">{formatCurrency(actualSpend)}</div>
           </div>
           <div className="p-5 rounded-xl border border-purple-100 bg-purple-50/50 flex flex-col justify-center">
-            <div className="text-xs text-purple-600 font-bold mb-1 uppercase tracking-wide">Committed</div>
+            <div className="text-xs text-purple-600 font-bold mb-1 uppercase tracking-wide">Committed Amount</div>
             <div className="text-2xl font-black text-purple-900">{formatCurrency(committedSpend)}</div>
           </div>
           <div className="p-5 rounded-xl border border-green-100 bg-green-50/50 flex flex-col justify-center">
@@ -131,7 +141,7 @@ export const ProjectCostingExportTemplate = ({
                   <Tooltip formatter={(value) => formatCurrency(value as number)} />
                   <Legend />
                   <Line type="monotone" dataKey="planned" name="Planned Spend" stroke="#3B7CED" strokeWidth={3} dot={false} strokeDasharray="5 5" />
-                  <Line type="monotone" dataKey="actual" name="Actual Spend" stroke="#2BA24D" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="actual" name="Actual Spent" stroke="#2BA24D" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

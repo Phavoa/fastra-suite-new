@@ -13,6 +13,8 @@ import { PageGuard } from "@/components/auth/PageGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { DraftIcon } from "@/components/shared/icons";
+
 const StatusIcon = ({ color }: { color: string }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0">
     <path
@@ -40,12 +42,21 @@ export default function TransactionsPage() {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
-  const { data: transactions = [], isLoading } = useGetProjectTransactionsQuery(Number(id), {
+  const { data: rawTransactions = [], isLoading } = useGetProjectTransactionsQuery(Number(id), {
     skip: !id,
   });
 
-  const approvedCount = transactions.filter((t: any) => (t.status || "approved").toLowerCase().includes("approv") || (t.status || "").toLowerCase() === "paid" || (t.status || "").toLowerCase() === "done").length;
+  const transactions = Array.isArray(rawTransactions)
+    ? rawTransactions
+    : Array.isArray((rawTransactions as any)?.results)
+    ? (rawTransactions as any).results
+    : Array.isArray((rawTransactions as any)?.data)
+    ? (rawTransactions as any).data
+    : [];
+
+  const approvedCount = transactions.filter((t: any) => (t.status || "approved").toLowerCase().includes("approv") || (t.status || "").toLowerCase() === "paid" || (t.status || "").toLowerCase() === "done" || (t.status || "").toLowerCase() === "released").length;
   const pendingCount = transactions.filter((t: any) => (t.status || "").toLowerCase().includes("pend")).length;
+  const draftCount = transactions.filter((t: any) => (t.status || "").toLowerCase().includes("draft")).length;
   const totalCount = transactions.length;
 
   const handleRowClick = (tx: any) => {
@@ -92,7 +103,7 @@ export default function TransactionsPage() {
         {/* KPI Cards Row (Consolidated Container) */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col md:flex-row items-center divide-y md:divide-y-0 md:divide-x divide-gray-150 shadow-2xs">
           {/* Approved transactions */}
-          <div className="flex-1 w-full pb-4 md:pb-0 md:pr-6 flex flex-col gap-2">
+          <div className="flex-1 w-full pb-4 md:pb-0 md:pr-4 lg:pr-6 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-[#2D8A4E]">
               <StatusIcon color="#2D8A4E" />
               <span className="text-sm font-semibold">Approved transactions</span>
@@ -102,19 +113,30 @@ export default function TransactionsPage() {
             </div>
           </div>
           
-          {/* Pending transactions */}
-          <div className="flex-1 w-full py-4 md:py-0 md:px-6 flex flex-col gap-2">
+          {/* Pending Approvals */}
+          <div className="flex-1 w-full py-4 md:py-0 md:px-4 lg:px-6 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-[#D99B00]">
               <StatusIcon color="#F0B401" />
-              <span className="text-sm font-semibold">Pending transactions</span>
+              <span className="text-sm font-semibold">Pending Approvals</span>
             </div>
             <div className="text-4xl font-bold text-[#D99B00] mt-1">
               {isLoading ? "-" : pendingCount}
             </div>
           </div>
 
+          {/* Draft transactions */}
+          <div className="flex-1 w-full py-4 md:py-0 md:px-4 lg:px-6 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-[#5E72E4]">
+              <DraftIcon color="#5E72E4" className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-semibold">Draft transactions</span>
+            </div>
+            <div className="text-4xl font-bold text-[#5E72E4] mt-1">
+              {isLoading ? "-" : draftCount}
+            </div>
+          </div>
+
           {/* Total Transactions */}
-          <div className="flex-1 w-full pt-4 md:pt-0 md:pl-6 flex flex-col gap-2">
+          <div className="flex-1 w-full pt-4 md:pt-0 md:pl-4 lg:pl-6 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-[#3B7CED]">
               <StatusIcon color="#3B7CED" />
               <span className="text-sm font-semibold">Total Transactions</span>

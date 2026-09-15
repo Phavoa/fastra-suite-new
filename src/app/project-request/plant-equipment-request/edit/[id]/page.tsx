@@ -74,15 +74,33 @@ export default function EditPlantEquipmentRequestPage() {
   // Validation feedback modal state
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [requestId, setRequestId] = useState("Loading...");
-
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const requestId = useMemo(() => {
+    if (!existingRequest) return "Loading...";
+    const req = existingRequest as any;
+    return (
+      (req.reference_id && String(req.reference_id).trim()) ||
+      ((req as any).detail?.reference_id && String((req as any).detail.reference_id).trim()) ||
+      ((req as any).project_request?.reference_id && String((req as any).project_request.reference_id).trim()) ||
+      `PE${String(req.id || id).padStart(4, "0")}`
+    );
+  }, [existingRequest, id]);
+
+  const requestDate = useMemo(() => {
+    if (!existingRequest?.created_at) return "";
+    return new Date(existingRequest.created_at).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [existingRequest?.created_at]);
 
   // Populate data when existing request is loaded
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (existingRequest) {
       const req = existingRequest as any;
-      setRequestId(req.reference_id || (req as any).project_request?.reference_id || `PE-${req.id}`);
       setEquipmentName(req.equipment_name || "");
       setDescription(req.description || "");
       setQuantity(req.quantity || "");
@@ -101,7 +119,7 @@ export default function EditPlantEquipmentRequestPage() {
       if (req.activity) setSelectedTaskId(String(req.activity));
       else if (req.activity_details?.id) setSelectedTaskId(String(req.activity_details.id));
     }
-  }, [existingRequest]);
+  }, [existingRequest, id]);
 
   // Fetch full project detail for WBS cascade
   const { data: costingProjectDetail } = useGetProjectCostingProjectQuery(
@@ -109,21 +127,79 @@ export default function EditPlantEquipmentRequestPage() {
     { skip: !selectedProjectId || isNaN(Number(selectedProjectId)) },
   );
 
+  // Helper to extract numeric budget from multiple potential backend fields
+  const getBudgetValue = (item: any): number => {
+    if (!item) return 0;
+    const val =
+      item.available_budget ??
+      item.remaining_budget ??
+      item.budget ??
+      item.amount ??
+      item.budgeted_amount ??
+      item.total_amount ??
+      (item.quantity && item.rate ? Number(item.quantity) * Number(item.rate) : undefined) ??
+      item.cost ??
+      0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+
   // Build a flat WBS list from either .wbs or .phases[].activities structure
   const wbsList = useMemo(() => {
     const proj: any = costingProjectDetail || projects.find((p: any) => String(p.id) === selectedProjectId);
     if (!proj) return [];
-    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) return proj.wbs;
+    if (Array.isArray(proj.wbs) && proj.wbs.length > 0) {
+      const rawWbs = proj.wbs;
+      return rawWbs.map((w: any) => {
+        let budgetVal = getBudgetValue(w);
+        if (budgetVal === 0 && !w.is_activity) {
+          const childSum = rawWbs
+            .filter((c: any) => c.is_activity && String(c.parent) === String(w.id))
+            .reduce((sum: number, c: any) => sum + getBudgetValue(c), 0);
+          if (childSum > 0) budgetVal = childSum;
+        }
+        return {
+          ...w,
+          amount: budgetVal,
+        };
+      });
+    }
+
     const items: any[] = [];
-    const phasesArr = Array.isArray(proj.phases)
-      ? proj.phases
-      : Array.isArray(proj.phase_list) ? proj.phase_list : [];
+    let phasesArr: any[] = [];
+    if (typeof proj.phases === "string") {
+      try {
+        phasesArr = JSON.parse(proj.phases);
+      } catch (e) {
+        phasesArr = [];
+      }
+    } else if (Array.isArray(proj.phases)) {
+      phasesArr = proj.phases;
+    } else if (Array.isArray(proj.phase_list)) {
+      phasesArr = proj.phase_list;
+    } else if (proj.phases?.results && Array.isArray(proj.phases.results)) {
+      phasesArr = proj.phases.results;
+    }
+
     phasesArr.forEach((ph: any, pi: number) => {
       const phId = ph.id || ph.phase_id || `phase-${pi + 1}`;
       const phName = ph.name || ph.phase_name || `Phase ${pi + 1}`;
-      items.push({ id: phId, name: phName, is_activity: false });
+
       const acts = Array.isArray(ph.activities) ? ph.activities
         : Array.isArray(ph.activity_list) ? ph.activity_list : [];
+
+      const actsTotal = acts.reduce((sum: number, act: any) => sum + getBudgetValue(act), 0);
+      const explicitPhaseBudget = getBudgetValue(ph);
+      const phaseAmount = explicitPhaseBudget > 0 ? explicitPhaseBudget : actsTotal;
+
+      items.push({
+        ...ph,
+        id: phId,
+        name: phName,
+        is_activity: false,
+        amount: phaseAmount,
+      });
+
       acts.forEach((act: any, ai: number) => {
         items.push({
           ...act,
@@ -131,9 +207,27 @@ export default function EditPlantEquipmentRequestPage() {
           name: act.name || act.activity_name || `Activity ${ai + 1}`,
           is_activity: true,
           parent: phId,
+          amount: getBudgetValue(act),
         });
       });
     });
+
+    if (Array.isArray(proj.activities)) {
+      proj.activities.forEach((act: any, ai: number) => {
+        const actId = act.id || act.activity_id || `act-${ai + 1}`;
+        if (!items.some((it) => String(it.id) === String(actId))) {
+          items.push({
+            ...act,
+            id: actId,
+            name: act.name || act.activity_name || `Activity ${ai + 1}`,
+            is_activity: true,
+            parent: act.phase || act.phase_id || act.parent || null,
+            amount: getBudgetValue(act),
+          });
+        }
+      });
+    }
+
     return items;
   }, [costingProjectDetail, projects, selectedProjectId]);
 
@@ -167,15 +261,12 @@ export default function EditPlantEquipmentRequestPage() {
 
   let availableBudget = 0;
   if (selectedActivity) {
-    availableBudget = selectedActivity.available_budget !== undefined && selectedActivity.available_budget !== null
-      ? Number(selectedActivity.available_budget)
-      : selectedActivity.remaining_budget !== undefined && selectedActivity.remaining_budget !== null
-      ? Number(selectedActivity.remaining_budget)
-      : selectedActivity.amount !== undefined && selectedActivity.amount !== null
-      ? Number(selectedActivity.amount)
-      : budgetData?.available_budget !== undefined && budgetData?.available_budget !== null
-      ? Number(budgetData.available_budget)
-      : 0;
+    const actBudget = Number(selectedActivity.amount ?? 0);
+    if (actBudget > 0) {
+      availableBudget = actBudget;
+    } else if (budgetData?.available_budget !== undefined && budgetData?.available_budget !== null) {
+      availableBudget = Number(budgetData.available_budget);
+    }
   } else {
     availableBudget = budgetData?.available_budget ? Number(budgetData.available_budget) : 0;
   }
@@ -363,7 +454,7 @@ export default function EditPlantEquipmentRequestPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-700">Date</Label>
-              <Input value={new Date(existingRequest?.created_at || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} disabled className="h-11 bg-gray-50 text-gray-500 font-normal border-gray-200 shadow-none" />
+              <Input value={requestDate || "—"} disabled className="h-11 bg-gray-50 text-gray-500 font-normal border-gray-200 shadow-none" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-gray-700">Requested by</Label>
@@ -473,15 +564,34 @@ export default function EditPlantEquipmentRequestPage() {
                 }}
                 disabled={!selectedProjectId}
               >
-                <SelectTrigger className="h-11 border-gray-200 bg-white disabled:bg-gray-50 w-full shadow-none">
+                <SelectTrigger className="h-11 border-gray-200 bg-white disabled:bg-gray-50 w-full shadow-none [&>span]:w-full">
                   <SelectValue placeholder="Select a phase" />
                 </SelectTrigger>
-                <SelectContent>
-                  {phases.map((ph: any) => (
-                    <SelectItem key={ph.id} value={String(ph.id)}>
-                      {ph.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-72">
+                  {phases.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-gray-500">
+                      No phases available
+                    </div>
+                  ) : (
+                    phases.map((ph: any) => (
+                      <SelectItem
+                        key={ph.id}
+                        value={String(ph.id)}
+                        className="py-2.5 cursor-pointer [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                      >
+                        <span className="flex items-center justify-between gap-3 w-full min-w-0">
+                          <span className="font-medium text-gray-800 truncate min-w-0">
+                            {ph.name}
+                          </span>
+                          <span className="font-semibold text-xs text-[#3B7CED] bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-auto">
+                            ₦{Number(ph.amount || 0).toLocaleString("en-NG", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -494,15 +604,34 @@ export default function EditPlantEquipmentRequestPage() {
                 onValueChange={setSelectedTaskId}
                 disabled={!selectedPhaseId}
               >
-                <SelectTrigger className="h-11 border-gray-200 bg-white disabled:bg-gray-50 w-full shadow-none">
+                <SelectTrigger className="h-11 border-gray-200 bg-white disabled:bg-gray-50 w-full shadow-none [&>span]:w-full">
                   <SelectValue placeholder="Select an activity" />
                 </SelectTrigger>
-                <SelectContent>
-                  {tasks.map((t: any) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-72">
+                  {tasks.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-gray-500">
+                      No activities available
+                    </div>
+                  ) : (
+                    tasks.map((t: any) => (
+                      <SelectItem
+                        key={t.id}
+                        value={String(t.id)}
+                        className="py-2.5 cursor-pointer [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                      >
+                        <span className="flex items-center justify-between gap-3 w-full min-w-0">
+                          <span className="font-medium text-gray-800 truncate min-w-0">
+                            {t.name}
+                          </span>
+                          <span className="font-semibold text-xs text-[#3B7CED] bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-auto">
+                            ₦{Number(t.amount || 0).toLocaleString("en-NG", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

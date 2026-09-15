@@ -13,6 +13,7 @@ interface FormSelectProps {
   placeholder: string;
   options: Option[];
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  error?: string;
 }
 
 export default function FormSelect({
@@ -22,31 +23,37 @@ export default function FormSelect({
   placeholder,
   options,
   onChange,
+  error,
 }: FormSelectProps) {
+  const borderClass = error
+    ? "border-red-500 focus:border-red-500"
+    : "border-[#7A8A98]";
+
   return (
-    <div className="flex flex-col gap-2 relative">
-  <label className="text-sm font-medium">{label}</label>
+    <div className="flex flex-col gap-1 relative">
+      <label className="text-sm font-medium text-[#1A1A1A]">{label}</label>
 
-  <select
-    name={name}
-    value={value}
-    onChange={onChange}
-    className="w-full border border-[#7A8A98] px-3 py-2 pr-10 bg-white text-[#7A8A98] text-sm appearance-none rounded"
-  >
-    <option value="" disabled>
-      {placeholder}
-    </option>
-    {options.map((opt) => (
-      <option key={opt.value} value={opt.value}>
-        {opt.label}
-      </option>
-    ))}
-  </select>
+      <div className="relative">
+        <select
+          name={name}
+          value={value}
+          onChange={onChange}
+          className={`w-full border ${borderClass} px-3 py-2 pr-10 bg-white text-[#1A1A1A] text-sm appearance-none rounded`}
+        >
+          <option value="" disabled>
+            {placeholder}
+          </option>
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
 
-  {/* Custom arrow */}
-  <FaChevronDown className="absolute right-3 top-[70%] text-sm transform -translate-y-1/2 text-[#7A8A98]" />
-</div>
-
-
+        {/* Custom arrow */}
+        <FaChevronDown className="absolute right-3 top-1/2 text-sm transform -translate-y-1/2 text-[#7A8A98] pointer-events-none" />
+      </div>
+      {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
+    </div>
   );
 }

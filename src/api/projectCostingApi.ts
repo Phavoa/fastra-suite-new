@@ -147,6 +147,7 @@ export const projectCostingApi = createApi({
         url: `/project-costing/projects/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: ["ProjectCosting"],
     }),
 
     // Project Actions

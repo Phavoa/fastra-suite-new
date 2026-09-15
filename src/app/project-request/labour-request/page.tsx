@@ -39,7 +39,14 @@ export default function LabourRequestPage() {
     isLoading,
     error,
     refetch,
-  } = useGetLabourRequestsQuery({});
+  } = useGetLabourRequestsQuery({}, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
   const { data: projectsData } = useGetProjectCostingProjectsQuery({});
   const projects = Array.isArray(projectsData)
     ? projectsData
@@ -69,19 +76,31 @@ export default function LabourRequestPage() {
         return Number(b.id || 0) - Number(a.id || 0);
       })
       .map((req) => {
-        const projectId = (req as any).project_request?.project || (req as any).project;
+        const projectId = (req as any).project_request?.project || (req as any).project || (req as any).detail?.project;
         const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
+        const labourDetailId = req.detail?.id ?? req.id;
+        const refCode =
+          (req.detail as any)?.reference_code ||
+          (req.detail as any)?.code ||
+          (req.detail as any)?.labour_reference ||
+          `LB${String(labourDetailId).padStart(4, "0")}`;
+
+        const createdBy = (req as any).created_by_details;
+        const requesterFullName =
+          createdBy?.first_name || createdBy?.last_name
+            ? `${createdBy.first_name || ""} ${createdBy.last_name || ""}`.trim()
+            : createdBy?.username;
+
         return {
           id: req.id,
-          referenceId: req.reference_id,
-          project: projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
+          referenceId: refCode,
+          project: req.detail?.project_details?.name || (req as any).project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "-"),
           workers: req.detail?.number_of_workers || 0,
           role: req.detail?.role_type || "Unknown",
-          requester: req.detail?.created_by_name || "Requester",
+          requester: requesterFullName || req.detail?.created_by_name || (req as any).created_by_name || "Requester",
           status: req.status || "draft",
         };
-      },
-    );
+      });
 
     setCombinedData(displayApiRequests);
 
@@ -116,7 +135,7 @@ export default function LabourRequestPage() {
 
   const config: RequestDashboardConfig<DisplayLabourRequest> = {
     title: "Labour Request",
-    idPrefix: "LR",
+    idPrefix: "LB",
     newRequestPath: "/project-request/labour-request/new",
     statusCounts,
     summaryConfigs: [

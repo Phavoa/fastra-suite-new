@@ -10,7 +10,16 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import Sidebar from "@/components/shared/Sidebar";
 import SessionTimeoutWrapper from "@/components/SessionTimeoutWrapper";
 import DatabaseInitializer from "@/components/DatabaseInitializer";
+import dynamic from "next/dynamic";
 import SubscriptionGuard from "@/components/shared/SubscriptionGuard";
+
+const AdminOnboardingChecklist = dynamic(
+  () =>
+    import("@/components/shared/onboarding/AdminOnboardingChecklist").then(
+      (mod) => mod.AdminOnboardingChecklist
+    ),
+  { ssr: false }
+);
 
 import { createContext, useContext } from "react";
 
@@ -39,13 +48,14 @@ export default function AppWrapper({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
-  // Automatically close mobile sidebar and collapse desktop sidebar on route changes
-  useEffect(() => {
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setSidebarOpen(false);
     if (pathname !== "/") {
       setSidebarExpanded(false);
     }
-  }, [pathname]);
+  }
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -96,6 +106,7 @@ export default function AppWrapper({
                       {children}
                     </SubscriptionGuard>
                   </div>
+                  {!isAuthPage && <AdminOnboardingChecklist />}
                 </div>
               </SessionTimeoutWrapper>
             </SidebarContext.Provider>

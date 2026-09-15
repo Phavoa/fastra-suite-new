@@ -43,9 +43,12 @@ export default function RequestDetailsPage() {
   const requestId = typeof params.id === "string" ? params.id : "";
   const numericId = Number(requestId);
 
-  const { data: request, isLoading: isRequestLoading } = useGetProjectRequestQuery(numericId, {
+  const { data: request, isLoading: isRequestLoading, refetch } = useGetProjectRequestQuery(numericId, {
     skip: !requestId || isNaN(numericId),
+    refetchOnMountOrArgChange: true,
   });
+
+  const [localStatus, setLocalStatus] = useState<string | null>(null);
   const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
   const projects = React.useMemo(() => {
     const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];
@@ -98,7 +101,28 @@ export default function RequestDetailsPage() {
   const isLabour = requestType === "labour";
   const isSubcontractor = requestType === "subcontractor";
   const isPlantEquipment = requestType === "plant_equipment";
-  const isPurchase = requestType === "purchase" || (!isMaterialConsumption && !isPettyCash && !isLabour && !isSubcontractor && !isPlantEquipment && (detail.items || detail.pr_total_price));
+  const isPurchase = requestType === "purchase" || (!isMaterialConsumption && !isPettyCash && !isLabour && !isSubcontractor && !isPlantEquipment && (detail.items || detail.lines || detail.pr_total_price || detail.site_location));
+
+  const purchaseLines = React.useMemo(() => {
+    if (Array.isArray(detail?.lines) && detail.lines.length > 0) return detail.lines;
+    if (Array.isArray(detail?.items) && detail.items.length > 0) return detail.items;
+    return [];
+  }, [detail]);
+
+  const cleanNotes = React.useMemo(() => {
+    const raw = detail?.notes || detail?.justification_notes || detail?.purpose || "";
+    if (typeof raw === "string" && raw.includes(" | ")) {
+      const notesMatch = raw.match(/Notes?:\s*(.+)$/i);
+      if (notesMatch && notesMatch[1]) return notesMatch[1].trim();
+      const parts = raw.split(" | ");
+      for (const part of parts) {
+        if (part.startsWith("Notes: ") || part.startsWith("Note: ")) {
+          return part.replace(/^Notes?:\s*/, "").trim();
+        }
+      }
+    }
+    return raw || "N/A";
+  }, [detail]);
 
   const formatCurrency = (val?: string | number) => {
     if (val === undefined || val === null) return "₦0.00";
@@ -161,12 +185,21 @@ export default function RequestDetailsPage() {
     if (detail?.project_request?.request_amount !== undefined && Number(detail.project_request.request_amount) > 0) {
       return Number(detail.project_request.request_amount);
     }
-    if (isMaterialConsumption || (detail?.lines && Array.isArray(detail.lines) && detail.lines.length > 0)) {
-      return (detail.lines || []).reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.quantity || 0) * Number(l.unit_cost || 0))), 0);
+    if (detail?.total_amount !== undefined && Number(detail.total_amount) > 0) {
+      return Number(detail.total_amount);
     }
-    if (isPurchase || (detail?.items && Array.isArray(detail.items) && detail.items.length > 0)) {
+    if (isPurchase) {
       if (detail.pr_total_price) return Number(detail.pr_total_price);
-      return (detail.items || []).reduce((sum: number, i: any) => sum + Number(i.total_cost || i.estimated_total_price || (Number(i.qty || i.quantity || 0) * Number(i.estimated_unit_price || i.unit_cost || 0))), 0);
+      if (purchaseLines.length > 0) {
+        return purchaseLines.reduce((sum: number, i: any) => {
+          const qty = Number(i.quantity || i.qty || 0);
+          const cost = Number(i.estimated_unit_cost || i.estimated_unit_price || i.unit_cost || i.unit_price || 0);
+          return sum + Number(i.line_total || i.total_cost || i.estimated_total_price || qty * cost);
+        }, 0);
+      }
+    }
+    if (isMaterialConsumption) {
+      return (detail.lines || []).reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.quantity || 0) * Number(l.unit_cost || 0))), 0);
     }
     if (isPettyCash) return Number(detail.amountRequested || detail.amount || 0);
     if (isLabour) {
@@ -183,8 +216,10 @@ export default function RequestDetailsPage() {
     return Number((request as any)?.total_cost || (request as any)?.amount || (request as any)?.request_amount || 0);
   };
 
+  const effectiveStatus = localStatus || request?.status || detail?.status || "pending";
+
   const getStatusBadge = (status?: string) => {
-    const st = (status || request?.status || "pending").toLowerCase();
+    const st = (status || effectiveStatus).toLowerCase();
     switch (st) {
       case "approved":
         return <span className="bg-emerald-50 text-emerald-600 font-semibold text-xs px-2.5 py-1 rounded-full border border-emerald-200">Approved</span>;
@@ -200,10 +235,12 @@ export default function RequestDetailsPage() {
     const displayRequestId = isMaterialConsumption ? subRequestId || `MCR-${numericId}` : request?.reference_id || `REQ-${numericId}`;
     try {
       await approveRequest({ id: numericId }).unwrap();
+      setLocalStatus("approved");
       statusModal.showSuccess(
         "Request Approved",
         `Project request ${displayRequestId} has been successfully approved.`
       );
+      refetch();
     } catch (err: any) {
       console.error("Approve Error:", err);
       const errMsg = extractErrorMessage(err, "An error occurred while approving the request.");
@@ -215,10 +252,12 @@ export default function RequestDetailsPage() {
     const displayRequestId = isMaterialConsumption ? subRequestId || `MCR-${numericId}` : request?.reference_id || `REQ-${numericId}`;
     try {
       await rejectRequest({ id: numericId }).unwrap();
+      setLocalStatus("rejected");
       statusModal.showSuccess(
         "Request Rejected",
         `Project request ${displayRequestId} has been successfully rejected.`
       );
+      refetch();
     } catch (err: any) {
       console.error("Reject Error:", err);
       const errMsg = extractErrorMessage(err, "An error occurred while rejecting the request.");
@@ -230,6 +269,7 @@ export default function RequestDetailsPage() {
     statusModal.close();
     if (statusModal.type === "success") {
       router.push("/project-request/approve");
+      router.refresh();
     }
   };
 
@@ -313,7 +353,7 @@ export default function RequestDetailsPage() {
                 label="Project" 
                 value={projectName} 
               />
-              <DataField label="Status" value={getStatusBadge(request.status || detail.status)} />
+              <DataField label="Status" value={getStatusBadge(effectiveStatus)} />
               
               {isMaterialConsumption && (
                 <>
@@ -365,10 +405,21 @@ export default function RequestDetailsPage() {
 
               {isPurchase && (
                 <>
-                  <DataField label="Required By Date" value={formatDate(detail.required_by_date)} />
+                  <DataField label="Required By Date" value={formatDate(detail.required_by_date || detail.requiredDate || detail.date_required)} />
                   <DataField 
                     label="Site Location" 
-                    value={detail.location_details?.location_name || detail.requesting_location_details?.location_name || detail.requesting_location || "N/A"} 
+                    value={
+                      detail.site_location ||
+                      (request as any)?.site_location ||
+                      detail.location_details?.location_name ||
+                      detail.location_details?.name ||
+                      detail.requesting_location_details?.location_name ||
+                      detail.requesting_location_details?.name ||
+                      detail.requesting_location ||
+                      detail.location ||
+                      (request as any)?.location ||
+                      "N/A"
+                    } 
                   />
                 </>
               )}
@@ -390,7 +441,7 @@ export default function RequestDetailsPage() {
             </div>
 
             {/* Request Type Specific Details & Products */}
-            {(isMaterialConsumption || (detail.lines && Array.isArray(detail.lines) && detail.lines.length > 0)) && (
+            {isMaterialConsumption && (
               <>
                 <SectionHeader title="Materials Consumed" />
                 <div className="space-y-3">
@@ -492,32 +543,77 @@ export default function RequestDetailsPage() {
               <>
                 <SectionHeader title="Products" />
                 <div className="space-y-4">
-                  {detail.items && detail.items.length > 0 ? (
-                    detail.items.map((item: any, idx: number) => (
-                      <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-white space-y-2">
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="text-[14px] font-semibold text-gray-900">
-                            {item.product_details?.product_name || item.product_name || "Unknown Product"}
-                          </span>
-                          <span className="text-[14px] font-semibold text-gray-900">
-                            {formatCurrency(item.total_cost || item.estimated_total_price || (Number(item.qty || item.quantity || 0) * Number(item.estimated_unit_price || item.unit_cost || 0)))}
-                          </span>
+                  {purchaseLines && purchaseLines.length > 0 ? (
+                    purchaseLines.map((item: any, idx: number) => {
+                      const prodName =
+                        item.product_name ||
+                        item.product_details?.product_name ||
+                        item.productName ||
+                        (typeof item.product === "number"
+                          ? `Product #${item.product}`
+                          : typeof item.product === "string" && item.product
+                          ? item.product
+                          : "Unknown Product");
+
+                      const qty = Number(item.quantity || item.qty || 0);
+                      const unitCost = Number(
+                        item.estimated_unit_cost ||
+                        item.estimated_unit_price ||
+                        item.unit_cost ||
+                        item.unit_price ||
+                        0
+                      );
+                      const lineTotal = Number(
+                        item.line_total ||
+                        item.total_cost ||
+                        item.estimated_total_price ||
+                        qty * unitCost
+                      );
+
+                      const uom =
+                        item.unit_of_measure_symbol ||
+                        item.unit_of_measure_name ||
+                        item.unit_of_measure_details?.unit_symbol ||
+                        item.unit_of_measure_details?.unit_name ||
+                        item.uom ||
+                        "";
+
+                      const description =
+                        item.description ||
+                        item.product_details?.product_description ||
+                        item.product_description ||
+                        "";
+
+                      return (
+                        <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-white space-y-2">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="text-[14px] font-semibold text-gray-900">
+                              {prodName}
+                            </span>
+                            <span className="text-[14px] font-semibold text-gray-900">
+                              {formatCurrency(lineTotal)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-[12px] text-gray-600">
+                            <span>
+                              Quantity: <strong className="text-gray-900">{qty} {uom}</strong>
+                            </span>
+                            <span>
+                              Unit Price: <strong className="text-gray-900">{formatCurrency(unitCost)}</strong>
+                            </span>
+                          </div>
+                          {description && (
+                            <div className="text-[12px] text-gray-400">{description}</div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4 text-[12px] text-gray-600">
-                          <span>Quantity: <strong className="text-gray-900">{item.qty || item.quantity || 0} {item.unit_of_measure_details?.unit_symbol || ""}</strong></span>
-                          <span>Unit Price: <strong className="text-gray-900">{formatCurrency(item.estimated_unit_price || item.unit_cost)}</strong></span>
-                        </div>
-                        {item.product_details?.product_description && (
-                          <div className="text-[12px] text-gray-400">{item.product_details.product_description}</div>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="text-sm text-gray-500 ">No products listed.</p>
                   )}
                 </div>
                 <div className="mt-6">
-                  <DataField label="Note" value={detail.purpose || detail.notes || detail.justification_notes || "N/A"} fullWidth />
+                  <DataField label="Note" value={cleanNotes} fullWidth />
                 </div>
               </>
             )}
@@ -531,8 +627,8 @@ export default function RequestDetailsPage() {
       </main>
 
       {/* Fixed Bottom Action Bar */}
-      {request && (request.status === "pending" || detail.status === "pending") && (
-        <div className="fixed bottom-0 left-16 right-0 bg-white border-t border-gray-100 px-4 py-4 md:py-6 z-40">
+      {request && effectiveStatus === "pending" && (
+        <div className="fixed bottom-0 left-0 md:left-16 right-0 bg-white border-t border-gray-100 px-4 py-4 md:py-6 z-40">
           <div className="max-w-2xl mx-auto space-y-4">
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-sm font-bold text-gray-900">

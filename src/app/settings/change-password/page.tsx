@@ -9,16 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/lib/store/store";
-import { useChangeAdminPasswordMutation } from "@/api/settings/companyApi";
+import { useChangePasswordMutation } from "@/api/settings/tenantUserApi";
 import {
   changePasswordSchema,
   ChangePasswordData,
 } from "@/schemas/changePasswordSchema";
 import { Eye, EyeOff } from "lucide-react";
+import { extractErrorMessage } from "@/lib/utils";
 
 const ChangePasswordPage: NextPage = () => {
   const user = useSelector((state: RootState) => state.auth.user);
-  const [changePassword, { isLoading }] = useChangeAdminPasswordMutation();
+  const tenant_user_id = useSelector(
+    (state: RootState) => state.auth.tenant_user_id,
+  );
+  const [changePassword, { isLoading }] = useChangePasswordMutation();
+
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -36,22 +41,40 @@ const ChangePasswordPage: NextPage = () => {
   });
 
   const onSubmit = async (data: ChangePasswordData) => {
-    if (!user) return;
+    const targetUserId = tenant_user_id || user?.id;
+    if (!targetUserId) {
+      setError("User information not found. Please log in again.");
+      return;
+    }
 
     setError(null);
     setSuccess(null);
 
+    const payload = {
+      user_id: Number(user?.id || targetUserId),
+      old_password: data.old_password,
+      new_password: data.new_password,
+      confirm_password: data.confirm_password,
+    };
+
     try {
-      const result = await changePassword({
-        ...data,
-        user_id: user.id,
+      const result: any = await changePassword({
+        id: targetUserId,
+        data: payload,
       }).unwrap();
 
-      setSuccess(result.detail);
+      setSuccess(
+        result?.detail ||
+          result?.message ||
+          "Your password has been changed successfully.",
+      );
       reset();
     } catch (err: any) {
       setError(
-        err.data?.detail || "Failed to change password. Please try again.",
+        extractErrorMessage(
+          err,
+          "Failed to change password. Please check your current password and try again.",
+        ),
       );
     }
   };

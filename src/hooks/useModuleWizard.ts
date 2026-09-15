@@ -271,6 +271,20 @@ export function useModuleWizard(moduleId: string) {
     }
   }, [config, storageKey, stepStorageKey, pathname, router, isRouteMatch, getPageKey, moduleId]);
 
+  // Listen for global wizard:start events (e.g. from AdminOnboardingChecklist)
+  useEffect(() => {
+    const handleStartEvent = (e: any) => {
+      const targetModule = e?.detail?.moduleId;
+      if (!targetModule || targetModule === moduleId) {
+        startTour();
+      }
+    };
+    window.addEventListener("wizard:start", handleStartEvent as EventListener);
+    return () => {
+      window.removeEventListener("wizard:start", handleStartEvent as EventListener);
+    };
+  }, [moduleId, startTour]);
+
   const dismissInvitation = useCallback(() => {
     setShowInvitation(false);
     const pageKey = pathname ? getPageKey(pathname) : "root";

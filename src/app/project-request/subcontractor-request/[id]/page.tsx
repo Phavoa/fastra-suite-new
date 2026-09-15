@@ -22,7 +22,7 @@ import {
 import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
 import { useGetVendorByIdQuery, useGetActiveVendorsQuery } from "@/api/invoice/vendorsApi";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
-import { extractErrorMessage } from "@/lib/utils";
+import { extractErrorMessage, cn } from "@/lib/utils";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,8 +44,8 @@ export default function SubcontractorRequestDetailsPage() {
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteSubcontractorRequestMutation();
   const [submitRequest, { isLoading: isSubmitting }] = useSubmitSubcontractorRequestMutation();
 
-  const detail = (request as any)?.detail || (request as any) || {};
-  const projectRequest = (request as any)?.project_request || (request as any) || {};
+  const detail = useMemo(() => (request as any)?.detail || (request as any) || {}, [request]);
+  const projectRequest = useMemo(() => (request as any)?.project_request || (request as any) || {}, [request]);
 
   const projectId = (request as any)?.project || projectRequest?.project || detail?.project;
   const activityId = (request as any)?.activity || detail?.activity || detail?.task;
@@ -267,11 +267,11 @@ export default function SubcontractorRequestDetailsPage() {
         "Requester";
 
   const refId =
-    projectRequest?.reference_id ||
+    ((request as any)?.reference_id && String((request as any).reference_id).trim()) ||
+    (detail?.reference_id && String(detail.reference_id).trim()) ||
+    (projectRequest?.reference_id && String(projectRequest.reference_id).trim()) ||
     (request as any)?.project_request?.reference_id ||
-    (request as any)?.reference_id ||
-    detail?.reference_id ||
-    `SC${String((request as any)?.id || requestId).padStart(5, "0")}`;
+    `SUB${String((request as any)?.id || requestId).padStart(4, "0")}`;
 
   const projectName =
     (request as any)?.project_details?.name ||
@@ -415,7 +415,16 @@ export default function SubcontractorRequestDetailsPage() {
   const rawContractVal = (request as any)?.contract_value ?? detail.contract_value ?? detail.estimated_cost ?? detail.amount;
   const contractValue = parseFloat(String(rawContractVal || "0")) || 0;
 
-  const paymentTerms = (request as any)?.payment_terms || detail.payment_terms || "—";
+  const paymentType = (request as any)?.payment_type || detail?.payment_type || "lump_sum";
+  const isMilestone = paymentType === "milestone" || paymentType === "milestone_based";
+  const paymentTypeLabel = isMilestone ? "Milestone" : "Lump sum";
+
+  const paymentTerms = (request as any)?.payment_terms || detail.payment_terms || "";
+  const milestones: any[] = Array.isArray((request as any)?.milestones)
+    ? (request as any).milestones
+    : Array.isArray(detail?.milestones)
+    ? detail.milestones
+    : [];
 
   const noteText =
     (request as any)?.justification_notes ||
@@ -575,7 +584,7 @@ export default function SubcontractorRequestDetailsPage() {
                   <span className="block text-[14px] font-semibold text-black/80">{phaseName}</span>
                 </div>
                 <div>
-                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Task</span>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Activity</span>
                   <span className="block text-[14px] font-semibold text-black/80">{taskName}</span>
                 </div>
               </div>
@@ -587,7 +596,7 @@ export default function SubcontractorRequestDetailsPage() {
               <div className="grid grid-cols-2 gap-y-4 gap-x-6 mb-4">
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
-                    Contract Value (Estimated)
+                    Contract Value
                   </span>
                   <span className="block text-[14px] font-semibold text-black/80">
                     ₦{contractValue.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -595,13 +604,76 @@ export default function SubcontractorRequestDetailsPage() {
                 </div>
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
-                    Payment Terms
+                    Payment Type
                   </span>
                   <span className="block text-[14px] font-semibold text-black/80">
-                    {paymentTerms}
+                    {paymentTypeLabel}
                   </span>
                 </div>
+                {paymentTerms && paymentTerms !== "—" && (
+                  <div className="col-span-2">
+                    <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
+                      Payment Terms
+                    </span>
+                    <span className="block text-[14px] font-semibold text-black/80">
+                      {paymentTerms}
+                    </span>
+                  </div>
+                )}
               </div>
+
+              {/* Milestones Information (Section 4.7 PRD) */}
+              {isMilestone && milestones.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold text-gray-700">
+                      Milestone Breakdown ({milestones.length})
+                    </span>
+                    <span className="text-[11px] font-medium text-gray-500">
+                      Total: {milestones.reduce((s, m) => s + (Number(m.percentage) || 0), 0)}%
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {milestones.map((m: any, idx: number) => {
+                      const pct = Number(m.percentage || 0);
+                      const amount = m.amount ? Number(m.amount) : (pct / 100) * contractValue;
+                      return (
+                        <div
+                          key={m.id || idx}
+                          className="p-3 bg-[#F8FAFC] rounded-lg border border-gray-100 text-xs space-y-1.5"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-900">
+                              {idx + 1}. {m.name}
+                            </span>
+                            <span className="font-bold text-[#3B7CED]">
+                              {pct}% (₦{amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                            </span>
+                          </div>
+                          {m.completion_criteria && (
+                            <div className="text-gray-500 text-[11px]">
+                              <span className="font-medium text-gray-700">Criteria: </span>
+                              {m.completion_criteria}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <span
+                              className={cn(
+                                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                m.is_completed
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-amber-100 text-amber-800"
+                              )}
+                            >
+                              {m.is_completed ? "Completed" : "Pending Completion"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Note */}
               <div className="mt-5">
@@ -619,13 +691,13 @@ export default function SubcontractorRequestDetailsPage() {
             <div className="flex justify-between items-center">
               <span className="text-[14px] font-semibold text-black/80">Available Budget</span>
               <span className="text-[14px] font-semibold text-black/80">
-                N{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{availableBudget.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[14px] font-semibold text-black/80">Total Cost</span>
               <span className="text-[14px] font-semibold text-[#3B82F6]">
-                N{totalCost.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{totalCost.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </section>

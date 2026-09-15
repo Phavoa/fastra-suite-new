@@ -151,64 +151,64 @@ export default function StockMoveDetailPage() {
             items={summaryItems}
           />
 
-      <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-2xs border border-gray-100 overflow-hidden font-['Open_Sans',sans-serif]">
         <div className="p-5 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-[#32325D]">
+          <h2 className="text-base font-semibold text-[#32325D] font-['Open_Sans',sans-serif]">
             Transacted Product Line & Valuation
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="w-full font-['Open_Sans',sans-serif]">
             <TableHeader>
-              <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
+              <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100 font-['Open_Sans',sans-serif]">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap font-['Open_Sans',sans-serif]">
                   Product Name
                 </TableHead>
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap font-['Open_Sans',sans-serif]">
                   Description
                 </TableHead>
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center font-['Open_Sans',sans-serif]">
                   Unit
                 </TableHead>
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center font-['Open_Sans',sans-serif]">
                   Quantity Moved
                 </TableHead>
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-right">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-right font-['Open_Sans',sans-serif]">
                   Unit Cost (₦)
                 </TableHead>
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-right">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-right font-['Open_Sans',sans-serif]">
                   Total Valuation (₦)
                 </TableHead>
-                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center">
+                <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 whitespace-nowrap text-center font-['Open_Sans',sans-serif]">
                   Running Balance
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow className="hover:bg-gray-50 border-b border-gray-100 transition-colors">
-                <TableCell className="px-6 py-3.5 font-semibold text-sm text-[#32325D] whitespace-nowrap">
+              <TableRow className="hover:bg-gray-50 border-b border-gray-100 transition-colors font-['Open_Sans',sans-serif]">
+                <TableCell className="px-6 py-3.5 font-semibold text-sm text-[#32325D] whitespace-nowrap font-['Open_Sans',sans-serif]">
                   {moveData.product_details?.product_name || "Unknown Product"}
                 </TableCell>
-                <TableCell className="px-6 py-3.5 text-sm text-[#525F7F] whitespace-nowrap">
+                <TableCell className="px-6 py-3.5 text-sm text-[#525F7F] whitespace-nowrap font-['Open_Sans',sans-serif]">
                   {moveData.product_details?.description || "-"}
                 </TableCell>
-                <TableCell className="px-6 py-3.5 text-center text-sm font-medium text-[#525F7F] whitespace-nowrap">
+                <TableCell className="px-6 py-3.5 text-center text-sm font-medium text-[#525F7F] whitespace-nowrap font-['Open_Sans',sans-serif]">
                   {moveData.unit_of_measure_details?.unit_symbol || "-"}
                 </TableCell>
                 <TableCell
-                  className={`px-6 py-3.5 text-center font-mono font-bold text-sm whitespace-nowrap ${
+                  className={`px-6 py-3.5 text-center tabular-nums font-bold text-sm whitespace-nowrap font-['Open_Sans',sans-serif] ${
                     isPositive ? "text-[#2BA24D]" : "text-[#E43D2B]"
                   }`}
                 >
                   {isPositive ? `+${qty}` : qty}
                 </TableCell>
-                <TableCell className="px-6 py-3.5 text-right font-mono text-sm text-[#525F7F] whitespace-nowrap">
+                <TableCell className="px-6 py-3.5 text-right tabular-nums text-sm text-[#525F7F] whitespace-nowrap font-['Open_Sans',sans-serif]">
                   ₦{moveData.unit_cost !== undefined && moveData.unit_cost !== null ? moveData.unit_cost.toLocaleString() : "—"}
                 </TableCell>
-                <TableCell className="px-6 py-3.5 text-right font-mono font-bold text-sm text-[#32325D] whitespace-nowrap">
+                <TableCell className="px-6 py-3.5 text-right tabular-nums font-bold text-sm text-[#32325D] whitespace-nowrap font-['Open_Sans',sans-serif]">
                   ₦{moveData.total_value !== undefined && moveData.total_value !== null ? moveData.total_value.toLocaleString() : "—"}
                 </TableCell>
-                <TableCell className="px-6 py-3.5 text-center font-mono font-semibold text-sm text-[#3B7CED] whitespace-nowrap">
+                <TableCell className="px-6 py-3.5 text-center tabular-nums font-semibold text-sm text-[#3B7CED] whitespace-nowrap font-['Open_Sans',sans-serif]">
                   {moveData.running_balance !== undefined && moveData.running_balance !== null ? moveData.running_balance.toLocaleString() : "—"} {moveData.unit_of_measure_details?.unit_symbol || ""}
                 </TableCell>
               </TableRow>

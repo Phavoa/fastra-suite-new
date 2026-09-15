@@ -152,15 +152,32 @@ export const usersApi = createApi({
   try {
     const response = await fetch(url, { method, body, headers });
     if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = await response.text();
+      }
       return {
         error: {
           status: response.status,
-          data: await response.json(),
+          data: errorData,
         },
       };
     }
-    const data = await response.json();
-    return { data };
+
+    if (response.status === 204) {
+      return { data: null };
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      const data = await response.json();
+      return { data };
+    }
+
+    const text = await response.text();
+    return { data: text ? JSON.parse(text) : null };
   } catch (error) {
     return {
       error: { status: "FETCH_ERROR" as const, data: error },
@@ -198,16 +215,26 @@ export const usersApi = createApi({
     ],
   }),
 
-  createUser: builder.mutation<NewUserResponse, FormData>({
-    query: (body) => ({
-      url: "/users/tenant-users/",
-      method: "POST",
-      body,
+    createUser: builder.mutation<NewUserResponse, FormData>({
+      query: (body) => ({
+        url: "/users/tenant-users/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
     }),
-    invalidatesTags: ["User"],
-  }),
-})
 
+    deleteUser: builder.mutation<void, number | string>({
+      query: (id) => ({
+        url: `/users/tenant-users/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "User", id },
+        "User",
+      ],
+    }),
+  }),
 });
 
 export const { 
@@ -215,5 +242,6 @@ export const {
   useGetUserQuery,   // original
   useGetUserByIdQuery, // new tenant-specific
   useUpdateUserByIdMutation, // new mutation
-  useCreateUserMutation 
+  useCreateUserMutation,
+  useDeleteUserMutation,
 } = usersApi;

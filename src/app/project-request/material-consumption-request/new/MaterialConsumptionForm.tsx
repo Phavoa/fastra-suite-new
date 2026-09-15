@@ -206,26 +206,78 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
 
 
 
+  const getBudgetValue = (item: any): number => {
+    if (!item) return 0;
+    const val =
+      item.available_budget ??
+      item.remaining_budget ??
+      item.budget ??
+      item.amount ??
+      item.budgeted_amount ??
+      item.total_amount ??
+      (item.quantity && item.rate ? Number(item.quantity) * Number(item.rate) : undefined) ??
+      item.cost ??
+      0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+
   // --- Derived WBS options (from project-costing data) ---
   const buildWbsList = (proj: any): any[] => {
     if (!proj) return [];
     if (Array.isArray(proj.wbs) && proj.wbs.length > 0) {
-      return proj.wbs.map((w: any) => ({
-        ...w,
-        id: w.uuid || w.id || w.activity_id || w.phase_id,
-        parent: w.parent || w.phase || w.phase_id || w.parent_id
-      }));
+      const rawWbs = proj.wbs;
+      return rawWbs.map((w: any) => {
+        let budgetVal = getBudgetValue(w);
+        if (budgetVal === 0 && !w.is_activity) {
+          const childSum = rawWbs
+            .filter((c: any) => c.is_activity && String(c.parent) === String(w.id || w.uuid))
+            .reduce((sum: number, c: any) => sum + getBudgetValue(c), 0);
+          if (childSum > 0) budgetVal = childSum;
+        }
+        return {
+          ...w,
+          id: w.uuid || w.id || w.activity_id || w.phase_id,
+          parent: w.parent || w.phase || w.phase_id || w.parent_id,
+          amount: budgetVal,
+        };
+      });
     }
     const items: any[] = [];
-    const phasesArr = Array.isArray(proj.phases)
-      ? proj.phases
-      : Array.isArray(proj.phase_list) ? proj.phase_list : [];
+    let phasesArr: any[] = [];
+    if (typeof proj.phases === "string") {
+      try {
+        phasesArr = JSON.parse(proj.phases);
+      } catch (e) {
+        phasesArr = [];
+      }
+    } else if (Array.isArray(proj.phases)) {
+      phasesArr = proj.phases;
+    } else if (Array.isArray(proj.phase_list)) {
+      phasesArr = proj.phase_list;
+    } else if (proj.phases?.results && Array.isArray(proj.phases.results)) {
+      phasesArr = proj.phases.results;
+    }
+
     phasesArr.forEach((ph: any, pi: number) => {
       const phId = ph.uuid || ph.id || ph.phase_id || `phase-${pi + 1}`;
       const phName = ph.name || ph.phase_name || `Phase ${pi + 1}`;
-      items.push({ ...ph, id: phId, name: phName, is_activity: false });
+
       const acts = Array.isArray(ph.activities) ? ph.activities
         : Array.isArray(ph.activity_list) ? ph.activity_list : [];
+
+      const actsTotal = acts.reduce((sum: number, act: any) => sum + getBudgetValue(act), 0);
+      const explicitPhaseBudget = getBudgetValue(ph);
+      const phaseAmount = explicitPhaseBudget > 0 ? explicitPhaseBudget : actsTotal;
+
+      items.push({
+        ...ph,
+        id: phId,
+        name: phName,
+        is_activity: false,
+        amount: phaseAmount,
+      });
+
       acts.forEach((act: any, ai: number) => {
         items.push({ 
           ...act, 
@@ -233,18 +285,27 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
           name: act.name || `Activity ${ai + 1}`, 
           is_activity: true, 
           parent: phId,
-          amount: Number(
-            act.available_budget ??
-            act.budget ??
-            act.amount ??
-            act.budgeted_amount ??
-            act.total_amount ??
-            act.cost ??
-            0
-          )
+          amount: getBudgetValue(act),
         });
       });
     });
+
+    if (Array.isArray(proj.activities)) {
+      proj.activities.forEach((act: any, ai: number) => {
+        const actId = act.uuid || act.id || `act-${ai + 1}`;
+        if (!items.some((it) => String(it.id) === String(actId))) {
+          items.push({
+            ...act,
+            id: actId,
+            name: act.name || `Activity ${ai + 1}`,
+            is_activity: true,
+            parent: act.phase || act.phase_id || act.parent || null,
+            amount: getBudgetValue(act),
+          });
+        }
+      });
+    }
+
     return items;
   };
 
@@ -646,7 +707,9 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                         <NativeSelect value={field.value} onChange={field.onChange} disabled={!projectId || phases.length === 0} className={form.formState.errors.phase ? "border-red-500 focus:ring-red-500/20" : ""}>
                           <option value="" disabled>{!projectId ? "Select a project first" : "Select a phase"}</option>
                           {phases.map((p) => (
-                            <option key={p.id} value={String(p.id)}>{p.name}</option>
+                            <option key={p.id} value={String(p.id)}>
+                              {p.name} {p.amount !== undefined ? `— ₦${Number(p.amount || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : ""}
+                            </option>
                           ))}
                         </NativeSelect>
                       </FormControl>
@@ -655,17 +718,30 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                         <FormControl>
                           <SelectTrigger
                             className={cn(
-                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
+                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400 [&>span]:w-full",
                               form.formState.errors.phase && "border-red-500 focus:ring-red-500/20"
                             )}
                           >
                             <SelectValue placeholder={!projectId ? "Select a project first" : "Select a phase"} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className="max-h-72">
                           {phases.map((p) => (
-                            <SelectItem key={p.id} value={String(p.id)}>
-                              {p.name}
+                            <SelectItem
+                              key={p.id}
+                              value={String(p.id)}
+                              className="py-2.5 cursor-pointer [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                            >
+                              <span className="flex items-center justify-between gap-3 w-full min-w-0">
+                                <span className="font-medium text-gray-800 truncate min-w-0">
+                                  {p.name}
+                                </span>
+                                <span className="font-semibold text-xs text-[#3B7CED] bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-auto">
+                                  ₦{Number(p.amount || 0).toLocaleString("en-NG", {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -688,7 +764,9 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                         <NativeSelect value={field.value} onChange={field.onChange} disabled={!phaseId || activities.length === 0} className={form.formState.errors.wbsElement ? "border-red-500 focus:ring-red-500/20" : ""}>
                           <option value="" disabled>{!phaseId ? "Select a phase first" : "Select an activity"}</option>
                           {activities.map((a) => (
-                            <option key={a.id} value={String(a.id)}>{a.name}</option>
+                            <option key={a.id} value={String(a.id)}>
+                              {a.name} {a.amount !== undefined ? `— ₦${Number(a.amount || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : ""}
+                            </option>
                           ))}
                         </NativeSelect>
                       </FormControl>
@@ -697,17 +775,30 @@ export default function MaterialConsumptionForm({ requestId }: { requestId?: num
                         <FormControl>
                           <SelectTrigger
                             className={cn(
-                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400",
+                              "h-11 w-full bg-white border-gray-200 focus:ring-[#3B7CED]/20 disabled:bg-gray-50 disabled:text-gray-400 [&>span]:w-full",
                               form.formState.errors.wbsElement && "border-red-500 focus:ring-red-500/20"
                             )}
                           >
                             <SelectValue placeholder={!phaseId ? "Select a phase first" : "Select an activity"} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className="max-h-72">
                           {activities.map((a) => (
-                            <SelectItem key={a.id} value={String(a.id)}>
-                              {a.name}
+                            <SelectItem
+                              key={a.id}
+                              value={String(a.id)}
+                              className="py-2.5 cursor-pointer [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                            >
+                              <span className="flex items-center justify-between gap-3 w-full min-w-0">
+                                <span className="font-medium text-gray-800 truncate min-w-0">
+                                  {a.name}
+                                </span>
+                                <span className="font-semibold text-xs text-[#3B7CED] bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-auto">
+                                  ₦{Number(a.amount || 0).toLocaleString("en-NG", {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>

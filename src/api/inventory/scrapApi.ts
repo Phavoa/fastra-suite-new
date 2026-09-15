@@ -125,6 +125,15 @@ export const scrapApi = createApi({
       invalidatesTags: ["Scrap"],
     }),
 
+    createAndValidateScrap: builder.mutation<Scrap, CreateScrapRequest>({
+      query: (body) => ({
+        url: "/inventory/scrap/create-and-validate/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Scrap"],
+    }),
+
     updateScrap: builder.mutation<
       Scrap,
       { id: string; data: UpdateScrapRequest }
@@ -212,6 +221,7 @@ export const {
 
   // Mutation hooks
   useCreateScrapMutation,
+  useCreateAndValidateScrapMutation,
   useUpdateScrapMutation,
   usePatchScrapMutation,
   useDeleteScrapMutation,

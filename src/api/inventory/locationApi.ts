@@ -84,6 +84,7 @@ export const locationApi = createApi({
       };
     }
   },
+  tagTypes: ["Location"],
   endpoints: (builder) => ({
     // Query endpoints
     getLocations: builder.query<Location[], GetLocationsParams>({
@@ -91,42 +92,60 @@ export const locationApi = createApi({
         url: "/inventory/location/",
         params,
       }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...(Array.isArray(result) ? result : (result as any)?.results || []).map(
+                (loc: any) => ({ type: "Location" as const, id: loc.id })
+              ),
+              { type: "Location", id: "LIST" },
+            ]
+          : [{ type: "Location", id: "LIST" }],
     }),
 
     getLocation: builder.query<Location, string>({
       query: (id) => `/inventory/location/${id}/`,
+      providesTags: (result, error, id) => [{ type: "Location", id }],
     }),
 
     getLocationStockLevels: builder.query<StockLevelItem[], string>({
       query: (id) => `/inventory/location/${id}/location_stock_levels/`,
+      providesTags: (result, error, id) => [{ type: "Location", id: `stock-${id}` }],
     }),
 
     getActiveLocations: builder.query<Location[], void>({
       query: () => "/inventory/location/active_list/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     getAllUserLocations: builder.query<Location[], void>({
       query: () => "/inventory/location/get-all-user-locations/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     getOtherLocationsForUser: builder.query<Location[], void>({
       query: () => "/inventory/location/get-other-locations-for-user/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     getUserManagedLocations: builder.query<Location[], void>({
       query: () => "/inventory/location/get-user-managed-locations/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     getUserStoreLocations: builder.query<Location[], void>({
       query: () => "/inventory/location/get-user-store-locations/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     getActiveLocationsFiltered: builder.query<Location[], void>({
       query: () => "/inventory/location/get_active_locations/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     getHiddenLocations: builder.query<Location[], void>({
       query: () => "/inventory/location/hidden_list/",
+      providesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     // Mutation endpoints
@@ -136,6 +155,7 @@ export const locationApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: [{ type: "Location", id: "LIST" }],
     }),
 
     updateLocation: builder.mutation<
@@ -147,6 +167,10 @@ export const locationApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Location", id },
+        { type: "Location", id: "LIST" },
+      ],
     }),
 
     patchLocation: builder.mutation<
@@ -158,6 +182,10 @@ export const locationApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Location", id },
+        { type: "Location", id: "LIST" },
+      ],
     }),
 
     deleteLocation: builder.mutation<void, string>({
@@ -165,6 +193,10 @@ export const locationApi = createApi({
         url: `/inventory/location/${id}/soft_delete/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [
+        { type: "Location", id },
+        { type: "Location", id: "LIST" },
+      ],
     }),
 
     toggleLocationHiddenStatus: builder.mutation<
@@ -176,6 +208,10 @@ export const locationApi = createApi({
         method: "PATCH",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Location", id },
+        { type: "Location", id: "LIST" },
+      ],
     }),
   }),
 });

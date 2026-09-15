@@ -34,7 +34,13 @@ const statusMap: Record<string, RequestStatus> = {
 
 export default function MaterialConsumptionRequestPage() {
   const router = useRouter();
-  const { data: apiData = [], isLoading } = useGetMaterialConsumptionsQuery();
+  const { data: apiData = [], isLoading, refetch } = useGetMaterialConsumptionsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  React.useEffect(() => {
+    refetch();
+  }, [refetch]);
 
   const requests: MaterialConsumptionRequest[] = React.useMemo(() => {
     const rawList = Array.isArray(apiData)

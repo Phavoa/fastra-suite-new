@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { LoadingDots } from "@/components/shared/LoadingComponents";
 import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
+import { extractErrorMessage } from "@/lib/utils";
 
 import Form from "@/components/Settings/form/form";
 import FormSection from "@/components/Settings/form/FormSection";
@@ -47,6 +48,8 @@ export default function CompanyEdit() {
   );
   const router = useRouter();
   const statusModal = useStatusModal();
+
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState({
     phone: "",
@@ -91,7 +94,15 @@ export default function CompanyEdit() {
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >,
   ) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const fieldName = e.target.name;
+    setForm({ ...form, [fieldName]: e.target.value });
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[fieldName];
+        return copy;
+      });
+    }
   };
 
   const handleImageChange = (file: File | null) => {
@@ -132,6 +143,7 @@ export default function CompanyEdit() {
     e.preventDefault();
 
     try {
+      setFieldErrors({});
       const fd = new FormData();
 
       fd.append("phone", form.phone);
@@ -167,13 +179,32 @@ export default function CompanyEdit() {
         router.push("/settings/company/1");
       }, 1500);
     } catch (err: any) {
-      console.error(err);
-      const message =
-        err?.data?.logo_image ||
-        err?.data?.detail ||
-        err?.data?.message ||
-        "Failed to update company";
-      statusModal.showError("Error", message);
+      console.error("Company update error:", err);
+      const message = extractErrorMessage(err, "Failed to update company");
+
+      // Extract field-specific errors to highlight on inputs
+      const errorsObj: Record<string, string> = {};
+      const data = err?.data;
+      if (data) {
+        if (Array.isArray(data.error)) {
+          data.error.forEach((item: any) => {
+            if (typeof item === "object" && item !== null) {
+              Object.entries(item).forEach(([k, v]) => {
+                errorsObj[k] = Array.isArray(v) ? String(v[0]) : String(v);
+              });
+            }
+          });
+        } else if (typeof data === "object") {
+          Object.entries(data).forEach(([k, v]) => {
+            if (k !== "detail" && k !== "message" && k !== "error") {
+              errorsObj[k] = Array.isArray(v) ? String(v[0]) : String(v);
+            }
+          });
+        }
+      }
+      setFieldErrors(errorsObj);
+
+      statusModal.showError("Failed to update company", message);
     }
   };
 
@@ -195,6 +226,13 @@ export default function CompanyEdit() {
 
   const handleSelect = (name: string, value: string) => {
     setForm({ ...form, [name]: value });
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[name];
+        return copy;
+      });
+    }
   };
 
   return (
@@ -221,7 +259,7 @@ export default function CompanyEdit() {
               textToDisplay="Click to Update Company Logo"
             />
             <div className="flex flex-col justify-center w-full md:w-auto">
-              <p className="text-[#1A1A1A] text-base">Comapany Name</p>
+              <p className="text-[#1A1A1A] text-base">Company Name</p>
               <p className="font-normal text-lg text-[#8C9AA6]">
                 {tenant_company_name}
               </p>
@@ -246,9 +284,10 @@ export default function CompanyEdit() {
               <FormInput
                 label="Email"
                 name="email"
-                value={user.email}
+                value={user?.email || ""}
                 placeholder="Enter your email"
                 onChange={handleInput}
+                error={fieldErrors.email}
               />
               <FormInput
                 label="Phone Number"
@@ -256,6 +295,7 @@ export default function CompanyEdit() {
                 placeholder="Enter your phone number"
                 value={form.phone}
                 onChange={handleInput}
+                error={fieldErrors.phone}
               />
               <FormInput
                 label="Website"
@@ -263,6 +303,7 @@ export default function CompanyEdit() {
                 placeholder="Enter your company website here"
                 value={form.website}
                 onChange={handleInput}
+                error={fieldErrors.website}
               />
             </div>
             <div className="mt-6">
@@ -276,6 +317,7 @@ export default function CompanyEdit() {
                   name="street_address"
                   value={form.street_address}
                   onChange={handleInput}
+                  error={fieldErrors.street_address}
                 />
                 <FormInput
                   label="City"
@@ -283,6 +325,7 @@ export default function CompanyEdit() {
                   placeholder="Enter your city"
                   value={form.city}
                   onChange={handleInput}
+                  error={fieldErrors.city}
                 />
                 <FormInput
                   label="State"
@@ -290,6 +333,7 @@ export default function CompanyEdit() {
                   placeholder="Enter your state"
                   value={form.state}
                   onChange={handleInput}
+                  error={fieldErrors.state}
                 />
                 <FormInput
                   label="Country"
@@ -297,6 +341,7 @@ export default function CompanyEdit() {
                   placeholder="Enter your country"
                   value={form.country}
                   onChange={handleInput}
+                  error={fieldErrors.country}
                 />
               </div>
             </div>
@@ -311,6 +356,7 @@ export default function CompanyEdit() {
               placeholder="Enter your company registration number"
               value={form.registration_number}
               onChange={handleInput}
+              error={fieldErrors.registration_number}
             />
             <FormInput
               label="Tax ID"
@@ -318,6 +364,7 @@ export default function CompanyEdit() {
               value={form.tax_id}
               placeholder="Enter your company Tax Identification Number"
               onChange={handleInput}
+              error={fieldErrors.tax_id}
             />
           </div>
         </FormSection>
@@ -331,6 +378,7 @@ export default function CompanyEdit() {
               value={form.industry}
               options={industryOptions}
               onChange={(e) => handleSelect("industry", e.target.value)}
+              error={fieldErrors.industry}
             />
             <FormSelect
               label="Language"
@@ -339,12 +387,14 @@ export default function CompanyEdit() {
               placeholder="Select your language"
               options={languageOptions}
               onChange={(e) => handleSelect("language", e.target.value)}
+              error={fieldErrors.language}
             />
             <FormInput
               label="Company Size"
               name="company_size"
               value={form.company_size}
               onChange={handleInput}
+              error={fieldErrors.company_size}
             />
           </div>
         </FormSection>

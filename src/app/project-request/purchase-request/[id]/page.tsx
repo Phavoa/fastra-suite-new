@@ -10,9 +10,9 @@ import {
   useGetProjectPurchaseRequestQuery,
   useDeleteProjectPurchaseRequestMutation,
   usePatchProjectPurchaseRequestMutation,
+  useSubmitProjectPurchaseRequestMutation,
 } from "@/api/requests/projectPurchaseRequestApi";
 import { StatusModal } from "@/components/shared/StatusModal";
-import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
 import { useGetProjectCostingProjectQuery } from "@/api/projectCostingApi";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { motion } from "framer-motion";
@@ -216,7 +216,7 @@ export default function PurchaseRequestDetailPage() {
 
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteProjectPurchaseRequestMutation();
   const [patchRequest, { isLoading: isUpdating }] = usePatchProjectPurchaseRequestMutation();
-  const [submitProjectRequest, { isLoading: isSubmitting }] = useSubmitProjectRequestMutation();
+  const [submitProjectRequest, { isLoading: isSubmitting }] = useSubmitProjectPurchaseRequestMutation();
 
   useEffect(() => {
     if (apiData) {

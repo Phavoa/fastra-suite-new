@@ -24,13 +24,32 @@ export default function ApproveRequestPage() {
   const user = useSelector((state: RootState) => state.auth?.user);
   const statusModal = useStatusModal();
 
+  const [removedIds, setRemovedIds] = useState<number[]>([]);
+
   const { data: rawApiRequests, isLoading: isRequestsLoading, refetch } = useGetProjectRequestsQuery({
-    status: "pending"
+    status: "pending",
+    ordering: "-created_at",
+  }, {
+    refetchOnMountOrArgChange: true,
   });
+
+  React.useEffect(() => {
+    refetch();
+  }, [refetch]);
   
   const apiRequests = React.useMemo(() => {
-    return Array.isArray(rawApiRequests) ? rawApiRequests : (rawApiRequests as any)?.results || [];
-  }, [rawApiRequests]);
+    const list = Array.isArray(rawApiRequests) ? rawApiRequests : (rawApiRequests as any)?.results || [];
+    return [...list]
+      .filter((req: any) => !removedIds.includes(req.id))
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        if (dateB !== dateA) {
+          return dateB - dateA;
+        }
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
+  }, [rawApiRequests, removedIds]);
   const { data: rawProjects } = useGetProjectCostingProjectsQuery({});
   const projects = React.useMemo(() => {
     const list = Array.isArray(rawProjects) ? rawProjects : (rawProjects as any)?.results || [];
@@ -84,6 +103,9 @@ export default function ApproveRequestPage() {
       }
     }
 
+    // Optimistically remove from view immediately
+    setRemovedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
     try {
       await approveRequest({ id }).unwrap();
       statusModal.showSuccess(
@@ -91,7 +113,10 @@ export default function ApproveRequestPage() {
         `Project request ${displayId} has been successfully approved.`
       );
       refetch();
+      router.refresh();
     } catch (err: any) {
+      // Revert if error
+      setRemovedIds((prev) => prev.filter((item) => item !== id));
       const errMsg = extractErrorMessage(err, "An error occurred while approving the request.");
       statusModal.showError("Approval Failed", errMsg);
     }
@@ -118,6 +143,9 @@ export default function ApproveRequestPage() {
       }
     }
 
+    // Optimistically remove from view immediately
+    setRemovedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
     try {
       await rejectRequest({ id }).unwrap();
       statusModal.showSuccess(
@@ -125,10 +153,19 @@ export default function ApproveRequestPage() {
         `Project request ${displayId} has been successfully rejected.`
       );
       refetch();
+      router.refresh();
     } catch (err: any) {
+      // Revert if error
+      setRemovedIds((prev) => prev.filter((item) => item !== id));
       const errMsg = extractErrorMessage(err, "An error occurred while rejecting the request.");
       statusModal.showError("Rejection Failed", errMsg);
     }
+  };
+
+  const handleModalClose = () => {
+    statusModal.close();
+    refetch();
+    router.refresh();
   };
 
   return (
@@ -300,11 +337,12 @@ export default function ApproveRequestPage() {
 
       <StatusModal
         isOpen={statusModal.isOpen}
-        onClose={statusModal.close}
+        onClose={handleModalClose}
         type={statusModal.type}
         title={statusModal.title}
         message={statusModal.message}
         actionText="Done"
+        onAction={handleModalClose}
       />
       <ModuleWizard moduleId="project-request" />
     </motion.div>

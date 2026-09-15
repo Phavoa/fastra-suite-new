@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import PettyCashRequestPage from '../petty-cash-request/page';
-import { useGetProjectRequestsQuery } from '@/api/requests/projectRequestApi';
+import { useGetPettyCashRequestsQuery } from '@/api/requests/pettyCashRequestApi';
 import { useGetProjectCostingProjectsQuery } from '@/api/projectCostingApi';
 import { usePermission } from '@/hooks/usePermission';
 import { useRouter } from 'next/navigation';
@@ -16,8 +16,8 @@ jest.mock('@/components/shared/TopBar/reusableTopBar', () => ({
   NavBar: () => <div data-testid="navbar">NavBar</div>,
 }));
 
-jest.mock('@/api/requests/projectRequestApi', () => ({
-  useGetProjectRequestsQuery: jest.fn(),
+jest.mock('@/api/requests/pettyCashRequestApi', () => ({
+  useGetPettyCashRequestsQuery: jest.fn(),
 }));
 
 jest.mock('@/api/projectCostingApi', () => ({
@@ -37,14 +37,14 @@ describe('PettyCashRequestPage Integration', () => {
     (useGetProjectCostingProjectsQuery as jest.Mock).mockReturnValue({
       data: [{ id: 1, name: 'Project Beta' }],
     });
-    (useGetProjectRequestsQuery as jest.Mock).mockReturnValue({
+    (useGetPettyCashRequestsQuery as jest.Mock).mockReturnValue({
       data: [
         {
           id: 1,
           reference_id: 'PC001',
           project_details: { name: 'Project Beta' },
           status: 'draft',
-          detail: JSON.stringify({ amount_requested: 500 }),
+          amount_requested: 500,
           reason: 'Office supplies',
         },
       ],
