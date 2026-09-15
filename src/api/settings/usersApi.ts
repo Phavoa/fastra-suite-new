@@ -56,6 +56,11 @@ export interface TenantUserWithAccess {
   user_permissions?: PermissionTemplateItem[];
   permissions?: any[];
   permission_details?: any[];
+  user?: {
+    username?: string;
+    [key: string]: any;
+  };
+  username?: string;
 }
 
 
