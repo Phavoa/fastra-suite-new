@@ -289,6 +289,9 @@ export default function VendorInfoPage() {
                   }
                   icon={<MapPin className="h-3.5 w-3.5" />}
                 />
+
+                {/* Tax information */}
+                {/* 
                 <InfoField
                   label="Tax ID"
                   value={(vendor as any).tax_id || "—"}
@@ -310,13 +313,15 @@ export default function VendorInfoPage() {
                     value={(vendor as any).tax_number}
                   />
                 )}
+                 */}
+
                 <InfoField
                   label="Vendor Type"
-                  value={
+                  value={(
                     (vendor as any).vendor_type_display ||
                     vendor.vendor_type ||
                     "—"
-                  }
+                  ).replace(/^./, (char: string) => char.toUpperCase())}
                   icon={<Building2 className="h-3.5 w-3.5" />}
                 />
                 {/* <InfoField

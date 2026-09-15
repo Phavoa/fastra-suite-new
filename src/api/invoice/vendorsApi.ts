@@ -108,6 +108,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const vendorsApi = createApi({
   reducerPath: "invoiceVendorsApi",
+  tagTypes: ["Vendors"],
   baseQuery: async (args, api, _extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -177,6 +178,7 @@ export const vendorsApi = createApi({
         url: "/invoicing/vendors/",
         params,
       }),
+      providesTags: ["Vendors"],
     }),
     createVendor: builder.mutation<CreateVendorRequest, CreateVendorRequest>({
       query: (body) => ({
@@ -184,6 +186,7 @@ export const vendorsApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Vendors"],
     }),
     getVendorById: builder.query<VendorFull, number>({
       query: (id) => `/invoicing/vendors/${id}/`,
@@ -197,6 +200,7 @@ export const vendorsApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: ["Vendors"],
     }),
     patchVendor: builder.mutation<
       CreateVendorRequest,
@@ -207,12 +211,14 @@ export const vendorsApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: ["Vendors"],
     }),
     deleteVendor: builder.mutation<void, number>({
       query: (id) => ({
         url: `/invoicing/vendors/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: ["Vendors"],
     }),
     activateVendor: builder.mutation<
       VendorFull,
@@ -223,15 +229,18 @@ export const vendorsApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: ["Vendors"],
     }),
     getVendorPaymentStatus: builder.query<VendorFull, number>({
       query: (id) => `/invoicing/vendors/${id}/payment-status/`,
     }),
     getActiveVendors: builder.query<VendorFull[], void>({
       query: () => "/invoicing/vendors/active/",
+      providesTags: ["Vendors"],
     }),
     getVendorsByType: builder.query<VendorFull[], void>({
       query: () => "/invoicing/vendors/by-type/",
+      providesTags: ["Vendors"],
     }),
   }),
 });

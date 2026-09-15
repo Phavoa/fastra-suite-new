@@ -308,7 +308,7 @@ export default function EditVendorPage() {
         </div>
 
         {/* Tax Information */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+        {/* <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-blue-600 mb-6">
             Tax Information
           </h2>
@@ -344,7 +344,7 @@ export default function EditVendorPage() {
               </label>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Footer Actions */}
         <div className="flex justify-end pt-4">
