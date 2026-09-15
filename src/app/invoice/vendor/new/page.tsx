@@ -293,7 +293,7 @@ export default function NewVendorPage() {
           </div>
 
           {/* NEW – Tax Information (optional) */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+          {/* <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-blue-600 mb-6">
               Tax Information
             </h2>
@@ -329,7 +329,7 @@ export default function NewVendorPage() {
                 </label>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Bank Information – unchanged layout, still optional */}
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
