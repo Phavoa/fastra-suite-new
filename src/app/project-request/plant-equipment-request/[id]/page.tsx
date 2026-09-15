@@ -50,7 +50,6 @@ export default function PlantEquipmentRequestDetailPage() {
   const { id } = useParams();
   const statusModal = useStatusModal();
   const { canDo } = useModulePermissions();
-  const [request, setRequest] = useState<PlantEquipmentRequestItem | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const numericId = Number(id);
@@ -61,98 +60,101 @@ export default function PlantEquipmentRequestDetailPage() {
   const [submitRequest, { isLoading: isSubmitting }] = useSubmitPlantEquipmentRequestMutation();
 
   const { data: projectsData } = useGetProjectCostingProjectsQuery({});
-  const projects = Array.isArray(projectsData)
-    ? projectsData
-    : (projectsData as any)?.results || [];
+  const projects = useMemo(() => {
+    return Array.isArray(projectsData)
+      ? projectsData
+      : (projectsData as any)?.results || [];
+  }, [projectsData]);
 
-  useEffect(() => {
-    if (apiRequest) {
-      const req = apiRequest as any;
-      const projectId =
-        req.project_details?.id ||
-        req.project_request_id ||
-        req.project_request?.id ||
-        req.project_request ||
-        req.project;
-      const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
+  const request = useMemo<PlantEquipmentRequestItem | null>(() => {
+    if (!apiRequest) return null;
+    const req = apiRequest as any;
+    const projectId =
+      req.project_details?.id ||
+      req.project_request_id ||
+      req.project_request?.id ||
+      req.project_request ||
+      req.project;
+    const projectObj = projects.find((p: any) => p.id === projectId || String(p.id) === String(projectId));
 
-      let requesterName = "Firstname Lastname";
-      if (req.created_by_details && typeof req.created_by_details === "object") {
-        const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
-        requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Firstname Lastname";
-      } else if (
-        typeof req.project_request === "object" &&
-        req.project_request?.created_by_details
-      ) {
-        const prCreatedBy = req.project_request.created_by_details;
-        const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
-        requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Firstname Lastname";
-      } else if (req.requester_details?.user) {
-        const userObj = req.requester_details.user;
-        const fullName = `${userObj.first_name || ""} ${userObj.last_name || ""}`.trim();
-        requesterName = fullName || userObj.username || userObj.email || "Firstname Lastname";
-      } else if (req.created_by_name && typeof req.created_by_name === "string") {
-        requesterName = req.created_by_name;
-      } else if (req.requester_name && typeof req.requester_name === "string") {
-        requesterName = req.requester_name;
-      } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
-        requesterName = req.requester;
-      }
-
-      const reqDateRaw = req.required_date || req.required_by_date;
-      const formattedRequiredDate = reqDateRaw
-        ? new Date(reqDateRaw).toLocaleDateString("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })
-        : "4 Apr 2024";
-
-      const createdDateRaw = req.created_at || req.date_created || Date.now();
-      const formattedCreatedDate = new Date(createdDateRaw).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-
-      const refId =
-        req.reference_id ||
-        req.project_request?.reference_id ||
-        `PE${String(req.id || id).padStart(5, "0")}`;
-
-      const statusVal = req.status || req.request_status || req.project_request?.status || "approved";
-
-      let phaseName = req.phase_details?.name || req.phase_name || req.phase || "Roofing";
-      let taskName = req.activity_details?.name || req.activity_name || (req.activity ? `Activity ${req.activity}` : req.task || "P.O.P");
-
-      if (projectObj && projectObj.wbs) {
-        const pMatch = projectObj.wbs.find((w: any) => String(w.id) === String(req.phase));
-        if (pMatch) phaseName = pMatch.name;
-        const aMatch = projectObj.wbs.find((w: any) => String(w.id) === String(req.activity || req.task));
-        if (aMatch) taskName = aMatch.name;
-      }
-
-      const estCost =
-        parseFloat(req.estimated_cost || req.amount || req.total_estimated_cost || "500000") || 500000;
-
-      setRequest({
-        id: refId,
-        project: req.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "Building project"),
-        projectId: typeof projectId === "number" ? projectId : undefined,
-        activityId: req.activity || req.activity_details?.id,
-        equipment: req.equipment_name || req.equipment || "Engineer",
-        description: req.description || req.equipment_description || "-",
-        quantity: Number(req.quantity || 24),
-        estimatedCost: estCost,
-        status: statusVal.toLowerCase() as any,
-        requester: requesterName,
-        date: formattedCreatedDate,
-        requiredDate: formattedRequiredDate,
-        phase: phaseName,
-        task: taskName,
-        notes: req.notes || req.justification_notes || "-",
-      });
+    let requesterName = "Firstname Lastname";
+    if (req.created_by_details && typeof req.created_by_details === "object") {
+      const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
+      requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Firstname Lastname";
+    } else if (
+      typeof req.project_request === "object" &&
+      req.project_request?.created_by_details
+    ) {
+      const prCreatedBy = req.project_request.created_by_details;
+      const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
+      requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Firstname Lastname";
+    } else if (req.requester_details?.user) {
+      const userObj = req.requester_details.user;
+      const fullName = `${userObj.first_name || ""} ${userObj.last_name || ""}`.trim();
+      requesterName = fullName || userObj.username || userObj.email || "Firstname Lastname";
+    } else if (req.created_by_name && typeof req.created_by_name === "string") {
+      requesterName = req.created_by_name;
+    } else if (req.requester_name && typeof req.requester_name === "string") {
+      requesterName = req.requester_name;
+    } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
+      requesterName = req.requester;
     }
+
+    const reqDateRaw = req.required_date || req.required_by_date;
+    const formattedRequiredDate = reqDateRaw
+      ? new Date(reqDateRaw).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "4 Apr 2024";
+
+    const formattedCreatedDate = req.created_at || req.date_created
+      ? new Date(req.created_at || req.date_created).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+
+    const refId =
+      (req.reference_id && String(req.reference_id).trim()) ||
+      ((req as any).detail?.reference_id && String((req as any).detail.reference_id).trim()) ||
+      (req.project_request?.reference_id && String(req.project_request.reference_id).trim()) ||
+      `PE${String(req.id || id).padStart(4, "0")}`;
+
+    const statusVal = req.status || req.request_status || req.project_request?.status || "approved";
+
+    let phaseName = req.phase_details?.name || req.phase_name || req.phase || "Roofing";
+    let taskName = req.activity_details?.name || req.activity_name || (req.activity ? `Activity ${req.activity}` : req.task || "P.O.P");
+
+    if (projectObj && projectObj.wbs) {
+      const pMatch = projectObj.wbs.find((w: any) => String(w.id) === String(req.phase));
+      if (pMatch) phaseName = pMatch.name;
+      const aMatch = projectObj.wbs.find((w: any) => String(w.id) === String(req.activity || req.task));
+      if (aMatch) taskName = aMatch.name;
+    }
+
+    const estCost =
+      parseFloat(req.estimated_cost || req.amount || req.total_estimated_cost || "500000") || 500000;
+
+    return {
+      id: refId,
+      project: req.project_details?.name || projectObj?.name || (projectId ? `Project #${projectId}` : "Building project"),
+      projectId: typeof projectId === "number" ? projectId : undefined,
+      activityId: req.activity || req.activity_details?.id,
+      equipment: req.equipment_name || req.equipment || "Engineer",
+      description: req.description || req.equipment_description || "-",
+      quantity: Number(req.quantity || 24),
+      estimatedCost: estCost,
+      status: statusVal.toLowerCase() as any,
+      requester: requesterName,
+      date: formattedCreatedDate,
+      requiredDate: formattedRequiredDate,
+      phase: phaseName,
+      task: taskName,
+      notes: req.notes || req.justification_notes || "-",
+    };
   }, [apiRequest, projects, id]);
 
   const { data: projectCosting } = useGetProjectCostingProjectQuery(
@@ -161,6 +163,12 @@ export default function PlantEquipmentRequestDetailPage() {
   );
 
   const availableBudget = useMemo(() => {
+    const rawBudget = (apiRequest as any)?.available_budget;
+    if (rawBudget !== undefined && rawBudget !== null && rawBudget !== "") {
+      const parsed = Number(rawBudget);
+      if (!isNaN(parsed)) return parsed;
+    }
+
     if (!projectCosting) return 5000000;
 
     if (request?.activityId) {
@@ -201,7 +209,7 @@ export default function PlantEquipmentRequestDetailPage() {
     }
 
     return 5000000;
-  }, [projectCosting, request?.activityId]);
+  }, [apiRequest, projectCosting, request]);
 
   const handleDelete = async () => {
     try {
@@ -215,7 +223,11 @@ export default function PlantEquipmentRequestDetailPage() {
 
   const handleSubmit = async () => {
     try {
-      await submitRequest({ id: numericId, data: {} }).unwrap();
+      const parentId =
+        typeof (apiRequest as any)?.project_request === "object"
+          ? (apiRequest as any)?.project_request?.id
+          : (apiRequest as any)?.project_request || numericId;
+      await submitRequest({ id: Number(parentId), data: {} }).unwrap();
       statusModal.showSuccess("Request Submitted", "The plant and equipment request has been submitted for approval.");
       refetch();
     } catch (err) {

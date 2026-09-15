@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Check, AlertTriangle, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, extractErrorMessage as baseExtractErrorMessage } from "@/lib/utils";
 
 export type StatusType = "success" | "error" | "warning" | "info";
 
@@ -309,76 +309,7 @@ export function extractErrorMessage(
   err: any,
   fallback = "An unexpected error occurred. Please try again."
 ): string {
-  if (!err) return fallback;
-
-  if (typeof err === "string") return err;
-  if (typeof err?.message === "string" && !err.data) return err.message;
-
-  const payload =
-    err?.data !== undefined
-      ? err.data
-      : err?.error !== undefined
-      ? err.error
-      : err;
-
-  if (!payload) return fallback;
-  if (typeof payload === "string") return payload;
-
-  const parseObject = (obj: any): string[] => {
-    if (!obj || typeof obj !== "object") return [String(obj)];
-    const messages: string[] = [];
-
-    for (const [key, val] of Object.entries(obj)) {
-      if (val === null || val === undefined) continue;
-
-      const cleanKey =
-        key === "non_field_errors" ||
-        key === "__all__" ||
-        key === "detail" ||
-        key === "message" ||
-        key === "error"
-          ? ""
-          : key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) + ": ";
-
-      if (typeof val === "string") {
-        messages.push(`${cleanKey}${val}`);
-      } else if (Array.isArray(val)) {
-        val.forEach((item) => {
-          if (typeof item === "string") {
-            messages.push(`${cleanKey}${item}`);
-          } else if (typeof item === "object" && item !== null) {
-            const nested = parseObject(item);
-            nested.forEach((n) => messages.push(`${cleanKey}${n}`));
-          } else {
-            messages.push(`${cleanKey}${String(item)}`);
-          }
-        });
-      } else if (typeof val === "object") {
-        const nested = parseObject(val);
-        nested.forEach((n) => messages.push(`${cleanKey}${n}`));
-      } else {
-        messages.push(`${cleanKey}${String(val)}`);
-      }
-    }
-    return messages.filter(Boolean);
-  };
-
-  if (Array.isArray(payload)) {
-    const parsed = payload.flatMap((item) =>
-      typeof item === "string" ? item : parseObject(item)
-    );
-    return parsed.length > 0 ? parsed.join(" | ") : fallback;
-  }
-
-  if (typeof payload === "object") {
-    if (typeof payload.detail === "string") return payload.detail;
-    if (typeof payload.message === "string") return payload.message;
-
-    const parsed = parseObject(payload);
-    return parsed.length > 0 ? parsed.join(" | ") : fallback;
-  }
-
-  return fallback;
+  return baseExtractErrorMessage(err, fallback);
 }
 
 export default StatusModal;

@@ -31,6 +31,26 @@ export default function SettingsLayout({
   const dispatch = useDispatch();
   const archive = useSelector((state: RootState) => state.viewMode.archive);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("search") ?? "";
+
+  if (pathname.startsWith("/settings/change-password")) {
+    return (
+      <div className="w-full flex-1 flex flex-col">
+        <NavBar title="Settings" items={[]} />
+        <div className="flex justify-between items-center w-full border-b border-gray-200 px-6 py-2.5 bg-white">
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              { label: "Settings", href: "/settings/change-password" },
+              { label: "Change Password", current: true },
+            ]}
+          />
+        </div>
+        <main className="flex-1">{children}</main>
+      </div>
+    );
+  }
 
   const navItems: {
     label: string;
@@ -85,9 +105,6 @@ export default function SettingsLayout({
 
   const activeSection = getActiveSection(pathname);
   const activeNav = navItems.find((item) => item.key === activeSection);
-
-  const searchParams = useSearchParams();
-  const searchQuery = searchParams.get("search") ?? "";
 
   /*const activeSection =
      activeNav?.label.toLowerCase().replace(/\s+/g, "").replace(/s$/, "") ||

@@ -33,40 +33,40 @@ export function StockMoveTable({ moves, query = "" }: StockMoveTableProps) {
   }, [moves, query]);
 
   return (
-    <div className="w-full">
+    <div className="w-full font-open-sans">
       <div className="overflow-x-auto">
-        <Table className="w-full">
+        <Table className="min-w-[900px] w-full font-open-sans">
           <TableHeader>
-            <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-200">
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                DATE
+            <TableRow className="bg-[#F8FAFC] border-b border-gray-100 hover:bg-[#F8FAFC]">
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
+                Date
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                REFERENCE
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
+                Reference
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
-                TYPE
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider text-center">
+                Type
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                PRODUCT
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
+                Product
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
-                IN
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider text-right">
+                In
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
-                OUT
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider text-right">
+                Out
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
-                BALANCE
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider text-right">
+                Balance
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                WBS PHASE
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
+                WBS Phase
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                WBS ACTIVITY
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
+                WBS Activity
               </TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
-                USER
+              <TableHead className="py-3.5 px-6 font-semibold text-gray-500 text-xs uppercase tracking-wider">
+                User
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -79,7 +79,7 @@ export function StockMoveTable({ moves, query = "" }: StockMoveTableProps) {
       </div>
 
       {filtered.length === 0 && (
-        <div className="p-12 text-center text-[#8898AA] text-sm">
+        <div className="py-16 text-center text-gray-500 text-sm font-open-sans">
           No stock move records found matching your query.
         </div>
       )}

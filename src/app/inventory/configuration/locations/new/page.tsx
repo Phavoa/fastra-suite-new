@@ -161,10 +161,33 @@ export default function NewLocationPage() {
       // Handle API errors using standardized utility
       const errorMessage = extractErrorMessage(error, "Failed to create location. Please try again.");
 
-      statusModal.showError(
-        "Failed to create location",
-        errorMessage
-      );
+      const isMaxLocations =
+        typeof errorMessage === "string" &&
+        (errorMessage.toLowerCase().includes("max number of locations reached") ||
+          errorMessage.toLowerCase().includes("max number") ||
+          errorMessage.toLowerCase().includes("multi-location") ||
+          errorMessage.toLowerCase().includes("multilocation"));
+
+      if (isMaxLocations) {
+        statusModal.showWarning(
+          "Multi-Location Required",
+          "You have reached the maximum number of locations allowed. To create additional warehouse or site locations, please activate the Multi-Location feature in Settings.",
+          "Go to Multi-Location Settings",
+          () => {
+            router.push("/settings/multi-location");
+          },
+          "Cancel",
+          () => {
+            statusModal.close();
+          },
+          "primary"
+        );
+      } else {
+        statusModal.showError(
+          "Failed to create location",
+          errorMessage
+        );
+      }
     }
   }
 

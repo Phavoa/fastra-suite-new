@@ -3,15 +3,65 @@ import type { RootState } from "../../lib/store/store";
 
 export interface PettyCashRequest {
   id: number;
-  reference_id: string;
-  amount_requested: string;
-  purpose: string;
-  description: string;
-  notes: string;
+  reference_id?: string;
+  amount_requested?: string | number;
+  amount?: string | number;
+  purpose?: string;
+  description?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
-  is_hidden: boolean;
-  project_request: number;
+  date_created?: string;
+  is_hidden?: boolean;
+  project?: number;
+  project_id?: number;
+  project_request?: number | {
+    id: number;
+    reference_id?: string;
+    request_type?: string;
+    status?: string;
+    request_amount?: number;
+    created_by?: number;
+    created_by_details?: any;
+    [key: string]: any;
+  };
+  project_request_id?: number;
+  project_details?: {
+    id: number;
+    name: string;
+    project_code?: string;
+    code?: string;
+  };
+  phase_details?: {
+    id: string;
+    name: string;
+    code?: string;
+  };
+  activity_details?: {
+    id: string;
+    name: string;
+    serial_number?: number;
+  };
+  created_by?: number;
+  created_by_name?: string;
+  created_by_details?: {
+    id: number;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
+  status?: string;
+  detail?: any;
+  [key: string]: any;
+}
+
+export interface GetPettyCashParams {
+  ordering?: string;
+  search?: string;
+  project?: number | string;
+  status?: string;
+  [key: string]: any;
 }
 
 export interface CreatePettyCashRequest {
@@ -33,6 +83,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const pettyCashRequestApi = createApi({
   reducerPath: "pettyCashRequestApi",
+  tagTypes: ["PettyCashRequest"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -88,14 +139,41 @@ export const pettyCashRequestApi = createApi({
     }
   },
   endpoints: (builder) => ({
+    getPettyCashRequests: builder.query<PettyCashRequest[], GetPettyCashParams | void>({
+      query: (params) => ({
+        url: "/project-requests/petty-cash/",
+        params: params || undefined,
+      }),
+      providesTags: (result) => {
+        const list = Array.isArray(result)
+          ? result
+          : (result as any)?.results && Array.isArray((result as any).results)
+          ? (result as any).results
+          : [];
+        return [
+          ...list.map(({ id }: { id: any }) => ({ type: "PettyCashRequest" as const, id })),
+          { type: "PettyCashRequest", id: "LIST" },
+          "PettyCashRequest",
+        ];
+      },
+    }),
+    getPettyCashRequest: builder.query<PettyCashRequest, number | string>({
+      query: (id) => `/project-requests/petty-cash/${id}/`,
+      providesTags: (result, error, id) => [{ type: "PettyCashRequest", id }, "PettyCashRequest"],
+    }),
     createPettyCashRequest: builder.mutation<PettyCashRequest, CreatePettyCashRequest>({
       query: (body) => ({
         url: "/project-requests/petty-cash/",
         method: "POST",
         body,
       }),
+      invalidatesTags: ["PettyCashRequest", { type: "PettyCashRequest", id: "LIST" }],
     }),
   }),
 });
 
-export const { useCreatePettyCashRequestMutation } = pettyCashRequestApi;
+export const {
+  useGetPettyCashRequestsQuery,
+  useGetPettyCashRequestQuery,
+  useCreatePettyCashRequestMutation,
+} = pettyCashRequestApi;

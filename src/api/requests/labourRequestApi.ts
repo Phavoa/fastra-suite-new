@@ -35,7 +35,6 @@ export interface ProjectRequest {
   created_by_details?: UserDetails;
 }
 
-// Main Labour Request interface
 export interface LabourRequestDetail {
   id: number;
   date_required: string;
@@ -49,6 +48,22 @@ export interface LabourRequestDetail {
   created_at?: string;
   updated_at?: string;
   created_by_name?: string;
+  available_budget?: string | number;
+  project_details?: {
+    id: number;
+    name: string;
+    project_code: string;
+  };
+  phase_details?: {
+    id: string;
+    name: string;
+    code?: string;
+  };
+  activity_details?: {
+    id: string;
+    name: string;
+    serial_number?: number;
+  };
 }
 
 export interface LabourRequest {
@@ -58,11 +73,24 @@ export interface LabourRequest {
   module_destination: string;
   status: "draft" | "pending" | "approved" | "rejected";
   created_by: number;
+  created_by_details?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    username?: string;
+    user?: User;
+  };
   created_at: string;
   updated_at: string;
   detail: LabourRequestDetail;
-  project_request: ProjectRequest;
+  project_request?: ProjectRequest;
   project?: number;
+  project_details?: {
+    id: number;
+    name: string;
+    project_code: string;
+  };
   activity?: string;
 }
 
@@ -150,6 +178,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const labourRequestApi = createApi({
   reducerPath: "labourRequestApi",
+  tagTypes: ["LabourRequest"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -221,10 +250,17 @@ export const labourRequestApi = createApi({
         params,
       }),
       transformResponse: (response: LabourRequest[]) => response,
+      providesTags: ["LabourRequest"],
     }),
     getLabourRequest: builder.query<LabourRequest, number>({
       query: (id) => `/project-requests/project-requests/${id}/`,
-      transformResponse: (response: LabourRequest) => response,
+      transformResponse: (response: LabourRequest | LabourRequest[]) => {
+        if (Array.isArray(response)) {
+          return response[0];
+        }
+        return response;
+      },
+      providesTags: (result, error, id) => [{ type: "LabourRequest", id }],
     }),
 
     // Labour Request Mutation endpoints
@@ -237,6 +273,7 @@ export const labourRequestApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["LabourRequest"],
     }),
     updateLabourRequest: builder.mutation<
       LabourRequest,
@@ -247,6 +284,7 @@ export const labourRequestApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
     patchLabourRequest: builder.mutation<
       LabourRequest,
@@ -257,12 +295,14 @@ export const labourRequestApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
     deleteLabourRequest: builder.mutation<void, number>({
       query: (id) => ({
         url: `/project-requests/labour-requests/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
     submitLabourRequest: builder.mutation<
       LabourRequest,
@@ -273,6 +313,7 @@ export const labourRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
 
     approveLabourRequest: builder.mutation<
@@ -284,6 +325,7 @@ export const labourRequestApi = createApi({
         method: "POST",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
 
     rejectLabourRequest: builder.mutation<
@@ -295,6 +337,7 @@ export const labourRequestApi = createApi({
         method: "POST",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
 
     cancelLabourRequest: builder.mutation<
@@ -306,6 +349,7 @@ export const labourRequestApi = createApi({
         method: "POST",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [{ type: "LabourRequest", id }, "LabourRequest"],
     }),
   }),
 });

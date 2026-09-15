@@ -320,6 +320,17 @@ export const projectPurchaseRequestApi = createApi({
       }),
       invalidatesTags: ["ProjectPurchaseRequest"],
     }),
+    submitProjectPurchaseRequest: builder.mutation<any, { id: number | string; data?: any }>({
+      query: ({ id, data }) => ({
+        url: `/project-requests/project-requests/${id}/submit/`,
+        method: "POST",
+        body: data || {},
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        "ProjectPurchaseRequest",
+        { type: "ProjectPurchaseRequest", id },
+      ],
+    }),
   }),
 });
 
@@ -330,5 +341,6 @@ export const {
   useUpdateProjectPurchaseRequestMutation,
   usePatchProjectPurchaseRequestMutation,
   useDeleteProjectPurchaseRequestMutation,
-} = projectPurchaseRequestApi; // Updated
+  useSubmitProjectPurchaseRequestMutation,
+} = projectPurchaseRequestApi;
 

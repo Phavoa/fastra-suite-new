@@ -74,6 +74,7 @@ describe('SubcontractorRequestDetailsPage', () => {
       code: "PHASE-04",
     },
     milestones: [],
+    reference_id: "SUB0001",
     vendor_name: "",
     vendor_email: null,
     vendor_phone: null,
@@ -140,16 +141,16 @@ describe('SubcontractorRequestDetailsPage', () => {
     expect(screen.queryByText('Approved')).not.toBeInTheDocument();
   });
 
-  it('renders Reference ID from project_request.reference_id', () => {
+  it('renders Reference ID from reference_id with format SUB0001', () => {
     render(<SubcontractorRequestDetailsPage />);
 
-    expect(screen.getByText('PjR-2026-001')).toBeInTheDocument();
+    expect(screen.getByText('SUB0001')).toBeInTheDocument();
   });
 
   it('renders Available Budget directly from available_budget response', () => {
     render(<SubcontractorRequestDetailsPage />);
 
-    expect(screen.getByText('N47,500,000.00')).toBeInTheDocument();
+    expect(screen.getByText(/47,500,000\.00/)).toBeInTheDocument();
   });
 
   it('renders resolved Vendor Details instead of empty strings', () => {

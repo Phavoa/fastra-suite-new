@@ -4,33 +4,59 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, X } from "lucide-react";
 
+const DISMISSAL_KEY = "fastra_pwa_prompt_dismissed";
+const INSTALLED_KEY = "fastra_pwa_installed";
+const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 export default function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // Check if running in standalone/PWA mode
+    const isStandalone =
+      typeof window !== "undefined" &&
+      (window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true);
+
+    const isDismissedOrInstalled = () => {
+      try {
+        if (typeof window === "undefined") return true;
+        if (localStorage.getItem(INSTALLED_KEY) === "true") return true;
+        const dismissedAt = localStorage.getItem(DISMISSAL_KEY);
+        if (dismissedAt) {
+          const dismissedTime = parseInt(dismissedAt, 10);
+          if (Date.now() - dismissedTime < COOLDOWN_MS) {
+            return true;
+          }
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    };
+
+    if (isStandalone || isDismissedOrInstalled()) {
+      return;
+    }
+
     const handler = (e: any) => {
       // Prevent the default browser prompt
       e.preventDefault();
       // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
-      // Show the banner
-      setIsVisible(true);
+      // Show the banner only if not dismissed
+      if (!isDismissedOrInstalled()) {
+        setIsVisible(true);
+      }
     };
 
     window.addEventListener("beforeinstallprompt", handler);
 
-    // Also show after 5 seconds if for some reason the event fired early or we missed it
-    // (Only if deferredPrompt exists)
-    const timeout = setTimeout(() => {
-      if (deferredPrompt) setIsVisible(true);
-    }, 5000);
-
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
-      clearTimeout(timeout);
     };
-  }, [deferredPrompt]);
+  }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -40,12 +66,14 @@ export default function PwaInstallPrompt() {
 
     // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === "accepted") {
-      console.log("User accepted the install prompt");
-    } else {
-      console.log("User dismissed the install prompt");
-    }
+
+    try {
+      if (outcome === "accepted") {
+        localStorage.setItem(INSTALLED_KEY, "true");
+      } else {
+        localStorage.setItem(DISMISSAL_KEY, Date.now().toString());
+      }
+    } catch {}
 
     // We've used the prompt, and can't use it again
     setDeferredPrompt(null);
@@ -53,6 +81,9 @@ export default function PwaInstallPrompt() {
   };
 
   const handleDismiss = () => {
+    try {
+      localStorage.setItem(DISMISSAL_KEY, Date.now().toString());
+    } catch {}
     setIsVisible(false);
   };
 

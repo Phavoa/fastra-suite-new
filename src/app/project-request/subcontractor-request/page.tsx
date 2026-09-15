@@ -79,7 +79,7 @@ export default function SubcontractorRequestPage() {
 
   const config: RequestDashboardConfig<any> = {
     title: "Subcontractor Request",
-    idPrefix: "SC",
+    idPrefix: "SUB",
     newRequestPath: "/project-request/subcontractor-request/new",
     statusCounts,
     summaryConfigs: [
@@ -119,6 +119,11 @@ export default function SubcontractorRequestPage() {
     renderItem: (req: any) => {
       const displayTitle = (req as any).activity_details?.name || (req as any).project_details?.name || "Subcontractor Request";
       const subName = (req as any).vendor_details?.vendor_name || (req as any).vendor_name || (req as any).sub_contractor_name || "";
+      const itemRefId =
+        (req.reference_id && String(req.reference_id).trim()) ||
+        ((req as any).detail?.reference_id && String((req as any).detail.reference_id).trim()) ||
+        ((req as any).project_request?.reference_id && String((req as any).project_request.reference_id).trim()) ||
+        `SUB${String(req.id).padStart(4, "0")}`;
       
       return (
       <div 
@@ -127,7 +132,7 @@ export default function SubcontractorRequestPage() {
         className="p-4 border border-gray-200 rounded-lg bg-white hover:border-[#3B7CED] hover:shadow-md transition-all cursor-pointer group"
       >
         <div className="flex justify-between items-start">
-          <span className="text-sm font-bold text-[#3B7CED] group-hover:text-blue-600">{(req as any).project_request?.reference_id || req.reference_id || `SR-${String(req.id).padStart(5, "0")}`}</span>
+          <span className="text-sm font-bold text-[#3B7CED] group-hover:text-blue-600">{itemRefId}</span>
           <Badge variant={getStatusBadgeVariant((req as any).project_request?.status || req.status || "pending")}>
             {((req as any).project_request?.status || req.status || "pending").charAt(0).toUpperCase() + ((req as any).project_request?.status || req.status || "pending").slice(1)}
           </Badge>

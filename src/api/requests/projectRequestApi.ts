@@ -59,6 +59,7 @@ const getTenantBaseUrl = (state: RootState): string => {
 
 export const projectRequestApi = createApi({
   reducerPath: "projectRequestApi",
+  tagTypes: ["ProjectRequest"],
   baseQuery: async (args, api, extraOptions) => {
     const state = api.getState() as RootState;
     const baseUrl = getTenantBaseUrl(state);
@@ -120,9 +121,22 @@ export const projectRequestApi = createApi({
         url: "/project-requests/project-requests/",
         params: params || undefined,
       }),
+      providesTags: (result) => {
+        const list = Array.isArray(result)
+          ? result
+          : (result as any)?.results && Array.isArray((result as any).results)
+          ? (result as any).results
+          : [];
+        return [
+          ...list.map(({ id }: { id: any }) => ({ type: "ProjectRequest" as const, id })),
+          { type: "ProjectRequest", id: "LIST" },
+          "ProjectRequest",
+        ];
+      },
     }),
     getProjectRequest: builder.query<ProjectRequest, number>({
       query: (id) => `/project-requests/project-requests/${id}/`,
+      providesTags: (result, error, id) => [{ type: "ProjectRequest", id }, "ProjectRequest"],
     }),
     approveProjectRequest: builder.mutation<ProjectRequest, { id: number; data?: ApproveProjectRequest }>({
       query: ({ id, data }) => ({
@@ -130,6 +144,11 @@ export const projectRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
     rejectProjectRequest: builder.mutation<ProjectRequest, { id: number; data?: RejectProjectRequest }>({
       query: ({ id, data }) => ({
@@ -137,6 +156,11 @@ export const projectRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
     cancelProjectRequest: builder.mutation<ProjectRequest, { id: number; data?: CancelProjectRequest }>({
       query: ({ id, data }) => ({
@@ -144,6 +168,11 @@ export const projectRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
     submitProjectRequest: builder.mutation<ProjectRequest, { id: number; data?: any }>({
       query: ({ id, data }) => ({
@@ -151,6 +180,11 @@ export const projectRequestApi = createApi({
         method: "POST",
         body: data || {},
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
     updateProjectRequest: builder.mutation<ProjectRequest, { id: number; data: any }>({
       query: ({ id, data }) => ({
@@ -158,6 +192,11 @@ export const projectRequestApi = createApi({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
     patchProjectRequest: builder.mutation<ProjectRequest, { id: number; data: any }>({
       query: ({ id, data }) => ({
@@ -165,12 +204,22 @@ export const projectRequestApi = createApi({
         method: "PATCH",
         body: data,
       }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
     deleteProjectRequest: builder.mutation<void, number>({
       query: (id) => ({
         url: `/project-requests/project-requests/${id}/`,
         method: "DELETE",
       }),
+      invalidatesTags: (result, error, id) => [
+        { type: "ProjectRequest", id },
+        { type: "ProjectRequest", id: "LIST" },
+        "ProjectRequest",
+      ],
     }),
   }),
 });

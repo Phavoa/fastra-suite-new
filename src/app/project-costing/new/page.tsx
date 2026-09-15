@@ -361,6 +361,7 @@ export default function NewProjectPage() {
         : await createProject(payload).unwrap();
 
       const newProjectId = res.id;
+      const failedDocs: { name: string; error: string }[] = [];
 
       // Upload documents if any
       if (documents.length > 0 && newProjectId) {
@@ -380,14 +381,33 @@ export default function NewProjectPage() {
           
           try {
             await addProjectDocument({ id: newProjectId, body: formData }).unwrap();
-          } catch (docErr) {
+          } catch (docErr: any) {
             console.error("Failed to upload document:", doc.name, docErr);
-            // We ignore individual document upload failures so we don't break the whole project creation flow
+            const errMsg = extractErrorMessage(docErr, "Upload failed");
+            failedDocs.push({
+              name: doc.name || (doc.file ? doc.file.name : "Document"),
+              error: errMsg,
+            });
           }
         }
       }
 
-      if (isSubmitForApproval) {
+      if (failedDocs.length > 0) {
+        const actionVerb = isSubmitForApproval
+          ? "created and submitted for approval"
+          : "saved as draft";
+        const docCount = failedDocs.length;
+        const totalCount = documents.length;
+        const failureList = failedDocs
+          .map((f) => `• ${f.name}: ${f.error}`)
+          .join("\n");
+
+        statusModal.showWarning(
+          "Project Created with Document Upload Issues",
+          `Your project "${name}" has been ${actionVerb} successfully.\n\nHowever, ${docCount} of ${totalCount} document${totalCount > 1 ? "s" : ""} failed to upload:\n\n${failureList}\n\nYou can re-upload these documents directly from the project details page.`,
+          "Continue to Projects"
+        );
+      } else if (isSubmitForApproval) {
         statusModal.showSuccess(
           "Project Submitted for Approval",
           `Your project "${name}" has been created and submitted for approval.`
@@ -415,9 +435,13 @@ export default function NewProjectPage() {
     const isProjectCreated =
       statusModal.title === "Project Submitted for Approval" ||
       statusModal.title === "Project Saved as Draft" ||
-      statusModal.title === "Project Created Successfully";
+      statusModal.title === "Project Created Successfully" ||
+      statusModal.title === "Project Created with Document Upload Issues";
     statusModal.close();
-    if (statusModal.type === "success" && isProjectCreated) {
+    if (
+      (statusModal.type === "success" || statusModal.type === "warning") &&
+      isProjectCreated
+    ) {
       router.push("/project-costing");
     }
   };
@@ -747,7 +771,12 @@ export default function NewProjectPage() {
         type={statusModal.type}
         title={statusModal.title}
         message={statusModal.message}
-        actionText={statusModal.type === "success" ? "Done" : "Try again"}
+        actionText={
+          statusModal.actionText ||
+          (statusModal.type === "success" || statusModal.type === "warning"
+            ? "Done"
+            : "Try again")
+        }
         onAction={handleModalAction}
         showCloseButton={false}
       />

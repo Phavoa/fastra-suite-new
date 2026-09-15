@@ -10,6 +10,7 @@ interface FormInputProps {
   placeholder?: string;
   className?: string;
   required?: boolean; // ✅ optional prop
+  error?: string;
 }
 
 const FormInput = ({
@@ -21,8 +22,10 @@ const FormInput = ({
   placeholder = "",
   className = "",
   required = false, // default to false
+  error,
 }: FormInputProps) => {
   const isTextArea = type === "textarea";
+  const borderClass = error ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500" : "border-[#7A8A98]";
 
   return (
     <div className="flex flex-col gap-1">
@@ -35,7 +38,7 @@ const FormInput = ({
           onChange={onChange}
           placeholder={placeholder}
           required={required} // ✅ apply required
-          className={`border rounded-lg p-3 text-[#7A8A98] ${className}`}
+          className={`border rounded-lg p-3 text-[#7A8A98] ${borderClass} ${className}`}
         />
       ) : type === "checkbox" ? (
         <input
@@ -53,9 +56,10 @@ const FormInput = ({
           onChange={onChange}
           placeholder={placeholder}
           required={required} // ✅ apply required
-          className={`border border-[#7A8A98] text-[#7A8A98] rounded-xs p-2 text-sm ${className}`}
+          className={`border text-[#1A1A1A] rounded-xs p-2 text-sm ${borderClass} ${className}`}
         />
       )}
+      {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
     </div>
   );
 };

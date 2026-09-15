@@ -210,35 +210,83 @@ export default function EditPurchaseRequestPage() {
     );
   }, [costingProjectDetail, approvedProjects, selectedProjectId]);
 
+  // Helper to extract numeric budget from multiple potential backend fields
+  const getBudgetValue = (item: any): number => {
+    if (!item) return 0;
+    const val =
+      item.available_budget ??
+      item.remaining_budget ??
+      item.budget ??
+      item.amount ??
+      item.budgeted_amount ??
+      item.total_amount ??
+      (item.quantity && item.rate ? Number(item.quantity) * Number(item.rate) : undefined) ??
+      item.cost ??
+      0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+
   const wbsList = useMemo(() => {
     if (!currentProject) return [];
 
     if (Array.isArray((currentProject as any).wbs) && (currentProject as any).wbs.length > 0) {
-      return (currentProject as any).wbs;
+      const rawWbs = (currentProject as any).wbs;
+      return rawWbs.map((w: any) => {
+        let budgetVal = getBudgetValue(w);
+        if (budgetVal === 0 && !w.is_activity) {
+          const childSum = rawWbs
+            .filter((c: any) => c.is_activity && String(c.parent) === String(w.id))
+            .reduce((sum: number, c: any) => sum + getBudgetValue(c), 0);
+          if (childSum > 0) budgetVal = childSum;
+        }
+        return {
+          ...w,
+          amount: budgetVal,
+        };
+      });
     }
 
     const items: any[] = [];
-    const phasesArray = Array.isArray(currentProject.phases)
-      ? currentProject.phases
-      : Array.isArray((currentProject as any)?.phase_list)
-        ? (currentProject as any).phase_list
-        : [];
+    let phasesArray: any[] = [];
+    if (typeof currentProject.phases === "string") {
+      try {
+        phasesArray = JSON.parse(currentProject.phases);
+      } catch (e) {
+        phasesArray = [];
+      }
+    } else if (Array.isArray(currentProject.phases)) {
+      phasesArray = currentProject.phases;
+    } else if (Array.isArray((currentProject as any)?.phase_list)) {
+      phasesArray = (currentProject as any).phase_list;
+    } else if ((currentProject.phases as any)?.results && Array.isArray((currentProject.phases as any).results)) {
+      phasesArray = (currentProject.phases as any).results;
+    }
 
     phasesArray.forEach((ph: any, idx: number) => {
       const phaseId = ph.id || ph.phase_id || `phase-${idx + 1}`;
       const phaseName = ph.name || ph.phase_name || `Phase ${idx + 1}`;
-
-      items.push({
-        id: phaseId,
-        name: phaseName,
-        is_activity: false,
-      });
 
       const acts = Array.isArray(ph.activities)
         ? ph.activities
         : Array.isArray(ph.activity_list)
           ? ph.activity_list
           : [];
+
+      const actsTotal = acts.reduce((sum: number, act: any) => {
+        return sum + getBudgetValue(act);
+      }, 0);
+
+      const explicitPhaseBudget = getBudgetValue(ph);
+      const phaseAmount = explicitPhaseBudget > 0 ? explicitPhaseBudget : actsTotal;
+
+      items.push({
+        ...ph,
+        id: phaseId,
+        name: phaseName,
+        is_activity: false,
+        amount: phaseAmount,
+      });
 
       acts.forEach((act: any, actIdx: number) => {
         const actId =
@@ -251,15 +299,7 @@ export default function EditPurchaseRequestPage() {
           name: actName,
           is_activity: true,
           parent: phaseId,
-          amount: Number(
-            act.available_budget ??
-            act.budget ??
-            act.amount ??
-            act.budgeted_amount ??
-            act.total_amount ??
-            act.cost ??
-            0
-          ),
+          amount: getBudgetValue(act),
         });
       });
     });
@@ -274,15 +314,7 @@ export default function EditPurchaseRequestPage() {
             name: act.name || act.activity_name || `Activity ${actIdx + 1}`,
             is_activity: true,
             parent: act.phase || act.phase_id || act.parent || null,
-            amount: Number(
-              act.available_budget ??
-              act.budget ??
-              act.amount ??
-              act.budgeted_amount ??
-              act.total_amount ??
-              act.cost ??
-              0
-            ),
+            amount: getBudgetValue(act),
           });
         }
       });
@@ -303,6 +335,10 @@ export default function EditPurchaseRequestPage() {
     );
   }, [wbsList, selectedPhaseId]);
 
+  const selectedPhaseObj = useMemo(() => {
+    return phases.find((p: any) => String(p.id) === String(selectedPhaseId));
+  }, [phases, selectedPhaseId]);
+
   // Selected Activity/Task object from WBS
   const selectedTaskObj = useMemo(() => {
     return tasks.find((t: any) => String(t.id) === String(selectedTaskId));
@@ -311,15 +347,7 @@ export default function EditPurchaseRequestPage() {
   const availableBudget = useMemo(() => {
     // 1. If we have a selected task/activity from WBS/Project Costing, get its budget/amount
     if (selectedTaskObj) {
-      const budgetVal = Number(
-        selectedTaskObj.available_budget ??
-        selectedTaskObj.amount ??
-        selectedTaskObj.budget ??
-        selectedTaskObj.budgeted_amount ??
-        selectedTaskObj.total_amount ??
-        selectedTaskObj.cost ??
-        0
-      );
+      const budgetVal = Number(selectedTaskObj.amount ?? 0);
       if (!isNaN(budgetVal) && budgetVal !== 0) {
         return budgetVal;
       }
@@ -329,22 +357,15 @@ export default function EditPurchaseRequestPage() {
       return Number(budgetData.available_budget);
     }
     // 3. Or check the selected phase if task not picked yet
-    if (selectedPhaseId) {
-      const phaseObj = phases.find((p: any) => String(p.id) === String(selectedPhaseId));
-      if (phaseObj) {
-        const phaseBudget = Number(
-          (phaseObj as any).available_budget ??
-          (phaseObj as any).amount ??
-          (phaseObj as any).budget ??
-          (phaseObj as any).total_amount ??
-          0
-        );
-        if (!isNaN(phaseBudget) && phaseBudget > 0) return phaseBudget;
-      }
+    if (selectedPhaseObj) {
+      const phaseBudget = Number(selectedPhaseObj.amount ?? 0);
+      if (!isNaN(phaseBudget) && phaseBudget > 0) return phaseBudget;
     }
     // 4. Or check the project-level available budget
     if (currentProject) {
       const projBudget = Number(
+        (currentProject as any).financials?.remaining_budget ??
+        (currentProject as any).financials?.budget ??
         (currentProject as any).available_budget ??
         (currentProject as any).budget ??
         (currentProject as any).total_budget ??
@@ -355,7 +376,7 @@ export default function EditPurchaseRequestPage() {
       }
     }
     return 0;
-  }, [selectedTaskObj, budgetData, selectedPhaseId, phases, currentProject]);
+  }, [selectedTaskObj, budgetData, selectedPhaseObj, currentProject]);
 
   // Normalize inventory products
   const invProductsList = useMemo(() => {
@@ -903,15 +924,34 @@ export default function EditPurchaseRequestPage() {
                 }}
                 disabled={!selectedProjectId}
               >
-                <SelectTrigger className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white disabled:bg-gray-50 disabled:text-gray-400">
+                <SelectTrigger className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white disabled:bg-gray-50 disabled:text-gray-400 [&>span]:w-full">
                   <SelectValue placeholder="Select a phase" />
                 </SelectTrigger>
-                <SelectContent>
-                  {phases.map((ph: any) => (
-                    <SelectItem key={ph.id} value={String(ph.id)}>
-                      {ph.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-72">
+                  {phases.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-gray-500">
+                      No phases available
+                    </div>
+                  ) : (
+                    phases.map((ph: any) => (
+                      <SelectItem
+                        key={ph.id}
+                        value={String(ph.id)}
+                        className="py-2.5 cursor-pointer [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                      >
+                        <span className="flex items-center justify-between gap-3 w-full min-w-0">
+                          <span className="font-medium text-gray-800 truncate min-w-0">
+                            {ph.name}
+                          </span>
+                          <span className="font-semibold text-xs text-[#3B7CED] bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-auto">
+                            ₦{Number(ph.amount || 0).toLocaleString("en-NG", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -925,15 +965,34 @@ export default function EditPurchaseRequestPage() {
                 onValueChange={setSelectedTaskId}
                 disabled={!selectedPhaseId}
               >
-                <SelectTrigger className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white disabled:bg-gray-50 disabled:text-gray-400">
+                <SelectTrigger className="h-11 border-gray-200 focus:ring-[#3B7CED]/20 bg-white disabled:bg-gray-50 disabled:text-gray-400 [&>span]:w-full">
                   <SelectValue placeholder="Select an activity" />
                 </SelectTrigger>
-                <SelectContent>
-                  {tasks.map((t: any) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-72">
+                  {tasks.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-gray-500">
+                      No activities available
+                    </div>
+                  ) : (
+                    tasks.map((t: any) => (
+                      <SelectItem
+                        key={t.id}
+                        value={String(t.id)}
+                        className="py-2.5 cursor-pointer [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                      >
+                        <span className="flex items-center justify-between gap-3 w-full min-w-0">
+                          <span className="font-medium text-gray-800 truncate min-w-0">
+                            {t.name}
+                          </span>
+                          <span className="font-semibold text-xs text-[#3B7CED] bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-auto">
+                            ₦{Number(t.amount || 0).toLocaleString("en-NG", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

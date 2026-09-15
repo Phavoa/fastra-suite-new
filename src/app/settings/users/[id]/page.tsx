@@ -25,7 +25,19 @@ import StatusModal, { useStatusModal } from "@/components/shared/StatusModal";
 import {
   useGetUserByIdQuery,
   useUpdateUserByIdMutation,
+  useDeleteUserMutation,
 } from "@/api/settings/usersApi";
+import { Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { extractErrorMessage } from "@/lib/utils";
 
 import PermissionsGrid from "@/components/Settings/PermissionsGrid";
 import {
@@ -69,12 +81,14 @@ export default function UsersDetails() {
   );
   const [updateUser] = useUpdateUserByIdMutation();
   const [resetPassword] = useResetPasswordMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
 
   const { data: permissionTemplates = [], isLoading: templatesLoading } = useGetPermissionTemplatesQuery();
 
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"basic" | "access" | "permissions">("basic");
   const [resetLoading, setResetLoading] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const statusModal = useStatusModal();
   const [directPermissions, setDirectPermissions] = useState<UserPermissions>(createEmptyPermissions());
 
@@ -235,6 +249,29 @@ export default function UsersDetails() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    try {
+      await deleteUser(userId).unwrap();
+      setIsConfirmingDelete(false);
+      statusModal.showSuccess("User Deleted", "The user has been successfully deleted.");
+      setTimeout(() => {
+        router.push("/settings/users");
+      }, 1500);
+    } catch (err: any) {
+      console.error("Delete user error:", err);
+      setIsConfirmingDelete(false);
+      const errMsg = extractErrorMessage(err, "Failed to delete user. Please try again.");
+      if (typeof errMsg === "string" && errMsg.toLowerCase().includes("already hidden")) {
+        statusModal.showSuccess("User Already Deleted", "This user has already been removed from the active list.");
+        setTimeout(() => {
+          router.push("/settings/users");
+        }, 1500);
+        return;
+      }
+      statusModal.showError("Failed to Delete User", errMsg);
+    }
+  };
+
   // ----------------- Options -----------------
   const languageOptions = ISO6391.getAllCodes().map((code) => ({
     label: ISO6391.getName(code),
@@ -294,15 +331,29 @@ export default function UsersDetails() {
         >
           Module Permissions
         </button>
-        <PermissionGuard module="settings" entitlement="change_tenantuser">
-          <button
-            onClick={handleResetPassword}
-            disabled={resetLoading}
-            className="ml-auto px-4 py-2 bg-[#3B7CED] text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {resetLoading ? "Resetting..." : "Reset Password"}
-          </button>
-        </PermissionGuard>
+        <div className="ml-auto flex items-center gap-2.5">
+          <PermissionGuard module="settings" entitlement="change_tenantuser">
+            <button
+              onClick={handleResetPassword}
+              disabled={resetLoading}
+              className="px-4 py-2 bg-[#3B7CED] text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm font-medium transition-colors"
+            >
+              {resetLoading ? "Resetting..." : "Reset Password"}
+            </button>
+          </PermissionGuard>
+
+          <PermissionGuard module="settings" entitlement="change_tenantuser">
+            <button
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)}
+              disabled={isDeleting}
+              className="px-3.5 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
+            >
+              <Trash2 size={15} />
+              <span>Delete User</span>
+            </button>
+          </PermissionGuard>
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -610,6 +661,57 @@ export default function UsersDetails() {
         title={statusModal.title}
         message={statusModal.message}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
+        <DialogContent className="max-w-md p-6 bg-white rounded-xl shadow-xl">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-gray-900">
+              Delete User
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-2">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-gray-800">
+                {form.first_name} {form.last_name}
+              </span>{" "}
+              ({form.email})? This user will be removed from your organization and lose all access.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-6 flex items-center justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConfirmingDelete(false)}
+              disabled={isDeleting}
+              className="px-4 py-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg text-sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteUser}
+              disabled={isDeleting}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={15} />
+                  <span>Yes, Delete</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -64,6 +64,7 @@ export function CreateLocationModal({
   const [storeKeeper, setStoreKeeper] = useState<string>("");
   const [contactInformation, setContactInformation] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isMaxLocationsError, setIsMaxLocationsError] = useState(false);
   const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export function CreateLocationModal({
       setStoreKeeper("");
       setContactInformation("");
       setErrorMessage("");
+      setIsMaxLocationsError(false);
     }
   }, [isOpen, refetchUsers]);
 
@@ -157,9 +159,23 @@ export function CreateLocationModal({
       onSuccess(res.id);
       onClose();
     } catch (err: any) {
-      setErrorMessage(
-        extractErrorMessage(err, "Failed to create location. Please check your inputs.")
-      );
+      const msg = extractErrorMessage(err, "Failed to create location. Please check your inputs.");
+      const isMaxLocations =
+        typeof msg === "string" &&
+        (msg.toLowerCase().includes("max number of locations reached") ||
+          msg.toLowerCase().includes("max number") ||
+          msg.toLowerCase().includes("multi-location") ||
+          msg.toLowerCase().includes("multilocation"));
+
+      if (isMaxLocations) {
+        setIsMaxLocationsError(true);
+        setErrorMessage(
+          "Maximum number of locations reached on single-location mode. To create additional warehouse or site locations, please activate the Multi-Location feature in Settings."
+        );
+      } else {
+        setIsMaxLocationsError(false);
+        setErrorMessage(msg);
+      }
     }
   };
 
@@ -174,8 +190,18 @@ export function CreateLocationModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 pt-2">
           {errorMessage && (
-            <div className="p-3 text-sm bg-red-50 border border-red-200 text-red-600 rounded">
-              {errorMessage}
+            <div className="p-3 text-sm bg-red-50 border border-red-200 text-red-600 rounded flex flex-col gap-1.5">
+              <div>{errorMessage}</div>
+              {isMaxLocationsError && (
+                <Link
+                  href="/settings/multi-location"
+                  onClick={onClose}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#3B7CED] hover:underline mt-1"
+                >
+                  <span>Go to Multi-Location Settings</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              )}
             </div>
           )}
 

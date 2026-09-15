@@ -17,6 +17,7 @@ import { useSelector, useDispatch } from "react-redux";
 import type { RootState } from "@/lib/store/store";
 import { usePermissionContext } from "@/contexts/PermissionContext";
 import { clearAuthData } from "@/lib/store/authSlice";
+import { useGetUserByIdQuery } from "@/api/settings/usersApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +61,61 @@ export function NavBar({
   const router = useRouter();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const tenant_user_id = useSelector((state: RootState) => state.auth.tenant_user_id);
+  const { data: tenantUserData } = useGetUserByIdQuery(
+    tenant_user_id ? Number(tenant_user_id) : 0,
+    { skip: !tenant_user_id || Number(tenant_user_id) <= 0 }
+  );
+
+  // Derive full name preferring live tenant user query, then Redux auth user
+  const firstName =
+    tenantUserData?.first_name ||
+    user?.first_name ||
+    (user as any)?.user?.first_name ||
+    "";
+  const lastName =
+    tenantUserData?.last_name ||
+    user?.last_name ||
+    (user as any)?.user?.last_name ||
+    "";
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  // Primary display name: Full name (if present), else username, else email, else "User"
+  const displayName =
+    fullName ||
+    user?.name ||
+    tenantUserData?.user?.username ||
+    user?.username ||
+    user?.email ||
+    "User";
+
+  const displayEmail =
+    tenantUserData?.email ||
+    user?.email ||
+    "";
+
+  const avatarImage =
+    tenantUserData?.user_image ||
+    user?.user_image ||
+    null;
+
+  const roleName = tenantUserData?.company_role_details?.name;
+
+  const getInitials = () => {
+    if (firstName && lastName) {
+      return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    }
+    if (displayName && displayName !== "User") {
+      const parts = displayName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return displayName.slice(0, 2).toUpperCase();
+    }
+    return null;
+  };
+  const initials = getInitials();
+
   const permissions = usePermissionContext();
   const { toggleSidebar } = useSidebarContext();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -367,13 +423,27 @@ export function NavBar({
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-2 p-1.5 md:p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="User menu"
+              aria-expanded={dropdownOpen}
             >
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <User size={18} className="text-blue-600" />
-              </div>
-              <span className="hidden md:block text-sm font-medium text-gray-700">
-                {user?.username || "User"}
+              {avatarImage ? (
+                <img
+                  src={avatarImage}
+                  alt={displayName}
+                  className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                />
+              ) : initials ? (
+                <div className="w-8 h-8 bg-blue-100 text-blue-700 font-semibold text-xs rounded-full flex items-center justify-center border border-blue-200 shrink-0">
+                  {initials}
+                </div>
+              ) : (
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                  <User size={18} className="text-blue-600" />
+                </div>
+              )}
+              <span className="hidden md:block text-sm font-medium text-gray-700 max-w-[140px] truncate text-left">
+                {displayName}
               </span>
               <ChevronDown
                 size={16}
@@ -382,14 +452,26 @@ export function NavBar({
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-50">
-                <div className="px-4 py-2 border-b border-gray-100 mb-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user?.username}
+              <div className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-50">
+                <div className="px-4 py-2.5 border-b border-gray-100 mb-1">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {displayName}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user?.email}
-                  </p>
+                  {displayEmail && (
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {displayEmail}
+                    </p>
+                  )}
+                  {fullName && user?.username && user.username !== fullName && (
+                    <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                      @{user.username}
+                    </p>
+                  )}
+                  {roleName && (
+                    <span className="inline-block mt-1.5 px-2 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-700 rounded-md">
+                      {roleName}
+                    </span>
+                  )}
                 </div>
 
                 {permissions.isAdmin && (
@@ -404,7 +486,7 @@ export function NavBar({
                 )}
 
                 <Link
-                  href={`/settings/users/${user?.id}`}
+                  href={`/settings/users/${tenant_user_id || user?.id}`}
                   onClick={() => setDropdownOpen(false)}
                   className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >

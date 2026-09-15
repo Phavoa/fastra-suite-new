@@ -48,14 +48,24 @@ export default function RootLayout({
           {`
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').then(
-                  function(registration) {
-                    console.log('Service Worker registration successful with scope: ', registration.scope);
-                  },
-                  function(err) {
-                    console.log('Service Worker registration failed: ', err);
-                  }
+                var isLocalhost = Boolean(
+                  window.location.hostname === 'localhost' ||
+                  window.location.hostname === '[::1]' ||
+                  window.location.hostname.match(/^127(?:\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
                 );
+
+                if (isLocalhost) {
+                  // In local development, unregister any active service worker to avoid ChunkLoadError and caching issues
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (var r of registrations) {
+                      r.unregister();
+                    }
+                  });
+                } else {
+                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.log('Service Worker registration failed: ', err);
+                  });
+                }
               });
             }
           `}

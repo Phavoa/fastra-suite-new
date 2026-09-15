@@ -142,62 +142,194 @@ export function formatTimeAgo(dateString: string): string {
   }
 }
 
-export function resolveNotificationUrl(notification: { action_url?: string; module?: string; object_id?: string; title?: string; message?: string }): string {
+export function resolveNotificationUrl(notification: {
+  action_url?: string;
+  module?: string;
+  module_display?: string;
+  object_id?: string;
+  title?: string;
+  message?: string;
+  event?: string;
+}): string {
   let url = notification.action_url || "";
-  
+
   if (!url) {
     return "#";
   }
 
-  // 1. Project Costing Fix
-  // Backend gives: /project-costing/projects/13
-  // Frontend route: /project-costing/13
-  if (url.startsWith("/project-costing/projects/")) {
-    return url.replace("/project-costing/projects/", "/project-costing/");
-  }
+  const title = (notification.title || "").toLowerCase();
+  const message = (notification.message || "").toLowerCase();
+  const event = (notification.event || "").toLowerCase();
+  const mod = (notification.module || "").toLowerCase();
+  const objectId = notification.object_id ? String(notification.object_id).trim() : "";
 
-  // 2. Project Request Fix
-  // Backend gives: /project-requests/25 or /project_request/25
-  // Frontend route requires the specific sub-module: /project-request/purchase-request/25
-  if (url.startsWith("/project_request/") || url.startsWith("/project-requests/")) {
-    const idMatch = url.match(/\/(?:project_request|project-requests)\/(\d+)/);
-    const id = idMatch ? idMatch[1] : notification.object_id;
-
-    if (id) {
-      const title = (notification.title || "").toLowerCase();
-      const message = (notification.message || "").toLowerCase();
-      
-      let subModule = "";
-      if (title.includes("purchase") || message.includes("purchase")) subModule = "purchase-request";
-      else if (title.includes("labour") || message.includes("labour")) subModule = "labour-request";
-      else if (title.includes("material") || message.includes("material")) subModule = "material-consumption-request";
-      else if (title.includes("petty") || message.includes("petty")) subModule = "petty-cash-request";
-      else if (title.includes("plant") || title.includes("equipment") || message.includes("equipment")) subModule = "plant-equipment-request";
-      else if (title.includes("subcontractor") || message.includes("subcontractor")) subModule = "subcontractor-request";
-
-      if (subModule) {
-        return `/project-request/${subModule}/${id}`;
-      }
+  // 1. Project Costing Routes
+  // Backend gives: /project-costing/projects/1/budget-adjustments/... or /project-costing/projects/1
+  // Frontend route: /project-costing/1
+  if (
+    url.startsWith("/project-costing/projects/") ||
+    url.startsWith("/project-costing/project/") ||
+    mod === "project_costing"
+  ) {
+    const projectMatch = url.match(/\/project-costing\/projects?\/(\d+)/);
+    const projId = projectMatch ? projectMatch[1] : objectId;
+    if (projId && !isNaN(Number(projId))) {
+      return `/project-costing/${projId}`;
     }
-    
-    return url.replace("/project-requests/", "/project-request/").replace("/project_request/", "/project-request/");
   }
 
-  // 3. Purchase Request Fix
+  // 2. Project Request Routes
+  // Backend gives: /project-requests/9, /project_request/9, /project-request/9
+  if (
+    url.startsWith("/project_request/") ||
+    url.startsWith("/project-requests/") ||
+    url.startsWith("/project-request/") ||
+    mod === "project_requests" ||
+    mod === "project_request"
+  ) {
+    const idMatch = url.match(/\/(?:project_request|project-requests|project-request)\/(\d+)/);
+    const masterId = idMatch ? idMatch[1] : objectId;
+
+    // Check if it is an approval or submission event
+    const isApprovalOrSubmission =
+      event.includes("approved") ||
+      event.includes("submitted") ||
+      title.includes("approved") ||
+      title.includes("submitted");
+
+    if (isApprovalOrSubmission && masterId) {
+      return `/project-request/approve/${masterId}`;
+    }
+
+    // Check for specific sub-module creation or status updates
+    const isPurchase =
+      title.includes("purchase") ||
+      message.includes("purchase") ||
+      event.includes("purchase");
+
+    const isSubcontractor =
+      title.includes("subcontractor") ||
+      message.includes("subcontractor") ||
+      event.includes("subcontractor");
+
+    const isMaterial =
+      title.includes("material") ||
+      message.includes("material") ||
+      event.includes("material");
+
+    const isLabour =
+      title.includes("labour") ||
+      message.includes("labour") ||
+      event.includes("labour");
+
+    const isPettyCash =
+      title.includes("petty") ||
+      message.includes("petty") ||
+      event.includes("petty");
+
+    const isPlant =
+      title.includes("plant") ||
+      title.includes("equipment") ||
+      message.includes("equipment") ||
+      event.includes("equipment") ||
+      event.includes("plant");
+
+    if (isPurchase) {
+      const targetId = objectId || masterId;
+      return `/project-request/purchase-request/${targetId}`;
+    }
+
+    if (isSubcontractor) {
+      const targetId = objectId || masterId;
+      return `/project-request/subcontractor-request/${targetId}`;
+    }
+
+    if (isMaterial) {
+      const targetId = objectId || masterId;
+      return `/project-request/material-consumption-request/${targetId}`;
+    }
+
+    if (isLabour) {
+      const targetId = masterId || objectId;
+      return `/project-request/labour-request/${targetId}`;
+    }
+
+    if (isPettyCash) {
+      const targetId = masterId || objectId;
+      return `/project-request/petty-cash-request/${targetId}`;
+    }
+
+    if (isPlant) {
+      const targetId = objectId || masterId;
+      return `/project-request/plant-equipment-request/${targetId}`;
+    }
+
+    // Default fallback for project request
+    if (masterId) {
+      return `/project-request/approve/${masterId}`;
+    }
+  }
+
+  // 3. Invoicing / Invoice Routes
+  // Backend gives: /invoicing/purchase-orders/1
+  // Frontend route: /invoice/purchase-order/1
+  if (
+    url.startsWith("/invoicing/purchase-orders/") ||
+    url.startsWith("/invoice/purchase-orders/") ||
+    (mod === "invoice" && (event.includes("purchase_order") || title.includes("purchase order")))
+  ) {
+    const poMatch = url.match(/\/(?:invoicing|invoice)\/purchase-orders?\/([^\/\s]+)/);
+    const poId = poMatch ? poMatch[1] : objectId;
+    if (poId) {
+      return `/invoice/purchase-order/${poId}`;
+    }
+    return "/invoice/purchase-order";
+  }
+
+  // 4. Inventory Routes
+  // 4a. Scraps: Backend gives: /inventory/scraps/SCP0001/
+  // Frontend route: /inventory/operation/scrap/SCP0001
+  if (
+    url.includes("/inventory/scraps/") ||
+    url.includes("/inventory/scrap/") ||
+    (mod === "inventory" && (event.includes("scrap") || title.includes("scrap")))
+  ) {
+    const scrapMatch = url.match(/\/inventory\/(?:scraps|scrap)\/([^\/\s]+)/);
+    const scrapId = scrapMatch ? scrapMatch[1] : objectId;
+    if (scrapId) {
+      return `/inventory/operation/scrap/${scrapId}`;
+    }
+    return "/inventory/operation/scrap";
+  }
+
+  // 4b. Incoming Products: Backend gives: /inventory/incoming-products/WH/IN/0001/
+  // Frontend route: /inventory/operation/incoming_product/${encodeURIComponent(code)}
+  if (
+    url.includes("/inventory/incoming-products/") ||
+    url.includes("/inventory/incoming_product/") ||
+    (mod === "inventory" && (event.includes("incoming_product") || title.includes("incoming product")))
+  ) {
+    const incomingMatch = url.match(/\/inventory\/(?:incoming-products|incoming_product)\/(.+?)(?:\/)?$/);
+    const rawCode = incomingMatch ? incomingMatch[1] : objectId;
+    if (rawCode) {
+      const cleanCode = decodeURIComponent(rawCode).replace(/\/$/, "");
+      return `/inventory/operation/incoming_product/${encodeURIComponent(cleanCode)}`;
+    }
+    return "/inventory/operation";
+  }
+
+  // 5. Direct purchase routes
   if (url.startsWith("/purchase_request/")) {
     return url.replace("/purchase_request/", "/purchase/");
   }
 
-  // 4. Fallback for completely invalid API routes
+  // 6. Fallback for raw API URLs
   if (url.includes("/api/") || url.includes("fastrasuiteapi")) {
-    const mod = (notification.module || "").toLowerCase();
-    const id = notification.object_id;
-    if (id) {
-      if (mod.includes("project_costing")) return `/project-costing/${id}`;
-      if (mod.includes("project_request")) return `/project-request/${id}`;
-      if (mod.includes("inventory")) return `/inventory/operation/${id}`;
-      if (mod.includes("purchase")) return `/purchase/${id}`;
-    }
+    if (mod.includes("project_costing") && objectId) return `/project-costing/${objectId}`;
+    if (mod.includes("project_request") && objectId) return `/project-request/approve/${objectId}`;
+    if (mod.includes("inventory") && objectId) return `/inventory/operation/${objectId}`;
+    if (mod.includes("purchase") && objectId) return `/purchase/${objectId}`;
+    if (mod.includes("invoice") && objectId) return `/invoice/purchase-order/${objectId}`;
   }
 
   return url;

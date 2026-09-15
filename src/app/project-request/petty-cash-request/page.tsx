@@ -5,7 +5,7 @@ import { FileText, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RequestDashboard } from "@/components/requests/RequestDashboard";
 import { RequestDashboardConfig, RequestStatus } from "@/components/requests/types";
-import { useGetProjectRequestsQuery } from "@/api/requests/projectRequestApi";
+import { useGetPettyCashRequestsQuery } from "@/api/requests/pettyCashRequestApi";
 import { useRouter } from "next/navigation";
 
 interface PettyCashRequestItem {
@@ -14,14 +14,28 @@ interface PettyCashRequestItem {
   amountRequested: number;
   requester: string;
   status: RequestStatus;
-  realId: number;
+  realId: number | string;
 }
 
 export default function PettyCashRequestPage() {
   const router = useRouter();
-  const { data: apiRequests = [], isLoading } = useGetProjectRequestsQuery({
-    request_type: "petty_cash",
+  const { data: rawApiRequests = [], isLoading, refetch } = useGetPettyCashRequestsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
   });
+
+  const apiRequests = React.useMemo(() => {
+    if (Array.isArray(rawApiRequests)) return rawApiRequests;
+    if (rawApiRequests && Array.isArray((rawApiRequests as any).results)) {
+      return (rawApiRequests as any).results;
+    }
+    return [];
+  }, [rawApiRequests]);
+
+  React.useEffect(() => {
+    if (typeof refetch === "function") {
+      refetch();
+    }
+  }, [refetch]);
 
   const getStatusBadgeVariant = (status: RequestStatus) => {
     switch (status) {
@@ -43,7 +57,7 @@ export default function PettyCashRequestPage() {
       if (dateB !== dateA) return dateB - dateA;
       return Number(b.id || 0) - Number(a.id || 0);
     });
-    return sorted.map((req) => {
+    return sorted.map((req: any) => {
       let detail: any = {};
       if (req.detail) {
         if (typeof req.detail === "string") {
@@ -56,15 +70,67 @@ export default function PettyCashRequestPage() {
           detail = req.detail;
         }
       }
+
+      let requesterName = "Requester";
+      if (req.created_by_details && typeof req.created_by_details === "object") {
+        const fullName = `${req.created_by_details.first_name || ""} ${req.created_by_details.last_name || ""}`.trim();
+        requesterName = fullName || req.created_by_details.username || req.created_by_details.email || "Requester";
+      } else if (
+        typeof req.project_request === "object" &&
+        req.project_request?.created_by_details
+      ) {
+        const prCreatedBy = req.project_request.created_by_details;
+        const fullName = `${prCreatedBy.first_name || ""} ${prCreatedBy.last_name || ""}`.trim();
+        requesterName = fullName || prCreatedBy.username || prCreatedBy.email || "Requester";
+      } else if (req.created_by_name && typeof req.created_by_name === "string") {
+        requesterName = req.created_by_name;
+      } else if (req.requester && typeof req.requester === "string" && isNaN(Number(req.requester))) {
+        requesterName = req.requester;
+      } else if (req.created_by) {
+        requesterName = `User #${req.created_by}`;
+      }
+
+      const rawStatus = (
+        (typeof req.project_request === "object" && req.project_request?.status) ||
+        req.status ||
+        "pending"
+      ).toLowerCase();
+      const status: RequestStatus =
+        rawStatus === "cancelled" ? "rejected" : (rawStatus as RequestStatus);
+
+      const itemRefId =
+        (req.reference_id && String(req.reference_id).trim()) ||
+        (detail?.reference_id && String(detail.reference_id).trim()) ||
+        (typeof req.project_request === "object" && req.project_request?.reference_id && String(req.project_request.reference_id).trim()) ||
+        `PC${String(req.id).padStart(4, "0")}`;
+
+      const projectName =
+        req.project_details?.name ||
+        req.project_name ||
+        (typeof req.project_request === "object" && req.project_request?.project_details?.name) ||
+        "General Project";
+
+      const amount =
+        parseFloat(String(req.amount_requested ?? "")) ||
+        parseFloat(String(req.amount ?? "")) ||
+        parseFloat(String(detail.amount_requested ?? "")) ||
+        parseFloat(String(detail.amountRequested ?? "")) ||
+        parseFloat(String(detail.amount ?? "")) ||
+        parseFloat(String(typeof req.project_request === "object" ? req.project_request?.request_amount ?? "" : "")) ||
+        0;
+
+      const realId =
+        (typeof req.project_request === "object" ? req.project_request?.id : req.project_request) ||
+        req.project_request_id ||
+        req.id;
+
       return {
-        id: req.reference_id || `PC-${req.id}`,
-        project: req.project_details?.name || "General Project",
-        amountRequested: parseFloat(detail.amount_requested) || detail.amountRequested || detail.amount || 0,
-        requester: req.created_by_details 
-          ? `${req.created_by_details.first_name} ${req.created_by_details.last_name}` 
-          : `User #${req.created_by}`,
-        status: (req.status === "cancelled" ? "rejected" : req.status) as RequestStatus,
-        realId: req.id,
+        id: itemRefId,
+        project: projectName,
+        amountRequested: amount,
+        requester: requesterName,
+        status,
+        realId,
       };
     });
   }, [apiRequests]);

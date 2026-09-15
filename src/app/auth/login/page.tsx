@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import type { NextPage } from "next";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,10 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+function getUnlockTime(): number {
+  return Date.now() + 30 * 60 * 1000;
+}
 
 const LoginPage: NextPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -44,44 +48,53 @@ const LoginPage: NextPage = () => {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isValid },
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
   });
 
-  const watchEmail = watch("email");
+  const watchEmail = useWatch({ control, name: "email" });
 
   // Check lockout status whenever email changes or component mounts
   useEffect(() => {
     if (!watchEmail) {
-      setIsLocked(false);
-      return;
+      const timer = setTimeout(() => {
+        setIsLocked(false);
+        setLockRemaining(null);
+      }, 0);
+      return () => clearTimeout(timer);
     }
     
-    // We check if this email is locked
-    const lockoutKey = `auth_lockout_${watchEmail}`;
-    const lockoutUntilStr = localStorage.getItem(lockoutKey);
-    
-    if (lockoutUntilStr) {
-      const lockoutUntil = parseInt(lockoutUntilStr, 10);
-      const now = Date.now();
+    const timer = setTimeout(() => {
+      // We check if this email is locked
+      const lockoutKey = `auth_lockout_${watchEmail}`;
+      const lockoutUntilStr = localStorage.getItem(lockoutKey);
       
-      if (now < lockoutUntil) {
-        setIsLocked(true);
-        const mins = Math.ceil((lockoutUntil - now) / 60000);
-        setLockRemaining(mins);
+      if (lockoutUntilStr) {
+        const lockoutUntil = parseInt(lockoutUntilStr, 10);
+        const now = Date.now();
+        
+        if (now < lockoutUntil) {
+          setIsLocked(true);
+          const mins = Math.ceil((lockoutUntil - now) / 60000);
+          setLockRemaining(mins);
+          return;
+        } else {
+          // Lock expired
+          localStorage.removeItem(lockoutKey);
+          localStorage.removeItem(`auth_failures_${watchEmail}`);
+          setIsLocked(false);
+          setLockRemaining(null);
+        }
       } else {
-        // Lock expired
-        localStorage.removeItem(lockoutKey);
-        localStorage.removeItem(`auth_failures_${watchEmail}`);
         setIsLocked(false);
         setLockRemaining(null);
       }
-    } else {
-      setIsLocked(false);
-    }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [watchEmail]);
 
   // Log handler
@@ -167,7 +180,7 @@ const LoginPage: NextPage = () => {
       
       if (failures >= 5) {
         // Lock for 30 minutes
-        const unlockTime = Date.now() + 30 * 60 * 1000;
+        const unlockTime = getUnlockTime();
         localStorage.setItem(lockoutKey, unlockTime.toString());
         setIsLocked(true);
         setLockRemaining(30);

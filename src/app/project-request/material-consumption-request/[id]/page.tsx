@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 import {
   useGetMaterialConsumptionQuery,
   useDeleteMaterialConsumptionMutation,
+  useSubmitMaterialConsumptionRequestMutation,
 } from "@/api/requests/materialConsumptionRequestApi";
-import { useSubmitProjectRequestMutation } from "@/api/requests/projectRequestApi";
 import { StatusModal, useStatusModal } from "@/components/shared/StatusModal";
 import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { PageGuard } from "@/components/auth/PageGuard";
@@ -45,7 +45,7 @@ export default function MaterialConsumptionRequestDetailPage() {
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [deleteRequest, { isLoading: isDeleting }] = useDeleteMaterialConsumptionMutation();
-  const [submitProjectRequest, { isLoading: isSubmitting }] = useSubmitProjectRequestMutation();
+  const [submitProjectRequest, { isLoading: isSubmitting }] = useSubmitMaterialConsumptionRequestMutation();
 
   const handleDelete = async () => {
     try {

@@ -29,10 +29,10 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
   return (
     <TableRow
       onClick={handleRowClick}
-      className="hover:bg-gray-50/80 border-b border-gray-100 transition-colors cursor-pointer"
+      className="hover:bg-blue-50/40 border-b border-gray-100 transition-colors cursor-pointer font-open-sans"
     >
       {/* 1. Date */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
         {move.date_moved ? (() => {
           try {
             const date = new Date(move.date_moved);
@@ -53,7 +53,7 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
       </TableCell>
 
       {/* 2. Reference */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap font-mono text-sm font-semibold">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm font-medium">
         <Link
           href={`/inventory/stocks/stock-moves/${move.id}`}
           className="text-[#3B7CED] hover:underline"
@@ -64,16 +64,16 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
       </TableCell>
 
       {/* 3. Type */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap text-center">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-center">
         <span
-          className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize ${
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
             move.move_type === "INCOMING" || move.move_type === "Receipt"
-              ? "bg-[#E2F2E9] text-[#2BA24D]"
+              ? "bg-[#E8F8EE] text-[#1E8E3E]"
               : move.move_type === "CONSUMPTION" || move.move_type === "Consumption"
               ? "bg-[#E8F0FE] text-[#1A73E8]"
               : move.move_type === "SCRAP" || move.move_type === "Scrap"
-              ? "bg-[#FCE8E6] text-[#E43D2B]"
-              : "bg-[#F4F5F7] text-[#525F7F]"
+              ? "bg-[#FCE8E6] text-[#D93025]"
+              : "bg-[#FEF7E6] text-[#B06000]"
           }`}
         >
           {move.move_type || "Move"}
@@ -81,37 +81,37 @@ export function StockMoveRow({ move }: StockMoveRowProps) {
       </TableCell>
 
       {/* 4. Product */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm font-medium text-[#32325D]">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">
         {move.product_details?.product_name || "Unknown Product"}
       </TableCell>
 
       {/* 5. Qty In */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap font-mono text-sm text-right text-[#2BA24D] font-medium bg-[#FAFAFA]/50 border-l border-gray-100">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-right font-medium text-[#1E8E3E]">
         {!isOutgoing ? Math.abs(qty) : "—"}
       </TableCell>
 
       {/* 6. Qty Out */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap font-mono text-sm text-right text-[#E43D2B] font-medium bg-[#FAFAFA]/50 border-x border-gray-100">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-right font-medium text-[#D93025]">
         {isOutgoing ? Math.abs(qty) : "—"}
       </TableCell>
 
       {/* 7. Balance */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap font-mono text-sm text-right text-[#32325D] font-bold bg-[#F4F5F7]/30">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-right font-medium text-gray-900">
         {move.running_balance !== undefined && move.running_balance !== null ? move.running_balance : "—"}
       </TableCell>
 
       {/* 8. WBS Phase */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
         {typeof move.wbs_phase === "object" ? (move.wbs_phase as any)?.name || (move.wbs_phase as any)?.id || "—" : move.wbs_phase || "—"}
       </TableCell>
 
       {/* 9. WBS Activity */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
         {typeof move.wbs_activity === "object" ? (move.wbs_activity as any)?.name || (move.wbs_activity as any)?.id || "—" : move.wbs_activity || "—"}
       </TableCell>
 
       {/* 10. User */}
-      <TableCell className="px-4 py-3.5 whitespace-nowrap text-sm text-[#525F7F]">
+      <TableCell className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
         {move.moved_by_details?.first_name 
           ? `${move.moved_by_details.first_name} ${move.moved_by_details.last_name || ""}`.trim() 
           : "System Admin"}

@@ -33,6 +33,7 @@ export type FormFieldType =
 export interface FormFieldOption {
   label: string;
   value: string;
+  amount?: number;
 }
 
 export interface RequestFormField {

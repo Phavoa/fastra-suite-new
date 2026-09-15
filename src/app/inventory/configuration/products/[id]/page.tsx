@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   History,
@@ -42,60 +42,8 @@ import {
 } from "@/api/inventory/productsApi";
 import { useGetInventoryUnitOfMeasuresQuery } from "@/api/inventory/unitOfMeasureApi";
 import { useGetProductCategoriesQuery } from "@/api/inventory/productCategoryApi";
+import { useGetStockMovesQuery } from "@/api/inventory/stockMoveApi";
 import { StatusModal, useStatusModal, extractErrorMessage } from "@/components/shared/StatusModal";
-
-const dummyStockMoves = [
-  {
-    id: "MV-1001",
-    date: "2026-06-25 08:30",
-    type: "Incoming Receipt",
-    reference: "WH-IN-0042 (Dangote Cement)",
-    qty: "+500",
-    balance: "1,200 Bags",
-    status: "VALIDATED",
-    isPositive: true,
-  },
-  {
-    id: "MV-1002",
-    date: "2026-06-24 14:15",
-    type: "Project Consumption",
-    reference: "MC-0089 (Lekki Tower WBS 1.2)",
-    qty: "-150",
-    balance: "700 Bags",
-    status: "VALIDATED",
-    isPositive: false,
-  },
-  {
-    id: "MV-1003",
-    date: "2026-06-23 11:00",
-    type: "Project Consumption",
-    reference: "MC-0081 (Victoria Island Mall)",
-    qty: "-50",
-    balance: "850 Bags",
-    status: "VALIDATED",
-    isPositive: false,
-  },
-  {
-    id: "MV-1004",
-    date: "2026-06-20 09:45",
-    type: "Scrap Recording",
-    reference: "SCR-0012 (Water Damage in Yard)",
-    qty: "-10",
-    balance: "900 Bags",
-    status: "VALIDATED",
-    isPositive: false,
-  },
-  {
-    id: "MV-1005",
-    date: "2026-06-18 16:20",
-    type: "Initial Balance",
-    reference: "INV-SETUP-001",
-    qty: "+910",
-    balance: "910 Bags",
-    status: "VALIDATED",
-    isPositive: true,
-  },
-];
 
 export default function ProductDetailsPage() {
   const params = useParams();
@@ -137,6 +85,20 @@ export default function ProductDetailsPage() {
     useGetProductCategoriesQuery();
 
   const categoriesList = (categoriesData as any)?.results || (Array.isArray(categoriesData) ? categoriesData : []);
+
+  // Stock movement history query for this product
+  const {
+    data: movesResponse,
+    isLoading: isLoadingMoves,
+    isError: isMovesError,
+  } = useGetStockMovesQuery(
+    { product: isNaN(Number(id)) ? (id as any) : Number(id) },
+    { skip: !id }
+  );
+
+  const movesList = useMemo(() => {
+    return (movesResponse as any)?.results || (Array.isArray(movesResponse) ? movesResponse : []);
+  }, [movesResponse]);
 
   // Helper to extract UOM ID
   const getUnitId = (uom: any, index: number): number => {
@@ -516,72 +478,158 @@ export default function ProductDetailsPage() {
 
           {/* Tab 2: Stock Movement History Card */}
           {activeTab === "history" && (
-            <div className="bg-white rounded-b-lg rounded-tr-lg shadow-2xs border border-gray-100 overflow-hidden animate-in fade-in-50 duration-150">
+            <div className="bg-white rounded-b-lg rounded-tr-lg shadow-2xs border border-gray-100 overflow-hidden animate-in fade-in-50 duration-150 font-['Open_Sans',sans-serif]">
               <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-[#32325D]">
-                  Transaction Audit Trail for {productData?.product_code || id}
-                </h2>
+                <div>
+                  <h2 className="text-base font-semibold text-[#32325D] font-['Open_Sans',sans-serif]">
+                    Transaction Audit Trail for {productData?.product_name || productData?.product_code || `Product #${id}`}
+                  </h2>
+                  <p className="text-xs text-[#8898AA] mt-0.5 font-['Open_Sans',sans-serif]">
+                    Chronological ledger of receipts, consumptions, scrap, and adjustments.
+                  </p>
+                </div>
+                {movesList.length > 0 && (
+                  <Link
+                    href={`/inventory/stocks/stock-moves?product=${encodeURIComponent(productData?.product_name || "")}`}
+                    className="text-xs font-semibold text-[#3B7CED] hover:underline font-['Open_Sans',sans-serif]"
+                  >
+                    View in Full Ledger &rarr;
+                  </Link>
+                )}
               </div>
               <div className="overflow-x-auto">
-                <Table className="min-w-[800px] w-full">
+                <Table className="min-w-[800px] w-full font-['Open_Sans',sans-serif]">
                   <TableHeader>
-                    <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100">
-                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                    <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-100 font-['Open_Sans',sans-serif]">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap font-['Open_Sans',sans-serif]">
                         Date & Time
                       </TableHead>
-                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap font-['Open_Sans',sans-serif]">
                         Movement Type
                       </TableHead>
-                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap font-['Open_Sans',sans-serif]">
                         Source / Reference
                       </TableHead>
-                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right font-['Open_Sans',sans-serif]">
                         Quantity Change
                       </TableHead>
-                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right">
+                      <TableHead className="py-3.5 px-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-right font-['Open_Sans',sans-serif]">
                         Running Balance
                       </TableHead>
-                      <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center">
+                      <TableHead className="py-3.5 pr-6 font-semibold text-[#8898AA] text-[11.5px] whitespace-nowrap text-center font-['Open_Sans',sans-serif]">
                         Status
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {dummyStockMoves.map((move) => (
-                      <TableRow key={move.id} className="hover:bg-gray-50 border-b border-gray-100 transition-colors">
-                        <TableCell className="px-6 py-3.5 font-mono text-sm font-semibold text-[#525F7F] whitespace-nowrap">
-                          {move.date}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 font-semibold text-sm text-[#32325D] whitespace-nowrap">
-                          {move.type}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 font-mono text-sm text-[#3B7CED] whitespace-nowrap">
-                          {move.reference}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 text-right font-mono font-bold text-sm whitespace-nowrap">
-                          <span
-                            className={
-                              move.isPositive
-                                ? "text-[#2BA24D]"
-                                : "text-[#E43D2B]"
-                            }
-                          >
-                            {move.qty}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 text-right font-mono text-sm font-semibold text-[#32325D] whitespace-nowrap">
-                          {move.balance}
-                        </TableCell>
-                        <TableCell className="pr-6 py-3.5 text-center whitespace-nowrap">
-                          <Badge
-                            variant="validated"
-                            className="px-2.5 py-0.5 font-semibold text-xs shadow-none"
-                          >
-                            {move.status}
-                          </Badge>
+                    {isLoadingMoves ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-12 text-center text-[#8898AA] text-sm font-['Open_Sans',sans-serif]">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-5 w-5 animate-spin text-[#3B7CED]" />
+                            <span>Loading stock movement history...</span>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : isMovesError ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-12 text-center text-red-500 text-sm font-['Open_Sans',sans-serif]">
+                          Failed to load stock movements. Please try refreshing.
+                        </TableCell>
+                      </TableRow>
+                    ) : movesList.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-12 text-center text-[#8898AA] text-sm font-['Open_Sans',sans-serif]">
+                          No stock movements recorded for this product yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      movesList.map((move: any) => {
+                        const qty = Number(move.quantity) || 0;
+                        const isOutgoing =
+                          move.move_type === "CONSUMPTION" ||
+                          move.move_type === "Consumption" ||
+                          move.move_type === "SCRAP" ||
+                          move.move_type === "Scrap" ||
+                          move.move_type === "OUTGOING" ||
+                          qty < 0;
+
+                        return (
+                          <TableRow key={move.id} className="hover:bg-gray-50 border-b border-gray-100 transition-colors font-['Open_Sans',sans-serif]">
+                            <TableCell className="px-6 py-3.5 text-sm font-semibold text-[#525F7F] whitespace-nowrap font-['Open_Sans',sans-serif]">
+                              {move.date_moved ? (() => {
+                                try {
+                                  const date = new Date(move.date_moved);
+                                  return isNaN(date.getTime())
+                                    ? move.date_moved
+                                    : date.toLocaleDateString("en-US", {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                      });
+                                } catch {
+                                  return move.date_moved;
+                                }
+                              })() : "—"}
+                            </TableCell>
+                            <TableCell className="px-6 py-3.5 font-semibold text-sm text-[#32325D] whitespace-nowrap font-['Open_Sans',sans-serif]">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize font-['Open_Sans',sans-serif] ${
+                                  move.move_type === "INCOMING" || move.move_type === "Receipt"
+                                    ? "bg-[#E2F2E9] text-[#2BA24D]"
+                                    : move.move_type === "CONSUMPTION" || move.move_type === "Consumption"
+                                    ? "bg-[#E8F0FE] text-[#1A73E8]"
+                                    : move.move_type === "SCRAP" || move.move_type === "Scrap"
+                                    ? "bg-[#FCE8E6] text-[#E43D2B]"
+                                    : "bg-[#F4F5F7] text-[#525F7F]"
+                                }`}
+                              >
+                                {move.move_type || "Move"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="px-6 py-3.5 text-sm whitespace-nowrap font-['Open_Sans',sans-serif]">
+                              <Link
+                                href={`/inventory/stocks/stock-moves/${move.id}`}
+                                className="text-[#3B7CED] hover:underline font-semibold"
+                              >
+                                {move.reference || `Move #${move.id}`}
+                              </Link>
+                            </TableCell>
+                            <TableCell className="px-6 py-3.5 text-right tabular-nums font-bold text-sm whitespace-nowrap font-['Open_Sans',sans-serif]">
+                              <span
+                                className={
+                                  !isOutgoing
+                                    ? "text-[#2BA24D]"
+                                    : "text-[#E43D2B]"
+                                }
+                              >
+                                {!isOutgoing ? `+${Math.abs(qty)}` : `-${Math.abs(qty)}`}
+                              </span>
+                            </TableCell>
+                            <TableCell className="px-6 py-3.5 text-right tabular-nums text-sm font-semibold text-[#32325D] whitespace-nowrap font-['Open_Sans',sans-serif]">
+                              {move.running_balance !== undefined && move.running_balance !== null
+                                ? `${Number(move.running_balance).toLocaleString()} ${
+                                    move.unit_of_measure_details?.unit_symbol ||
+                                    productData?.unit_of_measure_details?.unit_symbol ||
+                                    ""
+                                  }`.trim()
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="pr-6 py-3.5 text-center whitespace-nowrap">
+                              <Badge
+                                variant="validated"
+                                className="px-2.5 py-0.5 font-semibold text-xs shadow-none font-['Open_Sans',sans-serif]"
+                              >
+                                Validated
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>

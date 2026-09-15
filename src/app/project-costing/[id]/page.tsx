@@ -13,6 +13,8 @@ import { ProjectCostingExportTemplate } from "@/components/project-costing/expor
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { PageGuard } from "@/components/auth/PageGuard";
 import { ModuleWizard, WizardGuideButton } from "@/components/shared/wizard/ModuleWizard";
+import { TransactionDetailsModal } from "@/components/project-costing/modals/TransactionDetailsModal";
+import { extractAmount, formatCategory } from "@/components/project-costing/TransactionHistoryTable";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,6 +90,8 @@ export default function ProjectDashboardPage() {
   const [showActual, setShowActual] = useState(true);
   const [showPlanned, setShowPlanned] = useState(true);
   const [isBudgetAdjustmentModalOpen, setIsBudgetAdjustmentModalOpen] = useState(false);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("phases");
   const [isAdjExpanded, setIsAdjExpanded] = useState(true);
 
@@ -117,10 +121,18 @@ export default function ProjectDashboardPage() {
     { skip: !id }
   );
 
-  const { data: transactions, isLoading: isLoadingTransactions } = useGetProjectTransactionsQuery(
+  const { data: rawTransactions, isLoading: isLoadingTransactions } = useGetProjectTransactionsQuery(
     Number(id),
     { skip: !id }
   );
+
+  const transactions = Array.isArray(rawTransactions)
+    ? rawTransactions
+    : Array.isArray((rawTransactions as any)?.results)
+    ? (rawTransactions as any).results
+    : Array.isArray((rawTransactions as any)?.data)
+    ? (rawTransactions as any).data
+    : [];
 
   const { data: projectSettings, isLoading: isLoadingSettings, refetch: refetchSettings } = useGetProjectSettingsQuery(
     Number(id),
@@ -257,6 +269,11 @@ export default function ProjectDashboardPage() {
   const parsedBudgetAdjustments = (budgetAdjustments && ((budgetAdjustments as any).data || (budgetAdjustments as any).results)) || budgetAdjustments || [];
   const pendingAdjsList = Array.isArray(parsedBudgetAdjustments) ? parsedBudgetAdjustments.filter((a: any) => ["PENDING", "PENDING_APPROVAL", "DRAFT"].includes(a.status?.toUpperCase())) : [];
   let pendingAdjsTotal = pendingAdjsList.reduce((acc: number, a: any) => acc + Number(a.total_adjustment || a.amount || 0), 0);
+
+  const approvedAdjustments = Array.isArray(parsedBudgetAdjustments)
+    ? parsedBudgetAdjustments.filter((a: any) => ["APPROVED", "COMPLETED"].includes(a.status?.toUpperCase()))
+    : [];
+  const totalApprovedRevision = approvedAdjustments.reduce((acc: number, a: any) => acc + Number(a.total_adjustment || a.amount || 0), 0);
   
   if (isLoading) {
     return (
@@ -377,6 +394,7 @@ export default function ProjectDashboardPage() {
   let variance = "0%";
   let fin: any = null;
   let budgetNum = 0;
+  let originalBudgetNum = 0;
   let parsedPhases: any[] = [];
 
   if (project?.phases) {
@@ -398,6 +416,7 @@ export default function ProjectDashboardPage() {
       "rate",
       "amount",
       "budget",
+      "total_budget",
       "total_amount",
       "start_date",
       "end_date",
@@ -420,20 +439,58 @@ export default function ProjectDashboardPage() {
       "activity_name",
       "displayname",
       "custom_values",
+      "approved_revision",
+      "approve_revision",
+      "approved revision",
+      "approved_revisions",
+      "approved_adjustment",
+      "approved_adjustments",
+      "revision",
+      "revisions",
+      "revised_budget",
+      "revised budget",
+      "original_budget",
+      "original budget",
+      "current_budget",
+      "current budget",
+      "approved_budget",
+      "approved budget",
+      "wbs_code",
+      "wbs code",
+      "code",
+      "created_at",
+      "updated_at",
+      "project",
+      "project_id",
+      "uuid",
+      "pk",
+      "order",
+      "sequence",
+      "sort_order",
     ]);
     parsedPhases.forEach((phase: any) => {
       if (phase.activities && Array.isArray(phase.activities)) {
         phase.activities.forEach((act: any) => {
           Object.keys(act).forEach((key) => {
             const lower = key.toLowerCase().trim();
-            if (!standardKeys.has(lower)) {
+            if (
+              !standardKeys.has(lower) &&
+              !lower.includes("revision") &&
+              !lower.includes("budget") &&
+              !lower.includes("adjust")
+            ) {
               colSet.add(key);
             }
           });
           if (act.custom_values && typeof act.custom_values === "object") {
             Object.keys(act.custom_values).forEach((key) => {
               const lower = key.toLowerCase().trim();
-              if (!standardKeys.has(lower)) {
+              if (
+                !standardKeys.has(lower) &&
+                !lower.includes("revision") &&
+                !lower.includes("budget") &&
+                !lower.includes("adjust")
+              ) {
                 colSet.add(key);
               }
             });
@@ -476,13 +533,9 @@ export default function ProjectDashboardPage() {
          budgetNum = filteredBudget;
       } else {
         // All Categories
-        actualSpend = Number(fin.actual || fin.spent || fin.actual_spend || fin.total_actual_spend || fin.total_actual_cost || 0);
-        committed = Number(fin.committed || fin.committed_spend || fin.total_committed || fin.total_commitment || 0);
-        budgetNum = Number(fin.budget || fin.total_budget || fin.total_amount || 0);
-        
-        if (actualSpend === 0 && fin.category_breakdown && Array.isArray(fin.category_breakdown)) {
-           actualSpend = fin.category_breakdown.reduce((sum: number, cat: any) => sum + Number(cat.amount || 0), 0);
-        }
+        actualSpend = Number(fin.actual ?? fin.spent ?? fin.actual_spend ?? fin.total_actual_spend ?? fin.total_actual_cost ?? 0);
+        committed = Number(fin.committed ?? fin.committed_spend ?? fin.total_committed ?? fin.total_commitment ?? 0);
+        budgetNum = Number(fin.budget ?? fin.total_budget ?? fin.total_amount ?? 0);
       }
       
       // Fallback for pending adjustments if empty
@@ -502,12 +555,86 @@ export default function ProjectDashboardPage() {
 
   if (budgetNum === 0 && parsedPhases.length > 0) {
     budgetNum = parsedPhases.reduce((acc, phase) => {
-      return acc + (phase.activities || []).reduce((sum: number, act: any) => sum + Number(act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || act.budget || 0), 0);
+      return acc + (phase.activities || []).reduce((sum: number, act: any) => sum + Number(act.current_budget || act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || act.budget || 0), 0);
     }, 0);
   }
 
-  remaining = budgetNum - actualSpend - committed;
-  variance = budgetNum > 0 ? `${((actualSpend / budgetNum) * 100).toFixed(1)}%` : "0%";
+  if (costCategoryFilter === "all" && fin?.remaining_budget !== undefined && fin?.remaining_budget !== null) {
+    remaining = Number(fin.remaining_budget);
+  } else {
+    remaining = budgetNum - actualSpend - committed;
+  }
+
+  originalBudgetNum = Number(fin?.original_budget || budgetNum);
+  if (originalBudgetNum === 0) originalBudgetNum = budgetNum;
+
+  const isProjectApproved = ["ACTIVE", "APPROVED", "COMPLETED", "CLOSED"].includes(
+    (project?.status || "").toUpperCase()
+  );
+
+  const hasAdjustments =
+    isProjectApproved &&
+    (approvedAdjustments.length > 0 ||
+      (parsedPhases &&
+        Array.isArray(parsedPhases) &&
+        parsedPhases.some((p: any) =>
+          p.activities?.some((a: any) => Math.abs(Number(a.approved_revision || a.revision || 0)) > 0)
+        )));
+
+  const pendingBudgetsCount = pendingAdjsList.length > 0
+    ? pendingAdjsList.length
+    : Number(fin?.pending_requests_count || fin?.pending_count || fin?.pending_approval_count || 0);
+
+  const getActivityApprovedRevision = (act: any): number => {
+    if (act.approved_revision !== undefined && act.approved_revision !== null) {
+      return Number(act.approved_revision);
+    }
+    if (act.revision !== undefined && act.revision !== null) {
+      return Number(act.revision);
+    }
+    if (act.approved_adjustment !== undefined && act.approved_adjustment !== null) {
+      return Number(act.approved_adjustment);
+    }
+
+    if (approvedAdjustments.length > 0) {
+      let revSum = 0;
+      let matched = false;
+      approvedAdjustments.forEach((adj: any) => {
+        if (adj.lines && Array.isArray(adj.lines)) {
+          adj.lines.forEach((line: any) => {
+            const matches =
+              (line.activity && String(line.activity) === String(act.id)) ||
+              (line.activity_id && String(line.activity_id) === String(act.id)) ||
+              (line.activity_name && act.name && line.activity_name.trim().toLowerCase() === act.name.trim().toLowerCase());
+            if (matches) {
+              matched = true;
+              const isDecrease = line.direction?.toUpperCase() === "DECREASE" || Number(line.adjustment_amount || line.amount || 0) < 0;
+              const lineAmt = Math.abs(Number(
+                line.rate ? (Number(line.quantity || 1) * Number(line.rate)) :
+                (line.adjustment_amount !== undefined ? line.adjustment_amount : (line.amount || 0))
+              ));
+              revSum += isDecrease ? -lineAmt : lineAmt;
+            }
+          });
+        }
+      });
+      if (matched) return revSum;
+    }
+
+    if (act.current_budget !== undefined && act.current_budget !== null) {
+      const orig = Number(act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || 0);
+      const curr = Number(act.current_budget);
+      if (curr !== orig && orig > 0) {
+        return curr - orig;
+      }
+    }
+
+    return 0;
+  };
+
+  variance = fin?.consumed_percent !== undefined
+    ? `${Number(fin.consumed_percent).toFixed(1)}%`
+    : (budgetNum > 0 ? `${((actualSpend / budgetNum) * 100).toFixed(1)}%` : "0%");
 
   const finPercent = budgetNum > 0 ? actualSpend / budgetNum : 0;
   const actualPercent = budgetNum > 0 ? actualSpend / budgetNum : 0;
@@ -621,10 +748,23 @@ export default function ProjectDashboardPage() {
 
     return phases.flatMap((phase, pIndex) => {
       const phaseName = phase.name || `Phase ${pIndex + 1}`;
+      let phaseOrig = 0;
+      let phaseRevision = 0;
       let phaseBudget = 0;
       
       if (phase.activities && Array.isArray(phase.activities)) {
-        phaseBudget = phase.activities.reduce((sum: number, act: any) => sum + Number(act.amount || (Number(act.quantity || 1) * Number(act.rate || 0)) || 0), 0);
+        phase.activities.forEach((act: any) => {
+          const q = Number(act.quantity || 1);
+          const r = Number(act.rate || 0);
+          const orig = Number(act.original_budget || act.amount || (q * r) || 0);
+          const rev = getActivityApprovedRevision(act);
+          const curr = act.current_budget !== undefined && act.current_budget !== null 
+            ? Number(act.current_budget) 
+            : (orig + rev);
+          phaseOrig += orig;
+          phaseRevision += rev;
+          phaseBudget += curr;
+        });
       }
 
       const rows = [
@@ -636,8 +776,20 @@ export default function ProjectDashboardPage() {
             </div>
           </TableCell>
           <TableCell className="py-3 font-bold text-base bg-[#EEF2FB] text-gray-900">
-            {phaseBudget > 0 ? `₦${phaseBudget.toLocaleString()}` : "₦0"}
+            {phaseOrig > 0 ? `₦${phaseOrig.toLocaleString()}` : "₦0"}
           </TableCell>
+          {hasAdjustments && (
+            <>
+              <TableCell className="py-3 font-bold text-base bg-[#EEF2FB] text-gray-900">
+                {phaseRevision !== 0 
+                  ? `${phaseRevision > 0 ? "+" : ""}₦${phaseRevision.toLocaleString()}` 
+                  : "₦0.00"}
+              </TableCell>
+              <TableCell className="py-3 font-bold text-base bg-[#EEF2FB] text-gray-900">
+                {phaseBudget > 0 ? `₦${phaseBudget.toLocaleString()}` : "₦0"}
+              </TableCell>
+            </>
+          )}
           {customColumns.map(col => <TableCell key={col} className="bg-[#EEF2FB]" />)}
         </TableRow>
       ];
@@ -647,7 +799,11 @@ export default function ProjectDashboardPage() {
           const actName = act.name || `Activity ${aIndex + 1}`;
           const quantity = Number(act.quantity || 1);
           const rate = Number(act.rate || 0);
-          const actBudget = Number(act.amount || (quantity * rate) || 0);
+          const origAmt = Number(act.original_budget || act.amount || (quantity * rate) || 0);
+          const actRevision = getActivityApprovedRevision(act);
+          const actBudget = act.current_budget !== undefined && act.current_budget !== null
+            ? Number(act.current_budget)
+            : (origAmt + actRevision);
           const currentSn = serialCounter++;
 
           rows.push(
@@ -665,8 +821,18 @@ export default function ProjectDashboardPage() {
                 ₦{rate.toLocaleString()}
               </TableCell>
               <TableCell className="py-3 font-medium text-sm text-gray-800">
-                ₦{actBudget.toLocaleString()}
+                ₦{origAmt.toLocaleString()}
               </TableCell>
+              {hasAdjustments && (
+                <>
+                  <TableCell className={`py-3 font-medium text-sm ${actRevision > 0 ? "text-green-600" : actRevision < 0 ? "text-red-500" : "text-gray-600"}`}>
+                    {actRevision !== 0 ? `${actRevision > 0 ? "+" : ""}₦${actRevision.toLocaleString()}` : "₦0.00"}
+                  </TableCell>
+                  <TableCell className="py-3 font-semibold text-sm text-gray-900">
+                    ₦{actBudget.toLocaleString()}
+                  </TableCell>
+                </>
+              )}
               {customColumns.map(col => (
                 <TableCell key={col} className="py-3 text-sm text-gray-600">
                   {act[col] || act.custom_values?.[col] || ""}
@@ -720,7 +886,12 @@ export default function ProjectDashboardPage() {
             </div>
             <div className="text-sm text-gray-500 mt-2">{project.project_code || "N/A"}</div>
             <div className="text-sm text-gray-800 mt-1">
-              <span className="font-semibold text-gray-600">Project Manager:</span> John Doe <span className="mx-2"> </span> <span className="font-semibold text-gray-600">Date:</span> {project.start_date || "N/A"} - {project.expected_end_date || "N/A"}
+              <span className="font-semibold text-gray-600">Project Manager:</span>{" "}
+              {project.project_manager_details?.first_name || project.project_manager_details?.last_name
+                ? `${project.project_manager_details.first_name || ""} ${project.project_manager_details.last_name || ""}`.trim()
+                : project.project_manager_details?.email || "N/A"}{" "}
+              <span className="mx-2"> </span>{" "}
+              <span className="font-semibold text-gray-600">Date:</span> {project.start_date || "N/A"} - {project.expected_end_date || "N/A"}
             </div>
           </div>
           
@@ -851,11 +1022,11 @@ export default function ProjectDashboardPage() {
                 <div className="text-lg font-semibold text-gray-800">₦{budgetNum.toLocaleString()}</div>
               </div>
               <div className="p-4 border-r border-gray-100">
-                <div className="text-xs text-gray-500 font-medium mb-1">Actual Spend</div>
+                <div className="text-xs text-gray-500 font-medium mb-1">Actual Spent</div>
                 <div className="text-lg font-semibold text-gray-800">₦{actualSpend.toLocaleString()}</div>
               </div>
               <div className="p-4 border-r border-gray-100">
-                <div className="text-xs text-gray-500 font-medium mb-1">Committed</div>
+                <div className="text-xs text-gray-500 font-medium mb-1">Committed Amount</div>
                 <div className="text-lg font-semibold text-gray-800">₦{committed.toLocaleString()}</div>
               </div>
               <div className="p-4 border-r border-gray-100">
@@ -884,7 +1055,7 @@ export default function ProjectDashboardPage() {
                     <input type="checkbox" checked={showActual} onChange={() => setShowActual(!showActual)} className="w-4 h-4 rounded border-gray-300 text-[#2BA24D] focus:ring-[#2BA24D] accent-[#2BA24D] cursor-pointer" />
                     <span className="text-sm text-gray-600 font-medium flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-[#2BA24D]"></span>
-                      Actual Spend
+                      Actual Spent
                     </span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -938,7 +1109,7 @@ export default function ProjectDashboardPage() {
                               {payload.map((entry: any, index: number) => {
                                 const isPlanned = entry.dataKey === "planned";
                                 const color = isPlanned ? "#3B7CED" : "#2BA24D";
-                                const name = isPlanned ? "Planned Budget" : "Actual Spend";
+                                const name = isPlanned ? "Planned Budget" : "Actual Spent";
                                 const value = entry.value !== null && entry.value !== undefined ? `₦${Number(entry.value).toLocaleString()}` : "Not reached";
                                 return (
                                   <div key={`item-${index}`} className="flex items-center justify-between gap-4 py-0.5">
@@ -979,7 +1150,7 @@ export default function ProjectDashboardPage() {
                         fill="url(#actualGradient)" 
                         dot={{ r: 4, fill: '#2BA24D', strokeWidth: 1, stroke: '#fff' }}
                         activeDot={{ r: 6, fill: '#2BA24D' }} 
-                        name="Actual Spend"
+                        name="Actual Spent"
                       />
                     )}
                   </AreaChart>
@@ -1005,7 +1176,9 @@ export default function ProjectDashboardPage() {
               </div>
               <div className="flex items-center gap-2 mb-6">
                 <span className="text-sm text-gray-500">Budget Health:</span>
-                {finPercent > 0.8 ? (
+                {fin?.budget_health === "ON_TRACK" ? (
+                  <Badge className="bg-green-100 text-green-600 border-transparent hover:bg-green-100 text-xs py-0.5">On Track</Badge>
+                ) : (fin?.budget_health === "AT_RISK" || fin?.budget_health === "OVER_BUDGET" || finPercent > 0.8) ? (
                   <Badge className="bg-orange-100 text-orange-600 border-transparent hover:bg-orange-100 text-xs py-0.5">At Risk</Badge>
                 ) : (
                   <Badge className="bg-green-100 text-green-600 border-transparent hover:bg-green-100 text-xs py-0.5">On Track</Badge>
@@ -1025,11 +1198,11 @@ export default function ProjectDashboardPage() {
               <div className="flex gap-4 text-xs">
                 <div className="flex items-center gap-1.5 text-gray-600">
                   <div className="w-3 h-3 rounded bg-[#3B7CED]"></div>
-                  Actual ({(actualPercent * 100).toFixed(1)}%)
+                  Actual Spent ({(actualPercent * 100).toFixed(1)}%)
                 </div>
                 <div className="flex items-center gap-1.5 text-gray-600">
                   <div className="w-3 h-3 rounded bg-[#7BA8F5]"></div>
-                  Committed ({(committedPercent * 100).toFixed(1)}%)
+                  Committed Amount ({(committedPercent * 100).toFixed(1)}%)
                 </div>
                 <div className="flex items-center gap-1.5 text-gray-600">
                   <div className="w-3 h-3 rounded bg-[#E5E7EB]"></div>
@@ -1108,10 +1281,15 @@ export default function ProjectDashboardPage() {
             Phases & Activities
           </button>
           <button 
-            className={`pb-3 text-sm font-medium ${activeTab === 'adjustments' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`pb-3 text-sm font-medium flex items-center gap-2 ${activeTab === 'adjustments' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
             onClick={() => setActiveTab('adjustments')}
           >
-            Budget Adjustments
+            <span>Budget Adjustments</span>
+            {pendingBudgetsCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-[#EF4444] rounded-full shadow-xs leading-none">
+                {pendingBudgetsCount > 99 ? "99+" : pendingBudgetsCount}
+              </span>
+            )}
           </button>
           <button 
             className={`pb-3 text-sm font-medium ${activeTab === 'documents' ? 'text-[#3B7CED] border-b-2 border-[#3B7CED]' : 'text-gray-500 hover:text-gray-700'}`}
@@ -1152,7 +1330,15 @@ export default function ProjectDashboardPage() {
                   <TableHead className="min-w-[320px] font-semibold text-gray-600 py-3">Activity</TableHead>
                   <TableHead className="w-[120px] font-semibold text-gray-600 py-3">Quantity</TableHead>
                   <TableHead className="w-[140px] font-semibold text-gray-600 py-3">Rate</TableHead>
-                  <TableHead className="w-[160px] font-semibold text-gray-600 py-3">Amount</TableHead>
+                  <TableHead className="w-[160px] font-semibold text-gray-600 py-3">
+                    {hasAdjustments ? "Amount (Original)" : "Amount"}
+                  </TableHead>
+                  {hasAdjustments && (
+                    <>
+                      <TableHead className="w-[160px] font-semibold text-gray-600 py-3">Approved Revision</TableHead>
+                      <TableHead className="w-[160px] font-semibold text-gray-600 py-3">Current Budget</TableHead>
+                    </>
+                  )}
                   {customColumns.map(col => (
                     <TableHead key={col} className="font-semibold text-gray-600 py-3 whitespace-nowrap">{col}</TableHead>
                   ))}
@@ -1163,7 +1349,7 @@ export default function ProjectDashboardPage() {
                   renderPhaseRows(parsedPhases)
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-6 text-gray-500">
+                    <TableCell colSpan={hasAdjustments ? 7 + customColumns.length : 5 + customColumns.length} className="text-center py-6 text-gray-500">
                       No phases data available for this project.
                     </TableCell>
                   </TableRow>
@@ -1171,8 +1357,22 @@ export default function ProjectDashboardPage() {
               </TableBody>
             </Table>
             <div className="flex items-center justify-end p-4 bg-gray-50 border-t border-gray-200">
-              <div className="text-gray-600 text-sm">
-                Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">₦{budgetNum.toLocaleString()}</span>
+              <div className="text-gray-600 text-sm flex flex-wrap items-center gap-6">
+                {hasAdjustments && (
+                  <>
+                    <div>
+                      Original Budget: <span className="font-semibold text-gray-800 ml-1">₦{originalBudgetNum.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      Approved Revision: <span className={`font-semibold ml-1 ${totalApprovedRevision >= 0 ? "text-green-600" : "text-red-500"}`}>
+                        {totalApprovedRevision >= 0 ? "+" : ""}₦{totalApprovedRevision.toLocaleString()}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div>
+                  Total Project Budget: <span className="text-xl font-semibold text-gray-800 ml-2">₦{budgetNum.toLocaleString()}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1184,13 +1384,20 @@ export default function ProjectDashboardPage() {
             {/* Original Budget Box */}
             <div className="border border-gray-200 rounded-lg p-6 bg-white shadow-sm mb-2">
               <div className="text-sm font-medium text-gray-800 mb-2">Original Approved Budget</div>
-              <div className="text-3xl font-normal text-[#3B7CED]">₦{budgetNum.toLocaleString()}</div>
+              <div className="text-3xl font-normal text-[#3B7CED]">₦{originalBudgetNum.toLocaleString()}</div>
             </div>
 
             {/* Pending Approval Section */}
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[#3B7CED] font-medium text-base">Pending Approval</h3>
+                <h3 className="text-[#3B7CED] font-medium text-base flex items-center gap-2">
+                  <span>Pending Approval</span>
+                  {pendingBudgetsCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-[#EF4444] rounded-full shadow-xs leading-none">
+                      {pendingBudgetsCount > 99 ? "99+" : pendingBudgetsCount}
+                    </span>
+                  )}
+                </h3>
                 <span className="text-xs text-[#3B7CED] cursor-pointer hover:underline">See more</span>
               </div>
 
@@ -1516,7 +1723,7 @@ export default function ProjectDashboardPage() {
           <div data-wizard="pc-documents-content" className="bg-white rounded shadow-sm border border-gray-100 p-6 mb-12">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-[#3B7CED]">Project Documents & Links</h3>
-              {(!project?.status || ["DRAFT", "PENDING_APPROVAL"].includes(project.status.toUpperCase())) && (
+              {project?.status?.toUpperCase() !== "CLOSED" && (
                 <Button
                   onClick={() => setIsAddDocumentModalOpen(true)}
                   size="sm"
@@ -1639,9 +1846,8 @@ export default function ProjectDashboardPage() {
             <TableHeader className="bg-gray-50 border-b border-gray-200">
               <TableRow className="hover:bg-gray-50 border-0">
                 <TableHead className="font-medium text-gray-500 py-3 px-4">Date</TableHead>
-                <TableHead className="font-medium text-gray-500 py-3">Description</TableHead>
+                <TableHead className="font-medium text-gray-500 py-3">Record ID</TableHead>
                 <TableHead className="font-medium text-gray-500 py-3">Category</TableHead>
-                <TableHead className="font-medium text-gray-500 py-3">Cost Category</TableHead>
                 <TableHead className="font-medium text-gray-500 py-3">Amount</TableHead>
                 <TableHead className="font-medium text-gray-500 py-3">Status</TableHead>
               </TableRow>
@@ -1650,60 +1856,94 @@ export default function ProjectDashboardPage() {
               {isLoadingTransactions ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <TableRow key={idx} className="border-b border-gray-100">
-                    <TableCell className="py-3"><Skeleton className="h-4 w-20 bg-gray-100" /></TableCell>
-                    <TableCell className="py-3"><Skeleton className="h-4 w-48 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3 px-4"><Skeleton className="h-4 w-20 bg-gray-100" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-40 bg-gray-100" /></TableCell>
                     <TableCell className="py-3"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
-                    <TableCell className="py-3"><Skeleton className="h-4 w-28 bg-gray-100" /></TableCell>
                     <TableCell className="py-3"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
                     <TableCell className="py-3"><Skeleton className="h-6 w-20 bg-gray-100 rounded-full" /></TableCell>
                   </TableRow>
                 ))
               ) : transactions && transactions.length > 0 ? (
-                transactions.slice(0, 6).map((tx: any, idx: number) => (
-                  <TableRow key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                    <TableCell className="py-3 px-4 text-sm text-gray-600">
-                      {tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString() : "N/A"}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-gray-800 font-medium">
-                      {tx.description || tx.name || tx.desc || tx.detail?.lines?.[0]?.description || tx.detail?.notes || tx.reference_id || "Transaction"}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-gray-600 capitalize">
-                      {tx.category || tx.type || tx.request_type || tx.project_type || "-"}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-gray-600 font-mono uppercase">
-                      {tx.cost_category || tx.cost_category_code || tx.cost_code || tx.costCat || "-"}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-gray-800 font-semibold">
-                      ₦{Number(tx.amount || tx.detail?.total_amount || tx.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm">
-                      {(() => {
-                        const statusStr = tx.status || "Approved";
-                        const statusLower = statusStr.toLowerCase();
-                        let badgeClass = "bg-gray-150 text-gray-700";
-                        if (statusLower.includes("approv") || statusLower === "done" || statusLower === "success") {
-                          badgeClass = "bg-[#E2F2E9] text-[#1E8E3E]";
-                        } else if (statusLower === "paid" || statusLower === "invoice") {
-                          badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
-                        } else if (statusLower.includes("cancel") || statusLower.includes("reject")) {
-                          badgeClass = "bg-[#FCE8E6] text-[#C5221F]";
-                        } else if (statusLower.includes("pend")) {
-                          badgeClass = "bg-[#FFF2CC] text-[#D66011]";
-                        } else if (statusLower.includes("draft")) {
-                          badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
-                        }
-                        return (
-                          <Badge className={`border-none font-semibold px-2.5 py-0.5 rounded-full text-xs hover:bg-opacity-80 transition-all ${badgeClass}`}>
-                            {statusStr}
-                          </Badge>
-                        );
-                      })()}
-                    </TableCell>
-                  </TableRow>
-                ))
+                transactions.slice(0, 6).map((tx: any, idx: number) => {
+                  const dateStr = tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  }) : "-";
+                  const recordId =
+                    tx.reference_id ||
+                    tx.detail?.project_request?.reference_id ||
+                    tx.record_id ||
+                    tx.recordId ||
+                    tx.reference_no ||
+                    tx.reference ||
+                    tx.ref ||
+                    tx.transaction_number ||
+                    tx.transaction_id ||
+                    tx.code ||
+                    tx.item_code ||
+                    (tx.id ? (String(tx.id).startsWith("#") || String(tx.id).includes("-") ? String(tx.id) : `PjR-${tx.id}`) : "-");
+                  const subRef =
+                    tx.detail?.request_id ||
+                    (tx.detail?.reference_id && tx.detail.reference_id !== recordId ? tx.detail.reference_id : null);
+                  const catStr = formatCategory(tx.category || tx.type || tx.request_type || tx.project_type || "-");
+                  const amountVal = extractAmount(tx);
+                  const amountStr = `₦${Number(amountVal).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  const statusStr = tx.status || "Approved";
+                  const statusLower = statusStr.toLowerCase();
+
+                  let badgeClass = "bg-gray-150 text-gray-700";
+                  if (statusLower.includes("approv") || statusLower === "done" || statusLower === "success" || statusLower === "released") {
+                    badgeClass = "bg-[#E2F2E9] text-[#1E8E3E]";
+                  } else if (statusLower === "paid" || statusLower === "invoice") {
+                    badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
+                  } else if (statusLower.includes("cancel") || statusLower.includes("reject")) {
+                    badgeClass = "bg-[#FCE8E6] text-[#C5221F]";
+                  } else if (statusLower.includes("pend")) {
+                    badgeClass = "bg-[#FFF2CC] text-[#D66011]";
+                  } else if (statusLower === "draft") {
+                    badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
+                  }
+
+                  return (
+                    <TableRow 
+                      key={tx.id || idx} 
+                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => {
+                        setSelectedTransaction(tx);
+                        setIsTransactionModalOpen(true);
+                      }}
+                    >
+                      <TableCell className="py-3 px-4 text-sm text-gray-600">
+                        {dateStr}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-gray-800 font-semibold">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{recordId}</span>
+                          {subRef && (
+                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {subRef}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-gray-600">
+                        {catStr}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-gray-800 font-semibold">
+                        {amountStr}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm">
+                        <Badge className={`border-none font-semibold px-2.5 py-0.5 rounded-full text-xs hover:bg-opacity-80 transition-all capitalize ${badgeClass}`}>
+                          {statusStr}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                     No recent transactions recorded for this project yet.
                   </TableCell>
                 </TableRow>
@@ -1737,6 +1977,12 @@ export default function ProjectDashboardPage() {
         title={statusModal.title}
         message={statusModal.message}
         actionText={statusModal.type === "success" ? "Done" : "Try again"}
+      />
+
+      <TransactionDetailsModal
+        isOpen={isTransactionModalOpen}
+        onClose={() => setIsTransactionModalOpen(false)}
+        transaction={selectedTransaction}
       />
 
       {/* Hidden Export Template */}

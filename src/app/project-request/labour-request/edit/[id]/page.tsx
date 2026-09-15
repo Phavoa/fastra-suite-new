@@ -132,10 +132,13 @@ export default function EditLabourRequestPage() {
 
   const config: RequestFormConfig<FormValues> = {
     title: "Edit Labour Request",
-    requestId: request?.reference_id || `LR-${request?.id || id}`,
+    requestId:
+      (request?.detail as any)?.reference_code ||
+      (request?.detail as any)?.code ||
+      `LB${String(request?.detail?.id || request?.id || id).padStart(4, "0")}`,
     requesterName:
       request?.detail?.created_by_name ||
-      (request as any)?.project_request?.created_by_details?.user?.first_name ||
+      (request as any)?.project_request?.created_by_details?.first_name ||
       (request as any)?.created_by_name ||
       loggedInUserName,
     date: new Date(
@@ -286,6 +289,7 @@ export default function EditLabourRequestPage() {
       project:
         request?.project?.toString() ||
         (request as any)?.project_request?.project?.toString() ||
+        request?.detail?.project_details?.id?.toString() ||
         "",
       numberOfWorkers:
         request?.detail?.number_of_workers ??
@@ -306,8 +310,15 @@ export default function EditLabourRequestPage() {
         request?.detail?.justification_notes ||
         (request as any)?.justification_notes ||
         "",
-      phase: "",
-      task: request?.activity?.toString() || (request as any)?.activity?.toString() || "",
+      phase:
+        request?.detail?.phase_details?.id?.toString() ||
+        (request as any)?.phase?.toString() ||
+        "",
+      task:
+        request?.activity?.toString() ||
+        request?.detail?.activity_details?.id?.toString() ||
+        (request as any)?.activity?.toString() ||
+        "",
     },
     onSubmit: handleSubmit,
     successMessage: {

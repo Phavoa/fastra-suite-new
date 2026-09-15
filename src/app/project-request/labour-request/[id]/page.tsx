@@ -45,11 +45,22 @@ export default function LabourRequestDetailPage() {
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
-  const detail = request?.detail || (request as any) || {};
-  const projectRequest = request?.project_request || (request as any) || {};
+  // Normalize request in case response is wrapped in an array
+  const reqObj: any = (Array.isArray(request) ? request[0] : request) || {};
+  const detail: any = reqObj?.detail || (reqObj as any) || {};
+  const projectRequest: any = reqObj?.project_request || (reqObj as any) || {};
 
-  const projectId = request?.project || projectRequest?.project;
-  const activityId = request?.activity;
+  const projectId =
+    reqObj?.project ||
+    detail?.project ||
+    projectRequest?.project ||
+    detail?.project_details?.id ||
+    reqObj?.project_details?.id;
+
+  const activityId =
+    reqObj?.activity ||
+    detail?.activity ||
+    detail?.activity_details?.id;
 
   const { data: projectCosting } = useGetProjectCostingProjectQuery(
     Number(projectId),
@@ -57,6 +68,22 @@ export default function LabourRequestDetailPage() {
   );
 
   const availableBudget = useMemo(() => {
+    // 1. Direct available_budget from detail or reqObj
+    if (
+      detail?.available_budget !== undefined &&
+      detail?.available_budget !== null &&
+      !isNaN(Number(detail.available_budget))
+    ) {
+      return Number(detail.available_budget);
+    }
+    if (
+      reqObj?.available_budget !== undefined &&
+      reqObj?.available_budget !== null &&
+      !isNaN(Number(reqObj.available_budget))
+    ) {
+      return Number(reqObj.available_budget);
+    }
+
     if (!projectCosting) return 5000000;
 
     if (activityId) {
@@ -97,7 +124,7 @@ export default function LabourRequestDetailPage() {
     }
 
     return 5000000;
-  }, [projectCosting, activityId]);
+  }, [detail, reqObj, projectCosting, activityId]);
 
   const handleEdit = () => {
     router.push(`/project-request/labour-request/edit/${id}`);
@@ -105,7 +132,8 @@ export default function LabourRequestDetailPage() {
 
   const handleDelete = async () => {
     try {
-      await deleteRequest(id).unwrap();
+      const deleteId = detail?.id || reqObj?.id || id;
+      await deleteRequest(deleteId).unwrap();
       setIsConfirmingDelete(false);
       statusModal.showSuccess(
         "Request Deleted",
@@ -122,7 +150,8 @@ export default function LabourRequestDetailPage() {
 
   const handleSubmit = async () => {
     try {
-      await submitRequest({ id, data: {} }).unwrap();
+      const submitId = reqObj?.id || projectRequest?.id || id;
+      await submitRequest({ id: submitId, data: {} }).unwrap();
       statusModal.showSuccess(
         "Request Submitted",
         "The labour request has been submitted for approval."
@@ -226,55 +255,142 @@ export default function LabourRequestDetailPage() {
     );
   }
 
-  const requesterName =
-    projectRequest?.created_by_details?.user?.first_name &&
-    projectRequest?.created_by_details?.user?.last_name
-      ? `${projectRequest.created_by_details.user.first_name} ${projectRequest.created_by_details.user.last_name}`
-      : projectRequest?.created_by_details?.user?.username ||
-        detail?.created_by_name ||
-        (request as any)?.created_by_name ||
-        "Firstname Lastname";
+  const createdBy = reqObj?.created_by_details || projectRequest?.created_by_details;
+  const requesterFullName =
+    createdBy?.first_name || createdBy?.last_name
+      ? `${createdBy.first_name || ""} ${createdBy.last_name || ""}`.trim()
+      : createdBy?.user?.first_name || createdBy?.user?.last_name
+      ? `${createdBy.user.first_name || ""} ${createdBy.user.last_name || ""}`.trim()
+      : createdBy?.username || createdBy?.user?.username;
 
-  const dateValue = request?.created_at || detail?.created_at || Date.now();
+  const requesterName =
+    requesterFullName ||
+    detail?.created_by_name ||
+    reqObj?.created_by_name ||
+    createdBy?.email ||
+    "Firstname Lastname";
+
+  const dateValue = detail?.date_required || reqObj?.created_at || detail?.created_at || Date.now();
   const formattedDate = new Date(dateValue).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 
+  // Reference code format: LB0001…
+  const labourDetailId = detail?.id ?? (reqObj as any)?.detail_id ?? reqObj?.id ?? id;
   const refId =
-    request.reference_id ||
-    projectRequest?.reference_id ||
-    `LR${String(request.id || id).padStart(5, "0")}`;
+    (detail as any)?.reference_code ||
+    (detail as any)?.code ||
+    (detail as any)?.labour_reference ||
+    `LB${String(labourDetailId).padStart(4, "0")}`;
 
   const projectName =
+    detail?.project_details?.name ||
+    reqObj?.project_details?.name ||
     projectRequest?.project_details?.name ||
     projectCosting?.name ||
     (typeof projectId === "number" ? `Project #${projectId}` : "Building project");
 
-  const phaseName = detail.phase_name || detail.phase || "Roofing";
-  const taskName = detail.task_name || detail.task || (activityId ? `Activity ${activityId}` : "P.O.P");
-  const roleType = detail.role_type || detail.role || "Engineer";
-  const numberOfWorkers = detail.number_of_workers || 12;
+  const rawPhaseName =
+    detail?.phase_details?.name ||
+    (typeof detail?.phase === "object" ? detail.phase?.name : null) ||
+    detail?.phase_name ||
+    (typeof detail?.phase === "string" ? detail.phase : null) ||
+    (reqObj as any)?.phase_details?.name;
 
-  const durationFormatted = detail.duration
-    ? `${detail.duration} ${detail.duration_unit || "week"}`
-    : "1 week";
+  const rawActivityName =
+    detail?.activity_details?.name ||
+    (typeof detail?.activity === "object" ? detail.activity?.name : null) ||
+    detail?.activity_name ||
+    detail?.task_name ||
+    (typeof detail?.task === "string" ? detail.task : null) ||
+    (reqObj as any)?.activity_details?.name;
 
-  const dailyRateNumber = parseFloat(detail?.estimated_daily_rate || "800000");
+  // Resolve Phase name
+  const phaseName = useMemo(() => {
+    if (rawPhaseName && !rawPhaseName.match(/^[0-9a-f]{8}-[0-9a-f]{4}/i)) {
+      return rawPhaseName;
+    }
+    if (projectCosting && activityId) {
+      const phasesArr = Array.isArray(projectCosting.phases)
+        ? projectCosting.phases
+        : Array.isArray((projectCosting as any).phase_list)
+        ? (projectCosting as any).phase_list
+        : [];
+
+      for (const ph of phasesArr) {
+        const acts = Array.isArray(ph.activities)
+          ? ph.activities
+          : Array.isArray(ph.activity_list)
+          ? ph.activity_list
+          : [];
+        const act = acts.find((a: any) => String(a.id || a.activity_id) === String(activityId));
+        if (act) return ph.name || ph.phase_name || ph.title;
+      }
+    }
+    return rawPhaseName && !rawPhaseName.match(/^[0-9a-f]{8}-[0-9a-f]{4}/i)
+      ? rawPhaseName
+      : "—";
+  }, [rawPhaseName, projectCosting, activityId]);
+
+  // Resolve Activity name
+  const activityName = useMemo(() => {
+    if (rawActivityName && !rawActivityName.match(/^[0-9a-f]{8}-[0-9a-f]{4}/i)) {
+      return rawActivityName;
+    }
+    if (projectCosting && activityId) {
+      const phasesArr = Array.isArray(projectCosting.phases)
+        ? projectCosting.phases
+        : Array.isArray((projectCosting as any).phase_list)
+        ? (projectCosting as any).phase_list
+        : [];
+
+      for (const ph of phasesArr) {
+        const acts = Array.isArray(ph.activities)
+          ? ph.activities
+          : Array.isArray(ph.activity_list)
+          ? ph.activity_list
+          : [];
+        const act = acts.find((a: any) => String(a.id || a.activity_id) === String(activityId));
+        if (act) return act.name || act.activity_name || act.title;
+      }
+    }
+    return rawActivityName && !rawActivityName.match(/^[0-9a-f]{8}-[0-9a-f]{4}/i)
+      ? rawActivityName
+      : "—";
+  }, [rawActivityName, projectCosting, activityId]);
+
+  const roleType = detail?.role_type || detail?.role || "Labourers";
+  const numberOfWorkers = detail?.number_of_workers ?? 0;
+
+  const durationFormatted = detail?.duration
+    ? `${detail.duration} ${
+        detail.duration === 1 && detail.duration_unit === "days"
+          ? "day"
+          : detail.duration === 1 && detail.duration_unit === "weeks"
+          ? "week"
+          : detail.duration === 1 && detail.duration_unit === "months"
+          ? "month"
+          : detail.duration_unit || "day"
+      }`
+    : "1 day";
+
+  const dailyRateNumber = parseFloat(detail?.estimated_daily_rate || "0");
 
   const calculatedCost =
     parseFloat(detail?.projected_cost || "0") ||
     numberOfWorkers * dailyRateNumber * (detail?.duration || 1) ||
-    1500000;
+    0;
 
   const noteText =
-    detail.justification_notes ||
-    detail.notes ||
-    (request as any)?.notes ||
-    "-";
+    detail?.justification_notes ||
+    detail?.notes ||
+    reqObj?.notes ||
+    "—";
 
-  const isDraft = request?.status === "draft";
+  const requestStatus = reqObj?.status || projectRequest?.status || "draft";
+  const isDraft = requestStatus === "draft";
   const canEdit = isDraft && canDo("project_request", "edit");
   const canDelete = isDraft && canDo("project_request", "delete");
   const canSubmit = isDraft;
@@ -330,7 +446,7 @@ export default function LabourRequestDetailPage() {
                 </div>
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Status</span>
-                  <div>{renderStatusBadge(request.status)}</div>
+                  <div>{renderStatusBadge(requestStatus)}</div>
                 </div>
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Request Type</span>
@@ -368,8 +484,8 @@ export default function LabourRequestDetailPage() {
                   <span className="block text-[14px] font-semibold text-black/80">{phaseName}</span>
                 </div>
                 <div>
-                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Task</span>
-                  <span className="block text-[14px] font-semibold text-black/80">{taskName}</span>
+                  <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">Activity</span>
+                  <span className="block text-[14px] font-semibold text-black/80">{activityName}</span>
                 </div>
               </div>
             </section>
@@ -380,7 +496,7 @@ export default function LabourRequestDetailPage() {
               <div className="grid grid-cols-2 gap-y-4 gap-x-6 mb-4">
                 <div>
                   <span className="block text-[13px] text-[#8C9BAE] font-normal mb-0.5">
-                    Duration (days/weeks)
+                    Duration ({detail?.duration_unit || "days"})
                   </span>
                   <span className="block text-[14px] font-semibold text-black/80">{durationFormatted}</span>
                 </div>
@@ -389,7 +505,7 @@ export default function LabourRequestDetailPage() {
                     Estimated Daily Rate
                   </span>
                   <span className="block text-[14px] font-semibold text-black/80">
-                    N{dailyRateNumber.toLocaleString("en-NG")}
+                    N{dailyRateNumber.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

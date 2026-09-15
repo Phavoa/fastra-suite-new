@@ -16,9 +16,12 @@ import { Plus, Trash, ArrowLeft, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { useGetProjectCostingProjectsQuery } from "@/api/projectCostingApi";
-import { useGetLocationsQuery } from "@/api/inventory/locationApi";
+import { useGetActiveLocationsFilteredQuery } from "@/api/inventory/locationApi";
 import { useGetInventoryProductsQuery } from "@/api/inventory/productsApi";
-import { useCreateScrapMutation } from "@/api/inventory/scrapApi";
+import {
+  useCreateScrapMutation,
+  useCreateAndValidateScrapMutation,
+} from "@/api/inventory/scrapApi";
 import {
   useGetStockLocationsQuery,
   useGetStockLocationsByLocationQuery,
@@ -123,8 +126,9 @@ export default function CreateScrapPage() {
   };
 
   const [createScrap] = useCreateScrapMutation();
+  const [createAndValidateScrap] = useCreateAndValidateScrapMutation();
   const { data: rawProjects, isLoading: isLoadingProjects } = useGetProjectCostingProjectsQuery({});
-  const { data: rawLocations, isLoading: isLoadingLocations } = useGetLocationsQuery({});
+  const { data: rawLocations, isLoading: isLoadingLocations } = useGetActiveLocationsFilteredQuery();
   const { data: rawProducts, isLoading: isLoadingProducts } = useGetInventoryProductsQuery({});
 
   // Safely extract arrays from paginated API responses
@@ -139,9 +143,15 @@ export default function CreateScrapPage() {
   }, [rawProjects]);
 
   const locations = useMemo(() => {
-    return Array.isArray(rawLocations)
+    const list = Array.isArray(rawLocations)
       ? rawLocations
       : (rawLocations as any)?.results || (rawLocations as any)?.data || [];
+    return list.filter(
+      (l: any) =>
+        !l.is_hidden &&
+        l.is_active !== false &&
+        String(l.status || "").toUpperCase() !== "INACTIVE"
+    );
   }, [rawLocations]);
 
   const products = useMemo(() => {
@@ -168,17 +178,20 @@ export default function CreateScrapPage() {
 
   const selectedProject = watch("project");
 
-  // Automatically fill location with the project's location
+  // Automatically fill location with the project's location only if it is active
   useEffect(() => {
     if (!selectedProject) return;
     const proj = projects.find((p: any) => String(p.id) === selectedProject);
     if (proj) {
       const locId = proj.site_location || proj.location;
       if (locId) {
-        setValue("location", String(locId), { shouldValidate: true });
+        const isActiveLoc = locations.some((l: any) => String(l.id) === String(locId));
+        if (isActiveLoc) {
+          setValue("location", String(locId), { shouldValidate: true });
+        }
       }
     }
-  }, [selectedProject, projects, setValue]);
+  }, [selectedProject, projects, locations, setValue]);
 
   const selectedLocation = watch("location");
   const { data: rawStockLevels } = useGetStockLocationsByLocationQuery(selectedLocation, {
@@ -331,7 +344,11 @@ export default function CreateScrapPage() {
         payload.project = isNaN(Number(data.project)) ? data.project : Number(data.project);
       }
 
-      await createScrap(payload).unwrap();
+      if (status === "done") {
+        await createAndValidateScrap(payload).unwrap();
+      } else {
+        await createScrap(payload).unwrap();
+      }
       
       setModalState({
         isOpen: true,

@@ -18,11 +18,106 @@ interface Props {
   onRowClick?: (tx: any) => void;
 }
 
+export function extractAmount(tx: any): number {
+  if (!tx) return 0;
+
+  const candidates = [
+    tx?.detail?.project_request?.request_amount,
+    tx?.detail?.contract_value,
+    tx?.detail?.total_amount,
+    tx?.detail?.projected_cost,
+    tx?.detail?.amount_requested,
+    tx?.detail?.estimated_cost,
+    tx?.detail?.amount,
+    tx?.detail?.total,
+    tx?.detail?.subtotal,
+    tx?.amount,
+    tx?.total_amount,
+    tx?.request_amount,
+    tx?.actual_amount,
+    tx?.cost,
+    tx?.total,
+    tx?.subtotal,
+    tx?.value,
+  ];
+
+  for (const val of candidates) {
+    if (val !== undefined && val !== null && val !== "") {
+      if (typeof val === "number" && !isNaN(val)) {
+        return val;
+      }
+      if (typeof val === "string") {
+        const cleaned = val.replace(/[^0-9.-]/g, "");
+        const parsed = parseFloat(cleaned);
+        if (!isNaN(parsed)) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(tx?.detail?.lines) && tx.detail.lines.length > 0) {
+    const sum = tx.detail.lines.reduce((acc: number, line: any) => {
+      const lineAmt =
+        line.total_cost ??
+        line.line_total ??
+        line.total_amount ??
+        line.amount ??
+        line.subtotal ??
+        Number(line.quantity || line.hours || 0) *
+          Number(line.unit_cost || line.estimated_unit_cost || line.unit_price || line.hourly_rate || line.rate || 0);
+      const num =
+        typeof lineAmt === "number"
+          ? lineAmt
+          : parseFloat(String(lineAmt).replace(/[^0-9.-]/g, ""));
+      return acc + (isNaN(num) ? 0 : num);
+    }, 0);
+    if (sum > 0) return sum;
+  }
+
+  if (Array.isArray(tx?.lines) && tx.lines.length > 0) {
+    const sum = tx.lines.reduce((acc: number, line: any) => {
+      const lineAmt =
+        line.total_cost ??
+        line.line_total ??
+        line.total_amount ??
+        line.amount ??
+        line.subtotal ??
+        Number(line.quantity || line.hours || 0) *
+          Number(line.unit_cost || line.estimated_unit_cost || line.unit_price || line.hourly_rate || line.rate || 0);
+      const num =
+        typeof lineAmt === "number"
+          ? lineAmt
+          : parseFloat(String(lineAmt).replace(/[^0-9.-]/g, ""));
+      return acc + (isNaN(num) ? 0 : num);
+    }, 0);
+    if (sum > 0) return sum;
+  }
+
+  return 0;
+}
+
+export function formatCategory(cat: string): string {
+  if (!cat) return "-";
+  return cat
+    .replace(/_/g, " ")
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function TransactionHistoryTable({ transactions = [], isLoading = false, onRowClick }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const totalPages = Math.max(1, Math.ceil((transactions?.length || 0) / itemsPerPage));
-  const paginatedTransactions = (transactions || []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const txList = Array.isArray(transactions)
+    ? transactions
+    : Array.isArray((transactions as any)?.results)
+    ? (transactions as any).results
+    : Array.isArray((transactions as any)?.data)
+    ? (transactions as any).data
+    : [];
+  const totalPages = Math.max(1, Math.ceil(txList.length / itemsPerPage));
+  const paginatedTransactions = txList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getVisiblePages = () => {
     const pages: (number | string)[] = [];
@@ -47,9 +142,8 @@ export function TransactionHistoryTable({ transactions = [], isLoading = false, 
           <TableHeader>
             <TableRow className="bg-[#F6F9FC] hover:bg-[#F6F9FC] border-b border-gray-150">
               <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Date</TableHead>
-              <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Description</TableHead>
+              <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Record ID</TableHead>
               <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Category</TableHead>
-              <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Cost Category</TableHead>
               <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Amount</TableHead>
               <TableHead className="font-semibold text-[#8898AA] text-[11.5px] py-3.5 px-6 uppercase tracking-wider">Status</TableHead>
             </TableRow>
@@ -59,26 +153,43 @@ export function TransactionHistoryTable({ transactions = [], isLoading = false, 
               Array.from({ length: 5 }).map((_, idx) => (
                 <TableRow key={`tx-skeleton-${idx}`} className="border-b border-[#E9ECEF]">
                   <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-20 bg-gray-100" /></TableCell>
-                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-52 bg-gray-100" /></TableCell>
+                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-32 bg-gray-100" /></TableCell>
                   <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
-                  <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-28 bg-gray-100" /></TableCell>
                   <TableCell className="py-3.5 px-6"><Skeleton className="h-4 w-24 bg-gray-100" /></TableCell>
                   <TableCell className="py-3.5 px-6"><Skeleton className="h-6 w-20 bg-gray-100 rounded-full" /></TableCell>
                 </TableRow>
               ))
             ) : paginatedTransactions && paginatedTransactions.length > 0 ? (
               paginatedTransactions.map((tx: any, idx: number) => {
-                const dateStr = tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString() : "-";
-                const descStr = tx.description || tx.desc || tx.name || tx.detail?.lines?.[0]?.description || tx.detail?.notes || tx.reference_id || `Transaction #${tx.id || idx + 1}`;
-                const catStr = tx.category || tx.type || tx.request_type || tx.project_type || "-";
-                const costCatStr = tx.cost_category || tx.cost_category_code || tx.cost_code || tx.costCat || "-";
-                const amountVal = tx.amount || tx.detail?.total_amount || tx.total_amount || 0;
-                const amountStr = `N${Number(amountVal).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                const dateStr = tx.date || tx.created_at ? new Date(tx.date || tx.created_at).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                }) : "-";
+                const recordId =
+                  tx.reference_id ||
+                  tx.detail?.project_request?.reference_id ||
+                  tx.record_id ||
+                  tx.recordId ||
+                  tx.reference_no ||
+                  tx.reference ||
+                  tx.ref ||
+                  tx.transaction_number ||
+                  tx.transaction_id ||
+                  tx.code ||
+                  tx.item_code ||
+                  (tx.id ? (String(tx.id).startsWith("#") || String(tx.id).includes("-") ? String(tx.id) : `PjR-${tx.id}`) : "-");
+                const subRef =
+                  tx.detail?.request_id ||
+                  (tx.detail?.reference_id && tx.detail.reference_id !== recordId ? tx.detail.reference_id : null);
+                const catStr = formatCategory(tx.category || tx.request_type || tx.type || tx.project_type || "-");
+                const amountVal = extractAmount(tx);
+                const amountStr = `₦${Number(amountVal).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 const statusStr = tx.status || "Approved";
                 const statusLower = statusStr.toLowerCase();
 
                 let badgeClass = "bg-gray-150 text-gray-700";
-                if (statusLower.includes("approv") || statusLower === "done" || statusLower === "success") {
+                if (statusLower.includes("approv") || statusLower === "done" || statusLower === "success" || statusLower === "released") {
                   badgeClass = "bg-[#E2F2E9] text-[#1E8E3E]";
                 } else if (statusLower === "paid" || statusLower === "invoice") {
                   badgeClass = "bg-[#E8F0FE] text-[#1A73E8]";
@@ -97,12 +208,20 @@ export function TransactionHistoryTable({ transactions = [], isLoading = false, 
                     onClick={() => onRowClick?.(tx)}
                   >
                     <TableCell className="text-[#525F7F] py-3.5 px-6 text-sm">{dateStr}</TableCell>
-                    <TableCell className="text-[#32325D] py-3.5 px-6 font-semibold text-sm">{descStr}</TableCell>
-                    <TableCell className="text-[#525F7F] py-3.5 px-6 capitalize text-sm">{catStr}</TableCell>
-                    <TableCell className="text-[#525F7F] py-3.5 px-6 font-mono uppercase text-sm">{costCatStr}</TableCell>
+                    <TableCell className="text-[#32325D] py-3.5 px-6 font-semibold text-sm">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>{recordId}</span>
+                        {subRef && (
+                          <span className="text-xs font-normal text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                            {subRef}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[#525F7F] py-3.5 px-6 text-sm">{catStr}</TableCell>
                     <TableCell className="text-[#32325D] font-bold py-3.5 px-6 text-sm">{amountStr}</TableCell>
                     <TableCell className="py-3.5 px-6">
-                      <Badge className={`border-none font-semibold px-3 py-1 rounded-full text-xs hover:bg-opacity-80 transition-all ${badgeClass}`}>
+                      <Badge className={`border-none font-semibold px-3 py-1 rounded-full text-xs hover:bg-opacity-80 transition-all capitalize ${badgeClass}`}>
                         {statusStr}
                       </Badge>
                     </TableCell>
@@ -111,7 +230,7 @@ export function TransactionHistoryTable({ transactions = [], isLoading = false, 
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                   No transactions found for this project.
                 </TableCell>
               </TableRow>
