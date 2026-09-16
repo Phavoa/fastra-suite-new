@@ -591,7 +591,7 @@ export default function PaymentQueueDetailPage() {
                         {formatCurrency(inv.balance)}
                       </div>
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-4">
+                    {/* <div className="rounded-lg bg-gray-50 p-4">
                       <div className="text-xs text-gray-500 mb-1">
                         Days Until Due
                       </div>
@@ -606,7 +606,7 @@ export default function PaymentQueueDetailPage() {
                             ? `${Math.abs(daysUntilDue)}d overdue`
                             : `${daysUntilDue}d`}
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                   {/* Vendor & Source */}
                   <div>
@@ -652,31 +652,29 @@ export default function PaymentQueueDetailPage() {
                         }
                         icon={<CreditCard className="w-3.5 h-3.5" />}
                       />
-                      <InfoField
+                      {/* <InfoField
                         label="Source Type"
                         value={sourceTypeDisplay}
-                      />
+                      /> */}
                       {poNumber && (
                         <InfoField
-                          label="Purchase Order"
+                          label="Reference Number"
                           value={poNumber}
-                          icon={<Hash className="w-3.5 h-3.5" />}
+                          icon={""}
                         />
                       )}
                       {requestRef && (
                         <InfoField
                           label="Request Reference"
                           value={requestRef}
-                          icon={<Hash className="w-3.5 h-3.5" />}
+                          icon={""}
                         />
                       )}
                       {(projectName || projectCode) && (
                         <InfoField
                           label="Project"
                           value={
-                            projectCode
-                              ? `${projectName || ""} (${projectCode})`
-                              : projectName
+                            projectCode ? `${projectName || ""}` : projectName
                           }
                         />
                       )}
