@@ -249,35 +249,6 @@ export default function ApprovedRequestsPage() {
     setCurrentStep(1);
   };
 
-  const handleSubcontractorConvertToInvoice = async () => {
-    if (!selectedRequest?.backendId) {
-      showToast("error", "Invalid request selected.");
-      return;
-    }
-
-    if (process.env.NODE_ENV === "development")
-      console.log("Subcontractor → Vendor Bill", {
-        approved_request_id: selectedRequest.backendId,
-        reference_id: selectedRequest.id,
-        type: selectedRequest.originalType,
-      });
-
-    try {
-      // TODO: real mutation when backend is ready
-      showToast(
-        "success",
-        "Subcontractor request marked for Vendor Bill. Complete the bill in the Invoice module.",
-      );
-      handleCloseSubcontractorModal();
-      refetch();
-    } catch (err: unknown) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Subcontractor → Vendor Bill error →", err);
-      }
-      showToast("error", extractErrorMessage(err));
-    }
-  };
-
   // ---------- Labour (PRD 9.3.1) ----------
   const handleConvertToLabourInvoice = (request: any) => {
     setSelectedRequest(request);
@@ -644,7 +615,6 @@ export default function ApprovedRequestsPage() {
           currentStep={currentStep}
           onNextStep={handleNextStep}
           onBackStep={handleBackStep}
-          onConvertToInvoice={handleSubcontractorConvertToInvoice}
           formatCurrency={formatCurrency}
           isIssuing={false}
         />
