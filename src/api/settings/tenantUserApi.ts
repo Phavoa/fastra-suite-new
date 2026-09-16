@@ -71,8 +71,8 @@ export interface ChangePasswordRequest {
 
 // Reset password request interface
 export interface ResetPasswordRequest {
-  user_id?: number;
-  email: string;
+  user_id: number;
+  email?: string;
 }
 
 // Helper to get tenant-specific base URL
@@ -284,16 +284,19 @@ export const tenantUserApi = createApi({
       providesTags: ["TenantUser"],
     }),
 
-    // POST /users/tenant-users/{id}/change_password/ - Change password
+    // POST /users/tenant-users/change-password/ - Change password
     changePassword: builder.mutation<
       unknown,
-      { id: number | string; data: ChangePasswordRequest }
+      ChangePasswordRequest | { id?: number | string; data: ChangePasswordRequest }
     >({
-      query: ({ id, data }) => ({
-        url: `/users/tenant-users/${id}/change_password/`,
-        method: "POST",
-        body: data,
-      }),
+      query: (arg) => {
+        const body = "data" in arg ? arg.data : arg;
+        return {
+          url: "/users/tenant-users/change-password/",
+          method: "POST",
+          body,
+        };
+      },
     }),
 
     // PATCH /users/tenant-users/edit/{id}/ - Edit tenant user
@@ -312,10 +315,10 @@ export const tenantUserApi = createApi({
       ],
     }),
 
-    // POST /users/tenant-users/reset-password/ - Reset password
-    resetPassword: builder.mutation<TenantUser, ResetPasswordRequest>({
+    // POST /company/admin/reset-user-password/ - Reset user password
+    resetPassword: builder.mutation<unknown, ResetPasswordRequest>({
       query: (resetData) => ({
-        url: "/users/tenant-users/reset-password/",
+        url: "/company/admin/reset-user-password/",
         method: "POST",
         body: resetData,
       }),
@@ -343,3 +346,5 @@ export const {
   useEditTenantUserMutation,
   useResetPasswordMutation,
 } = tenantUserApi;
+
+export const useResetUserPasswordMutation = useResetPasswordMutation;

@@ -58,10 +58,7 @@ const ChangePasswordPage: NextPage = () => {
     };
 
     try {
-      const result: any = await changePassword({
-        id: targetUserId,
-        data: payload,
-      }).unwrap();
+      const result: any = await changePassword(payload).unwrap();
 
       setSuccess(
         result?.detail ||
