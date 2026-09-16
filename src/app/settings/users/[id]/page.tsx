@@ -232,9 +232,14 @@ export default function UsersDetails() {
   };
 
   const handleResetPassword = async () => {
+    const targetUserId = userId || Number(userData?.user_id) || Number(userData?.id);
+    if (!targetUserId) {
+      statusModal.showError("Error", "User ID not found.");
+      return;
+    }
     setResetLoading(true);
     try {
-      await resetPassword({ user_id: userId, email: form.email }).unwrap();
+      await resetPassword({ user_id: targetUserId }).unwrap();
       statusModal.showSuccess(
         "Success",
         "Password reset email sent successfully!",
@@ -242,7 +247,7 @@ export default function UsersDetails() {
     } catch (err: any) {
       statusModal.showError(
         "Error",
-        err?.data?.detail || "Failed to reset password. Please try again.",
+        extractErrorMessage(err, "Failed to reset password. Please try again."),
       );
     } finally {
       setResetLoading(false);
